@@ -720,6 +720,7 @@ function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches
   const [notes, setNotes] = useState("");
   const [photos, setPhotos] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [showRulePicker, setShowRulePicker] = useState(false);
   const fileRef = useRef(null);
   const T = TYPES[type];
 
@@ -821,19 +822,14 @@ function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches
           <div>
             <Label>Rule cited</Label>
             <div className="flex gap-2">
-              <div className="relative">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono">&lt;</span>
-                <input list="rulecodes" value={code} onChange={(e) => onCode(e.target.value)} placeholder="R7" spellCheck={false}
-                  className="w-28 pl-5 pr-2 py-2.5 rounded-lg border border-slate-300 font-mono uppercase focus:outline-none focus:ring-2 focus:ring-slate-300" />
-                <datalist id="rulecodes">
-                  {(rules || []).map((r) => <option key={r.code} value={r.code}>{r.desc}</option>)}
-                  {Object.keys(knownRules).filter((c) => !ruleBook[c]).map((c) => <option key={c} value={c}>{knownRules[c]}</option>)}
-                </datalist>
-              </div>
+              <button type="button" onClick={() => setShowRulePicker(true)}
+                className="w-28 px-3 py-2.5 rounded-lg border border-slate-300 bg-white font-mono text-left hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                {code ? <span className="text-slate-900 font-semibold">{fmtRule(code)}</span> : <span className="text-slate-400 font-sans">Rule…</span>}
+              </button>
               <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What the rule covers"
                 className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">Enter the code as in the rulebook (R, G, SG, T…). Shown as {fmtRule(code || "R7")}.</p>
+            <p className="text-[11px] text-slate-400 mt-1">Tap the box to pick a rule — search by code or description.</p>
           </div>
 
           <div>
@@ -860,6 +856,67 @@ function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches
           <button onClick={onClose} className="px-4 py-3 rounded-lg border border-slate-300 bg-white font-medium text-slate-600">Cancel</button>
           <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? `${T.solid} ${T.solidHover}` : "bg-slate-300"}`}>{busy ? "Saving…" : "Save violation"}</button>
         </div>
+      </div>
+      {showRulePicker && (
+        <RulePicker rules={rules} knownRules={knownRules}
+          onPickRule={(c, d) => { setCode(c); setDesc(d || ""); setShowRulePicker(false); }}
+          onPickCustom={(c) => { setCode(c); setShowRulePicker(false); }}
+          onClose={() => setShowRulePicker(false)} />
+      )}
+    </div>
+  );
+}
+
+/* ============================ RULE PICKER ============================ */
+function RulePicker({ rules, knownRules, onPickRule, onPickCustom, onClose }) {
+  const [q, setQ] = useState("");
+  const query = q.trim();
+  const uq = query.toUpperCase();
+  const book = rules || [];
+  const bookCodes = new Set(book.map((r) => r.code));
+  const custom = Object.keys(knownRules || {}).filter((c) => !bookCodes.has(c)).map((c) => ({ code: c, desc: knownRules[c], category: "Previously used" }));
+  const all = [...book, ...custom];
+  const filtered = query ? all.filter((r) => r.code.toUpperCase().includes(uq) || (r.desc || "").toUpperCase().includes(uq)) : all;
+  const groups = [];
+  const idx = {};
+  for (const r of filtered) {
+    if (!(r.category in idx)) { idx[r.category] = groups.length; groups.push({ cat: r.category, items: [] }); }
+    groups[idx[r.category]].items.push(r);
+  }
+  const exact = all.some((r) => r.code.toUpperCase() === uq);
+  const showCustom = query && !exact;
+  return (
+    <div className="fixed inset-0 z-50 bg-white flex flex-col font-sans">
+      <div className="px-3 py-3 border-b border-slate-200 flex items-center gap-2 shrink-0">
+        <button onClick={onClose} className="text-slate-500 p-1 -ml-1"><ChevronLeft size={22} /></button>
+        <h2 className="font-bold text-slate-900">Cite a rule</h2>
+      </div>
+      <div className="p-3 border-b border-slate-100 shrink-0">
+        <div className="relative">
+          <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search code or description"
+            className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto overscroll-contain">
+        {showCustom && (
+          <button onClick={() => onPickCustom(uq.replace(/[<>]/g, ""))} className="w-full text-left px-4 py-3 border-b border-slate-100 hover:bg-slate-50">
+            <span className="font-mono font-bold text-slate-900">Use {fmtRule(uq)}</span>
+            <span className="text-sm text-slate-500 ml-2">custom — not in the rulebook</span>
+          </button>
+        )}
+        {groups.length === 0 && !showCustom && <p className="text-center text-slate-400 py-10">No rules match.</p>}
+        {groups.map((g) => (
+          <div key={g.cat}>
+            <div className="sticky top-0 bg-slate-100 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">{g.cat}</div>
+            {g.items.map((r) => (
+              <button key={r.code} onClick={() => onPickRule(r.code, r.desc)} className="w-full text-left px-4 py-2.5 border-b border-slate-100 hover:bg-slate-50 flex gap-3 items-baseline">
+                <span className="font-mono font-bold text-slate-900 w-16 shrink-0">{fmtRule(r.code)}</span>
+                <span className="text-sm text-slate-600">{r.desc}</span>
+              </button>
+            ))}
+          </div>
+        ))}
       </div>
     </div>
   );
