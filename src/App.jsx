@@ -581,7 +581,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
       )}
 
       {logFor !== null && (
-        <LogModal teams={teams} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules}
+        <LogModal teams={teams} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules} onOpenPhoto={setLightbox}
           onSetName={() => setShowIdentity(true)} onClose={() => { setLogFor(null); setLogMatch(null); }}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await saveViolation({ ...form, team }); setLogFor(null); setLogMatch(null); }} />
       )}
@@ -611,7 +611,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
       {showShare && <ShareModal event={event} onClose={() => setShowShare(false)} />}
       {showEvent && <EventModal event={event} onSave={saveEvent} onClose={() => setShowEvent(false)} />}
       {lightbox && (
-        <div onClick={() => setLightbox(null)} className="fixed inset-0 z-40 bg-black/90 grid place-items-center p-4">
+        <div onClick={() => setLightbox(null)} className="fixed inset-0 z-[60] bg-black/90 grid place-items-center p-4">
           <img src={lightbox} alt="robot" className="max-h-full max-w-full rounded-lg" />
           <button className="absolute top-4 right-4 text-white/80 p-2"><X size={26} /></button>
         </div>
@@ -750,7 +750,7 @@ function ByRule({ viols, expandRule, setExpandRule }) {
 }
 
 /* ============================ LOG MODAL ============================ */
-function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onSetName, onClose, onSave }) {
+function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, onSetName, onClose, onSave }) {
   const ruleBook = useMemo(() => {
     const m = {}; for (const r of (rules || [])) m[r.code] = r.desc; return m;
   }, [rules]);
@@ -806,6 +806,16 @@ function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches
                 <button onClick={() => setCreatingNew(true)} className="px-3 rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 flex items-center gap-1 text-sm"><Plus size={16} /> New</button>
               </div>
             )}
+            {(() => {
+              const rk = (teams.find((t) => t.number === team)?.photoKeys) || [];
+              if (creatingNew || rk.length === 0) return null;
+              return (
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] text-slate-400">Robot on file:</span>
+                  {rk.map((k) => <Thumb key={k} pkey={k} onOpen={onOpenPhoto} />)}
+                </div>
+              );
+            })()}
           </div>
 
           <div>
