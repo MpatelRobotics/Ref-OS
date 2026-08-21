@@ -255,6 +255,8 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
   const [showEvent, setShowEvent] = useState(false);
   const [showIdentity, setShowIdentity] = useState(false);
   const [showClear, setShowClear] = useState(false);
+  const [showOnline, setShowOnline] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 
   const refresh = useCallback(async () => {
     setSyncing(true);
@@ -388,7 +390,6 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
   }, [viols]);
   const teamNameMap = useMemo(() => Object.fromEntries(teams.map((t) => [t.number, t.name])), [teams]);
   const matchNums = useMemo(() => Object.keys(matches).map(Number).sort((a, b) => a - b), [matches]);
-  const onlineCount = useMemo(() => new Set(presence.map((p) => p.name || "Ref")).size, [presence]);
 
   const exportCSV = () => {
     const rows = [["Team", "Team Name", "Match", "Type", "Rule", "Rule Description", "Notes", "Logged By", "Photos", "Time"]];
@@ -448,6 +449,10 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
               {teams.length} teams · {viols.length} violations · synced {ago(syncedAt)}
             </button>
           </div>
+          <OnlineCluster presence={presence} onClick={() => setShowOnline(true)} />
+          {rules.length > 0 && (
+            <button onClick={() => setShowRules(true)} title="Rulebook" className="p-1.5 rounded hover:bg-white/10"><BookOpen size={18} /></button>
+          )}
           <button onClick={() => setShowIdentity(true)} title="Your ref name"
             className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-full pl-1 pr-2.5 py-1">
             <span className="w-6 h-6 rounded-full bg-[#D7212B] text-white text-[11px] font-bold grid place-items-center">{meName ? initials(meName) : "?"}</span>
@@ -472,9 +477,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
           <div className="max-w-2xl mx-auto px-4 flex gap-1 overflow-x-auto">
             {[{ k: "teams", label: "Teams", Icon: Users },
               ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
-              { k: "rules", label: "By Rule", Icon: BarChart3 },
-              ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
-              { k: "online", label: `Online${onlineCount ? ` ${onlineCount}` : ""}`, Icon: Wifi }].map(({ k, label, Icon }) => (
+              { k: "rules", label: "By Rule", Icon: BarChart3 }].map(({ k, label, Icon }) => (
               <button key={k} onClick={() => { setView(k); setQuery(""); }}
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
                 <Icon size={15} /> {label}
@@ -504,10 +507,6 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
             onLogTeam={(n) => { setLogFor(n); setLogMatch(openMatch); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} />
         ) : view === "matches" ? (
           <MatchList matches={matches} teamName={teamNameMap} viols={viols} query={query} setQuery={setQuery} onOpen={setOpenMatch} />
-        ) : view === "online" ? (
-          <OnlineList presence={presence} meName={meName} />
-        ) : view === "rulebook" ? (
-          <RuleBook rules={rules} query={query} setQuery={setQuery} />
         ) : view === "teams" ? (
           <>
             {!event?.quals ? (
@@ -577,6 +576,26 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
       {showIdentity && <IdentityModal me={{ name: meName }} onSave={async (n) => { await onEditName(n); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
       {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length }} onClear={clearSelected} onClose={() => setShowClear(false)} />}
+      {showOnline && (
+        <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
+          <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 sticky top-0 bg-white">
+              <h2 className="font-bold text-slate-900 flex items-center gap-2"><Wifi size={18} /> Who's online</h2>
+              <button onClick={() => setShowOnline(false)} className="text-slate-400"><X size={22} /></button>
+            </div>
+            <div className="p-4"><OnlineList presence={presence} meName={meName} /></div>
+          </div>
+        </div>
+      )}
+      {showRules && (
+        <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col font-sans">
+          <div className="px-3 py-3 border-b border-slate-200 bg-white flex items-center gap-2 shrink-0">
+            <button onClick={() => setShowRules(false)} className="text-slate-500 p-1 -ml-1"><ChevronLeft size={22} /></button>
+            <h2 className="font-bold text-slate-900 flex items-center gap-2"><BookOpen size={18} /> Rulebook</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><RuleBook rules={rules} /></div></div>
+        </div>
+      )}
       {showShare && <ShareModal event={event} onClose={() => setShowShare(false)} />}
       {showEvent && <EventModal event={event} onSave={saveEvent} onClose={() => setShowEvent(false)} />}
       {lightbox && (
@@ -1072,15 +1091,28 @@ function EventModal({ event, onSave, onClose }) {
 
 /* ============================ MATCHES ============================ */
 function MatchList({ matches, teamName, viols, query, setQuery, onOpen }) {
+  const [field, setField] = useState("all");
   const list = Object.values(matches).sort((a, b) => a.num - b.num);
+  const fields = [...new Set(list.map((m) => m.field).filter(Boolean))].sort();
   const vcount = {};
   for (const v of viols) if (v.match && v.match.phase === "qual" && v.match.num) vcount[v.match.num] = (vcount[v.match.num] || 0) + 1;
   const q = query.trim().toUpperCase();
+  const base = field === "all" ? list : list.filter((m) => m.field === field);
   const filtered = q
-    ? list.filter((m) => String(m.num) === q || String(m.num).startsWith(q) || m.red.some((t) => t.includes(q)) || m.blue.some((t) => t.includes(q)))
-    : list;
+    ? base.filter((m) => String(m.num) === q || String(m.num).startsWith(q) || m.red.some((t) => t.includes(q)) || m.blue.some((t) => t.includes(q)))
+    : base;
   return (
     <>
+      {fields.length > 1 && (
+        <div className="flex gap-1.5 mb-3 overflow-x-auto">
+          {["all", ...fields].map((f) => (
+            <button key={f} onClick={() => setField(f)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border ${field === f ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"}`}>
+              {f === "all" ? "All fields" : f}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search match # or team"
@@ -1099,6 +1131,7 @@ function MatchList({ matches, teamName, viols, query, setQuery, onOpen }) {
                   <span className="text-slate-300 font-sans">vs</span>
                   <span className="text-blue-700 font-semibold">{m.blue.join("  ")}</span>
                 </div>
+                {m.field && <span className="text-[11px] text-slate-400 shrink-0">{m.field.replace("Field ", "F")}</span>}
                 {vcount[m.num] ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold border bg-slate-100 text-slate-600 border-slate-300 shrink-0">{vcount[m.num]}</span> : null}
                 <ChevronRight size={16} className="text-slate-300 shrink-0" />
               </button>
@@ -1240,6 +1273,22 @@ function ClearModal({ counts, onClear, onClose }) {
 }
 
 /* ============================ ONLINE (presence) ============================ */
+function OnlineCluster({ presence, onClick }) {
+  const names = [...new Set(presence.map((p) => p.name || "Ref"))];
+  const shown = names.slice(0, 3);
+  const extra = names.length - shown.length;
+  return (
+    <button onClick={onClick} title={`${names.length} online`} className="flex items-center gap-1 pl-1 pr-1.5 py-1 rounded-full hover:bg-white/10">
+      <div className="flex -space-x-2">
+        {shown.map((n) => (
+          <span key={n} className="w-6 h-6 rounded-full bg-[#D7212B] text-white text-[10px] font-bold grid place-items-center ring-2 ring-emerald-400">{initials(n)}</span>
+        ))}
+        {extra > 0 && <span className="w-6 h-6 rounded-full bg-white/20 text-white text-[10px] font-bold grid place-items-center ring-2 ring-[#0D0F32]">+{extra}</span>}
+      </div>
+    </button>
+  );
+}
+
 function OnlineList({ presence, meName }) {
   const byName = {};
   for (const p of presence) { const n = p.name || "Ref"; byName[n] = (byName[n] || 0) + 1; }
@@ -1263,7 +1312,8 @@ function OnlineList({ presence, meName }) {
 }
 
 /* ============================ RULEBOOK (reference) ============================ */
-function RuleBook({ rules, query, setQuery }) {
+function RuleBook({ rules }) {
+  const [query, setQuery] = useState("");
   if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
   const q = query.trim().toUpperCase();
   const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
