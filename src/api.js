@@ -106,6 +106,12 @@ export async function listMatches(eventId) {
   return (data || []).map((m) => ({ num: m.num, red: m.red || [], blue: m.blue || [], field: m.field || "" }));
 }
 
+/* ================= rulebook ================= */
+export async function listRules(eventId) {
+  const { data } = await supabase.from("rules").select("code,description,category,ord").eq("event_id", eventId).order("ord");
+  return (data || []).map((r) => ({ code: r.code, desc: r.description || "", category: r.category || "" }));
+}
+
 /* ================= violations ================= */
 const mapViol = (r) => ({
   id: r.id, team: r.team, type: r.type, code: r.code, desc: r.rule_desc || "",

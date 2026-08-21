@@ -170,3 +170,16 @@ alter table public.matches enable row level security;
 drop policy if exists "open rw matches" on public.matches;
 create policy "open rw matches" on public.matches for all using (true) with check (true);
 create index if not exists matches_event_idx on public.matches(event_id);
+
+-- ---------- rulebook (for the Rule-cited autocomplete) ----------
+create table if not exists public.rules (
+  event_id    uuid references public.events(id) on delete cascade,
+  code        text not null,
+  description text,
+  category    text,
+  ord         int,
+  primary key (event_id, code)
+);
+alter table public.rules enable row level security;
+drop policy if exists "open rw rules" on public.rules;
+create policy "open rw rules" on public.rules for all using (true) with check (true);

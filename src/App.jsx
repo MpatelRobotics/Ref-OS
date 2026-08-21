@@ -232,6 +232,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
   const [syncedAt, setSyncedAt] = useState(0);
   const [online, setOnline] = useState(typeof navigator === "undefined" || navigator.onLine !== false);
   const [matches, setMatches] = useState({}); // { [num]: {red:[], blue:[]} }
+  const [rules, setRules] = useState([]);      // [{ code, desc, category }]
   const pendingCount = viols.filter((v) => v._pending).length;
 
   const [lastMatch, setLastMatch] = useState(() => {
@@ -277,6 +278,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
       api.listMatches(eventId).then((list) => {
         const map = {}; for (const m of list) map[m.num] = m; setMatches(map);
       });
+      api.listRules(eventId).then(setRules);
       // restore violations still waiting in the queue (e.g. after a reload while offline)
       const q = await outbox.loadQueue(eventId);
       const pend = q.filter((o) => o.kind === "violation").map((o) => ({
@@ -554,7 +556,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
       )}
 
       {logFor !== null && (
-        <LogModal teams={teams} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch}
+        <LogModal teams={teams} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules}
           onSetName={() => setShowIdentity(true)} onClose={() => { setLogFor(null); setLogMatch(null); }}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await saveViolation({ ...form, team }); setLogFor(null); setLogMatch(null); }} />
       )}
@@ -702,7 +704,10 @@ function ByRule({ viols, expandRule, setExpandRule }) {
 }
 
 /* ============================ LOG MODAL ============================ */
-function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, onSetName, onClose, onSave }) {
+function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onSetName, onClose, onSave }) {
+  const ruleBook = useMemo(() => {
+    const m = {}; for (const r of (rules || [])) m[r.code] = r.desc; return m;
+  }, [rules]);
   const [team, setTeam] = useState(presetTeam || (teams[0]?.number ?? ""));
   const [creatingNew, setCreatingNew] = useState(teams.length === 0);
   const [newNumber, setNewNumber] = useState("");
@@ -718,7 +723,7 @@ function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches
   const fileRef = useRef(null);
   const T = TYPES[type];
 
-  const onCode = (val) => { setCode(val); const clean = normNum(val).replace(/[<>]/g, ""); if (knownRules[clean] && !desc) setDesc(knownRules[clean]); };
+  const onCode = (val) => { setCode(val); const clean = normNum(val).replace(/[<>]/g, ""); const d = ruleBook[clean] || knownRules[clean]; if (d && !desc) setDesc(d); };
   const addPhotos = async (files) => { const list = Array.from(files).slice(0, 4); const out = []; for (const f of list) { try { out.push(await compress(f)); } catch {} } setPhotos((p) => [...p, ...out].slice(0, 6)); };
   const valid = (creatingNew ? newNumber.trim() : team) && (code.trim() || desc.trim());
   const submit = async () => { if (!valid || busy) return; setBusy(true); try { await onSave({ team: creatingNew ? "" : team, newNumber, newName, type, code, desc, notes, photos, match: { phase: matchPhase, num: matchNum } }); } catch (e) { alert("Could not save: " + (e.message || e)); setBusy(false); } };
@@ -820,7 +825,10 @@ function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches
                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono">&lt;</span>
                 <input list="rulecodes" value={code} onChange={(e) => onCode(e.target.value)} placeholder="R7" spellCheck={false}
                   className="w-28 pl-5 pr-2 py-2.5 rounded-lg border border-slate-300 font-mono uppercase focus:outline-none focus:ring-2 focus:ring-slate-300" />
-                <datalist id="rulecodes">{Object.keys(knownRules).map((c) => <option key={c} value={c} />)}</datalist>
+                <datalist id="rulecodes">
+                  {(rules || []).map((r) => <option key={r.code} value={r.code}>{r.desc}</option>)}
+                  {Object.keys(knownRules).filter((c) => !ruleBook[c]).map((c) => <option key={c} value={c}>{knownRules[c]}</option>)}
+                </datalist>
               </div>
               <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What the rule covers"
                 className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
