@@ -230,6 +230,22 @@ export function subscribeEvent(eventId, onChange) {
 }
 
 /* live presence — who's currently on the log. onChange gets an array of {name, ...} */
+export async function listRefRoster(eventId) {
+  const { data, error } = await supabase.from("ref_roster").select("name,last_seen").eq("event_id", eventId).order("name");
+  if (error) { console.warn("Could not load ref roster", error); return []; }
+  return (data || []).map((r) => ({ name: r.name, lastSeen: r.last_seen ? new Date(r.last_seen).getTime() : 0 }));
+}
+
+export async function touchRefRoster(eventId, name) {
+  const clean = (name || "Ref").trim();
+  if (!clean) return;
+  const { error } = await supabase.from("ref_roster").upsert(
+    { event_id: eventId, name: clean, last_seen: new Date().toISOString() },
+    { onConflict: "event_id,name" }
+  );
+  if (error) console.warn("Could not update ref roster", error);
+}
+
 export function joinPresence(eventId, meta, onChange) {
   const key = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
   const ch = supabase.channel(`presence-${eventId}`, { config: { presence: { key } } });

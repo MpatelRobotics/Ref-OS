@@ -234,6 +234,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
   const [matches, setMatches] = useState({}); // { [num]: {red:[], blue:[]} }
   const [rules, setRules] = useState([]);      // [{ code, desc, category }]
   const [presence, setPresence] = useState([]); // [{ name, ... }] currently online
+  const [refRoster, setRefRoster] = useState([]); // refs seen at this event, including offline
   const pendingCount = viols.filter((v) => v._pending).length;
 
   const [lastMatch, setLastMatch] = useState(() => {
@@ -311,8 +312,12 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
   }, [eventId, refresh, doFlush]);
 
   useEffect(() => {
-    const leave = api.joinPresence(eventId, { name: meName || "Ref", online_at: Date.now() }, setPresence);
-    return leave;
+    const name = meName || "Ref";
+    const loadRoster = () => api.listRefRoster(eventId).then(setRefRoster);
+    api.touchRefRoster(eventId, name).then(loadRoster);
+    const leave = api.joinPresence(eventId, { name, online_at: Date.now() }, setPresence);
+    const iv = setInterval(() => { api.touchRefRoster(eventId, name); loadRoster(); }, 60000);
+    return () => { clearInterval(iv); leave(); };
   }, [eventId, meName]);
 
   const saveEvent = async (data) => {
@@ -486,6 +491,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
             {menu && (
               <div className="absolute right-0 mt-2 w-56 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 py-1 text-sm">
                 <button onClick={() => { setMenu(false); setShowEvent(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><CalendarDays size={16} /> Event setup</button>
+                <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Users size={16} /> Ref status</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
                 <button onClick={exportCSV} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Download size={16} /> Export CSV</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
@@ -613,10 +619,10 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
         <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
           <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 sticky top-0 bg-white">
-              <h2 className="font-bold text-slate-900 flex items-center gap-2"><Wifi size={18} /> Who's online</h2>
+              <h2 className="font-bold text-slate-900 flex items-center gap-2"><Users size={18} /> Ref status</h2>
               <button onClick={() => setShowOnline(false)} className="text-slate-400"><X size={22} /></button>
             </div>
-            <div className="p-4"><OnlineList presence={presence} meName={meName} /></div>
+            <div className="p-4"><OnlineList presence={presence} roster={refRoster} meName={meName} /></div>
           </div>
         </div>
       )}
@@ -1394,23 +1400,37 @@ function OnlineCluster({ presence, onClick }) {
   );
 }
 
-function OnlineList({ presence, meName }) {
-  const byName = {};
-  for (const p of presence) { const n = p.name || "Ref"; byName[n] = (byName[n] || 0) + 1; }
-  const names = Object.keys(byName).sort((a, b) => a.localeCompare(b));
+function OnlineList({ presence, roster, meName }) {
+  const onlineCounts = {};
+  for (const p of presence) { const n = p.name || "Ref"; onlineCounts[n] = (onlineCounts[n] || 0) + 1; }
+  const all = new Map((roster || []).map((r) => [r.name, r]));
+  Object.keys(onlineCounts).forEach((name) => { if (!all.has(name)) all.set(name, { name, lastSeen: Date.now() }); });
+  const refs = [...all.values()].sort((a, b) => {
+    const ao = !!onlineCounts[a.name], bo = !!onlineCounts[b.name];
+    return Number(bo) - Number(ao) || a.name.localeCompare(b.name);
+  });
+  const onlineTotal = refs.filter((r) => onlineCounts[r.name]).length;
   return (
     <>
-      <p className="text-xs text-slate-400 mb-3">{names.length} ref{names.length !== 1 ? "s" : ""} on the log right now. Updates live as people join or leave.</p>
+      <p className="text-xs text-slate-400 mb-3">{onlineTotal} online · {Math.max(0, refs.length - onlineTotal)} offline. Status updates live as refs join or leave.</p>
       <ul className="space-y-2">
-        {names.map((n) => (
-          <li key={n} className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3">
-            <span className="w-8 h-8 rounded-full bg-[#D7212B] text-white text-xs font-bold grid place-items-center shrink-0">{initials(n)}</span>
-            <span className="font-medium text-slate-800 truncate">{n}{n === meName && <span className="text-xs text-slate-400 ml-1">(you)</span>}</span>
-            <span className="ml-auto inline-flex items-center gap-1 text-xs text-emerald-600 shrink-0">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" /> online{byName[n] > 1 ? ` · ${byName[n]} devices` : ""}
-            </span>
-          </li>
-        ))}
+        {refs.map((r) => {
+          const isOnline = !!onlineCounts[r.name];
+          return (
+            <li key={r.name} className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3">
+              <span className={`w-8 h-8 rounded-full text-white text-xs font-bold grid place-items-center shrink-0 ${isOnline ? "bg-[#D7212B]" : "bg-slate-400"}`}>{initials(r.name)}</span>
+              <div className="min-w-0">
+                <span className="font-medium text-slate-800 truncate">{r.name}{r.name === meName && <span className="text-xs text-slate-400 ml-1">(you)</span>}</span>
+                {!isOnline && r.lastSeen > 0 && <div className="text-[11px] text-slate-400">last seen {ago(r.lastSeen)}</div>}
+              </div>
+              <span className={`ml-auto inline-flex items-center gap-1 text-xs shrink-0 ${isOnline ? "text-emerald-600" : "text-slate-400"}`}>
+                <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500" : "bg-slate-300"}`} />
+                {isOnline ? `online${onlineCounts[r.name] > 1 ? ` · ${onlineCounts[r.name]} devices` : ""}` : "offline"}
+              </span>
+            </li>
+          );
+        })}
+        {refs.length === 0 && <li className="text-sm text-slate-400 text-center py-6">No refs have joined this event yet.</li>}
       </ul>
     </>
   );
