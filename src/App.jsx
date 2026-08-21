@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert,
   ClipboardCheck, X, Search, BarChart3, Users, Download,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -473,6 +473,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
             {[{ k: "teams", label: "Teams", Icon: Users },
               ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
               { k: "rules", label: "By Rule", Icon: BarChart3 },
+              ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
               { k: "online", label: `Online${onlineCount ? ` ${onlineCount}` : ""}`, Icon: Wifi }].map(({ k, label, Icon }) => (
               <button key={k} onClick={() => { setView(k); setQuery(""); }}
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
@@ -505,6 +506,8 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
           <MatchList matches={matches} teamName={teamNameMap} viols={viols} query={query} setQuery={setQuery} onOpen={setOpenMatch} />
         ) : view === "online" ? (
           <OnlineList presence={presence} meName={meName} />
+        ) : view === "rulebook" ? (
+          <RuleBook rules={rules} query={query} setQuery={setQuery} />
         ) : view === "teams" ? (
           <>
             {!event?.quals ? (
@@ -1255,6 +1258,47 @@ function OnlineList({ presence, meName }) {
           </li>
         ))}
       </ul>
+    </>
+  );
+}
+
+/* ============================ RULEBOOK (reference) ============================ */
+function RuleBook({ rules, query, setQuery }) {
+  if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
+  const q = query.trim().toUpperCase();
+  const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
+  const groups = [];
+  const idx = {};
+  for (const r of filtered) {
+    if (!(r.category in idx)) { idx[r.category] = groups.length; groups.push({ cat: r.category, items: [] }); }
+    groups[idx[r.category]].items.push(r);
+  }
+  return (
+    <>
+      <div className="relative mb-4">
+        <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search rules — code or wording"
+          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+      </div>
+      {groups.length === 0 ? (
+        <Empty title="No rules match" sub="Try a different word or code." />
+      ) : (
+        <div className="space-y-4">
+          {groups.map((g) => (
+            <div key={g.cat}>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">{g.cat}</h2>
+              <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+                {g.items.map((r) => (
+                  <div key={r.code} className="px-4 py-2.5 flex gap-3 items-baseline">
+                    <span className="font-mono font-bold text-slate-900 w-16 shrink-0">{fmtRule(r.code)}</span>
+                    <span className="text-sm text-slate-600">{r.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
