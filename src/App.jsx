@@ -390,7 +390,15 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           {openTeam ? (
             <button onClick={() => setOpenTeam(null)} className="p-1 -ml-1 rounded hover:bg-white/10"><ChevronLeft size={22} /></button>
-          ) : (<img src="/logo.svg" alt="Highlander Summit" className="h-9 w-9 object-contain shrink-0" />)}
+          ) : (
+            <div className="flex items-center gap-2 shrink-0">
+              <img src="/logo.svg" alt="Highlander Summit" className="h-9 w-9 object-contain" />
+              <div className="leading-tight hidden sm:block">
+                <div className="font-bold text-[13px] text-white">Ref-OS</div>
+                <div className="text-[9px] text-slate-400">Referee Operating System</div>
+              </div>
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-start gap-1.5 flex-wrap">
               <h1 className="font-bold tracking-tight leading-tight text-[15px] sm:text-base line-clamp-2">{event?.name || "Violation Log"}</h1>
@@ -409,7 +417,6 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-slate-400 leading-tight mt-0.5"><span className="font-semibold text-slate-300">Ref-OS</span>: Referee Operating System</p>
             <button onClick={() => { refresh(); doFlush(); }} className="text-[11px] text-slate-400 leading-tight mt-0.5 flex items-center gap-1 hover:text-slate-200">
               <RefreshCw size={10} className={syncing ? "animate-spin" : ""} />
               {teams.length} teams · {viols.length} violations · synced {ago(syncedAt)}
