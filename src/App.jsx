@@ -637,12 +637,13 @@ function TeamDetail({ team, viols, onLog, onDeleteViolation, onDeleteTeam, onOpe
   );
 }
 
-function ViolationCard({ v, onDelete, onOpenPhoto }) {
+function ViolationCard({ v, onDelete, onOpenPhoto, showTeam }) {
   const T = TYPES[v.type];
   return (
     <li className={`rounded-xl border p-3 ${T.soft}`}>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border ${T.badge}`}><T.Icon size={12} /> {T.label}</span>
+        {showTeam && <span className="font-mono font-bold text-slate-900 bg-slate-200 px-1.5 py-0.5 rounded-md text-sm">{v.team}</span>}
         <span className="font-mono font-bold text-slate-900">{fmtRule(v.code)}</span>
         {fmtMatch(v.match) && <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-700">{fmtMatch(v.match)}</span>}
         {v._pending && <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-300"><RefreshCw size={9} className="animate-spin" /> Saving</span>}
@@ -1182,7 +1183,7 @@ function MatchDetail({ num, match, teamName, viols, allNums, onNav, onLogTeam, o
       {mv.length === 0 ? (
         <Empty title="No violations logged" sub="Tap a team above to log one for this match." />
       ) : (
-        <ul className="space-y-2">{mv.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} />)}</ul>
+        <ul className="space-y-2">{mv.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} showTeam />)}</ul>
       )}
     </>
   );
