@@ -410,6 +410,10 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
     }
   };
   const deleteTeam = async (num) => {
+    if (!adminUnlocked) {
+      requireAdmin(() => deleteTeam(num));
+      return;
+    }
     try { await api.deleteTeam(eventId, num); }
     catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to delete a team."); return; } throw e; }
     setViols((cur) => cur.filter((v) => v.team !== num));
@@ -565,7 +569,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
       <main className="max-w-2xl mx-auto px-4 pb-28 pt-4">
         {openTeam ? (
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)}
-            onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} onOpenPhoto={setLightbox} />
+            onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} onOpenPhoto={setLightbox} />
         ) : openMatch ? (
           <MatchDetail num={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols} allNums={matchNums} onNav={setOpenMatch}
             onLogTeam={(n) => { setLogFor(n); setLogMatch(openMatch); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} />
@@ -683,7 +687,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
 }
 
 /* ============================ TEAM DETAIL ============================ */
-function TeamDetail({ team, viols, onLog, onDeleteViolation, onEditViolation, onDeleteTeam, onOpenPhoto }) {
+function TeamDetail({ team, viols, onLog, onDeleteViolation, onEditViolation, onDeleteTeam, canDeleteTeam, onOpenPhoto }) {
   if (!team) return null;
   const sorted = [...viols].sort((a, b) => b.createdAt - a.createdAt);
   const byRule = useMemo(() => {
@@ -704,7 +708,15 @@ function TeamDetail({ team, viols, onLog, onDeleteViolation, onEditViolation, on
             <div className="font-mono font-bold text-2xl text-slate-900 leading-none">{team.number}</div>
             {team.name && <div className="text-sm text-slate-500 mt-1">{team.name}</div>}
           </div>
-          <button onClick={() => { if (confirm(`Delete team ${team.number} and all its violations?`)) onDeleteTeam(team.number); }} className="text-slate-400 hover:text-red-600 p-1"><Trash2 size={18} /></button>
+          {canDeleteTeam && (
+            <button
+              onClick={() => { if (confirm(`Delete team ${team.number} and all its violations?`)) onDeleteTeam(team.number); }}
+              className="text-slate-400 hover:text-red-600 p-1"
+              title="Delete team (admin only)"
+            >
+              <Trash2 size={18} />
+            </button>
+          )}
         </div>
         <button onClick={onLog} className="mt-4 w-full bg-[#D7212B] text-white py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-[#B42024]"><Plus size={18} /> Log violation for {team.number}</button>
       </div>
