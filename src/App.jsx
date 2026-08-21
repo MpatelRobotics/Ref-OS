@@ -392,19 +392,19 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
             <button onClick={() => setOpenTeam(null)} className="p-1 -ml-1 rounded hover:bg-white/10"><ChevronLeft size={22} /></button>
           ) : (<img src="/logo.svg" alt="Highlander Summit" className="h-9 w-9 object-contain shrink-0" />)}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-bold tracking-tight leading-none truncate">{event?.name || "Violation Log"}</h1>
+            <div className="flex items-start gap-1.5 flex-wrap">
+              <h1 className="font-bold tracking-tight leading-tight text-[15px] sm:text-base line-clamp-2">{event?.name || "Violation Log"}</h1>
               {online ? (
-                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-300 bg-emerald-900/40 px-1.5 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-300 bg-emerald-900/40 px-1.5 py-0.5 rounded-full shrink-0 mt-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> live
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 text-[10px] text-amber-300 bg-amber-900/40 px-1.5 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 text-[10px] text-amber-300 bg-amber-900/40 px-1.5 py-0.5 rounded-full shrink-0 mt-0.5">
                   <CloudOff size={10} /> offline
                 </span>
               )}
               {pendingCount > 0 && (
-                <span className="inline-flex items-center gap-1 text-[10px] text-amber-200 bg-amber-900/40 px-1.5 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 text-[10px] text-amber-200 bg-amber-900/40 px-1.5 py-0.5 rounded-full shrink-0 mt-0.5">
                   <RefreshCw size={9} className="animate-spin" /> {pendingCount} pending
                 </span>
               )}
