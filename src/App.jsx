@@ -597,12 +597,12 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
       )}
 
       {logFor !== null && (
-        <LogModal teams={teams} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules} onOpenPhoto={setLightbox}
+        <LogModal teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules} onOpenPhoto={setLightbox}
           onSetName={() => setShowIdentity(true)} onClose={() => { setLogFor(null); setLogMatch(null); }}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await saveViolation({ ...form, team }); setLogFor(null); setLogMatch(null); }} />
       )}
       {editing && (
-        <LogModal teams={teams} presetTeam={editing.team} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} rules={rules} onOpenPhoto={setLightbox} edit={editing}
+        <LogModal teams={teams} viols={viols} presetTeam={editing.team} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} rules={rules} onOpenPhoto={setLightbox} edit={editing}
           onSetName={() => setShowIdentity(true)} onClose={() => setEditing(null)}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await editViolation(editing, { ...form, team }); setEditing(null); }} />
       )}
@@ -773,7 +773,7 @@ function ByRule({ viols, expandRule, setExpandRule }) {
 }
 
 /* ============================ LOG MODAL ============================ */
-function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, edit, onSetName, onClose, onSave }) {
+function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, edit, onSetName, onClose, onSave }) {
   const ruleBook = useMemo(() => {
     const m = {}; for (const r of (rules || [])) m[r.code] = r.desc; return m;
   }, [rules]);
@@ -791,13 +791,39 @@ function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches
   const [keepKeys, setKeepKeys] = useState((edit && edit.photoKeys) || []);
   const [busy, setBusy] = useState(false);
   const [showRulePicker, setShowRulePicker] = useState(false);
+  const [repeatWarning, setRepeatWarning] = useState(null);
   const fileRef = useRef(null);
   const T = TYPES[type];
 
   const onCode = (val) => { setCode(val); const clean = normNum(val).replace(/[<>]/g, ""); const d = ruleBook[clean] || knownRules[clean]; if (d && !desc) setDesc(d); };
   const addPhotos = async (files) => { const list = Array.from(files).slice(0, 4); const out = []; for (const f of list) { try { out.push(await compress(f)); } catch {} } setPhotos((p) => [...p, ...out].slice(0, 6)); };
   const valid = (creatingNew ? newNumber.trim() : team) && (code.trim() || desc.trim());
-  const submit = async () => { if (!valid || busy) return; setBusy(true); try { await onSave({ team: creatingNew ? "" : team, newNumber, newName, type, code, desc, notes, photos, keepKeys, match: { phase: matchPhase, num: matchNum } }); } catch (e) { alert("Could not save: " + (e.message || e)); setBusy(false); } };
+  const doSave = async () => {
+    setBusy(true);
+    try {
+      await onSave({ team: creatingNew ? "" : team, newNumber, newName, type, code, desc, notes, photos, keepKeys, match: { phase: matchPhase, num: matchNum } });
+    } catch (e) {
+      alert("Could not save: " + (e.message || e));
+      setBusy(false);
+    }
+  };
+  const submit = async () => {
+    if (!valid || busy) return;
+    const selectedTeam = normNum(creatingNew ? newNumber : team);
+    const selectedRule = normNum(code).replace(/[<>]/g, "");
+    if (!edit && type === "minor" && selectedTeam && selectedRule) {
+      const priorMinors = (viols || []).filter((v) =>
+        v.type === "minor" &&
+        normNum(v.team) === selectedTeam &&
+        normNum(v.code).replace(/[<>]/g, "") === selectedRule
+      ).length;
+      if (priorMinors >= 3) {
+        setRepeatWarning({ team: selectedTeam, rule: selectedRule, count: priorMinors });
+        return;
+      }
+    }
+    await doSave();
+  };
 
   return (
     <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
@@ -943,6 +969,23 @@ function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches
           <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? `${T.solid} ${T.solidHover}` : "bg-slate-300"}`}>{busy ? "Saving…" : edit ? "Save changes" : "Save violation"}</button>
         </div>
       </div>
+      {repeatWarning && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden">
+            <div className="p-5">
+              <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 grid place-items-center mb-3"><ShieldAlert size={26} /></div>
+              <h3 className="text-lg font-bold text-slate-900">Possible Major Violation</h3>
+              <p className="text-sm text-slate-600 mt-2">Team <b className="font-mono text-slate-900">{repeatWarning.team}</b> already has <b>{repeatWarning.count} Minor Violations</b> for <b className="font-mono text-slate-900">{fmtRule(repeatWarning.rule)}</b>.</p>
+              <p className="text-sm text-slate-600 mt-2">Because this rule is being violated repeatedly, consider whether this should be recorded as a Major Violation before saving.</p>
+            </div>
+            <div className="border-t border-slate-200 p-3 flex flex-col gap-2">
+              <button onClick={() => { setType("major"); setRepeatWarning(null); }} className="w-full py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold">Change to Major</button>
+              <button onClick={() => { setRepeatWarning(null); doSave(); }} className="w-full py-2.5 rounded-lg border border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-50">Save as Minor anyway</button>
+              <button onClick={() => setRepeatWarning(null)} className="w-full py-2 text-sm text-slate-500 hover:text-slate-700">Review violation</button>
+            </div>
+          </div>
+        </div>
+      )}
       {showRulePicker && (
         <RulePicker rules={rules} knownRules={knownRules}
           onPickRule={(c, d) => { setCode(c); setDesc(d || ""); setShowRulePicker(false); }}
