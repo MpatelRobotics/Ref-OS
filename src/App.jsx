@@ -381,6 +381,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
     const m = {}; for (const v of viols) if (v.code && !m[v.code]) m[v.code] = v.desc || ""; return m;
   }, [viols]);
   const teamNameMap = useMemo(() => Object.fromEntries(teams.map((t) => [t.number, t.name])), [teams]);
+  const matchNums = useMemo(() => Object.keys(matches).map(Number).sort((a, b) => a - b), [matches]);
 
   const exportCSV = () => {
     const rows = [["Team", "Team Name", "Match", "Type", "Rule", "Rule Description", "Notes", "Logged By", "Photos", "Time"]];
@@ -490,7 +491,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)}
             onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onDeleteTeam={deleteTeam} onOpenPhoto={setLightbox} />
         ) : openMatch ? (
-          <MatchDetail num={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols}
+          <MatchDetail num={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols} allNums={matchNums} onNav={setOpenMatch}
             onLogTeam={(n) => { setLogFor(n); setLogMatch(openMatch); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} />
         ) : view === "matches" ? (
           <MatchList matches={matches} teamName={teamNameMap} viols={viols} query={query} setQuery={setQuery} onOpen={setOpenMatch} />
@@ -1095,8 +1096,12 @@ function MatchList({ matches, teamName, viols, query, setQuery, onOpen }) {
   );
 }
 
-function MatchDetail({ num, match, teamName, viols, onLogTeam, onOpenPhoto, onDeleteViolation }) {
+function MatchDetail({ num, match, teamName, viols, allNums, onNav, onLogTeam, onOpenPhoto, onDeleteViolation }) {
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
+  const nums = allNums || [num];
+  const idx = nums.indexOf(num);
+  const prev = idx > 0 ? nums[idx - 1] : null;
+  const next = idx >= 0 && idx < nums.length - 1 ? nums[idx + 1] : null;
   const mv = viols.filter((v) => v.match && v.match.phase === "qual" && String(v.match.num) === String(num)).sort((a, b) => b.createdAt - a.createdAt);
   const Alliance = ({ label, teams, color }) => (
     <div className={`rounded-xl border p-3 ${color === "red" ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"}`}>
@@ -1115,8 +1120,24 @@ function MatchDetail({ num, match, teamName, viols, onLogTeam, onOpenPhoto, onDe
   return (
     <>
       <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
-        <div className="font-mono font-bold text-2xl text-slate-900 leading-none">Q{num}</div>
-        {match.field && <div className="text-sm text-slate-500 mt-1">{match.field}</div>}
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <div className="font-mono font-bold text-2xl text-slate-900 leading-none">Q{num}</div>
+            {match.field && <div className="text-sm text-slate-500 mt-1">{match.field}</div>}
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => prev && onNav(prev)} disabled={!prev} title="Previous match"
+              className={`p-2 rounded-lg border ${prev ? "border-slate-300 text-slate-600 hover:bg-slate-50" : "border-slate-200 text-slate-300"}`}><ChevronLeft size={18} /></button>
+            <button onClick={() => next && onNav(next)} disabled={!next}
+              className={`px-3 py-2 rounded-lg font-semibold text-sm flex items-center gap-1 ${next ? "bg-[#D7212B] text-white hover:bg-[#B42024]" : "bg-slate-200 text-slate-400"}`}>Next <ChevronRight size={16} /></button>
+          </div>
+        </div>
+        {nums.length > 1 && (
+          <select value={num} onChange={(e) => onNav(Number(e.target.value))}
+            className="w-full mt-3 px-3 py-2 rounded-lg border border-slate-300 bg-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
+            {nums.map((n) => <option key={n} value={n}>Jump to Q{n}</option>)}
+          </select>
+        )}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
         <Alliance label="Red alliance" teams={match.red} color="red" />
