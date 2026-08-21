@@ -1,0 +1,939 @@
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import {
+  Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert,
+  ClipboardCheck, X, Search, BarChart3, Users, Download, Flag,
+  Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload,
+} from "lucide-react";
+import { configured } from "./supabaseClient";
+import * as api from "./api";
+import * as outbox from "./outbox";
+
+/* This build is locked to one event: The Highlander Summit Signature Event.
+   EVENT_ID must match supabase/seed.sql. A shared site password gates entry. */
+const EVENT_ID = "11111111-1111-4111-8111-111111111111";
+const SITE_PASSWORD = import.meta.env.VITE_SITE_PASSWORD || "";
+
+/* ---------- helpers ---------- */
+const normNum = (n) => (n || "").trim().toUpperCase();
+const initials = (name) =>
+  (name || "").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 3).toUpperCase() || "?";
+
+function compress(file, maxDim = 1200, quality = 0.6) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        let { width: w, height: h } = img;
+        if (w > h && w > maxDim) { h = Math.round((h * maxDim) / w); w = maxDim; }
+        else if (h > maxDim) { w = Math.round((w * maxDim) / h); h = maxDim; }
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        c.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(c.toDataURL("image/jpeg", quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+const TYPES = {
+  minor: { label: "Minor", Icon: AlertTriangle,
+    badge: "bg-amber-100 text-amber-800 border-amber-300", dot: "bg-amber-500",
+    solid: "bg-amber-500", solidHover: "hover:bg-amber-600", soft: "bg-amber-50 border-amber-200", text: "text-amber-700" },
+  major: { label: "Major", Icon: ShieldAlert,
+    badge: "bg-red-100 text-red-800 border-red-300", dot: "bg-red-500",
+    solid: "bg-red-600", solidHover: "hover:bg-red-700", soft: "bg-red-50 border-red-200", text: "text-red-700" },
+  inspection: { label: "Inspection", Icon: ClipboardCheck,
+    badge: "bg-blue-100 text-blue-800 border-blue-300", dot: "bg-blue-500",
+    solid: "bg-blue-600", solidHover: "hover:bg-blue-700", soft: "bg-blue-50 border-blue-200", text: "text-blue-700" },
+};
+const ORDER = ["minor", "major", "inspection"];
+
+const MATCH_PHASES = [
+  { key: "qual", label: "Qualification", abbrev: "Q" },
+  { key: "practice", label: "Practice", abbrev: "P" },
+  { key: "r16", label: "Round of 16", abbrev: "R16" },
+  { key: "qf", label: "Quarterfinal", abbrev: "QF" },
+  { key: "sf", label: "Semifinal", abbrev: "SF" },
+  { key: "final", label: "Final", abbrev: "F" },
+  { key: "skills", label: "Skills", abbrev: "Skills" },
+  { key: "none", label: "Not tied to a match", abbrev: "" },
+];
+const fmtMatch = (m) => {
+  if (!m || !m.phase || m.phase === "none") return null;
+  const p = MATCH_PHASES.find((x) => x.key === m.phase);
+  if (!p) return null;
+  const num = (m.num || "").trim();
+  if (m.phase === "skills") return num ? `Skills ${num}` : "Skills";
+  if (!num) return p.abbrev;
+  return /\d$/.test(p.abbrev) ? `${p.abbrev}-${num}` : `${p.abbrev}${num}`;
+};
+const elimCounts = (bracket) => {
+  switch (Number(bracket)) {
+    case 16: return { r16: 8, qf: 4, sf: 2 };
+    case 8:  return { qf: 4, sf: 2 };
+    case 4:  return { sf: 2 };
+    default: return {};
+  }
+};
+const phaseCount = (phase, event) => {
+  if (!event) return null;
+  if (phase === "qual") return event.quals > 0 ? event.quals : null;
+  if (phase === "practice") return event.practice > 0 ? event.practice : null;
+  if (phase === "final") return event.bracket ? (event.finalsBestOf || 1) : null;
+  const ec = elimCounts(event.bracket);
+  return phase in ec ? ec[phase] : null;
+};
+const availablePhases = (event) => MATCH_PHASES.filter((p) => {
+  if (["qual", "practice", "skills", "none", "final"].includes(p.key)) return true;
+  if (!event?.bracket) return true;
+  return p.key in elimCounts(event.bracket);
+});
+
+const fmtRule = (code) => { const c = (code || "").trim().replace(/[<>]/g, "").toUpperCase(); return c ? `<${c}>` : "—"; };
+const fmtTime = (ts) => new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const ago = (ts) => {
+  if (!ts) return "";
+  const s = Math.round((Date.now() - ts) / 1000);
+  if (s < 5) return "just now";
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  return `${Math.round(s / 3600)}h ago`;
+};
+
+/* ---------- lazy photo thumbnail (signed URL from Supabase Storage) ---------- */
+function Thumb({ pkey, onOpen }) {
+  const [src, setSrc] = useState(null);
+  const [gone, setGone] = useState(false);
+  useEffect(() => {
+    let live = true;
+    api.photoUrl(pkey).then((u) => { if (live) { u ? setSrc(u) : setGone(true); } });
+    return () => { live = false; };
+  }, [pkey]);
+  if (gone) return <div className="w-16 h-16 rounded-lg bg-slate-100 border border-slate-200 grid place-items-center text-slate-300"><ImageOff size={18} /></div>;
+  if (!src) return <div className="w-16 h-16 rounded-lg bg-slate-100 border border-slate-200 animate-pulse" />;
+  return (
+    <button onClick={() => onOpen(src)} className="shrink-0">
+      <img src={src} alt="robot" className="w-16 h-16 rounded-lg object-cover border border-slate-200" />
+    </button>
+  );
+}
+
+/* ==================================================================== */
+/*  ROOT: auth -> event selection -> tracker                            */
+/* ==================================================================== */
+export default function App() {
+  const [unlocked, setUnlocked] = useState(() => localStorage.getItem("unlocked") === "1");
+  const [meName, setMeName] = useState(() => localStorage.getItem("refName") || "");
+  const [event, setEvent] = useState(null);
+  const [loadErr, setLoadErr] = useState(false);
+
+  useEffect(() => {
+    if (!unlocked || !meName) return;
+    let live = true; setLoadErr(false);
+    api.getEvent(EVENT_ID).then((ev) => { if (live) { ev ? setEvent(ev) : setLoadErr(true); } });
+    return () => { live = false; };
+  }, [unlocked, meName]);
+
+  const unlock = () => { localStorage.setItem("unlocked", "1"); setUnlocked(true); };
+  const saveName = (n) => { localStorage.setItem("refName", n.trim()); setMeName(n.trim()); };
+  const lock = () => { localStorage.removeItem("unlocked"); setUnlocked(false); setEvent(null); };
+
+  if (!configured) return <ConfigError />;
+  if (!unlocked) return <PasswordScreen onUnlock={unlock} />;
+  if (!meName) return <NameScreen onName={saveName} />;
+  if (loadErr) return (
+    <FullPage>
+      <div className="max-w-sm">
+        <p className="font-semibold text-slate-700">Couldn't load the event</p>
+        <p className="text-sm mt-1">Make sure <code>schema.sql</code> and <code>seed.sql</code> have been run in Supabase, then reload.</p>
+      </div>
+    </FullPage>
+  );
+  if (!event) return <FullPage>Loading…</FullPage>;
+
+  return <Tracker key={event.id} initialEvent={event} meName={meName} onEditName={saveName} onLock={lock} />;
+}
+
+const FullPage = ({ children }) => (
+  <div className="min-h-screen grid place-items-center bg-slate-100 text-slate-400 font-sans p-6 text-center">{children}</div>
+);
+const ConfigError = () => (
+  <FullPage>
+    <div className="max-w-sm">
+      <p className="font-semibold text-slate-700">Not configured yet</p>
+      <p className="text-sm mt-1">Copy <code>.env.example</code> to <code>.env</code> and add your Supabase URL and anon key, then restart.</p>
+    </div>
+  </FullPage>
+);
+
+/* ---------------------- PASSWORD GATE ---------------------- */
+function PasswordScreen({ onUnlock }) {
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
+  const submit = () => {
+    if (!SITE_PASSWORD) { setErr("Site password isn't set. Add VITE_SITE_PASSWORD to the environment."); return; }
+    if (pw === SITE_PASSWORD) onUnlock(); else setErr("Incorrect password.");
+  };
+  return (
+    <div className="min-h-screen bg-slate-900 text-white grid place-items-center p-6 font-sans">
+      <div className="w-full max-w-sm">
+        <div className="flex items-center gap-2 mb-6"><Flag className="text-amber-400" /> <span className="font-bold text-lg">Highlander Summit — Violation Log</span></div>
+        <p className="text-sm text-slate-400 mb-4">Enter the crew password to open the log.</p>
+        <input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} placeholder="Password" autoFocus
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          className="w-full px-3 py-3 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+        {err && <p className="text-sm text-red-400 mt-2">{err}</p>}
+        <button onClick={submit} disabled={!pw}
+          className="w-full mt-3 py-3 rounded-lg font-semibold bg-amber-400 text-slate-900 disabled:bg-slate-700 disabled:text-slate-500">Enter</button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------- NAME (ref identity) ---------------------- */
+function NameScreen({ onName }) {
+  const [name, setName] = useState("");
+  return (
+    <div className="min-h-screen bg-slate-100 grid place-items-center p-6 font-sans">
+      <div className="w-full max-w-sm bg-white rounded-2xl border border-slate-200 p-5">
+        <div className="flex items-center gap-2 mb-1"><Flag className="text-amber-400" size={18} /><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Highlander Summit Signature</span></div>
+        <h1 className="font-bold text-slate-900 text-lg">Welcome, ref</h1>
+        <p className="text-sm text-slate-500 mt-1 mb-4">Your name is shown on every violation you log, so the crew knows who made the call.</p>
+        <Label>Name or initials</Label>
+        <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Alex R or ABR"
+          onKeyDown={(e) => e.key === "Enter" && name.trim() && onName(name)}
+          className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+        <button onClick={() => name.trim() && onName(name)} disabled={!name.trim()}
+          className={`w-full mt-3 py-2.5 rounded-lg font-semibold text-white ${name.trim() ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Start logging</button>
+      </div>
+    </div>
+  );
+}
+
+/* ==================================================================== */
+/*  TRACKER (the main app, scoped to one event)                        */
+/* ==================================================================== */
+function Tracker({ initialEvent, meName, onEditName, onLock }) {
+  const eventId = initialEvent.id;
+  const [event, setEvent] = useState(initialEvent);
+  const [teams, setTeams] = useState([]);
+  const [viols, setViols] = useState([]);
+  const [ready, setReady] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncedAt, setSyncedAt] = useState(0);
+  const [online, setOnline] = useState(typeof navigator === "undefined" || navigator.onLine !== false);
+  const pendingCount = viols.filter((v) => v._pending).length;
+
+  const [lastMatch, setLastMatch] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("lastMatch")) || { phase: "qual", num: "" }; }
+    catch { return { phase: "qual", num: "" }; }
+  });
+
+  const [view, setView] = useState("teams");
+  const [openTeam, setOpenTeam] = useState(null);
+  const [query, setQuery] = useState("");
+  const [lightbox, setLightbox] = useState(null);
+  const [menu, setMenu] = useState(false);
+  const [logFor, setLogFor] = useState(null);
+  const [addTeam, setAddTeam] = useState(false);
+  const [expandRule, setExpandRule] = useState(null);
+  const [showShare, setShowShare] = useState(false);
+  const [showEvent, setShowEvent] = useState(false);
+  const [showIdentity, setShowIdentity] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setSyncing(true);
+    const [ev, t, v] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), api.listViolations(eventId)]);
+    if (ev) setEvent(ev);
+    // keep optimistic items the server hasn't caught up on yet (unsynced writes)
+    setTeams((cur) => { const extra = cur.filter((x) => !t.some((s) => s.number === x.number)); return [...t, ...extra]; });
+    setViols((cur) => { const pend = cur.filter((x) => x._pending && !v.some((s) => s.id === x.id)); return [...pend, ...v]; });
+    setSyncedAt(Date.now()); setSyncing(false);
+  }, [eventId]);
+
+  const doFlush = useCallback(async () => {
+    await outbox.flush(eventId, {
+      onSynced: (saved) => setViols((cur) => cur.map((x) => (x.id === saved.id ? saved : x))),
+      onDropped: (op, e) => console.error("outbox op dropped", op, e),
+    });
+  }, [eventId]);
+
+  useEffect(() => {
+    (async () => {
+      await refresh();
+      // restore violations still waiting in the queue (e.g. after a reload while offline)
+      const q = await outbox.loadQueue(eventId);
+      const pend = q.filter((o) => o.kind === "violation").map((o) => ({
+        id: o.row.id, team: o.row.team, type: o.row.type, code: o.row.code, desc: o.row.rule_desc || "",
+        notes: o.row.notes || "", match: o.row.match_info || null, by: o.row.logged_by || "",
+        photoKeys: [], createdAt: o.createdAt || Date.now(), _pending: true, _localPhotos: o.photos || [],
+      }));
+      if (pend.length) setViols((cur) => { const have = new Set(cur.map((v) => v.id)); return [...pend.filter((p) => !have.has(p.id)), ...cur]; });
+      setReady(true);
+      doFlush();
+    })();
+    const unsub = api.subscribeEvent(eventId, () => refresh());
+    const onFocus = () => { refresh(); doFlush(); };
+    const goOnline = () => { setOnline(true); doFlush(); };
+    const goOffline = () => setOnline(false);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    const iv = setInterval(doFlush, 20000); // retry any stragglers
+    return () => {
+      unsub(); window.removeEventListener("focus", onFocus);
+      window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline);
+      clearInterval(iv);
+    };
+  }, [eventId, refresh, doFlush]);
+
+  const saveEvent = async (data) => {
+    const ev = await api.updateEvent(eventId, {
+      name: (data.name || "").trim(),
+      quals: Math.max(0, parseInt(data.quals, 10) || 0),
+      practice: Math.max(0, parseInt(data.practice, 10) || 0),
+      bracket: Number(data.bracket) || 0, finalsBestOf: Number(data.finalsBestOf) || 1,
+    });
+    setEvent(ev); setShowEvent(false);
+  };
+
+  const upsertTeam = async (number, name) => {
+    const num = normNum(number);
+    setTeams((cur) => {
+      const ex = cur.find((t) => t.number === num);
+      if (!ex) return [...cur, { number: num, name: (name || "").trim(), createdAt: Date.now() }];
+      if (name && !ex.name) return cur.map((t) => (t.number === num ? { ...t, name: name.trim() } : t));
+      return cur;
+    });
+    try { await api.upsertTeam(eventId, num, name); }
+    catch (e) { if (outbox.isOffline(e)) await outbox.enqueue(eventId, { id: `team:${num}:${Date.now()}`, kind: "team", eventId, number: num, name }); else throw e; }
+    return num;
+  };
+
+  const saveViolation = async ({ team, type, code, desc, notes, photos, match }) => {
+    const cleanMatch = match && match.phase && match.phase !== "none" ? { phase: match.phase, num: (match.num || "").trim() } : null;
+    const row = api.buildViolationRow(eventId, {
+      team, type, code: normNum(code).replace(/[<>]/g, ""), desc: desc.trim(),
+      notes: notes.trim(), by: meName || "", match: cleanMatch,
+    });
+    const createdAt = Date.now();
+    // show it immediately (marked pending), then persist to the durable queue and try to send
+    setViols((cur) => [{
+      id: row.id, team: row.team, type: row.type, code: row.code, desc: row.rule_desc,
+      notes: row.notes, match: row.match_info, by: row.logged_by, photoKeys: [],
+      createdAt, _pending: true, _localPhotos: photos,
+    }, ...cur]);
+    if (cleanMatch) { setLastMatch(cleanMatch); localStorage.setItem("lastMatch", JSON.stringify(cleanMatch)); }
+    await outbox.enqueue(eventId, { id: row.id, kind: "violation", eventId, row, photos, createdAt });
+    doFlush();
+  };
+
+  const deleteViolation = async (v) => {
+    if (v._pending) { await outbox.removeOp(eventId, v.id); setViols((cur) => cur.filter((x) => x.id !== v.id)); return; }
+    try { await api.deleteViolation(v); setViols((cur) => cur.filter((x) => x.id !== v.id)); }
+    catch (e) { if (outbox.isOffline(e)) alert("You're offline — reconnect to delete this violation."); else throw e; }
+  };
+  const deleteTeam = async (num) => {
+    try { await api.deleteTeam(eventId, num); }
+    catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to delete a team."); return; } throw e; }
+    setViols((cur) => cur.filter((v) => v.team !== num));
+    setTeams((cur) => cur.filter((t) => t.number !== num));
+    setOpenTeam(null);
+  };
+  const clearAll = async () => {
+    try { await api.clearEvent(eventId); }
+    catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to clear the event."); return; } throw e; }
+    setTeams([]); setViols([]); setOpenTeam(null); setMenu(false);
+  };
+
+  const countsByTeam = useMemo(() => {
+    const m = {};
+    for (const v of viols) { m[v.team] = m[v.team] || { total: 0, minor: 0, major: 0, inspection: 0 }; m[v.team].total++; m[v.team][v.type]++; }
+    return m;
+  }, [viols]);
+  const knownRules = useMemo(() => {
+    const m = {}; for (const v of viols) if (v.code && !m[v.code]) m[v.code] = v.desc || ""; return m;
+  }, [viols]);
+
+  const exportCSV = () => {
+    const rows = [["Team", "Team Name", "Match", "Type", "Rule", "Rule Description", "Notes", "Logged By", "Photos", "Time"]];
+    for (const v of [...viols].sort((a, b) => a.createdAt - b.createdAt)) {
+      const t = teams.find((x) => x.number === v.team);
+      rows.push([v.team, t?.name || "", fmtMatch(v.match) || "", TYPES[v.type].label, fmtRule(v.code), v.desc || "",
+        v.notes || "", v.by || "", String((v.photoKeys || []).length), new Date(v.createdAt).toISOString()]);
+    }
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = `${(event.name || "vex").replace(/\W+/g, "-").toLowerCase()}-violations.csv`; a.click(); setMenu(false);
+  };
+
+  if (!ready) return <FullPage>Loading event…</FullPage>;
+
+  const filteredTeams = teams
+    .filter((t) => { const q = query.trim().toLowerCase(); return !q || t.number.toLowerCase().includes(q) || (t.name || "").toLowerCase().includes(q); })
+    .sort((a, b) => (countsByTeam[b.number]?.total || 0) - (countsByTeam[a.number]?.total || 0)
+      || a.number.localeCompare(b.number, undefined, { numeric: true }));
+
+  return (
+    <div className="min-h-screen bg-slate-100 font-sans text-slate-800 antialiased">
+      <header className="sticky top-0 z-20 bg-slate-900 text-white shadow-lg">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+          {openTeam ? (
+            <button onClick={() => setOpenTeam(null)} className="p-1 -ml-1 rounded hover:bg-slate-800"><ChevronLeft size={22} /></button>
+          ) : (<Flag size={20} className="text-amber-400 shrink-0" />)}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <h1 className="font-bold tracking-tight leading-none truncate">{event?.name || "Violation Log"}</h1>
+              {online ? (
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-300 bg-emerald-900/40 px-1.5 py-0.5 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> live
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] text-amber-300 bg-amber-900/40 px-1.5 py-0.5 rounded-full">
+                  <CloudOff size={10} /> offline
+                </span>
+              )}
+              {pendingCount > 0 && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-amber-200 bg-amber-900/40 px-1.5 py-0.5 rounded-full">
+                  <RefreshCw size={9} className="animate-spin" /> {pendingCount} pending
+                </span>
+              )}
+            </div>
+            <button onClick={() => { refresh(); doFlush(); }} className="text-[11px] text-slate-400 leading-tight mt-0.5 flex items-center gap-1 hover:text-slate-200">
+              <RefreshCw size={10} className={syncing ? "animate-spin" : ""} />
+              {teams.length} teams · {viols.length} violations · synced {ago(syncedAt)}
+            </button>
+          </div>
+          <button onClick={() => setShowIdentity(true)} title="Your ref name"
+            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 rounded-full pl-1 pr-2.5 py-1">
+            <span className="w-6 h-6 rounded-full bg-amber-400 text-slate-900 text-[11px] font-bold grid place-items-center">{meName ? initials(meName) : "?"}</span>
+            <span className="text-xs font-medium max-w-[70px] truncate">{meName || "Set name"}</span>
+          </button>
+          <div className="relative">
+            <button onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-slate-800"><Settings size={19} /></button>
+            {menu && (
+              <div className="absolute right-0 mt-2 w-56 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 py-1 text-sm">
+                <button onClick={() => { setMenu(false); setShowEvent(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><CalendarDays size={16} /> Event setup</button>
+                <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
+                <button onClick={exportCSV} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Download size={16} /> Export CSV</button>
+                <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
+                <div className="border-t border-slate-100 my-1" />
+                <button onClick={() => { if (confirm("Delete ALL teams and violations for this event? This cannot be undone.")) clearAll(); }}
+                  className="w-full text-left px-4 py-2.5 hover:bg-red-50 text-red-600 flex items-center gap-2"><Trash2 size={16} /> Clear this event</button>
+              </div>
+            )}
+          </div>
+        </div>
+        {!openTeam && (
+          <div className="max-w-2xl mx-auto px-4 flex gap-1">
+            {[{ k: "teams", label: "Teams", Icon: Users }, { k: "rules", label: "By Rule", Icon: BarChart3 }].map(({ k, label, Icon }) => (
+              <button key={k} onClick={() => setView(k)}
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${view === k ? "border-amber-400 text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
+                <Icon size={15} /> {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </header>
+
+      {(pendingCount > 0 || !online) && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-xs">
+          <div className="max-w-2xl mx-auto px-4 py-2 flex items-center gap-2">
+            {online ? <RefreshCw size={13} className="animate-spin shrink-0" /> : <CloudOff size={13} className="shrink-0" />}
+            {pendingCount > 0
+              ? <span>{pendingCount} {pendingCount === 1 ? "entry" : "entries"} saved on this device{online ? " — syncing now…" : " — will sync when you're back online."}</span>
+              : <span>You're offline. New entries are saved here and will sync automatically when you reconnect.</span>}
+          </div>
+        </div>
+      )}
+
+      <main className="max-w-2xl mx-auto px-4 pb-28 pt-4">
+        {openTeam ? (
+          <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)}
+            onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onDeleteTeam={deleteTeam} onOpenPhoto={setLightbox} />
+        ) : view === "teams" ? (
+          <>
+            {!event?.quals ? (
+              <button onClick={() => setShowEvent(true)} className="w-full mb-4 bg-slate-900 text-white rounded-xl p-4 flex items-center gap-3 text-left hover:bg-slate-800">
+                <CalendarDays size={22} className="text-amber-400 shrink-0" />
+                <div className="flex-1"><p className="font-semibold leading-tight">Finish event setup</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Add how many matches so logging picks the match from a list.</p></div>
+                <ChevronRight size={18} className="text-slate-500" />
+              </button>
+            ) : (
+              <button onClick={() => setShowEvent(true)} className="w-full mb-4 bg-white border border-slate-200 rounded-xl px-4 py-2.5 flex items-center gap-2 text-left hover:border-slate-300">
+                <CalendarDays size={16} className="text-slate-400 shrink-0" />
+                <span className="text-sm font-medium text-slate-700 truncate flex-1">{event.name || "Event"}</span>
+                <span className="text-xs text-slate-400">{event.quals} quals{event.bracket ? ` · top ${event.bracket}` : ""}</span>
+                <ChevronRight size={16} className="text-slate-300" />
+              </button>
+            )}
+            <div className="flex gap-2 mb-4">
+              <div className="relative flex-1">
+                <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search team #"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+              </div>
+              <button onClick={() => setAddTeam(true)} className="px-3 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center gap-1 text-sm font-medium"><Plus size={17} /> Team</button>
+            </div>
+            {filteredTeams.length === 0 ? (
+              <Empty title={teams.length ? "No matches" : "No teams yet"} sub={teams.length ? "Try a different team number." : "Add a team, or just log a violation and the team is created for you."} />
+            ) : (
+              <ul className="space-y-2">
+                {filteredTeams.map((t) => {
+                  const c = countsByTeam[t.number] || { total: 0 };
+                  return (
+                    <li key={t.number}>
+                      <button onClick={() => setOpenTeam(t.number)} className="w-full text-left bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3 hover:border-slate-300 hover:shadow-sm transition">
+                        <span className="font-mono font-bold text-lg text-slate-900">{t.number}</span>
+                        {t.name && <span className="text-sm text-slate-500 truncate flex-1">{t.name}</span>}
+                        <div className="flex items-center gap-1.5 ml-auto">
+                          {ORDER.map((ty) => c[ty] ? (
+                            <span key={ty} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold border ${TYPES[ty].badge}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${TYPES[ty].dot}`} />{c[ty]}</span>) : null)}
+                          {!c.total && <span className="text-xs text-slate-300">clean</span>}
+                          <ChevronRight size={16} className="text-slate-300" />
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </>
+        ) : (
+          <ByRule viols={viols} expandRule={expandRule} setExpandRule={setExpandRule} />
+        )}
+      </main>
+
+      {!openTeam && (
+        <button onClick={() => setLogFor("")} className="fixed bottom-5 left-1/2 -translate-x-1/2 z-20 bg-slate-900 text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-slate-800 active:scale-95 transition">
+          <Plus size={20} /> Log violation
+        </button>
+      )}
+
+      {logFor !== null && (
+        <LogModal teams={teams} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event}
+          onSetName={() => setShowIdentity(true)} onClose={() => setLogFor(null)}
+          onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await saveViolation({ ...form, team }); setLogFor(null); }} />
+      )}
+      {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
+      {showIdentity && <IdentityModal me={{ name: meName }} onSave={async (n) => { await onEditName(n); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
+      {showShare && <ShareModal event={event} onClose={() => setShowShare(false)} />}
+      {showEvent && <EventModal event={event} onSave={saveEvent} onClose={() => setShowEvent(false)} />}
+      {lightbox && (
+        <div onClick={() => setLightbox(null)} className="fixed inset-0 z-40 bg-black/90 grid place-items-center p-4">
+          <img src={lightbox} alt="robot" className="max-h-full max-w-full rounded-lg" />
+          <button className="absolute top-4 right-4 text-white/80 p-2"><X size={26} /></button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================ TEAM DETAIL ============================ */
+function TeamDetail({ team, viols, onLog, onDeleteViolation, onDeleteTeam, onOpenPhoto }) {
+  if (!team) return null;
+  const sorted = [...viols].sort((a, b) => b.createdAt - a.createdAt);
+  const byRule = useMemo(() => {
+    const m = {};
+    for (const v of viols) {
+      const key = v.code || "—";
+      m[key] = m[key] || { code: v.code, desc: v.desc, count: 0, types: {} };
+      m[key].count++; m[key].types[v.type] = (m[key].types[v.type] || 0) + 1;
+      if (!m[key].desc && v.desc) m[key].desc = v.desc;
+    }
+    return Object.values(m).sort((a, b) => b.count - a.count);
+  }, [viols]);
+  return (
+    <>
+      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="font-mono font-bold text-2xl text-slate-900 leading-none">{team.number}</div>
+            {team.name && <div className="text-sm text-slate-500 mt-1">{team.name}</div>}
+          </div>
+          <button onClick={() => { if (confirm(`Delete team ${team.number} and all its violations?`)) onDeleteTeam(team.number); }} className="text-slate-400 hover:text-red-600 p-1"><Trash2 size={18} /></button>
+        </div>
+        <button onClick={onLog} className="mt-4 w-full bg-slate-900 text-white py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-slate-800"><Plus size={18} /> Log violation for {team.number}</button>
+      </div>
+      {byRule.length > 0 && (
+        <div className="mb-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">Violations by rule</h2>
+          <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+            {byRule.map((r) => (
+              <div key={r.code || "none"} className="px-4 py-2.5 flex items-center gap-3">
+                <span className="font-mono font-semibold text-slate-800">{fmtRule(r.code)}</span>
+                {r.desc && <span className="text-sm text-slate-500 truncate flex-1">{r.desc}</span>}
+                <div className="ml-auto flex items-center gap-1.5">
+                  {ORDER.map((ty) => r.types[ty] ? <span key={ty} className={`w-1.5 h-1.5 rounded-full ${TYPES[ty].dot}`} title={TYPES[ty].label} /> : null)}
+                  <span className="font-bold text-slate-900 tabular-nums ml-1">×{r.count}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">Log ({viols.length})</h2>
+      {sorted.length === 0 ? <Empty title="No violations" sub="This team has a clean record." /> : (
+        <ul className="space-y-2">{sorted.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} />)}</ul>
+      )}
+    </>
+  );
+}
+
+function ViolationCard({ v, onDelete, onOpenPhoto }) {
+  const T = TYPES[v.type];
+  return (
+    <li className={`rounded-xl border p-3 ${T.soft}`}>
+      <div className="flex items-center gap-2">
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border ${T.badge}`}><T.Icon size={12} /> {T.label}</span>
+        <span className="font-mono font-bold text-slate-900">{fmtRule(v.code)}</span>
+        {fmtMatch(v.match) && <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-700">{fmtMatch(v.match)}</span>}
+        {v._pending && <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-300"><RefreshCw size={9} className="animate-spin" /> Saving</span>}
+        <span className="text-[11px] text-slate-400 ml-auto">{fmtTime(v.createdAt)}</span>
+        <button onClick={() => { if (confirm(v._pending ? "Discard this unsynced violation?" : "Delete this violation?")) onDelete(v); }} className="text-slate-300 hover:text-red-600"><Trash2 size={15} /></button>
+      </div>
+      {v.desc && <p className={`text-sm mt-1.5 font-medium ${T.text}`}>{v.desc}</p>}
+      {v.notes && <p className="text-sm text-slate-600 mt-1">{v.notes}</p>}
+      {v._localPhotos?.length > 0 ? (
+        <div className="flex gap-2 mt-2 overflow-x-auto">{v._localPhotos.map((src, i) => (
+          <button key={i} onClick={() => onOpenPhoto(src)} className="shrink-0"><img src={src} alt="robot" className="w-16 h-16 rounded-lg object-cover border border-slate-200 opacity-90" /></button>
+        ))}</div>
+      ) : v.photoKeys?.length > 0 ? (
+        <div className="flex gap-2 mt-2 overflow-x-auto">{v.photoKeys.map((k) => <Thumb key={k} pkey={k} onOpen={onOpenPhoto} />)}</div>
+      ) : null}
+      {v.by && <p className="text-[11px] text-slate-400 mt-2 flex items-center gap-1"><UserCircle2 size={12} /> {v.by}</p>}
+    </li>
+  );
+}
+
+/* ============================ BY RULE ============================ */
+function ByRule({ viols, expandRule, setExpandRule }) {
+  const rules = useMemo(() => {
+    const m = {};
+    for (const v of viols) {
+      const key = v.code || "—";
+      m[key] = m[key] || { code: v.code, desc: v.desc, count: 0, types: {}, teams: {} };
+      m[key].count++; m[key].types[v.type] = (m[key].types[v.type] || 0) + 1;
+      m[key].teams[v.team] = (m[key].teams[v.team] || 0) + 1;
+      if (!m[key].desc && v.desc) m[key].desc = v.desc;
+    }
+    return Object.values(m).sort((a, b) => b.count - a.count);
+  }, [viols]);
+  const max = rules[0]?.count || 1;
+  if (rules.length === 0) return <Empty title="Nothing logged yet" sub="Rule totals across all teams will appear here." />;
+  return (
+    <ul className="space-y-2">
+      {rules.map((r) => {
+        const teamCount = Object.keys(r.teams).length;
+        const open = expandRule === (r.code || "—");
+        return (
+          <li key={r.code || "none"} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <button onClick={() => setExpandRule(open ? null : (r.code || "—"))} className="w-full text-left px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-bold text-slate-900">{fmtRule(r.code)}</span>
+                <span className="text-xs text-slate-400">{teamCount} team{teamCount !== 1 ? "s" : ""}</span>
+                <span className="ml-auto font-bold text-lg text-slate-900 tabular-nums">{r.count}</span>
+                <ChevronRight size={16} className={`text-slate-300 transition-transform ${open ? "rotate-90" : ""}`} />
+              </div>
+              {r.desc && <p className="text-sm text-slate-500 mt-0.5">{r.desc}</p>}
+              <div className="flex h-1.5 rounded-full overflow-hidden mt-2 bg-slate-100" style={{ width: `${Math.max(12, (r.count / max) * 100)}%` }}>
+                {ORDER.map((ty) => r.types[ty] ? <div key={ty} className={TYPES[ty].solid} style={{ flex: r.types[ty] }} /> : null)}
+              </div>
+            </button>
+            {open && (
+              <div className="px-4 pb-3 pt-1 border-t border-slate-100">
+                {Object.entries(r.teams).sort((a, b) => b[1] - a[1]).map(([num, n]) => (
+                  <div key={num} className="flex items-center justify-between py-1 text-sm">
+                    <span className="font-mono font-medium text-slate-700">{num}</span>
+                    <span className="text-slate-500 tabular-nums">×{n}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/* ============================ LOG MODAL ============================ */
+function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, onSetName, onClose, onSave }) {
+  const [team, setTeam] = useState(presetTeam || (teams[0]?.number ?? ""));
+  const [creatingNew, setCreatingNew] = useState(teams.length === 0);
+  const [newNumber, setNewNumber] = useState("");
+  const [newName, setNewName] = useState("");
+  const [matchPhase, setMatchPhase] = useState(lastMatch?.phase || "qual");
+  const [matchNum, setMatchNum] = useState(lastMatch?.num || "");
+  const [type, setType] = useState("minor");
+  const [code, setCode] = useState("");
+  const [desc, setDesc] = useState("");
+  const [notes, setNotes] = useState("");
+  const [photos, setPhotos] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef(null);
+  const T = TYPES[type];
+
+  const onCode = (val) => { setCode(val); const clean = normNum(val).replace(/[<>]/g, ""); if (knownRules[clean] && !desc) setDesc(knownRules[clean]); };
+  const addPhotos = async (files) => { const list = Array.from(files).slice(0, 4); const out = []; for (const f of list) { try { out.push(await compress(f)); } catch {} } setPhotos((p) => [...p, ...out].slice(0, 6)); };
+  const valid = (creatingNew ? newNumber.trim() : team) && (code.trim() || desc.trim());
+  const submit = async () => { if (!valid || busy) return; setBusy(true); try { await onSave({ team: creatingNew ? "" : team, newNumber, newName, type, code, desc, notes, photos, match: { phase: matchPhase, num: matchNum } }); } catch (e) { alert("Could not save: " + (e.message || e)); setBusy(false); } };
+
+  return (
+    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
+      <div className="bg-slate-50 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
+        <div className="sticky top-0 bg-slate-50 px-4 py-3 flex items-center justify-between border-b border-slate-200">
+          <h2 className="font-bold text-slate-900">New violation</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={22} /></button>
+        </div>
+        <div className="p-4 space-y-4">
+          <button onClick={onSetName} className="w-full flex items-center gap-2 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg px-3 py-2">
+            <UserCircle2 size={15} className="text-slate-400" />
+            {me?.name ? <>Logging as <b className="text-slate-700">{me.name}</b></> : <span className="text-amber-600 font-medium">Tap to set your ref name (so entries are attributed)</span>}
+          </button>
+
+          <div>
+            <Label>Team</Label>
+            {creatingNew ? (
+              <div className="space-y-2">
+                <input autoFocus value={newNumber} onChange={(e) => setNewNumber(e.target.value)} placeholder="Team number (e.g. 1234A)"
+                  className="w-full px-3 py-2.5 rounded-lg border border-slate-300 font-mono focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Team name (optional)"
+                  className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                {teams.length > 0 && <button onClick={() => setCreatingNew(false)} className="text-sm text-slate-500 underline">Pick an existing team instead</button>}
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <select value={team} onChange={(e) => setTeam(e.target.value)} className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+                  {teams.map((t) => <option key={t.number} value={t.number}>{t.number}{t.name ? ` — ${t.name}` : ""}</option>)}
+                </select>
+                <button onClick={() => setCreatingNew(true)} className="px-3 rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 flex items-center gap-1 text-sm"><Plus size={16} /> New</button>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <Label>Match</Label>
+            <div className="flex gap-2">
+              <select value={matchPhase} onChange={(e) => { setMatchPhase(e.target.value); setMatchNum(""); }}
+                className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+                {availablePhases(event).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+              </select>
+              {(() => {
+                if (matchPhase === "none") return null;
+                const count = phaseCount(matchPhase, event);
+                if (count) return (
+                  <select value={matchNum} onChange={(e) => setMatchNum(e.target.value)}
+                    className="w-32 px-2 py-2.5 rounded-lg border border-slate-300 bg-white font-mono focus:outline-none focus:ring-2 focus:ring-slate-300">
+                    <option value="">Match…</option>
+                    {Array.from({ length: count }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{fmtMatch({ phase: matchPhase, num: String(n) })}</option>)}
+                  </select>
+                );
+                return (<input value={matchNum} onChange={(e) => setMatchNum(e.target.value)} placeholder={matchPhase === "skills" ? "run" : "#"} inputMode="numeric"
+                  className="w-24 px-3 py-2.5 rounded-lg border border-slate-300 text-center focus:outline-none focus:ring-2 focus:ring-slate-300" />);
+              })()}
+            </div>
+            {fmtMatch({ phase: matchPhase, num: matchNum }) && (<p className="text-[11px] text-slate-400 mt-1">Recorded as <b className="font-mono text-slate-600">{fmtMatch({ phase: matchPhase, num: matchNum })}</b></p>)}
+          </div>
+
+          <div>
+            <Label>Type</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {ORDER.map((ty) => { const M = TYPES[ty]; const on = type === ty; return (
+                <button key={ty} onClick={() => setType(ty)} className={`py-2.5 rounded-lg border-2 font-semibold text-sm flex flex-col items-center gap-1 transition ${on ? `${M.solid} text-white border-transparent` : `bg-white ${M.text} border-slate-200`}`}>
+                  <M.Icon size={18} /> {M.label}
+                </button>); })}
+            </div>
+          </div>
+
+          <div>
+            <Label>Rule cited</Label>
+            <div className="flex gap-2">
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono">&lt;</span>
+                <input list="rulecodes" value={code} onChange={(e) => onCode(e.target.value)} placeholder="R7" spellCheck={false}
+                  className="w-28 pl-5 pr-2 py-2.5 rounded-lg border border-slate-300 font-mono uppercase focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                <datalist id="rulecodes">{Object.keys(knownRules).map((c) => <option key={c} value={c} />)}</datalist>
+              </div>
+              <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What the rule covers"
+                className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Enter the code as in the rulebook (R, G, SG, T…). Shown as {fmtRule(code || "R7")}.</p>
+          </div>
+
+          <div>
+            <Label>Robot photos</Label>
+            <div className="flex gap-2 flex-wrap">
+              {photos.map((p, i) => (
+                <div key={i} className="relative">
+                  <img src={p} className="w-20 h-20 rounded-lg object-cover border border-slate-200" alt="robot" />
+                  <button onClick={() => setPhotos((ps) => ps.filter((_, j) => j !== i))} className="absolute -top-1.5 -right-1.5 bg-slate-900 text-white rounded-full p-0.5"><X size={13} /></button>
+                </div>
+              ))}
+              {photos.length < 6 && (<button onClick={() => fileRef.current?.click()} className="w-20 h-20 rounded-lg border-2 border-dashed border-slate-300 grid place-items-center text-slate-400 hover:border-slate-400 hover:text-slate-500"><Camera size={22} /></button>)}
+              <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
+            </div>
+          </div>
+
+          <div>
+            <Label>Notes</Label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="What happened, where on the field, who was told…"
+              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-slate-300" />
+          </div>
+        </div>
+        <div className="sticky bottom-0 bg-slate-50 border-t border-slate-200 p-4 flex gap-2">
+          <button onClick={onClose} className="px-4 py-3 rounded-lg border border-slate-300 bg-white font-medium text-slate-600">Cancel</button>
+          <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? `${T.solid} ${T.solidHover}` : "bg-slate-300"}`}>{busy ? "Saving…" : "Save violation"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ ADD TEAM MODAL ============================ */
+function AddTeamModal({ onClose, onSave }) {
+  const [num, setNum] = useState(""); const [name, setName] = useState("");
+  return (
+    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
+      <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
+        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200"><h2 className="font-bold text-slate-900">Add team</h2><button onClick={onClose} className="text-slate-400"><X size={22} /></button></div>
+        <div className="p-4 space-y-3">
+          <div><Label>Team number</Label><input autoFocus value={num} onChange={(e) => setNum(e.target.value)} placeholder="e.g. 1234A" className="w-full px-3 py-2.5 rounded-lg border border-slate-300 font-mono focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
+          <div><Label>Team name (optional)</Label><input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
+        </div>
+        <div className="p-4 pt-0 flex gap-2">
+          <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 font-medium text-slate-600">Cancel</button>
+          <button onClick={() => num.trim() && onSave(num, name)} disabled={!num.trim()} className={`flex-1 py-2.5 rounded-lg font-semibold text-white ${num.trim() ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Add team</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ IDENTITY MODAL ============================ */
+function IdentityModal({ me, onSave, onClose }) {
+  const [name, setName] = useState(me?.name || "");
+  return (
+    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
+      <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
+        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200">
+          <h2 className="font-bold text-slate-900">Your ref name</h2>
+          <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
+        </div>
+        <div className="p-4 space-y-3">
+          <div><Label>Name or initials</Label>
+            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Alex R or ABR"
+              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+          </div>
+        </div>
+        <div className="p-4 pt-0"><button onClick={() => name.trim() && onSave(name)} disabled={!name.trim()} className={`w-full py-2.5 rounded-lg font-semibold text-white ${name.trim() ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Save</button></div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ SHARE / INVITE MODAL ============================ */
+function ShareModal({ event, onClose }) {
+  const [copied, setCopied] = useState("");
+  const url = window.location.origin;
+  const copy = (text, which) => { navigator.clipboard?.writeText(text); setCopied(which); setTimeout(() => setCopied(""), 1500); };
+  return (
+    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
+      <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
+        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200">
+          <h2 className="font-bold text-slate-900 flex items-center gap-2"><Share2 size={18} /> Invite other refs</h2>
+          <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
+        </div>
+        <div className="p-4 space-y-4 text-sm text-slate-600">
+          <p>Everyone works from the same live Highlander Summit log and sees each other's entries within seconds.</p>
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+            <div>
+              <Label>Send your crew the site</Label>
+              <div className="flex gap-2">
+                <input readOnly value={url} className="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm" />
+                <button onClick={() => copy(url, "url")} className="px-3 rounded-lg bg-slate-900 text-white flex items-center gap-1 text-sm">{copied === "url" ? <Check size={15} /> : <Copy size={15} />}</button>
+              </div>
+            </div>
+            <p className="text-[13px] text-slate-500">They open the link, enter the crew password, set a ref name, and they're in.</p>
+          </div>
+          <div className="flex items-start gap-2 text-xs text-slate-500 bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <AlertTriangle size={15} className="text-amber-500 shrink-0 mt-0.5" />
+            <span>Share the password only with your officiating crew — anyone who has it can view, add, and delete entries.</span>
+          </div>
+        </div>
+        <div className="p-4 pt-0"><button onClick={onClose} className="w-full py-2.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 flex items-center justify-center gap-2"><Check size={16} /> Done</button></div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ EVENT MODAL ============================ */
+function EventModal({ event, onSave, onClose }) {
+  const [name, setName] = useState(event?.name || "");
+  const [quals, setQuals] = useState(event?.quals ? String(event.quals) : "");
+  const [practice, setPractice] = useState(event?.practice ? String(event.practice) : "");
+  const [bracket, setBracket] = useState(event?.bracket ? String(event.bracket) : "16");
+  const [finalsBestOf, setFinalsBestOf] = useState(event?.finalsBestOf ? String(event.finalsBestOf) : "3");
+  const creating = !event;
+  return (
+    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
+      <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white px-4 py-3 flex items-center justify-between border-b border-slate-200">
+          <h2 className="font-bold text-slate-900 flex items-center gap-2"><CalendarDays size={18} /> {creating ? "New event" : "Event setup"}</h2>
+          <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
+        </div>
+        <div className="p-4 space-y-3">
+          <div><Label>Event name</Label>
+            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Highlander Summit Signature"
+              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
+          <div><Label>Number of qualification matches</Label>
+            <div className="relative">
+              <ListOrdered size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={quals} onChange={(e) => setQuals(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="e.g. 60"
+                className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Logging will offer Q1–Q{quals || "n"} as a dropdown.</p>
+          </div>
+          <div><Label>Practice matches (optional)</Label>
+            <input value={practice} onChange={(e) => setPractice(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="leave blank if none"
+              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
+          <div className="grid grid-cols-2 gap-2">
+            <div><Label>Elimination bracket</Label>
+              <select value={bracket} onChange={(e) => setBracket(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <option value="0">None</option><option value="4">Top 4</option><option value="8">Top 8</option><option value="16">Top 16</option>
+              </select>
+            </div>
+            <div><Label>Finals</Label>
+              <select value={finalsBestOf} onChange={(e) => setFinalsBestOf(e.target.value)} disabled={bracket === "0"} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white disabled:bg-slate-100 disabled:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <option value="1">Single</option><option value="3">Best of 3</option>
+              </select>
+            </div>
+          </div>
+          {bracket !== "0" && (
+            <p className="text-[11px] text-slate-400">Generates {(() => { const ec = elimCounts(bracket); const parts = []; if (ec.r16) parts.push("R16-1…8"); if (ec.qf) parts.push("QF1…4"); if (ec.sf) parts.push("SF1…2"); parts.push(finalsBestOf === "3" ? "F1…3" : "F1"); return parts.join(", "); })()} as dropdowns.</p>
+          )}
+        </div>
+        <div className="p-4 pt-0 flex gap-2">
+          <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 font-medium text-slate-600">Cancel</button>
+          <button onClick={() => onSave({ name, quals, practice, bracket, finalsBestOf })} className="flex-1 py-2.5 rounded-lg font-semibold text-white bg-slate-900 hover:bg-slate-800">{creating ? "Create event" : "Save event"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+/* ---------- shared bits ---------- */
+const Label = ({ children }) => <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">{children}</label>;
+const Empty = ({ title, sub }) => (
+  <div className="text-center py-14 px-6"><p className="font-semibold text-slate-700">{title}</p><p className="text-sm text-slate-400 mt-1">{sub}</p></div>
+);
