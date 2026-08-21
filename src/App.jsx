@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
-  Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert,
+  Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
   CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen,
@@ -249,6 +249,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
   const [lightbox, setLightbox] = useState(null);
   const [menu, setMenu] = useState(false);
   const [logFor, setLogFor] = useState(null);
+  const [editing, setEditing] = useState(null); // violation being edited
   const [logMatch, setLogMatch] = useState(null);
   const [addTeam, setAddTeam] = useState(false);
   const [expandRule, setExpandRule] = useState(null);
@@ -359,6 +360,21 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
     if (v._pending) { await outbox.removeOp(eventId, v.id); setViols((cur) => cur.filter((x) => x.id !== v.id)); return; }
     try { await api.deleteViolation(v); setViols((cur) => cur.filter((x) => x.id !== v.id)); }
     catch (e) { if (outbox.isOffline(e)) alert("You're offline — reconnect to delete this violation."); else throw e; }
+  };
+  const editViolation = async (orig, form) => {
+    const cleanMatch = form.match && form.match.phase && form.match.phase !== "none" ? { phase: form.match.phase, num: (form.match.num || "").trim() } : null;
+    const row = {
+      id: orig.id, event_id: eventId, team: form.team, type: form.type,
+      code: normNum(form.code).replace(/[<>]/g, ""), rule_desc: (form.desc || "").trim(),
+      notes: (form.notes || "").trim(), match_info: cleanMatch, logged_by: orig.by || meName || "",
+    };
+    try {
+      const saved = await api.updateViolation(eventId, row, form.keepKeys || [], form.photos || [], orig.photoKeys || []);
+      setViols((cur) => cur.map((x) => (x.id === orig.id ? saved : x)));
+    } catch (e) {
+      if (outbox.isOffline(e)) { alert("You're offline — reconnect to edit this violation."); return; }
+      throw e;
+    }
   };
   const deleteTeam = async (num) => {
     try { await api.deleteTeam(eventId, num); }
@@ -509,10 +525,10 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
       <main className="max-w-2xl mx-auto px-4 pb-28 pt-4">
         {openTeam ? (
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)}
-            onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onDeleteTeam={deleteTeam} onOpenPhoto={setLightbox} />
+            onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} onOpenPhoto={setLightbox} />
         ) : openMatch ? (
           <MatchDetail num={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols} allNums={matchNums} onNav={setOpenMatch}
-            onLogTeam={(n) => { setLogFor(n); setLogMatch(openMatch); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} />
+            onLogTeam={(n) => { setLogFor(n); setLogMatch(openMatch); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} />
         ) : openRobot ? (
           <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onOpenPhoto={setLightbox} />
         ) : view === "matches" ? (
@@ -585,6 +601,11 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
           onSetName={() => setShowIdentity(true)} onClose={() => { setLogFor(null); setLogMatch(null); }}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await saveViolation({ ...form, team }); setLogFor(null); setLogMatch(null); }} />
       )}
+      {editing && (
+        <LogModal teams={teams} presetTeam={editing.team} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} rules={rules} onOpenPhoto={setLightbox} edit={editing}
+          onSetName={() => setShowIdentity(true)} onClose={() => setEditing(null)}
+          onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await editViolation(editing, { ...form, team }); setEditing(null); }} />
+      )}
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
       {showIdentity && <IdentityModal me={{ name: meName }} onSave={async (n) => { await onEditName(n); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
       {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length }} onClear={clearSelected} onClose={() => setShowClear(false)} />}
@@ -621,7 +642,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
 }
 
 /* ============================ TEAM DETAIL ============================ */
-function TeamDetail({ team, viols, onLog, onDeleteViolation, onDeleteTeam, onOpenPhoto }) {
+function TeamDetail({ team, viols, onLog, onDeleteViolation, onEditViolation, onDeleteTeam, onOpenPhoto }) {
   if (!team) return null;
   const sorted = [...viols].sort((a, b) => b.createdAt - a.createdAt);
   const byRule = useMemo(() => {
@@ -665,14 +686,15 @@ function TeamDetail({ team, viols, onLog, onDeleteViolation, onDeleteTeam, onOpe
       )}
       <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">Log ({viols.length})</h2>
       {sorted.length === 0 ? <Empty title="No violations" sub="This team has a clean record." /> : (
-        <ul className="space-y-2">{sorted.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} />)}</ul>
+        <ul className="space-y-2">{sorted.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} />)}</ul>
       )}
     </>
   );
 }
 
-function ViolationCard({ v, onDelete, onOpenPhoto, showTeam }) {
+function ViolationCard({ v, onDelete, onOpenPhoto, onEdit, showTeam }) {
   const T = TYPES[v.type];
+  const canEdit = onEdit && !v._pending;
   return (
     <li className={`rounded-xl border p-3 ${T.soft}`}>
       <div className="flex items-center gap-2 flex-wrap">
@@ -682,7 +704,8 @@ function ViolationCard({ v, onDelete, onOpenPhoto, showTeam }) {
         {fmtMatch(v.match) && <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-700">{fmtMatch(v.match)}</span>}
         {v._pending && <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-300"><RefreshCw size={9} className="animate-spin" /> Saving</span>}
         <span className="text-[11px] text-slate-400 ml-auto">{fmtTime(v.createdAt)}</span>
-        <button onClick={() => { if (confirm(v._pending ? "Discard this unsynced violation?" : "Delete this violation?")) onDelete(v); }} className="text-slate-300 hover:text-red-600"><Trash2 size={15} /></button>
+        {canEdit && <button onClick={() => onEdit(v)} className="text-slate-300 hover:text-slate-700" title="Edit"><Pencil size={15} /></button>}
+        <button onClick={() => { if (confirm(v._pending ? "Discard this unsynced violation?" : "Delete this violation?")) onDelete(v); }} className="text-slate-300 hover:text-red-600" title="Delete"><Trash2 size={15} /></button>
       </div>
       {v.desc && <p className={`text-sm mt-1.5 font-medium ${T.text}`}>{v.desc}</p>}
       {v.notes && <p className="text-sm text-slate-600 mt-1">{v.notes}</p>}
@@ -750,21 +773,22 @@ function ByRule({ viols, expandRule, setExpandRule }) {
 }
 
 /* ============================ LOG MODAL ============================ */
-function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, onSetName, onClose, onSave }) {
+function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, edit, onSetName, onClose, onSave }) {
   const ruleBook = useMemo(() => {
     const m = {}; for (const r of (rules || [])) m[r.code] = r.desc; return m;
   }, [rules]);
-  const [team, setTeam] = useState(presetTeam || (teams[0]?.number ?? ""));
-  const [creatingNew, setCreatingNew] = useState(teams.length === 0);
+  const [team, setTeam] = useState((edit && edit.team) || presetTeam || (teams[0]?.number ?? ""));
+  const [creatingNew, setCreatingNew] = useState(!edit && teams.length === 0);
   const [newNumber, setNewNumber] = useState("");
   const [newName, setNewName] = useState("");
-  const [matchPhase, setMatchPhase] = useState(presetMatch ? "qual" : (lastMatch?.phase || "qual"));
-  const [matchNum, setMatchNum] = useState(presetMatch ? String(presetMatch) : (lastMatch?.num || ""));
-  const [type, setType] = useState("minor");
-  const [code, setCode] = useState("");
-  const [desc, setDesc] = useState("");
-  const [notes, setNotes] = useState("");
+  const [matchPhase, setMatchPhase] = useState((edit && edit.match?.phase) || (presetMatch ? "qual" : (lastMatch?.phase || "qual")));
+  const [matchNum, setMatchNum] = useState((edit && edit.match?.num) || (presetMatch ? String(presetMatch) : (lastMatch?.num || "")));
+  const [type, setType] = useState((edit && edit.type) || "minor");
+  const [code, setCode] = useState((edit && edit.code) || "");
+  const [desc, setDesc] = useState((edit && edit.desc) || "");
+  const [notes, setNotes] = useState((edit && edit.notes) || "");
   const [photos, setPhotos] = useState([]);
+  const [keepKeys, setKeepKeys] = useState((edit && edit.photoKeys) || []);
   const [busy, setBusy] = useState(false);
   const [showRulePicker, setShowRulePicker] = useState(false);
   const fileRef = useRef(null);
@@ -773,13 +797,13 @@ function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches
   const onCode = (val) => { setCode(val); const clean = normNum(val).replace(/[<>]/g, ""); const d = ruleBook[clean] || knownRules[clean]; if (d && !desc) setDesc(d); };
   const addPhotos = async (files) => { const list = Array.from(files).slice(0, 4); const out = []; for (const f of list) { try { out.push(await compress(f)); } catch {} } setPhotos((p) => [...p, ...out].slice(0, 6)); };
   const valid = (creatingNew ? newNumber.trim() : team) && (code.trim() || desc.trim());
-  const submit = async () => { if (!valid || busy) return; setBusy(true); try { await onSave({ team: creatingNew ? "" : team, newNumber, newName, type, code, desc, notes, photos, match: { phase: matchPhase, num: matchNum } }); } catch (e) { alert("Could not save: " + (e.message || e)); setBusy(false); } };
+  const submit = async () => { if (!valid || busy) return; setBusy(true); try { await onSave({ team: creatingNew ? "" : team, newNumber, newName, type, code, desc, notes, photos, keepKeys, match: { phase: matchPhase, num: matchNum } }); } catch (e) { alert("Could not save: " + (e.message || e)); setBusy(false); } };
 
   return (
     <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
       <div className="bg-slate-50 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
         <div className="sticky top-0 bg-slate-50 px-4 py-3 flex items-center justify-between border-b border-slate-200">
-          <h2 className="font-bold text-slate-900">New violation</h2>
+          <h2 className="font-bold text-slate-900">{edit ? "Edit violation" : "New violation"}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-4">
@@ -891,13 +915,19 @@ function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches
           <div>
             <Label>Robot photos</Label>
             <div className="flex gap-2 flex-wrap">
+              {keepKeys.map((k) => (
+                <div key={k} className="relative">
+                  <Thumb pkey={k} onOpen={onOpenPhoto} />
+                  <button onClick={() => setKeepKeys((ks) => ks.filter((x) => x !== k))} className="absolute -top-1.5 -right-1.5 bg-slate-900 text-white rounded-full p-0.5"><X size={13} /></button>
+                </div>
+              ))}
               {photos.map((p, i) => (
                 <div key={i} className="relative">
                   <img src={p} className="w-20 h-20 rounded-lg object-cover border border-slate-200" alt="robot" />
                   <button onClick={() => setPhotos((ps) => ps.filter((_, j) => j !== i))} className="absolute -top-1.5 -right-1.5 bg-slate-900 text-white rounded-full p-0.5"><X size={13} /></button>
                 </div>
               ))}
-              {photos.length < 6 && (<button onClick={() => fileRef.current?.click()} className="w-20 h-20 rounded-lg border-2 border-dashed border-slate-300 grid place-items-center text-slate-400 hover:border-slate-400 hover:text-slate-500"><Camera size={22} /></button>)}
+              {keepKeys.length + photos.length < 6 && (<button onClick={() => fileRef.current?.click()} className="w-20 h-20 rounded-lg border-2 border-dashed border-slate-300 grid place-items-center text-slate-400 hover:border-slate-400 hover:text-slate-500"><Camera size={22} /></button>)}
               <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
             </div>
           </div>
@@ -910,7 +940,7 @@ function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches
         </div>
         <div className="sticky bottom-0 bg-slate-50 border-t border-slate-200 p-4 flex gap-2">
           <button onClick={onClose} className="px-4 py-3 rounded-lg border border-slate-300 bg-white font-medium text-slate-600">Cancel</button>
-          <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? `${T.solid} ${T.solidHover}` : "bg-slate-300"}`}>{busy ? "Saving…" : "Save violation"}</button>
+          <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? `${T.solid} ${T.solidHover}` : "bg-slate-300"}`}>{busy ? "Saving…" : edit ? "Save changes" : "Save violation"}</button>
         </div>
       </div>
       {showRulePicker && (
@@ -1165,7 +1195,7 @@ function MatchList({ matches, teamName, viols, query, setQuery, onOpen }) {
   );
 }
 
-function MatchDetail({ num, match, teamName, viols, allNums, onNav, onLogTeam, onOpenPhoto, onDeleteViolation }) {
+function MatchDetail({ num, match, teamName, viols, allNums, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation }) {
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
   const nums = allNums || [num];
   const idx = nums.indexOf(num);
@@ -1241,7 +1271,7 @@ function MatchDetail({ num, match, teamName, viols, allNums, onNav, onLogTeam, o
       {mv.length === 0 ? (
         <Empty title="No violations logged" sub="Tap a team above to log one for this match." />
       ) : (
-        <ul className="space-y-2">{mv.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} showTeam />)}</ul>
+        <ul className="space-y-2">{mv.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} showTeam />)}</ul>
       )}
     </>
   );

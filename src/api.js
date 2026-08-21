@@ -172,6 +172,22 @@ export async function addViolationRow(eventId, row, photoDataUrls = []) {
 export async function addViolation(eventId, v, photoDataUrls) {
   return addViolationRow(eventId, buildViolationRow(eventId, v), photoDataUrls);
 }
+// Edit an existing violation. keepKeys = existing photo paths to retain;
+// newPhotoDataUrls = freshly added photos to upload; dropped keys are deleted from storage.
+export async function updateViolation(eventId, row, keepKeys = [], newPhotoDataUrls = [], allOldKeys = []) {
+  const removed = allOldKeys.filter((k) => !keepKeys.includes(k));
+  if (removed.length) await supabase.storage.from("robot-photos").remove(removed);
+  const paths = [...keepKeys];
+  for (let i = 0; i < newPhotoDataUrls.length; i++) {
+    const path = `${eventId}/${row.id}/e${Date.now()}-${i}.jpg`;
+    const { error } = await supabase.storage.from("robot-photos").upload(path, dataURLtoBlob(newPhotoDataUrls[i]), { contentType: "image/jpeg", upsert: true });
+    if (error) throw error;
+    paths.push(path);
+  }
+  const { data, error } = await supabase.from("violations").upsert({ ...row, photo_paths: paths }, { onConflict: "id" }).select().single();
+  if (error) throw error;
+  return mapViol(data);
+}
 export async function deleteViolation(v) {
   if (v.photoKeys?.length) await supabase.storage.from("robot-photos").remove(v.photoKeys);
   await supabase.from("violations").delete().eq("id", v.id);
