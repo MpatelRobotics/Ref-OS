@@ -409,6 +409,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
                 </span>
               )}
             </div>
+            <p className="text-[10px] text-slate-400 leading-tight mt-0.5"><span className="font-semibold text-slate-300">Ref-OS</span>: Referee Operating System</p>
             <button onClick={() => { refresh(); doFlush(); }} className="text-[11px] text-slate-400 leading-tight mt-0.5 flex items-center gap-1 hover:text-slate-200">
               <RefreshCw size={10} className={syncing ? "animate-spin" : ""} />
               {teams.length} teams · {viols.length} violations · synced {ago(syncedAt)}
