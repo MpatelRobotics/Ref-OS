@@ -256,7 +256,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
   const [showIdentity, setShowIdentity] = useState(false);
   const [showClear, setShowClear] = useState(false);
   const [showOnline, setShowOnline] = useState(false);
-  const [showRules, setShowRules] = useState(false);
+  const [showByRule, setShowByRule] = useState(false);
 
   const refresh = useCallback(async () => {
     setSyncing(true);
@@ -450,9 +450,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
             </button>
           </div>
           <OnlineCluster presence={presence} onClick={() => setShowOnline(true)} />
-          {rules.length > 0 && (
-            <button onClick={() => setShowRules(true)} title="Rulebook" className="p-1.5 rounded hover:bg-white/10"><BookOpen size={18} /></button>
-          )}
+          <button onClick={() => setShowByRule(true)} title="By rule" className="p-1.5 rounded hover:bg-white/10"><BarChart3 size={18} /></button>
           <button onClick={() => setShowIdentity(true)} title="Your ref name"
             className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-full pl-1 pr-2.5 py-1">
             <span className="w-6 h-6 rounded-full bg-[#D7212B] text-white text-[11px] font-bold grid place-items-center">{meName ? initials(meName) : "?"}</span>
@@ -477,7 +475,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
           <div className="max-w-2xl mx-auto px-4 flex gap-1 overflow-x-auto">
             {[{ k: "teams", label: "Teams", Icon: Users },
               ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
-              { k: "rules", label: "By Rule", Icon: BarChart3 }].map(({ k, label, Icon }) => (
+              ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])].map(({ k, label, Icon }) => (
               <button key={k} onClick={() => { setView(k); setQuery(""); }}
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
                 <Icon size={15} /> {label}
@@ -507,7 +505,9 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
             onLogTeam={(n) => { setLogFor(n); setLogMatch(openMatch); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} />
         ) : view === "matches" ? (
           <MatchList matches={matches} teamName={teamNameMap} viols={viols} query={query} setQuery={setQuery} onOpen={setOpenMatch} />
-        ) : view === "teams" ? (
+        ) : view === "rulebook" ? (
+          <RuleBook rules={rules} />
+        ) : (
           <>
             {!event?.quals ? (
               <button onClick={() => setShowEvent(true)} className="w-full mb-4 bg-[#0D0F32] text-white rounded-xl p-4 flex items-center gap-3 text-left hover:bg-[#171a45]">
@@ -557,8 +557,6 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
               </ul>
             )}
           </>
-        ) : (
-          <ByRule viols={viols} expandRule={expandRule} setExpandRule={setExpandRule} />
         )}
       </main>
 
@@ -587,13 +585,13 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
           </div>
         </div>
       )}
-      {showRules && (
+      {showByRule && (
         <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col font-sans">
           <div className="px-3 py-3 border-b border-slate-200 bg-white flex items-center gap-2 shrink-0">
-            <button onClick={() => setShowRules(false)} className="text-slate-500 p-1 -ml-1"><ChevronLeft size={22} /></button>
-            <h2 className="font-bold text-slate-900 flex items-center gap-2"><BookOpen size={18} /> Rulebook</h2>
+            <button onClick={() => setShowByRule(false)} className="text-slate-500 p-1 -ml-1"><ChevronLeft size={22} /></button>
+            <h2 className="font-bold text-slate-900 flex items-center gap-2"><BarChart3 size={18} /> Violations by rule</h2>
           </div>
-          <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><RuleBook rules={rules} /></div></div>
+          <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><ByRule viols={viols} expandRule={expandRule} setExpandRule={setExpandRule} /></div></div>
         </div>
       )}
       {showShare && <ShareModal event={event} onClose={() => setShowShare(false)} />}
