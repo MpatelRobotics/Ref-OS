@@ -241,15 +241,18 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
 
   const [view, setView] = useState("teams");
   const [openTeam, setOpenTeam] = useState(null);
+  const [openMatch, setOpenMatch] = useState(null);
   const [query, setQuery] = useState("");
   const [lightbox, setLightbox] = useState(null);
   const [menu, setMenu] = useState(false);
   const [logFor, setLogFor] = useState(null);
+  const [logMatch, setLogMatch] = useState(null);
   const [addTeam, setAddTeam] = useState(false);
   const [expandRule, setExpandRule] = useState(null);
   const [showShare, setShowShare] = useState(false);
   const [showEvent, setShowEvent] = useState(false);
   const [showIdentity, setShowIdentity] = useState(false);
+  const [showClear, setShowClear] = useState(false);
 
   const refresh = useCallback(async () => {
     setSyncing(true);
@@ -353,10 +356,18 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
     setTeams((cur) => cur.filter((t) => t.number !== num));
     setOpenTeam(null);
   };
-  const clearAll = async () => {
-    try { await api.clearEvent(eventId); }
-    catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to clear the event."); return; } throw e; }
-    setTeams([]); setViols([]); setOpenTeam(null); setMenu(false);
+  const clearSelected = async (sel) => {
+    try {
+      if (sel.violations) { await api.clearViolations(eventId); setViols([]); }
+      if (sel.teams) { await api.clearTeams(eventId); setTeams([]); }
+      if (sel.schedule) { await api.clearMatches(eventId); setMatches({}); }
+    } catch (e) {
+      if (outbox.isOffline(e)) { alert("You're offline — reconnect to clear."); return; }
+      throw e;
+    }
+    if (sel.teams) setOpenTeam(null);
+    if (sel.schedule) setOpenMatch(null);
+    setShowClear(false); setMenu(false);
   };
 
   const countsByTeam = useMemo(() => {
@@ -367,6 +378,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
   const knownRules = useMemo(() => {
     const m = {}; for (const v of viols) if (v.code && !m[v.code]) m[v.code] = v.desc || ""; return m;
   }, [viols]);
+  const teamNameMap = useMemo(() => Object.fromEntries(teams.map((t) => [t.number, t.name])), [teams]);
 
   const exportCSV = () => {
     const rows = [["Team", "Team Name", "Match", "Type", "Rule", "Rule Description", "Notes", "Logged By", "Photos", "Time"]];
@@ -392,8 +404,8 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
     <div className="min-h-screen bg-slate-100 font-sans text-slate-800 antialiased">
       <header className="sticky top-0 z-20 bg-[#0D0F32] text-white shadow-lg">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
-          {openTeam ? (
-            <button onClick={() => setOpenTeam(null)} className="p-1 -ml-1 rounded hover:bg-white/10"><ChevronLeft size={22} /></button>
+          {(openTeam || openMatch) ? (
+            <button onClick={() => { setOpenTeam(null); setOpenMatch(null); }} className="p-1 -ml-1 rounded hover:bg-white/10"><ChevronLeft size={22} /></button>
           ) : (
             <div className="flex items-center gap-2 shrink-0">
               <img src="/logo.svg" alt="Highlander Summit" className="h-9 w-9 object-contain" />
@@ -440,16 +452,18 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
                 <button onClick={exportCSV} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Download size={16} /> Export CSV</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
                 <div className="border-t border-slate-100 my-1" />
-                <button onClick={() => { if (confirm("Delete ALL teams and violations for this event? This cannot be undone.")) clearAll(); }}
-                  className="w-full text-left px-4 py-2.5 hover:bg-red-50 text-red-600 flex items-center gap-2"><Trash2 size={16} /> Clear this event</button>
+                <button onClick={() => { setMenu(false); setShowClear(true); }}
+                  className="w-full text-left px-4 py-2.5 hover:bg-red-50 text-red-600 flex items-center gap-2"><Trash2 size={16} /> Clear data…</button>
               </div>
             )}
           </div>
         </div>
-        {!openTeam && (
+        {!openTeam && !openMatch && (
           <div className="max-w-2xl mx-auto px-4 flex gap-1">
-            {[{ k: "teams", label: "Teams", Icon: Users }, { k: "rules", label: "By Rule", Icon: BarChart3 }].map(({ k, label, Icon }) => (
-              <button key={k} onClick={() => setView(k)}
+            {[{ k: "teams", label: "Teams", Icon: Users },
+              ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
+              { k: "rules", label: "By Rule", Icon: BarChart3 }].map(({ k, label, Icon }) => (
+              <button key={k} onClick={() => { setView(k); setQuery(""); }}
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
                 <Icon size={15} /> {label}
               </button>
@@ -473,6 +487,11 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
         {openTeam ? (
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)}
             onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onDeleteTeam={deleteTeam} onOpenPhoto={setLightbox} />
+        ) : openMatch ? (
+          <MatchDetail num={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols}
+            onLogTeam={(n) => { setLogFor(n); setLogMatch(openMatch); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} />
+        ) : view === "matches" ? (
+          <MatchList matches={matches} teamName={teamNameMap} viols={viols} query={query} setQuery={setQuery} onOpen={setOpenMatch} />
         ) : view === "teams" ? (
           <>
             {!event?.quals ? (
@@ -528,19 +547,20 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
         )}
       </main>
 
-      {!openTeam && (
+      {!openTeam && !openMatch && (
         <button onClick={() => setLogFor("")} className="fixed bottom-5 left-1/2 -translate-x-1/2 z-20 bg-[#D7212B] text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
           <Plus size={20} /> Log violation
         </button>
       )}
 
       {logFor !== null && (
-        <LogModal teams={teams} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches}
-          onSetName={() => setShowIdentity(true)} onClose={() => setLogFor(null)}
-          onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await saveViolation({ ...form, team }); setLogFor(null); }} />
+        <LogModal teams={teams} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch}
+          onSetName={() => setShowIdentity(true)} onClose={() => { setLogFor(null); setLogMatch(null); }}
+          onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await saveViolation({ ...form, team }); setLogFor(null); setLogMatch(null); }} />
       )}
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
       {showIdentity && <IdentityModal me={{ name: meName }} onSave={async (n) => { await onEditName(n); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
+      {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length }} onClear={clearSelected} onClose={() => setShowClear(false)} />}
       {showShare && <ShareModal event={event} onClose={() => setShowShare(false)} />}
       {showEvent && <EventModal event={event} onSave={saveEvent} onClose={() => setShowEvent(false)} />}
       {lightbox && (
@@ -682,13 +702,13 @@ function ByRule({ viols, expandRule, setExpandRule }) {
 }
 
 /* ============================ LOG MODAL ============================ */
-function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches, onSetName, onClose, onSave }) {
+function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, onSetName, onClose, onSave }) {
   const [team, setTeam] = useState(presetTeam || (teams[0]?.number ?? ""));
   const [creatingNew, setCreatingNew] = useState(teams.length === 0);
   const [newNumber, setNewNumber] = useState("");
   const [newName, setNewName] = useState("");
-  const [matchPhase, setMatchPhase] = useState(lastMatch?.phase || "qual");
-  const [matchNum, setMatchNum] = useState(lastMatch?.num || "");
+  const [matchPhase, setMatchPhase] = useState(presetMatch ? "qual" : (lastMatch?.phase || "qual"));
+  const [matchNum, setMatchNum] = useState(presetMatch ? String(presetMatch) : (lastMatch?.num || ""));
   const [type, setType] = useState("minor");
   const [code, setCode] = useState("");
   const [desc, setDesc] = useState("");
@@ -969,6 +989,130 @@ function EventModal({ event, onSave, onClose }) {
   );
 }
 
+
+/* ============================ MATCHES ============================ */
+function MatchList({ matches, teamName, viols, query, setQuery, onOpen }) {
+  const list = Object.values(matches).sort((a, b) => a.num - b.num);
+  const vcount = {};
+  for (const v of viols) if (v.match && v.match.phase === "qual" && v.match.num) vcount[v.match.num] = (vcount[v.match.num] || 0) + 1;
+  const q = query.trim().toUpperCase();
+  const filtered = q
+    ? list.filter((m) => String(m.num) === q || String(m.num).startsWith(q) || m.red.some((t) => t.includes(q)) || m.blue.some((t) => t.includes(q)))
+    : list;
+  return (
+    <>
+      <div className="relative mb-4">
+        <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search match # or team"
+          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+      </div>
+      {filtered.length === 0 ? (
+        <Empty title="No matches" sub="Try a different match number or team." />
+      ) : (
+        <ul className="space-y-2">
+          {filtered.map((m) => (
+            <li key={m.num}>
+              <button onClick={() => onOpen(m.num)} className="w-full text-left bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3 hover:border-slate-300 hover:shadow-sm transition">
+                <span className="font-mono font-bold text-slate-900 w-11 shrink-0">Q{m.num}</span>
+                <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
+                  <span className="text-red-700 font-semibold">{m.red.join("  ")}</span>
+                  <span className="text-slate-300 font-sans">vs</span>
+                  <span className="text-blue-700 font-semibold">{m.blue.join("  ")}</span>
+                </div>
+                {vcount[m.num] ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold border bg-slate-100 text-slate-600 border-slate-300 shrink-0">{vcount[m.num]}</span> : null}
+                <ChevronRight size={16} className="text-slate-300 shrink-0" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+function MatchDetail({ num, match, teamName, viols, onLogTeam, onOpenPhoto, onDeleteViolation }) {
+  if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
+  const mv = viols.filter((v) => v.match && v.match.phase === "qual" && String(v.match.num) === String(num)).sort((a, b) => b.createdAt - a.createdAt);
+  const Alliance = ({ label, teams, color }) => (
+    <div className={`rounded-xl border p-3 ${color === "red" ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"}`}>
+      <p className={`text-xs font-bold uppercase tracking-wide mb-2 ${color === "red" ? "text-red-700" : "text-blue-700"}`}>{label}</p>
+      <div className="space-y-2">
+        {teams.map((n) => (
+          <button key={n} onClick={() => onLogTeam(n)} className="w-full flex items-center gap-2 bg-white rounded-lg border border-slate-200 px-3 py-2.5 text-left hover:border-slate-300">
+            <span className="font-mono font-bold text-slate-900">{n}</span>
+            {teamName[n] && <span className="text-sm text-slate-500 truncate">{teamName[n]}</span>}
+            <span className="ml-auto text-xs font-semibold text-[#D7212B] flex items-center gap-1 shrink-0"><Plus size={14} /> Log</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+  return (
+    <>
+      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+        <div className="font-mono font-bold text-2xl text-slate-900 leading-none">Q{num}</div>
+        {match.field && <div className="text-sm text-slate-500 mt-1">{match.field}</div>}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+        <Alliance label="Red alliance" teams={match.red} color="red" />
+        <Alliance label="Blue alliance" teams={match.blue} color="blue" />
+      </div>
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">Violations in this match ({mv.length})</h2>
+      {mv.length === 0 ? (
+        <Empty title="No violations logged" sub="Tap a team above to log one for this match." />
+      ) : (
+        <ul className="space-y-2">{mv.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} />)}</ul>
+      )}
+    </>
+  );
+}
+
+/* ============================ CLEAR MODAL ============================ */
+function ClearModal({ counts, onClear, onClose }) {
+  const [sel, setSel] = useState({ violations: false, teams: false, schedule: false });
+  const opts = [
+    { key: "violations", label: "Violations", desc: `${counts.violations} logged`, note: "Clears every violation and its photos." },
+    { key: "teams", label: "Teams", desc: `${counts.teams} teams`, note: "Removes the team roster." },
+    { key: "schedule", label: "Match schedule", desc: `${counts.schedule} matches`, note: "Removes the imported qual schedule." },
+  ];
+  const any = sel.violations || sel.teams || sel.schedule;
+  const toggle = (k) => setSel((s) => ({ ...s, [k]: !s[k] }));
+  const doClear = () => {
+    const names = opts.filter((o) => sel[o.key]).map((o) => o.label.toLowerCase()).join(", ");
+    if (confirm(`Permanently delete: ${names}?\nThis cannot be undone.`)) onClear(sel);
+  };
+  return (
+    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
+      <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
+        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200">
+          <h2 className="font-bold text-slate-900 flex items-center gap-2"><Trash2 size={18} /> Clear data</h2>
+          <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
+        </div>
+        <div className="p-4 space-y-2">
+          <p className="text-sm text-slate-500 mb-1">Choose what to delete. Anything you leave unchecked is kept.</p>
+          {opts.map((o) => {
+            const on = sel[o.key];
+            return (
+              <button key={o.key} onClick={() => toggle(o.key)}
+                className={`w-full flex items-start gap-3 text-left rounded-xl border-2 p-3 transition ${on ? "border-red-400 bg-red-50" : "border-slate-200 hover:border-slate-300"}`}>
+                <span className={`mt-0.5 w-5 h-5 rounded-md grid place-items-center shrink-0 border-2 ${on ? "bg-red-600 border-red-600 text-white" : "border-slate-300"}`}>{on && <Check size={13} />}</span>
+                <span className="flex-1">
+                  <span className="flex items-center gap-2"><b className="text-slate-800">{o.label}</b><span className="text-xs text-slate-400">{o.desc}</span></span>
+                  <span className="block text-xs text-slate-500 mt-0.5">{o.note}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="p-4 pt-0 flex gap-2">
+          <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 font-medium text-slate-600">Cancel</button>
+          <button onClick={doClear} disabled={!any}
+            className={`flex-1 py-2.5 rounded-lg font-semibold text-white ${any ? "bg-red-600 hover:bg-red-700" : "bg-slate-300"}`}>Clear selected</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ---------- shared bits ---------- */
 const Label = ({ children }) => <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">{children}</label>;

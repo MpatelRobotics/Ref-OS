@@ -148,12 +148,17 @@ export async function deleteViolation(v) {
   if (v.photoKeys?.length) await supabase.storage.from("robot-photos").remove(v.photoKeys);
   await supabase.from("violations").delete().eq("id", v.id);
 }
-export async function clearEvent(eventId) {
+export async function clearViolations(eventId) {
   const { data: vs } = await supabase.from("violations").select("photo_paths").eq("event_id", eventId);
   const paths = (vs || []).flatMap((v) => v.photo_paths || []);
   if (paths.length) await supabase.storage.from("robot-photos").remove(paths);
   await supabase.from("violations").delete().eq("event_id", eventId);
+}
+export async function clearTeams(eventId) {
   await supabase.from("teams").delete().eq("event_id", eventId);
+}
+export async function clearMatches(eventId) {
+  await supabase.from("matches").delete().eq("event_id", eventId);
 }
 
 /* ================= photos ================= */
