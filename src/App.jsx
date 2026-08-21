@@ -812,13 +812,14 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
     const selectedTeam = normNum(creatingNew ? newNumber : team);
     const selectedRule = normNum(code).replace(/[<>]/g, "");
     if (!edit && type === "minor" && selectedTeam && selectedRule) {
-      const priorMinors = (viols || []).filter((v) =>
-        v.type === "minor" &&
+      const matchingRuleViolations = (viols || []).filter((v) =>
         normNum(v.team) === selectedTeam &&
         normNum(v.code).replace(/[<>]/g, "") === selectedRule
-      ).length;
-      if (priorMinors >= 3) {
-        setRepeatWarning({ team: selectedTeam, rule: selectedRule, count: priorMinors });
+      );
+      const priorMinors = matchingRuleViolations.filter((v) => v.type === "minor").length;
+      const priorMajors = matchingRuleViolations.filter((v) => v.type === "major").length;
+      if (priorMajors > 0 || priorMinors >= 3) {
+        setRepeatWarning({ team: selectedTeam, rule: selectedRule, count: priorMinors, previouslyMajor: priorMajors > 0 });
         return;
       }
     }
@@ -975,8 +976,17 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
             <div className="p-5">
               <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 grid place-items-center mb-3"><ShieldAlert size={26} /></div>
               <h3 className="text-lg font-bold text-slate-900">Possible Major Violation</h3>
-              <p className="text-sm text-slate-600 mt-2">Team <b className="font-mono text-slate-900">{repeatWarning.team}</b> already has <b>{repeatWarning.count} Minor Violations</b> for <b className="font-mono text-slate-900">{fmtRule(repeatWarning.rule)}</b>.</p>
-              <p className="text-sm text-slate-600 mt-2">Because this rule is being violated repeatedly, consider whether this should be recorded as a Major Violation before saving.</p>
+              {repeatWarning.previouslyMajor ? (
+                <>
+                  <p className="text-sm text-slate-600 mt-2">Team <b className="font-mono text-slate-900">{repeatWarning.team}</b> has already had <b className="text-red-700">{fmtRule(repeatWarning.rule)} recorded as a Major Violation</b> after repeated violations.</p>
+                  <p className="text-sm text-slate-600 mt-2">This rule was previously escalated to Major for this team. Confirm before recording another Minor Violation.</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-600 mt-2">Team <b className="font-mono text-slate-900">{repeatWarning.team}</b> already has <b>{repeatWarning.count} Minor Violations</b> for <b className="font-mono text-slate-900">{fmtRule(repeatWarning.rule)}</b>.</p>
+                  <p className="text-sm text-slate-600 mt-2">Because this rule is being violated repeatedly, consider whether this should be recorded as a Major Violation before saving.</p>
+                </>
+              )}
             </div>
             <div className="border-t border-slate-200 p-3 flex flex-col gap-2">
               <button onClick={() => { setType("major"); setRepeatWarning(null); }} className="w-full py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold">Change to Major</button>
