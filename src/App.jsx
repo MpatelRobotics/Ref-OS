@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert,
-  ClipboardCheck, X, Search, BarChart3, Users, Download, Flag,
+  ClipboardCheck, X, Search, BarChart3, Users, Download,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
   CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload,
 } from "lucide-react";
@@ -181,16 +181,19 @@ function PasswordScreen({ onUnlock }) {
     if (pw === SITE_PASSWORD) onUnlock(); else setErr("Incorrect password.");
   };
   return (
-    <div className="min-h-screen bg-slate-900 text-white grid place-items-center p-6 font-sans">
+    <div className="min-h-screen bg-[#0D0F32] text-white grid place-items-center p-6 font-sans">
       <div className="w-full max-w-sm">
-        <div className="flex items-center gap-2 mb-6"><Flag className="text-amber-400" /> <span className="font-bold text-lg">Highlander Summit — Violation Log</span></div>
-        <p className="text-sm text-slate-400 mb-4">Enter the crew password to open the log.</p>
+        <div className="flex flex-col items-center text-center mb-6">
+          <img src="/logo.svg" alt="Highlander Summit" className="h-24 w-24 object-contain mb-3" />
+          <span className="font-bold text-lg">Highlander Summit — Violation Log</span>
+        </div>
+        <p className="text-sm text-slate-300 mb-4 text-center">Enter the crew password to open the log.</p>
         <input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} placeholder="Password" autoFocus
           onKeyDown={(e) => e.key === "Enter" && submit()}
-          className="w-full px-3 py-3 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400" />
+          className="w-full px-3 py-3 rounded-lg bg-[#1b1f4d] border border-[#2c3168] text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#D7212B]" />
         {err && <p className="text-sm text-red-400 mt-2">{err}</p>}
         <button onClick={submit} disabled={!pw}
-          className="w-full mt-3 py-3 rounded-lg font-semibold bg-amber-400 text-slate-900 disabled:bg-slate-700 disabled:text-slate-500">Enter</button>
+          className="w-full mt-3 py-3 rounded-lg font-semibold bg-[#D7212B] text-white hover:bg-[#B42024] disabled:bg-[#2c3168] disabled:text-slate-400">Enter</button>
       </div>
     </div>
   );
@@ -202,7 +205,7 @@ function NameScreen({ onName }) {
   return (
     <div className="min-h-screen bg-slate-100 grid place-items-center p-6 font-sans">
       <div className="w-full max-w-sm bg-white rounded-2xl border border-slate-200 p-5">
-        <div className="flex items-center gap-2 mb-1"><Flag className="text-amber-400" size={18} /><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Highlander Summit Signature</span></div>
+        <div className="flex items-center gap-2 mb-1"><img src="/logo.svg" alt="" className="h-6 w-6 object-contain" /><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Highlander Summit Signature</span></div>
         <h1 className="font-bold text-slate-900 text-lg">Welcome, ref</h1>
         <p className="text-sm text-slate-500 mt-1 mb-4">Your name is shown on every violation you log, so the crew knows who made the call.</p>
         <Label>Name or initials</Label>
@@ -383,11 +386,11 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans text-slate-800 antialiased">
-      <header className="sticky top-0 z-20 bg-slate-900 text-white shadow-lg">
+      <header className="sticky top-0 z-20 bg-[#0D0F32] text-white shadow-lg">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           {openTeam ? (
-            <button onClick={() => setOpenTeam(null)} className="p-1 -ml-1 rounded hover:bg-slate-800"><ChevronLeft size={22} /></button>
-          ) : (<Flag size={20} className="text-amber-400 shrink-0" />)}
+            <button onClick={() => setOpenTeam(null)} className="p-1 -ml-1 rounded hover:bg-white/10"><ChevronLeft size={22} /></button>
+          ) : (<img src="/logo.svg" alt="Highlander Summit" className="h-9 w-9 object-contain shrink-0" />)}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <h1 className="font-bold tracking-tight leading-none truncate">{event?.name || "Violation Log"}</h1>
@@ -412,12 +415,12 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
             </button>
           </div>
           <button onClick={() => setShowIdentity(true)} title="Your ref name"
-            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 rounded-full pl-1 pr-2.5 py-1">
-            <span className="w-6 h-6 rounded-full bg-amber-400 text-slate-900 text-[11px] font-bold grid place-items-center">{meName ? initials(meName) : "?"}</span>
+            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-full pl-1 pr-2.5 py-1">
+            <span className="w-6 h-6 rounded-full bg-[#D7212B] text-white text-[11px] font-bold grid place-items-center">{meName ? initials(meName) : "?"}</span>
             <span className="text-xs font-medium max-w-[70px] truncate">{meName || "Set name"}</span>
           </button>
           <div className="relative">
-            <button onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-slate-800"><Settings size={19} /></button>
+            <button onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
               <div className="absolute right-0 mt-2 w-56 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 py-1 text-sm">
                 <button onClick={() => { setMenu(false); setShowEvent(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><CalendarDays size={16} /> Event setup</button>
@@ -435,7 +438,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
           <div className="max-w-2xl mx-auto px-4 flex gap-1">
             {[{ k: "teams", label: "Teams", Icon: Users }, { k: "rules", label: "By Rule", Icon: BarChart3 }].map(({ k, label, Icon }) => (
               <button key={k} onClick={() => setView(k)}
-                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${view === k ? "border-amber-400 text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
                 <Icon size={15} /> {label}
               </button>
             ))}
@@ -461,8 +464,8 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
         ) : view === "teams" ? (
           <>
             {!event?.quals ? (
-              <button onClick={() => setShowEvent(true)} className="w-full mb-4 bg-slate-900 text-white rounded-xl p-4 flex items-center gap-3 text-left hover:bg-slate-800">
-                <CalendarDays size={22} className="text-amber-400 shrink-0" />
+              <button onClick={() => setShowEvent(true)} className="w-full mb-4 bg-[#0D0F32] text-white rounded-xl p-4 flex items-center gap-3 text-left hover:bg-[#171a45]">
+                <CalendarDays size={22} className="text-[#EBA622] shrink-0" />
                 <div className="flex-1"><p className="font-semibold leading-tight">Finish event setup</p>
                   <p className="text-xs text-slate-400 mt-0.5">Add how many matches so logging picks the match from a list.</p></div>
                 <ChevronRight size={18} className="text-slate-500" />
@@ -514,7 +517,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
       </main>
 
       {!openTeam && (
-        <button onClick={() => setLogFor("")} className="fixed bottom-5 left-1/2 -translate-x-1/2 z-20 bg-slate-900 text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-slate-800 active:scale-95 transition">
+        <button onClick={() => setLogFor("")} className="fixed bottom-5 left-1/2 -translate-x-1/2 z-20 bg-[#D7212B] text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
           <Plus size={20} /> Log violation
         </button>
       )}
@@ -562,7 +565,7 @@ function TeamDetail({ team, viols, onLog, onDeleteViolation, onDeleteTeam, onOpe
           </div>
           <button onClick={() => { if (confirm(`Delete team ${team.number} and all its violations?`)) onDeleteTeam(team.number); }} className="text-slate-400 hover:text-red-600 p-1"><Trash2 size={18} /></button>
         </div>
-        <button onClick={onLog} className="mt-4 w-full bg-slate-900 text-white py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-slate-800"><Plus size={18} /> Log violation for {team.number}</button>
+        <button onClick={onLog} className="mt-4 w-full bg-[#D7212B] text-white py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-[#B42024]"><Plus size={18} /> Log violation for {team.number}</button>
       </div>
       {byRule.length > 0 && (
         <div className="mb-4">
