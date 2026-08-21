@@ -13,6 +13,7 @@ import * as outbox from "./outbox";
    EVENT_ID must match supabase/seed.sql. A shared site password gates entry. */
 const EVENT_ID = "11111111-1111-4111-8111-111111111111";
 const SITE_PASSWORD = import.meta.env.VITE_SITE_PASSWORD || "";
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || "";
 
 /* ---------- helpers ---------- */
 const normNum = (n) => (n || "").trim().toUpperCase();
@@ -260,6 +261,33 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
   const [showClear, setShowClear] = useState(false);
   const [showOnline, setShowOnline] = useState(false);
   const [showByRule, setShowByRule] = useState(false);
+  const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const pendingAdminAction = useRef(null);
+
+  const requireAdmin = useCallback((action) => {
+    if (adminUnlocked) { action(); return; }
+    pendingAdminAction.current = action;
+    setShowAdminPassword(true);
+  }, [adminUnlocked]);
+
+  const unlockAdmin = (password) => {
+    if (!ADMIN_PASSWORD) return { ok: false, message: "Admin password isn't configured. Add VITE_ADMIN_PASSWORD to the environment." };
+    if (password !== ADMIN_PASSWORD) return { ok: false, message: "Incorrect admin password." };
+    sessionStorage.setItem("refosAdmin", "1");
+    setAdminUnlocked(true);
+    setShowAdminPassword(false);
+    const action = pendingAdminAction.current;
+    pendingAdminAction.current = null;
+    if (action) setTimeout(action, 0);
+    return { ok: true };
+  };
+
+  const lockAdmin = () => {
+    sessionStorage.removeItem("refosAdmin");
+    setAdminUnlocked(false);
+    setMenu(false);
+  };
 
   const refresh = useCallback(async () => {
     setSyncing(true);
@@ -490,10 +518,11 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
             <button onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
               <div className="absolute right-0 mt-2 w-56 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 py-1 text-sm">
-                <button onClick={() => { setMenu(false); setShowEvent(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><CalendarDays size={16} /> Event setup</button>
+                <button onClick={() => { setMenu(false); requireAdmin(() => setShowEvent(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><CalendarDays size={16} /> Event setup {adminUnlocked && <span className="ml-auto text-[10px] text-emerald-600 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Users size={16} /> Ref status</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
-                <button onClick={exportCSV} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Download size={16} /> Export CSV</button>
+                <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Download size={16} /> Export CSV</button>
+                {adminUnlocked && <button onClick={lockAdmin} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2 text-amber-700"><KeyRound size={16} /> Lock admin access</button>}
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
                 <div className="border-t border-slate-100 my-1" />
                 <button onClick={() => { setMenu(false); setShowClear(true); }}
@@ -546,14 +575,14 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
         ) : (
           <>
             {!event?.quals ? (
-              <button onClick={() => setShowEvent(true)} className="w-full mb-4 bg-[#0D0F32] text-white rounded-xl p-4 flex items-center gap-3 text-left hover:bg-[#171a45]">
+              <button onClick={() => requireAdmin(() => setShowEvent(true))} className="w-full mb-4 bg-[#0D0F32] text-white rounded-xl p-4 flex items-center gap-3 text-left hover:bg-[#171a45]">
                 <CalendarDays size={22} className="text-[#EBA622] shrink-0" />
                 <div className="flex-1"><p className="font-semibold leading-tight">Finish event setup</p>
                   <p className="text-xs text-slate-400 mt-0.5">Add how many matches so logging picks the match from a list.</p></div>
                 <ChevronRight size={18} className="text-slate-500" />
               </button>
             ) : (
-              <button onClick={() => setShowEvent(true)} className="w-full mb-4 bg-white border border-slate-200 rounded-xl px-4 py-2.5 flex items-center gap-2 text-left hover:border-slate-300">
+              <button onClick={() => requireAdmin(() => setShowEvent(true))} className="w-full mb-4 bg-white border border-slate-200 rounded-xl px-4 py-2.5 flex items-center gap-2 text-left hover:border-slate-300">
                 <CalendarDays size={16} className="text-slate-400 shrink-0" />
                 <span className="text-sm font-medium text-slate-700 truncate flex-1">{event.name || "Event"}</span>
                 <span className="text-xs text-slate-400">{event.quals} quals{event.bracket ? ` · top ${event.bracket}` : ""}</span>
@@ -636,6 +665,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
         </div>
       )}
       {showShare && <ShareModal event={event} onClose={() => setShowShare(false)} />}
+      {showAdminPassword && <AdminPasswordModal onUnlock={unlockAdmin} onClose={() => { pendingAdminAction.current = null; setShowAdminPassword(false); }} />}
       {showEvent && <EventModal event={event} onSave={saveEvent} onClose={() => setShowEvent(false)} />}
       {lightbox && (
         <div onClick={() => setLightbox(null)} className="fixed inset-0 z-[60] bg-black/90 grid place-items-center p-4">
@@ -1145,6 +1175,33 @@ function ShareModal({ event, onClose }) {
 }
 
 /* ============================ EVENT MODAL ============================ */
+function AdminPasswordModal({ onUnlock, onClose }) {
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
+  const submit = (e) => {
+    e?.preventDefault();
+    const result = onUnlock(pw);
+    if (!result?.ok) setErr(result?.message || "Incorrect admin password.");
+  };
+  return (
+    <div className="fixed inset-0 z-[70] bg-slate-950/60 grid place-items-center p-4" onMouseDown={onClose}>
+      <form onSubmit={submit} onMouseDown={(e) => e.stopPropagation()} className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-5">
+        <div className="flex items-center gap-3 mb-2">
+          <span className="w-10 h-10 rounded-full bg-[#0D0F32] text-white grid place-items-center"><KeyRound size={19} /></span>
+          <div><h2 className="font-bold text-slate-900">Admin access required</h2><p className="text-xs text-slate-500">Event editing and CSV export are admin only.</p></div>
+        </div>
+        <input autoFocus type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} placeholder="Admin password"
+          className="w-full mt-4 px-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+        {err && <p className="text-xs text-red-600 mt-2">{err}</p>}
+        <div className="flex gap-2 mt-4">
+          <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-medium">Cancel</button>
+          <button type="submit" className="flex-1 px-4 py-2.5 rounded-xl bg-[#0D0F32] text-white font-semibold">Unlock admin</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function EventModal({ event, onSave, onClose }) {
   const [name, setName] = useState(event?.name || "");
   const [quals, setQuals] = useState(event?.quals ? String(event.quals) : "");
