@@ -1116,9 +1116,10 @@ function MatchDetail({ num, match, teamName, viols, allNums, onNav, onLogTeam, o
   const stat = {};
   for (const v of viols) {
     const t = v.team;
-    stat[t] = stat[t] || { total: 0, minor: 0, major: 0, inspection: 0, codes: [] };
+    stat[t] = stat[t] || { total: 0, minor: 0, major: 0, inspection: 0, codes: {} };
     stat[t].total++; stat[t][v.type] = (stat[t][v.type] || 0) + 1;
-    if (v.code && !stat[t].codes.includes(v.code)) stat[t].codes.push(v.code);
+    const code = v.code || "—";
+    stat[t].codes[code] = (stat[t].codes[code] || 0) + 1;
   }
   const Alliance = ({ label, teams, color }) => (
     <div className={`rounded-xl border p-3 ${color === "red" ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"}`}>
@@ -1140,7 +1141,9 @@ function MatchDetail({ num, match, teamName, viols, allNums, onNav, onLogTeam, o
                     <span key={ty} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold border ${TYPES[ty].badge}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${TYPES[ty].dot}`} />{s[ty]}
                     </span>) : null)}
-                  {s.codes.map((c) => <span key={c} className="font-mono text-[11px] text-slate-500">{fmtRule(c)}</span>)}
+                  {Object.entries(s.codes).sort((a, b) => b[1] - a[1]).map(([c, n2]) => (
+                    <span key={c} className="font-mono text-[11px] text-slate-500">{fmtRule(c)}{n2 > 1 ? <span className="text-slate-400">×{n2}</span> : null}</span>
+                  ))}
                 </div>
               )}
             </button>
