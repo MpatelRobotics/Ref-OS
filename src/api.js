@@ -190,3 +190,12 @@ export function subscribeEvent(eventId, onChange) {
     .subscribe();
   return () => supabase.removeChannel(ch);
 }
+
+/* live presence — who's currently on the log. onChange gets an array of {name, ...} */
+export function joinPresence(eventId, meta, onChange) {
+  const key = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
+  const ch = supabase.channel(`presence-${eventId}`, { config: { presence: { key } } });
+  ch.on("presence", { event: "sync" }, () => onChange(Object.values(ch.presenceState()).flat()));
+  ch.subscribe((status) => { if (status === "SUBSCRIBED") ch.track(meta); });
+  return () => supabase.removeChannel(ch);
+}

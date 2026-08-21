@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert,
   ClipboardCheck, X, Search, BarChart3, Users, Download,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -233,6 +233,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
   const [online, setOnline] = useState(typeof navigator === "undefined" || navigator.onLine !== false);
   const [matches, setMatches] = useState({}); // { [num]: {red:[], blue:[]} }
   const [rules, setRules] = useState([]);      // [{ code, desc, category }]
+  const [presence, setPresence] = useState([]); // [{ name, ... }] currently online
   const pendingCount = viols.filter((v) => v._pending).length;
 
   const [lastMatch, setLastMatch] = useState(() => {
@@ -304,6 +305,11 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
       clearInterval(iv);
     };
   }, [eventId, refresh, doFlush]);
+
+  useEffect(() => {
+    const leave = api.joinPresence(eventId, { name: meName || "Ref", online_at: Date.now() }, setPresence);
+    return leave;
+  }, [eventId, meName]);
 
   const saveEvent = async (data) => {
     const ev = await api.updateEvent(eventId, {
@@ -382,6 +388,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
   }, [viols]);
   const teamNameMap = useMemo(() => Object.fromEntries(teams.map((t) => [t.number, t.name])), [teams]);
   const matchNums = useMemo(() => Object.keys(matches).map(Number).sort((a, b) => a - b), [matches]);
+  const onlineCount = useMemo(() => new Set(presence.map((p) => p.name || "Ref")).size, [presence]);
 
   const exportCSV = () => {
     const rows = [["Team", "Team Name", "Match", "Type", "Rule", "Rule Description", "Notes", "Logged By", "Photos", "Time"]];
@@ -462,12 +469,13 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
           </div>
         </div>
         {!openTeam && !openMatch && (
-          <div className="max-w-2xl mx-auto px-4 flex gap-1">
+          <div className="max-w-2xl mx-auto px-4 flex gap-1 overflow-x-auto">
             {[{ k: "teams", label: "Teams", Icon: Users },
               ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
-              { k: "rules", label: "By Rule", Icon: BarChart3 }].map(({ k, label, Icon }) => (
+              { k: "rules", label: "By Rule", Icon: BarChart3 },
+              { k: "online", label: `Online${onlineCount ? ` ${onlineCount}` : ""}`, Icon: Wifi }].map(({ k, label, Icon }) => (
               <button key={k} onClick={() => { setView(k); setQuery(""); }}
-                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
+                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
                 <Icon size={15} /> {label}
               </button>
             ))}
@@ -495,6 +503,8 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
             onLogTeam={(n) => { setLogFor(n); setLogMatch(openMatch); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} />
         ) : view === "matches" ? (
           <MatchList matches={matches} teamName={teamNameMap} viols={viols} query={query} setQuery={setQuery} onOpen={setOpenMatch} />
+        ) : view === "online" ? (
+          <OnlineList presence={presence} meName={meName} />
         ) : view === "teams" ? (
           <>
             {!event?.quals ? (
@@ -1197,6 +1207,29 @@ function ClearModal({ counts, onClear, onClose }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/* ============================ ONLINE (presence) ============================ */
+function OnlineList({ presence, meName }) {
+  const byName = {};
+  for (const p of presence) { const n = p.name || "Ref"; byName[n] = (byName[n] || 0) + 1; }
+  const names = Object.keys(byName).sort((a, b) => a.localeCompare(b));
+  return (
+    <>
+      <p className="text-xs text-slate-400 mb-3">{names.length} ref{names.length !== 1 ? "s" : ""} on the log right now. Updates live as people join or leave.</p>
+      <ul className="space-y-2">
+        {names.map((n) => (
+          <li key={n} className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3">
+            <span className="w-8 h-8 rounded-full bg-[#D7212B] text-white text-xs font-bold grid place-items-center shrink-0">{initials(n)}</span>
+            <span className="font-medium text-slate-800 truncate">{n}{n === meName && <span className="text-xs text-slate-400 ml-1">(you)</span>}</span>
+            <span className="ml-auto inline-flex items-center gap-1 text-xs text-emerald-600 shrink-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" /> online{byName[n] > 1 ? ` · ${byName[n]} devices` : ""}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
