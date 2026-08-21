@@ -75,6 +75,7 @@ create table if not exists public.teams (
   primary key (event_id, number)
 );
 alter table public.teams enable row level security;
+alter table public.teams add column if not exists photo_paths text[] default '{}';
 drop policy if exists "members rw teams" on public.teams;
 drop policy if exists "open rw teams" on public.teams;
 create policy "open rw teams" on public.teams for all using (true) with check (true);

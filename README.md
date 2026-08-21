@@ -80,6 +80,7 @@ issued automatically.
 ## How refs use it
 - **Sign in** with email (one-tap link, no password).
 - **Open the site** by entering the shared crew password, then set a ref name. The app is locked to the one Highlander Summit event.
+- **Robots tab:** tap a team to add robot photos during inspection (stored on the team, viewable any time).
 - **Everyone in** has the same tools from the menu: event setup (match counts), invite (share the link), export CSV, lock the device, and clear-event.
 - **Invite crew** — menu → *Invite other refs* → share the site link and the 6-character event code.
 - **Log a violation** — pick the team (or type a new one), pick the match from the dropdown, choose minor/major/inspection, cite the rule, snap robot photos, add notes.

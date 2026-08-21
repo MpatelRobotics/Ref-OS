@@ -244,6 +244,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
   const [view, setView] = useState("teams");
   const [openTeam, setOpenTeam] = useState(null);
   const [openMatch, setOpenMatch] = useState(null);
+  const [openRobot, setOpenRobot] = useState(null);
   const [query, setQuery] = useState("");
   const [lightbox, setLightbox] = useState(null);
   const [menu, setMenu] = useState(false);
@@ -366,6 +367,14 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
     setTeams((cur) => cur.filter((t) => t.number !== num));
     setOpenTeam(null);
   };
+  const addRobotPhoto = async (number, dataUrl) => {
+    const paths = await api.addTeamPhoto(eventId, number, dataUrl);
+    setTeams((cur) => cur.map((t) => (t.number === number ? { ...t, photoKeys: paths } : t)));
+  };
+  const removeRobotPhoto = async (number, path) => {
+    const paths = await api.removeTeamPhoto(eventId, number, path);
+    setTeams((cur) => cur.map((t) => (t.number === number ? { ...t, photoKeys: paths } : t)));
+  };
   const clearSelected = async (sel) => {
     try {
       if (sel.violations) { await api.clearViolations(eventId); setViols([]); }
@@ -415,8 +424,8 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
     <div className="min-h-screen bg-slate-100 font-sans text-slate-800 antialiased">
       <header className="sticky top-0 z-20 bg-[#0D0F32] text-white shadow-lg">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
-          {(openTeam || openMatch) ? (
-            <button onClick={() => { setOpenTeam(null); setOpenMatch(null); }} className="p-1 -ml-1 rounded hover:bg-white/10"><ChevronLeft size={22} /></button>
+          {(openTeam || openMatch || openRobot) ? (
+            <button onClick={() => { setOpenTeam(null); setOpenMatch(null); setOpenRobot(null); }} className="p-1 -ml-1 rounded hover:bg-white/10"><ChevronLeft size={22} /></button>
           ) : (
             <div className="flex items-center gap-2 shrink-0">
               <img src="/logo.svg" alt="Highlander Summit" className="h-9 w-9 object-contain" />
@@ -471,10 +480,11 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
             )}
           </div>
         </div>
-        {!openTeam && !openMatch && (
+        {!openTeam && !openMatch && !openRobot && (
           <div className="max-w-2xl mx-auto px-4 flex gap-1 overflow-x-auto">
             {[{ k: "teams", label: "Teams", Icon: Users },
               ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
+              { k: "robots", label: "Robots", Icon: Camera },
               ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])].map(({ k, label, Icon }) => (
               <button key={k} onClick={() => { setView(k); setQuery(""); }}
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
@@ -503,8 +513,12 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
         ) : openMatch ? (
           <MatchDetail num={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols} allNums={matchNums} onNav={setOpenMatch}
             onLogTeam={(n) => { setLogFor(n); setLogMatch(openMatch); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} />
+        ) : openRobot ? (
+          <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onOpenPhoto={setLightbox} />
         ) : view === "matches" ? (
           <MatchList matches={matches} teamName={teamNameMap} viols={viols} query={query} setQuery={setQuery} onOpen={setOpenMatch} />
+        ) : view === "robots" ? (
+          <RobotList teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "rulebook" ? (
           <RuleBook rules={rules} />
         ) : (
@@ -560,7 +574,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
         )}
       </main>
 
-      {!openTeam && !openMatch && (
+      {!openTeam && !openMatch && !openRobot && (
         <button onClick={() => setLogFor("")} className="fixed bottom-5 left-1/2 -translate-x-1/2 z-20 bg-[#D7212B] text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
           <Plus size={20} /> Log violation
         </button>
@@ -1305,6 +1319,88 @@ function OnlineList({ presence, meName }) {
           </li>
         ))}
       </ul>
+    </>
+  );
+}
+
+/* ============================ ROBOTS (inspection photos) ============================ */
+function RobotList({ teams, query, setQuery, onOpen }) {
+  const q = query.trim().toUpperCase();
+  const list = [...teams].sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
+  const filtered = q ? list.filter((t) => t.number.toUpperCase().includes(q) || (t.name || "").toUpperCase().includes(q)) : list;
+  const withPhotos = teams.filter((t) => (t.photoKeys || []).length > 0).length;
+  return (
+    <>
+      <p className="text-xs text-slate-400 mb-3">{withPhotos} of {teams.length} teams have a robot photo. Tap a team to add inspection photos.</p>
+      <div className="relative mb-4">
+        <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search team #"
+          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+      </div>
+      {filtered.length === 0 ? (
+        <Empty title="No teams" sub="Try a different team number." />
+      ) : (
+        <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {filtered.map((t) => {
+            const key = (t.photoKeys || [])[0];
+            return (
+              <li key={t.number}>
+                <button onClick={() => onOpen(t.number)} className="w-full bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-slate-300 hover:shadow-sm transition text-left">
+                  <div className="aspect-square bg-slate-100 grid place-items-center">
+                    {key ? <Thumb pkey={key} /> : <Camera size={26} className="text-slate-300" />}
+                  </div>
+                  <div className="px-2.5 py-2 flex items-center gap-1.5">
+                    <span className="font-mono font-bold text-slate-900 text-sm truncate">{t.number}</span>
+                    {(t.photoKeys || []).length > 0 && <span className="ml-auto text-[10px] font-semibold text-slate-400">{t.photoKeys.length}</span>}
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
+  );
+}
+
+function RobotDetail({ team, onAddPhoto, onRemovePhoto, onOpenPhoto }) {
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef(null);
+  if (!team) return <Empty title="Team not found" sub="" />;
+  const photos = team.photoKeys || [];
+  const add = async (files) => {
+    const list = Array.from(files).slice(0, 6);
+    setBusy(true);
+    for (const f of list) {
+      try { const d = await compress(f); await onAddPhoto(team.number, d); }
+      catch (e) { alert("Couldn't save that photo — check your connection."); break; }
+    }
+    setBusy(false);
+  };
+  return (
+    <>
+      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+        <div className="font-mono font-bold text-2xl text-slate-900 leading-none">{team.number}</div>
+        {team.name && <div className="text-sm text-slate-500 mt-1">{team.name}</div>}
+      </div>
+      <button onClick={() => fileRef.current?.click()} disabled={busy}
+        className="w-full mb-4 bg-[#D7212B] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-[#B42024] disabled:bg-slate-300">
+        <Camera size={18} /> {busy ? "Saving…" : photos.length ? "Add another photo" : "Add robot photo"}
+      </button>
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => { add(e.target.files); e.target.value = ""; }} />
+      {photos.length === 0 ? (
+        <Empty title="No robot photos yet" sub="Snap the robot during inspection so refs can reference it later." />
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {photos.map((p) => (
+            <div key={p} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+              <button onClick={() => onOpenPhoto(p)} className="w-full h-full"><Thumb pkey={p} /></button>
+              <button onClick={() => { if (confirm("Delete this robot photo?")) onRemovePhoto(team.number, p); }}
+                className="absolute top-1 right-1 bg-slate-900/80 text-white rounded-full p-1"><Trash2 size={13} /></button>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }

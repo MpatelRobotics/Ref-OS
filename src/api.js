@@ -67,7 +67,7 @@ export async function listMembers(eventId) {
 }
 
 /* ================= teams ================= */
-const mapTeam = (r) => ({ number: r.number, name: r.name || "", createdAt: new Date(r.created_at).getTime() });
+const mapTeam = (r) => ({ number: r.number, name: r.name || "", photoKeys: r.photo_paths || [], createdAt: new Date(r.created_at).getTime() });
 export async function listTeams(eventId) {
   const { data } = await supabase.from("teams").select("*").eq("event_id", eventId);
   return (data || []).map(mapTeam);
@@ -98,6 +98,28 @@ export async function deleteTeam(eventId, number) {
   if (paths.length) await supabase.storage.from("robot-photos").remove(paths);
   await supabase.from("violations").delete().eq("event_id", eventId).eq("team", number);
   await supabase.from("teams").delete().eq("event_id", eventId).eq("number", number);
+}
+
+/* ---- robot inspection photos (stored on the team) ---- */
+export async function addTeamPhoto(eventId, number, dataUrl) {
+  const num = (number || "").trim().toUpperCase();
+  const id = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
+  const path = `${eventId}/team/${num}/${id}.jpg`;
+  const up = await supabase.storage.from("robot-photos").upload(path, dataURLtoBlob(dataUrl), { contentType: "image/jpeg", upsert: true });
+  if (up.error) throw up.error;
+  const { data: t } = await supabase.from("teams").select("photo_paths").eq("event_id", eventId).eq("number", num).single();
+  const paths = [...((t && t.photo_paths) || []), path];
+  const { error } = await supabase.from("teams").update({ photo_paths: paths }).eq("event_id", eventId).eq("number", num);
+  if (error) throw error;
+  return paths;
+}
+export async function removeTeamPhoto(eventId, number, path) {
+  const num = (number || "").trim().toUpperCase();
+  await supabase.storage.from("robot-photos").remove([path]);
+  const { data: t } = await supabase.from("teams").select("photo_paths").eq("event_id", eventId).eq("number", num).single();
+  const paths = ((t && t.photo_paths) || []).filter((p) => p !== path);
+  await supabase.from("teams").update({ photo_paths: paths }).eq("event_id", eventId).eq("number", num);
+  return paths;
 }
 
 /* ================= matches (qualification schedule) ================= */
