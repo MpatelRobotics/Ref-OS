@@ -231,6 +231,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
   const [syncing, setSyncing] = useState(false);
   const [syncedAt, setSyncedAt] = useState(0);
   const [online, setOnline] = useState(typeof navigator === "undefined" || navigator.onLine !== false);
+  const [matches, setMatches] = useState({}); // { [num]: {red:[], blue:[]} }
   const pendingCount = viols.filter((v) => v._pending).length;
 
   const [lastMatch, setLastMatch] = useState(() => {
@@ -270,6 +271,9 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
   useEffect(() => {
     (async () => {
       await refresh();
+      api.listMatches(eventId).then((list) => {
+        const map = {}; for (const m of list) map[m.num] = m; setMatches(map);
+      });
       // restore violations still waiting in the queue (e.g. after a reload while offline)
       const q = await outbox.loadQueue(eventId);
       const pend = q.filter((o) => o.kind === "violation").map((o) => ({
@@ -531,7 +535,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
       )}
 
       {logFor !== null && (
-        <LogModal teams={teams} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event}
+        <LogModal teams={teams} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches}
           onSetName={() => setShowIdentity(true)} onClose={() => setLogFor(null)}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await saveViolation({ ...form, team }); setLogFor(null); }} />
       )}
@@ -678,7 +682,7 @@ function ByRule({ viols, expandRule, setExpandRule }) {
 }
 
 /* ============================ LOG MODAL ============================ */
-function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, onSetName, onClose, onSave }) {
+function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, matches, onSetName, onClose, onSave }) {
   const [team, setTeam] = useState(presetTeam || (teams[0]?.number ?? ""));
   const [creatingNew, setCreatingNew] = useState(teams.length === 0);
   const [newNumber, setNewNumber] = useState("");
@@ -754,6 +758,29 @@ function LogModal({ teams, presetTeam, knownRules, me, lastMatch, event, onSetNa
               })()}
             </div>
             {fmtMatch({ phase: matchPhase, num: matchNum }) && (<p className="text-[11px] text-slate-400 mt-1">Recorded as <b className="font-mono text-slate-600">{fmtMatch({ phase: matchPhase, num: matchNum })}</b></p>)}
+            {(() => {
+              const m = matchPhase === "qual" && matchNum ? matches?.[Number(matchNum)] : null;
+              if (!m) return null;
+              const chip = (num, color) => {
+                const on = !creatingNew && team === num;
+                return (
+                  <button key={num} onClick={() => { setCreatingNew(false); setTeam(num); }}
+                    className={`px-2.5 py-1.5 rounded-lg text-sm font-mono font-semibold border-2 transition ${on
+                      ? (color === "red" ? "bg-red-600 text-white border-red-600" : "bg-blue-600 text-white border-blue-600")
+                      : (color === "red" ? "bg-red-50 text-red-700 border-red-200 hover:border-red-400" : "bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-400")}`}>{num}</button>
+                );
+              };
+              return (
+                <div className="mt-2 bg-slate-50 border border-slate-200 rounded-lg p-2.5">
+                  <p className="text-[11px] text-slate-400 mb-1.5">Teams in this match — tap the one that committed the violation:</p>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {m.red.map((n) => chip(n, "red"))}
+                    <span className="text-slate-300 px-1">vs</span>
+                    {m.blue.map((n) => chip(n, "blue"))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           <div>

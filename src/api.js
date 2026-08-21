@@ -100,6 +100,12 @@ export async function deleteTeam(eventId, number) {
   await supabase.from("teams").delete().eq("event_id", eventId).eq("number", number);
 }
 
+/* ================= matches (qualification schedule) ================= */
+export async function listMatches(eventId) {
+  const { data } = await supabase.from("matches").select("num,red,blue,field").eq("event_id", eventId).order("num");
+  return (data || []).map((m) => ({ num: m.num, red: m.red || [], blue: m.blue || [], field: m.field || "" }));
+}
+
 /* ================= violations ================= */
 const mapViol = (r) => ({
   id: r.id, team: r.team, type: r.type, code: r.code, desc: r.rule_desc || "",

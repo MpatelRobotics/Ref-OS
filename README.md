@@ -22,6 +22,7 @@ Auth + Storage + Realtime).
 1. Create a new project at supabase.com. Set a database password and pick a region near your events.
 2. Open **SQL Editor**, paste the entire contents of `supabase/schema.sql`, and click **Run**. This creates the tables, security rules, the photo storage bucket, and realtime.
 3. In the SQL Editor, paste `supabase/seed.sql` and **Run** it too. This creates the single locked event (The Highlander Summit Signature Event) and preloads your teams.
+4. (Optional, once the schedule exists) Paste `supabase/seed_matches.sql` and **Run** it to load the qualification match schedule. Then, when logging, picking a qual match shows that match's 4 teams as red/blue tap-chips so refs tap the offender instead of scrolling the full roster. Re-run any time the schedule changes.
 3. Open **Authentication → Providers → Email** and make sure **Email** is enabled (magic-link / OTP sign-in is on by default).
 4. Under **Authentication → URL Configuration**, set **Site URL** to where the app will live. For local testing use `http://localhost:5173`; add your real domain once deployed.
 5. Open **Project Settings → API** and copy the **Project URL** and the **anon public** key.

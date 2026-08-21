@@ -155,3 +155,18 @@ drop policy if exists "open delete photos" on storage.objects;
 create policy "open read photos"   on storage.objects for select using (bucket_id = 'robot-photos');
 create policy "open upload photos" on storage.objects for insert with check (bucket_id = 'robot-photos');
 create policy "open delete photos" on storage.objects for delete using (bucket_id = 'robot-photos');
+
+-- ---------- match schedule (qualification) ----------
+create table if not exists public.matches (
+  event_id uuid references public.events(id) on delete cascade,
+  num      int not null,               -- qualification match number (Q<num>)
+  red      text[] not null default '{}',
+  blue     text[] not null default '{}',
+  field    text,
+  scheduled timestamptz,
+  primary key (event_id, num)
+);
+alter table public.matches enable row level security;
+drop policy if exists "open rw matches" on public.matches;
+create policy "open rw matches" on public.matches for all using (true) with check (true);
+create index if not exists matches_event_idx on public.matches(event_id);
