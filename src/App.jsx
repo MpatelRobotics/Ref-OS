@@ -566,19 +566,21 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
               <div className="absolute right-0 mt-2 w-56 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 py-1 text-sm">
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowEvent(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><CalendarDays size={16} /> Event setup {adminUnlocked && <span className="ml-auto text-[10px] text-emerald-600 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Users size={16} /> Ref status</button>
-                {!adminUnlocked ? (
-                  <button onClick={() => { setMenu(false); pendingAdminAction.current = null; setShowAdminPassword(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><KeyRound size={16} /> Admin login</button>
-                ) : (
-                  <div className="w-full px-4 py-2.5 flex items-center gap-2 text-emerald-700 bg-emerald-50/60"><KeyRound size={16} /> Admin mode <span className="ml-auto text-[10px] font-semibold">ACTIVE</span></div>
-                )}
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
                 <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Download size={16} /> Export violations</button>
                 <button onClick={() => requireAdmin(exportNominations)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Trophy size={16} /> Export nominations</button>
-                {adminUnlocked && <button onClick={lockAdmin} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2 text-amber-700"><KeyRound size={16} /> Lock admin access</button>}
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
                 <div className="border-t border-slate-100 my-1" />
-                <button onClick={() => { setMenu(false); setShowClear(true); }}
-                  className="w-full text-left px-4 py-2.5 hover:bg-red-50 text-red-600 flex items-center gap-2"><Trash2 size={16} /> Clear data…</button>
+                {!adminUnlocked ? (
+                  <button onClick={() => { setMenu(false); pendingAdminAction.current = null; setShowAdminPassword(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><KeyRound size={16} /> Admin login</button>
+                ) : (
+                  <>
+                    <div className="w-full px-4 py-2.5 flex items-center gap-2 text-emerald-700 bg-emerald-50/60"><KeyRound size={16} /> Admin mode <span className="ml-auto text-[10px] font-semibold">ACTIVE</span></div>
+                    <button onClick={lockAdmin} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2 text-amber-700"><KeyRound size={16} /> Lock admin access</button>
+                  </>
+                )}
+                <button onClick={() => { setMenu(false); requireAdmin(() => setShowClear(true)); }}
+                  className="w-full text-left px-4 py-2.5 hover:bg-red-50 text-red-600 flex items-center gap-2"><Trash2 size={16} /> Clear data… {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
               </div>
             )}
           </div>
