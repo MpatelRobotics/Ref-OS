@@ -14,6 +14,7 @@ import * as outbox from "./outbox";
 const EVENT_ID = "11111111-1111-4111-8111-111111111111";
 const SITE_PASSWORD = import.meta.env.VITE_SITE_PASSWORD || "";
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || "";
+const JUDGE_PASSWORD = import.meta.env.VITE_JUDGE_PASSWORD || "";
 
 /* ---------- helpers ---------- */
 const normNum = (n) => (n || "").trim().toUpperCase();
@@ -130,6 +131,7 @@ function Thumb({ pkey, onOpen }) {
 /* ==================================================================== */
 export default function App() {
   const [unlocked, setUnlocked] = useState(() => localStorage.getItem("unlocked") === "1");
+  const [role, setRole] = useState(() => localStorage.getItem("refosRole") || "ref");
   const [meName, setMeName] = useState(() => localStorage.getItem("refName") || "");
   const [event, setEvent] = useState(null);
   const [loadErr, setLoadErr] = useState(false);
@@ -141,9 +143,9 @@ export default function App() {
     return () => { live = false; };
   }, [unlocked, meName]);
 
-  const unlock = () => { localStorage.setItem("unlocked", "1"); setUnlocked(true); };
+  const unlock = (r) => { localStorage.setItem("unlocked", "1"); localStorage.setItem("refosRole", r || "ref"); setRole(r || "ref"); setUnlocked(true); };
   const saveName = (n) => { localStorage.setItem("refName", n.trim()); setMeName(n.trim()); };
-  const lock = () => { localStorage.removeItem("unlocked"); setUnlocked(false); setEvent(null); };
+  const lock = () => { localStorage.removeItem("unlocked"); localStorage.removeItem("refosRole"); setUnlocked(false); setEvent(null); };
 
   if (!configured) return <ConfigError />;
   if (!unlocked) return <PasswordScreen onUnlock={unlock} />;
@@ -158,7 +160,7 @@ export default function App() {
   );
   if (!event) return <FullPage>Loading…</FullPage>;
 
-  return <Tracker key={event.id} initialEvent={event} meName={meName} onEditName={saveName} onLock={lock} />;
+  return <Tracker key={event.id} initialEvent={event} meName={meName} role={role} onEditName={saveName} onLock={lock} />;
 }
 
 const FullPage = ({ children }) => (
@@ -178,8 +180,10 @@ function PasswordScreen({ onUnlock }) {
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
   const submit = () => {
-    if (!SITE_PASSWORD) { setErr("Site password isn't set. Add VITE_SITE_PASSWORD to the environment."); return; }
-    if (pw === SITE_PASSWORD) onUnlock(); else setErr("Incorrect password.");
+    if (!SITE_PASSWORD && !JUDGE_PASSWORD) { setErr("Site password isn't set. Add VITE_SITE_PASSWORD to the environment."); return; }
+    if (SITE_PASSWORD && pw === SITE_PASSWORD) { onUnlock("ref"); return; }
+    if (JUDGE_PASSWORD && pw === JUDGE_PASSWORD) { onUnlock("judge"); return; }
+    setErr("Incorrect password.");
   };
   return (
     <div className="min-h-screen bg-[#0D0F32] text-white grid place-items-center p-6 font-sans">
@@ -223,7 +227,8 @@ function NameScreen({ onName }) {
 /* ==================================================================== */
 /*  TRACKER (the main app, scoped to one event)                        */
 /* ==================================================================== */
-function Tracker({ initialEvent, meName, onEditName, onLock }) {
+function Tracker({ initialEvent, meName, role, onEditName, onLock }) {
+  const isJudge = role === "judge";
   const eventId = initialEvent.id;
   const [event, setEvent] = useState(initialEvent);
   const [teams, setTeams] = useState([]);
@@ -243,7 +248,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
     catch { return { phase: "qual", num: "" }; }
   });
 
-  const [view, setView] = useState("teams");
+  const [view, setView] = useState(role === "judge" ? "judging" : "teams");
   const [openTeam, setOpenTeam] = useState(null);
   const [openMatch, setOpenMatch] = useState(null);
   const [openRobot, setOpenRobot] = useState(null);
@@ -554,7 +559,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
             </button>
           </div>
           <OnlineCluster presence={presence} onClick={() => setShowOnline(true)} />
-          <button onClick={() => setShowByRule(true)} title="By rule" className="p-1.5 rounded hover:bg-white/10"><BarChart3 size={18} /></button>
+          {!isJudge && <button onClick={() => setShowByRule(true)} title="By rule" className="p-1.5 rounded hover:bg-white/10"><BarChart3 size={18} /></button>}
           <button onClick={() => setShowIdentity(true)} title="Your ref name"
             className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-full pl-1 pr-2.5 py-1">
             <span className="w-6 h-6 rounded-full bg-[#D7212B] text-white text-[11px] font-bold grid place-items-center">{meName ? initials(meName) : "?"}</span>
@@ -564,6 +569,16 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
             <button onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
               <div className="absolute right-0 mt-2 w-56 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 py-1 text-sm">
+                {isJudge ? (
+                  <>
+                    <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><Trophy size={12} /> Judge Advisor</div>
+                    <button onClick={() => { setMenu(false); exportNominations(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Download size={16} /> Export nominations</button>
+                    <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
+                    <div className="border-t border-slate-100 my-1" />
+                    <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
+                  </>
+                ) : (
+                <>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowEvent(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><CalendarDays size={16} /> Event setup {adminUnlocked && <span className="ml-auto text-[10px] text-emerald-600 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Users size={16} /> Ref status</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
@@ -581,17 +596,20 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
                 )}
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowClear(true)); }}
                   className="w-full text-left px-4 py-2.5 hover:bg-red-50 text-red-600 flex items-center gap-2"><Trash2 size={16} /> Clear data… {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
+                </>
+                )}
               </div>
             )}
           </div>
         </div>
         {!openTeam && !openMatch && !openRobot && (
           <div className="max-w-2xl mx-auto px-4 flex gap-1 overflow-x-auto">
-            {[{ k: "teams", label: "Teams", Icon: Users },
+            {(isJudge ? [{ k: "judging", label: "Judging", Icon: Trophy }] : [
+              { k: "teams", label: "Teams", Icon: Users },
               ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
               { k: "robots", label: "Robots", Icon: Camera },
               { k: "judging", label: "Judging", Icon: Trophy },
-              ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])].map(({ k, label, Icon }) => (
+              ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])]).map(({ k, label, Icon }) => (
               <button key={k} onClick={() => { setView(k); setQuery(""); }}
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
                 <Icon size={15} /> {label}
@@ -626,7 +644,10 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
         ) : view === "robots" ? (
           <RobotList teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "judging" ? (
-          <JudgingView noms={noms} viols={viols} teamName={teamNameMap} finalists={finalists} onToggleFinalist={(award, team) => requireAdmin(() => toggleFinalist(award, team))} onNominate={(award) => setNominating(award || "sportsmanship")} onDeleteNom={removeNomination} />
+          <JudgingView noms={noms} viols={viols} teamName={teamNameMap} finalists={finalists}
+            onToggleFinalist={(award, team) => (isJudge ? toggleFinalist(award, team) : requireAdmin(() => toggleFinalist(award, team)))}
+            onNominate={(award) => setNominating(award || "sportsmanship")} onDeleteNom={removeNomination}
+            onExport={() => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
         ) : view === "rulebook" ? (
           <RuleBook rules={rules} />
         ) : (
@@ -1652,7 +1673,7 @@ const AWARDS = [
 ];
 const G_RULE = /^G[1-5]$/i;
 
-function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNominate, onDeleteNom }) {
+function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNominate, onDeleteNom, onExport }) {
   const [award, setAward] = useState("sportsmanship");
   const [openTeam, setOpenTeam] = useState(null);
 
@@ -1674,6 +1695,11 @@ function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNom
 
   return (
     <>
+      {onExport && noms.length > 0 && (
+        <div className="flex justify-end mb-2">
+          <button onClick={onExport} className="inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 bg-white rounded-lg px-3 py-1.5"><Download size={15} /> Export nominations</button>
+        </div>
+      )}
       <div className="flex gap-1.5 mb-4">
         {AWARDS.map((a) => (
           <button key={a.key} onClick={() => { setAward(a.key); setOpenTeam(null); }}
