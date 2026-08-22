@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -251,6 +251,9 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
   const [lightbox, setLightbox] = useState(null);
   const [menu, setMenu] = useState(false);
   const [logFor, setLogFor] = useState(null);
+  const [noms, setNoms] = useState([]);
+  const [finalists, setFinalists] = useState(new Set()); // `${award}::${team}`
+  const [nominating, setNominating] = useState(null); // award key when the nominate modal is open
   const [editing, setEditing] = useState(null); // violation being edited
   const [logMatch, setLogMatch] = useState(null);
   const [addTeam, setAddTeam] = useState(false);
@@ -291,11 +294,13 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
 
   const refresh = useCallback(async () => {
     setSyncing(true);
-    const [ev, t, v] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), api.listViolations(eventId)]);
+    const [ev, t, v, nm, sl] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), api.listViolations(eventId), api.listNominations(eventId), api.listShortlist(eventId)]);
     if (ev) setEvent(ev);
     // keep optimistic items the server hasn't caught up on yet (unsynced writes)
     setTeams((cur) => { const extra = cur.filter((x) => !t.some((s) => s.number === x.number)); return [...t, ...extra]; });
     setViols((cur) => { const pend = cur.filter((x) => x._pending && !v.some((s) => s.id === x.id)); return [...pend, ...v]; });
+    setNoms(nm);
+    setFinalists(new Set(sl.map((s) => `${s.award}::${s.team}`)));
     setSyncedAt(Date.now()); setSyncing(false);
   }, [eventId]);
 
@@ -428,6 +433,43 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
     const paths = await api.removeTeamPhoto(eventId, number, path);
     setTeams((cur) => cur.map((t) => (t.number === number ? { ...t, photoKeys: paths } : t)));
   };
+  const addNomination = async (form) => {
+    try {
+      const saved = await api.addNomination(eventId, { ...form, by: meName });
+      setNoms((cur) => [saved, ...cur.filter((x) => x.id !== saved.id)]);
+    } catch (e) {
+      if (outbox.isOffline(e)) throw new Error("You're offline — reconnect to nominate.");
+      throw e;
+    }
+  };
+  const removeNomination = async (id) => {
+    try { await api.deleteNomination(id); setNoms((cur) => cur.filter((x) => x.id !== id)); }
+    catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to remove this nomination."); return; } throw e; }
+  };
+  const toggleFinalist = async (award, team) => {
+    const key = `${award}::${team}`;
+    const on = !finalists.has(key);
+    setFinalists((cur) => { const n = new Set(cur); on ? n.add(key) : n.delete(key); return n; });
+    try { await api.setShortlist(eventId, award, team, on); }
+    catch (e) {
+      setFinalists((cur) => { const n = new Set(cur); on ? n.delete(key) : n.add(key); return n; });
+      if (outbox.isOffline(e)) alert("You're offline — reconnect to change finalists."); else throw e;
+    }
+  };
+  const exportNominations = () => {
+    const rows = [["Award", "Team", "Team Name", "Finalist", "Match", "Reason", "Nominated By", "Time"]];
+    const sorted = [...noms].sort((a, b) => a.award.localeCompare(b.award) || a.team.localeCompare(b.team, undefined, { numeric: true }) || a.createdAt - b.createdAt);
+    for (const n of sorted) {
+      const t = teams.find((x) => x.number === n.team);
+      const awardName = (AWARDS.find((a) => a.key === n.award) || {}).full || n.award;
+      const fin = finalists.has(`${n.award}::${n.team}`) ? "Yes" : "No";
+      rows.push([awardName, n.team, t?.name || "", fin, fmtMatch(n.match) || "", n.reason || "", n.by || "", new Date(n.createdAt).toISOString()]);
+    }
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = `${(event.name || "vex").replace(/\W+/g, "-").toLowerCase()}-nominations.csv`; a.click(); setMenu(false);
+  };
   const clearSelected = async (sel) => {
     try {
       if (sel.violations) { await api.clearViolations(eventId); setViols([]); }
@@ -530,7 +572,8 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
                   <div className="w-full px-4 py-2.5 flex items-center gap-2 text-emerald-700 bg-emerald-50/60"><KeyRound size={16} /> Admin mode <span className="ml-auto text-[10px] font-semibold">ACTIVE</span></div>
                 )}
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
-                <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Download size={16} /> Export CSV</button>
+                <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Download size={16} /> Export violations</button>
+                <button onClick={() => requireAdmin(exportNominations)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Trophy size={16} /> Export nominations</button>
                 {adminUnlocked && <button onClick={lockAdmin} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2 text-amber-700"><KeyRound size={16} /> Lock admin access</button>}
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
                 <div className="border-t border-slate-100 my-1" />
@@ -545,6 +588,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
             {[{ k: "teams", label: "Teams", Icon: Users },
               ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
               { k: "robots", label: "Robots", Icon: Camera },
+              { k: "judging", label: "Judging", Icon: Trophy },
               ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])].map(({ k, label, Icon }) => (
               <button key={k} onClick={() => { setView(k); setQuery(""); }}
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
@@ -579,6 +623,8 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
           <MatchList matches={matches} teamName={teamNameMap} viols={viols} query={query} setQuery={setQuery} onOpen={setOpenMatch} />
         ) : view === "robots" ? (
           <RobotList teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
+        ) : view === "judging" ? (
+          <JudgingView noms={noms} viols={viols} teamName={teamNameMap} finalists={finalists} onToggleFinalist={(award, team) => requireAdmin(() => toggleFinalist(award, team))} onNominate={(award) => setNominating(award || "sportsmanship")} onDeleteNom={removeNomination} />
         ) : view === "rulebook" ? (
           <RuleBook rules={rules} />
         ) : (
@@ -634,7 +680,7 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
         )}
       </main>
 
-      {!openTeam && !openMatch && !openRobot && (
+      {!openTeam && !openMatch && !openRobot && view !== "judging" && (
         <button onClick={() => setLogFor("")} className="fixed bottom-5 left-1/2 -translate-x-1/2 z-20 bg-[#D7212B] text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
           <Plus size={20} /> Log violation
         </button>
@@ -649,6 +695,11 @@ function Tracker({ initialEvent, meName, onEditName, onLock }) {
         <LogModal teams={teams} viols={viols} presetTeam={editing.team} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} rules={rules} onOpenPhoto={setLightbox} edit={editing}
           onSetName={() => setShowIdentity(true)} onClose={() => setEditing(null)}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await editViolation(editing, { ...form, team }); setEditing(null); }} />
+      )}
+      {nominating && (
+        <NominateModal teams={teams} presetAward={nominating} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches}
+          onSetName={() => setShowIdentity(true)} onClose={() => setNominating(null)}
+          onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await addNomination({ ...form, team }); setNominating(null); }} />
       )}
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
       {showIdentity && <IdentityModal me={{ name: meName }} onSave={async (n) => { await onEditName(n); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
@@ -1589,6 +1640,194 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onOpenPhoto }) {
         </div>
       )}
     </>
+  );
+}
+
+/* ============================ JUDGING (award nominations) ============================ */
+const AWARDS = [
+  { key: "sportsmanship", label: "Sportsmanship", full: "Sportsmanship Award" },
+  { key: "energy", label: "Energy", full: "Energy Award" },
+];
+const G_RULE = /^G[1-5]$/i;
+
+function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNominate, onDeleteNom }) {
+  const [award, setAward] = useState("sportsmanship");
+  const [openTeam, setOpenTeam] = useState(null);
+
+  // conduct flags: which G1–G5 rules each team has been cited for
+  const gByTeam = {};
+  for (const v of viols) {
+    if (G_RULE.test(v.code || "")) {
+      const t = v.team; (gByTeam[t] = gByTeam[t] || {});
+      const c = (v.code || "").toUpperCase();
+      gByTeam[t][c] = (gByTeam[t][c] || 0) + 1;
+    }
+  }
+
+  const forAward = noms.filter((n) => n.award === award);
+  const tally = {};
+  for (const n of forAward) { tally[n.team] = tally[n.team] || { team: n.team, count: 0, noms: [] }; tally[n.team].count++; tally[n.team].noms.push(n); }
+  const ranked = Object.values(tally).sort((a, b) => b.count - a.count || a.team.localeCompare(b.team, undefined, { numeric: true }));
+  const cur = AWARDS.find((a) => a.key === award);
+
+  return (
+    <>
+      <div className="flex gap-1.5 mb-4">
+        {AWARDS.map((a) => (
+          <button key={a.key} onClick={() => { setAward(a.key); setOpenTeam(null); }}
+            className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold border ${award === a.key ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white text-slate-600 border-slate-200"}`}>{a.full}</button>
+        ))}
+      </div>
+
+      <button onClick={() => onNominate(award)} className="w-full mb-4 bg-[#D7212B] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-[#B42024]">
+        <Trophy size={18} /> Nominate a team for {cur.label}
+      </button>
+
+      {ranked.length === 0 ? (
+        <Empty title="No nominations yet" sub={`Tap “Nominate a team” to add the first ${cur.label} nomination.`} />
+      ) : (
+        <ul className="space-y-2">
+          {ranked.map((row, i) => {
+            const g = gByTeam[row.team];
+            const gCodes = g ? Object.keys(g).sort() : [];
+            const expanded = openTeam === row.team;
+            const isFinalist = finalists && finalists.has(`${award}::${row.team}`);
+            return (
+              <li key={row.team} className={`bg-white rounded-xl border overflow-hidden ${isFinalist ? "border-[#EBA622] ring-1 ring-[#EBA622]" : "border-slate-200"}`}>
+                <div className="w-full px-4 py-3 flex items-center gap-3">
+                  <button onClick={() => setOpenTeam(expanded ? null : row.team)} className="flex items-center gap-3 text-left flex-1 min-w-0">
+                    <span className={`w-7 h-7 rounded-full grid place-items-center text-sm font-bold shrink-0 ${i === 0 ? "bg-[#EBA622] text-white" : "bg-slate-100 text-slate-500"}`}>{i + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-slate-900">{row.team}</span>
+                        {teamName[row.team] && <span className="text-sm text-slate-500 truncate">{teamName[row.team]}</span>}
+                        {isFinalist && <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#8a6100] bg-[#EBA622]/20 border border-[#EBA622] rounded-md px-1.5 py-0.5"><Star size={10} className="fill-[#EBA622] text-[#EBA622]" /> FINALIST</span>}
+                      </div>
+                      {gCodes.length > 0 && (
+                        <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-md px-1.5 py-0.5">
+                          <AlertTriangle size={11} /> Conduct: {gCodes.map((c) => `${c}${g[c] > 1 ? `×${g[c]}` : ""}`).join(", ")}
+                        </div>
+                      )}
+                    </div>
+                    <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-700 text-sm font-semibold">{row.count} <span className="text-slate-400 font-normal text-xs">nom{row.count !== 1 ? "s" : ""}</span></span>
+                  </button>
+                  <button onClick={() => onToggleFinalist(award, row.team)} title={isFinalist ? "Remove finalist" : "Mark finalist"} className="shrink-0 p-1">
+                    <Star size={20} className={isFinalist ? "fill-[#EBA622] text-[#EBA622]" : "text-slate-300 hover:text-[#EBA622]"} />
+                  </button>
+                </div>
+                {expanded && (
+                  <div className="border-t border-slate-100 divide-y divide-slate-100">
+                    {row.noms.sort((a, b) => b.createdAt - a.createdAt).map((n) => (
+                      <div key={n.id} className="px-4 py-2.5 text-sm">
+                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                          {fmtMatch(n.match) && <span className="font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{fmtMatch(n.match)}</span>}
+                          {n.by && <span className="flex items-center gap-1"><UserCircle2 size={12} /> {n.by}</span>}
+                          <span className="ml-auto">{fmtTime(n.createdAt)}</span>
+                          <button onClick={() => { if (confirm("Remove this nomination?")) onDeleteNom(n.id); }} className="text-slate-300 hover:text-red-600"><Trash2 size={14} /></button>
+                        </div>
+                        {n.reason ? <p className="text-slate-700 mt-1">{n.reason}</p> : <p className="text-slate-400 italic mt-1">No reason given</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
+  );
+}
+
+function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSetName, onClose, onSave }) {
+  const [award, setAward] = useState(presetAward || "sportsmanship");
+  const [team, setTeam] = useState(teams[0]?.number ?? "");
+  const [creatingNew, setCreatingNew] = useState(teams.length === 0);
+  const [newNumber, setNewNumber] = useState("");
+  const [newName, setNewName] = useState("");
+  const [matchPhase, setMatchPhase] = useState("none");
+  const [matchNum, setMatchNum] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const count = phaseCount(matchPhase, event);
+  const valid = (creatingNew ? newNumber.trim() : team) && reason.trim();
+  const submit = async () => {
+    if (!valid || busy) return; setBusy(true);
+    try { await onSave({ award, team: creatingNew ? "" : team, newNumber, newName, reason, match: { phase: matchPhase, num: matchNum } }); }
+    catch (e) { alert("Could not save: " + (e.message || e)); setBusy(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
+      <div className="bg-slate-50 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
+        <div className="sticky top-0 bg-slate-50 px-4 py-3 flex items-center justify-between border-b border-slate-200">
+          <h2 className="font-bold text-slate-900">Nominate for an award</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={22} /></button>
+        </div>
+        <div className="p-4 space-y-4">
+          <button onClick={onSetName} className="w-full flex items-center gap-2 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg px-3 py-2">
+            <UserCircle2 size={15} className="text-slate-400" />
+            {me?.name ? <>Nominating as <b className="text-slate-700">{me.name}</b></> : <span className="text-amber-600 font-medium">Tap to set your ref name</span>}
+          </button>
+
+          <div>
+            <Label>Award</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {AWARDS.map((a) => (
+                <button key={a.key} onClick={() => setAward(a.key)}
+                  className={`py-2.5 rounded-lg border-2 font-semibold text-sm flex items-center justify-center gap-1.5 ${award === a.key ? "bg-[#0D0F32] text-white border-transparent" : "bg-white text-slate-600 border-slate-200"}`}>
+                  <Trophy size={15} /> {a.full}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <Label>Team</Label>
+            {creatingNew ? (
+              <div className="space-y-2">
+                <input autoFocus value={newNumber} onChange={(e) => setNewNumber(e.target.value)} placeholder="Team number (e.g. 1234A)"
+                  className="w-full px-3 py-2.5 rounded-lg border border-slate-300 font-mono focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Team name (optional)"
+                  className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                {teams.length > 0 && <button onClick={() => setCreatingNew(false)} className="text-sm text-slate-500 underline">Pick an existing team instead</button>}
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <select value={team} onChange={(e) => setTeam(e.target.value)} className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+                  {teams.map((t) => <option key={t.number} value={t.number}>{t.number}{t.name ? ` — ${t.name}` : ""}</option>)}
+                </select>
+                <button onClick={() => setCreatingNew(true)} className="px-3 rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 flex items-center gap-1 text-sm"><Plus size={16} /> New</button>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <Label>Match</Label>
+            <div className="flex gap-2">
+              <select value={matchPhase} onChange={(e) => { setMatchPhase(e.target.value); setMatchNum(""); }} className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+                {availablePhases(event).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+              </select>
+              {matchPhase !== "none" && count > 0 && (
+                <select value={matchNum} onChange={(e) => setMatchNum(e.target.value)} className="w-32 px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+                  <option value="">#</option>
+                  {Array.from({ length: count }, (_, i) => String(i + 1)).map((n) => <option key={n} value={n}>{fmtMatch({ phase: matchPhase, num: n })}</option>)}
+                </select>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <Label>Why are you nominating them?</Label>
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="What did this team do that stood out…"
+              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+          </div>
+        </div>
+        <div className="sticky bottom-0 bg-slate-50 border-t border-slate-200 p-4 flex gap-2">
+          <button onClick={onClose} className="px-4 py-3 rounded-lg border border-slate-300 font-medium text-slate-600">Cancel</button>
+          <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? "bg-[#D7212B] hover:bg-[#B42024]" : "bg-slate-300"}`}>{busy ? "Saving…" : "Submit nomination"}</button>
+        </div>
+      </div>
+    </div>
   );
 }
 

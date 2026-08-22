@@ -134,6 +134,39 @@ export async function listRules(eventId) {
   return (data || []).map((r) => ({ code: r.code, desc: r.description || "", category: r.category || "" }));
 }
 
+/* ================= award nominations (Judging) ================= */
+const mapNom = (r) => ({ id: r.id, award: r.award, team: r.team, match: r.match_info || null, reason: r.reason || "", by: r.nominated_by || "", createdAt: new Date(r.created_at).getTime() });
+export async function listNominations(eventId) {
+  const { data } = await supabase.from("nominations").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
+  return (data || []).map(mapNom);
+}
+export async function addNomination(eventId, n) {
+  const id = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
+  const cleanMatch = n.match && n.match.phase && n.match.phase !== "none" ? { phase: n.match.phase, num: (n.match.num || "").trim() } : null;
+  const row = { id, event_id: eventId, award: n.award, team: (n.team || "").trim().toUpperCase(), match_info: cleanMatch, reason: (n.reason || "").trim(), nominated_by: n.by || "" };
+  const { data, error } = await supabase.from("nominations").upsert(row, { onConflict: "id" }).select().single();
+  if (error) throw error;
+  return mapNom(data);
+}
+export async function deleteNomination(id) {
+  await supabase.from("nominations").delete().eq("id", id);
+}
+
+/* ---- award shortlist / finalists ---- */
+export async function listShortlist(eventId) {
+  const { data } = await supabase.from("shortlist").select("award,team").eq("event_id", eventId);
+  return (data || []).map((r) => ({ award: r.award, team: r.team }));
+}
+export async function setShortlist(eventId, award, team, on) {
+  if (on) {
+    const { error } = await supabase.from("shortlist").upsert({ event_id: eventId, award, team }, { onConflict: "event_id,award,team" });
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("shortlist").delete().eq("event_id", eventId).eq("award", award).eq("team", team);
+    if (error) throw error;
+  }
+}
+
 /* ================= violations ================= */
 const mapViol = (r) => ({
   id: r.id, team: r.team, type: r.type, code: r.code, desc: r.rule_desc || "",
@@ -225,6 +258,8 @@ export function subscribeEvent(eventId, onChange) {
     .on("postgres_changes", { event: "*", schema: "public", table: "violations", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "teams", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "events", filter: `id=eq.${eventId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "nominations", filter: `event_id=eq.${eventId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "shortlist", filter: `event_id=eq.${eventId}` }, onChange)
     .subscribe();
   return () => supabase.removeChannel(ch);
 }

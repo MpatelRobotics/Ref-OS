@@ -184,3 +184,40 @@ create table if not exists public.rules (
 alter table public.rules enable row level security;
 drop policy if exists "open rw rules" on public.rules;
 create policy "open rw rules" on public.rules for all using (true) with check (true);
+
+-- ---------- award nominations (Judging tab) ----------
+create table if not exists public.nominations (
+  id          uuid primary key,
+  event_id    uuid references public.events(id) on delete cascade,
+  award       text not null,          -- 'sportsmanship' | 'energy'
+  team        text not null,
+  match_info  jsonb,
+  reason      text,
+  nominated_by text,
+  created_at  timestamptz default now()
+);
+alter table public.nominations enable row level security;
+drop policy if exists "open rw nominations" on public.nominations;
+create policy "open rw nominations" on public.nominations for all using (true) with check (true);
+create index if not exists nominations_event_idx on public.nominations(event_id);
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'nominations')
+    then alter publication supabase_realtime add table public.nominations; end if;
+end $$;
+
+-- ---------- award shortlist / finalists (Judging tab) ----------
+create table if not exists public.shortlist (
+  event_id uuid references public.events(id) on delete cascade,
+  award    text not null,
+  team     text not null,
+  primary key (event_id, award, team)
+);
+alter table public.shortlist enable row level security;
+drop policy if exists "open rw shortlist" on public.shortlist;
+create policy "open rw shortlist" on public.shortlist for all using (true) with check (true);
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'shortlist')
+    then alter publication supabase_realtime add table public.shortlist; end if;
+end $$;
