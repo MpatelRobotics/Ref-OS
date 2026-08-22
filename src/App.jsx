@@ -711,6 +711,10 @@ function Tracker({ initialEvent, meName, role, onEditName, onLock }) {
             )}
           </>
         )}
+        <p className="text-center text-xs text-slate-400 mt-10 pb-2">
+          Made by Maharshi Patel ·{" "}
+          <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-slate-700 underline">@mpatel_ref</a>
+        </p>
       </main>
 
       {!openTeam && !openMatch && !openRobot && view !== "judging" && (
