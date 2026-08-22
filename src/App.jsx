@@ -143,9 +143,14 @@ export default function App() {
     return () => { live = false; };
   }, [unlocked, meName]);
 
-  const unlock = (r) => { localStorage.setItem("unlocked", "1"); localStorage.setItem("refosRole", r || "ref"); setRole(r || "ref"); setUnlocked(true); };
+  const unlock = (r, admin) => {
+    localStorage.setItem("unlocked", "1");
+    localStorage.setItem("refosRole", r || "ref");
+    if (admin) sessionStorage.setItem("refosAdmin", "1");
+    setRole(r || "ref"); setUnlocked(true);
+  };
   const saveName = (n) => { localStorage.setItem("refName", n.trim()); setMeName(n.trim()); };
-  const lock = () => { localStorage.removeItem("unlocked"); localStorage.removeItem("refosRole"); setUnlocked(false); setEvent(null); };
+  const lock = () => { localStorage.removeItem("unlocked"); localStorage.removeItem("refosRole"); sessionStorage.removeItem("refosAdmin"); setUnlocked(false); setEvent(null); };
 
   if (!configured) return <ConfigError />;
   if (!unlocked) return <PasswordScreen onUnlock={unlock} />;
@@ -183,6 +188,7 @@ function PasswordScreen({ onUnlock }) {
     if (!SITE_PASSWORD && !JUDGE_PASSWORD) { setErr("Site password isn't set. Add VITE_SITE_PASSWORD to the environment."); return; }
     if (SITE_PASSWORD && pw === SITE_PASSWORD) { onUnlock("ref"); return; }
     if (JUDGE_PASSWORD && pw === JUDGE_PASSWORD) { onUnlock("judge"); return; }
+    if (ADMIN_PASSWORD && pw === ADMIN_PASSWORD) { onUnlock("ref", true); return; }
     setErr("Incorrect password.");
   };
   return (
