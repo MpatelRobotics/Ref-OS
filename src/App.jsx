@@ -205,6 +205,10 @@ function PasswordScreen({ onUnlock }) {
         {err && <p className="text-sm text-red-400 mt-2">{err}</p>}
         <button onClick={submit} disabled={!pw}
           className="w-full mt-3 py-3 rounded-lg font-semibold bg-[#D7212B] text-white hover:bg-[#B42024] disabled:bg-[#2c3168] disabled:text-slate-400">Enter</button>
+        <p className="text-center text-xs text-slate-400 mt-8">
+          Made by Maharshi Patel ·{" "}
+          <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-white underline">@mpatel_ref</a>
+        </p>
       </div>
     </div>
   );
