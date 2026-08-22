@@ -613,9 +613,9 @@ function Tracker({ initialEvent, meName, role, onEditName, onLock }) {
             {(isJudge ? [{ k: "judging", label: "Judging", Icon: Trophy }] : [
               { k: "teams", label: "Teams", Icon: Users },
               ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
+              ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
               { k: "robots", label: "Robots", Icon: Camera },
-              { k: "judging", label: "Judging", Icon: Trophy },
-              ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])]).map(({ k, label, Icon }) => (
+              { k: "judging", label: "Judging", Icon: Trophy }]).map(({ k, label, Icon }) => (
               <button key={k} onClick={() => { setView(k); setQuery(""); }}
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
                 <Icon size={15} /> {label}
