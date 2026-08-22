@@ -195,10 +195,10 @@ function PasswordScreen({ onUnlock }) {
     <div className="min-h-screen bg-[#0D0F32] text-white grid place-items-center p-6 font-sans">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center text-center mb-6">
-          <img src="/logo.svg" alt="Highlander Summit" className="h-24 w-24 object-contain mb-3" />
+          <img src="/logo.svg" alt="Highlander Summit" className="h-72 w-72 object-contain mb-3" />
           <span className="font-bold text-lg">Highlander Summit — Violation Log</span>
         </div>
-        <p className="text-sm text-slate-300 mb-4 text-center">Enter the crew password to open the log.</p>
+        <p className="text-sm text-slate-300 mb-4 text-center">Enter the referee, judge advisor, or admin password to open the log.</p>
         <input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} placeholder="Password" autoFocus
           onKeyDown={(e) => e.key === "Enter" && submit()}
           className="w-full px-3 py-3 rounded-lg bg-[#1b1f4d] border border-[#2c3168] text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#D7212B]" />
