@@ -45,14 +45,14 @@ function compress(file, maxDim = 1200, quality = 0.6) {
 
 const TYPES = {
   minor: { label: "Minor", Icon: AlertTriangle,
-    badge: "bg-amber-100 text-amber-800 border-amber-300", dot: "bg-amber-500",
-    solid: "bg-amber-500", solidHover: "hover:bg-amber-600", soft: "bg-amber-50 border-amber-200", text: "text-amber-700" },
+    badge: "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700", dot: "bg-amber-500",
+    solid: "bg-amber-500", solidHover: "hover:bg-amber-600", soft: "bg-amber-50 border-amber-200 dark:bg-amber-950/40 dark:border-amber-900", text: "text-amber-700 dark:text-amber-300" },
   major: { label: "Major", Icon: ShieldAlert,
-    badge: "bg-red-100 text-red-800 border-red-300", dot: "bg-red-500",
-    solid: "bg-red-600", solidHover: "hover:bg-red-700", soft: "bg-red-50 border-red-200", text: "text-red-700" },
+    badge: "bg-red-100 text-red-800 border-red-300 dark:bg-red-900/40 dark:text-red-200 dark:border-red-700", dot: "bg-red-500",
+    solid: "bg-red-600", solidHover: "hover:bg-red-700", soft: "bg-red-50 border-red-200 dark:bg-red-950/40 dark:border-red-900", text: "text-red-700 dark:text-red-300" },
   inspection: { label: "Inspection", Icon: ClipboardCheck,
-    badge: "bg-blue-100 text-blue-800 border-blue-300", dot: "bg-blue-500",
-    solid: "bg-blue-600", solidHover: "hover:bg-blue-700", soft: "bg-blue-50 border-blue-200", text: "text-blue-700" },
+    badge: "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700", dot: "bg-blue-500",
+    solid: "bg-blue-600", solidHover: "hover:bg-blue-700", soft: "bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-900", text: "text-blue-700 dark:text-blue-300" },
 };
 const ORDER = ["minor", "major", "inspection"];
 
