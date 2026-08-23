@@ -282,6 +282,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   const [logFor, setLogFor] = useState(null);
   const [noms, setNoms] = useState([]);
   const [finalists, setFinalists] = useState(new Set()); // `${award}::${team}`
+  const [watchNotes, setWatchNotes] = useState([]);
   const [nominating, setNominating] = useState(null); // award key when the nominate modal is open
   const [editing, setEditing] = useState(null); // violation being edited
   const [logMatch, setLogMatch] = useState(null);
@@ -344,13 +345,14 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
 
   const refresh = useCallback(async () => {
     setSyncing(true);
-    const [ev, t, v, nm, sl] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), api.listViolations(eventId), api.listNominations(eventId), api.listShortlist(eventId)]);
+    const [ev, t, v, nm, sl, wn] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), api.listViolations(eventId), api.listNominations(eventId), api.listShortlist(eventId), api.listWatchNotes(eventId)]);
     if (ev) setEvent(ev);
     // keep optimistic items the server hasn't caught up on yet (unsynced writes)
     setTeams((cur) => { const extra = cur.filter((x) => !t.some((s) => s.number === x.number)); return [...t, ...extra]; });
     setViols((cur) => { const pend = cur.filter((x) => x._pending && !v.some((s) => s.id === x.id)); return [...pend, ...v]; });
     setNoms(nm);
     setFinalists(new Set(sl.map((s) => `${s.award}::${s.team}`)));
+    setWatchNotes(wn);
     setSyncedAt(Date.now()); setSyncing(false);
   }, [eventId]);
 
@@ -475,17 +477,18 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     setTeams((cur) => cur.filter((t) => t.number !== num));
     setOpenTeam(null);
   };
-  const setTeamWatchlist = async (number, watchlisted, watchNote = "") => {
+  const addWatchNote = async (number, note) => {
     try {
-      const saved = await api.setTeamWatchlist(eventId, number, watchlisted, watchNote);
-      setTeams((cur) => cur.map((t) => t.number === number ? { ...t, ...saved } : t));
+      const saved = await api.addWatchNote(eventId, { team: number, by: meName, note });
+      setWatchNotes((cur) => [...cur.filter((x) => x.id !== saved.id), saved]);
     } catch (e) {
-      if (outbox.isOffline(e)) {
-        alert("You're offline — reconnect to update the team watchlist.");
-        return;
-      }
+      if (outbox.isOffline(e)) throw new Error("You're offline — reconnect to add to the watchlist.");
       throw e;
     }
+  };
+  const removeWatchNote = async (id) => {
+    try { await api.deleteWatchNote(id); setWatchNotes((cur) => cur.filter((x) => x.id !== id)); }
+    catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to remove this note."); return; } throw e; }
   };
 
   const addRobotPhoto = async (number, dataUrl) => {
@@ -560,7 +563,12 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     const m = {}; for (const v of viols) if (v.code && !m[v.code]) m[v.code] = v.desc || ""; return m;
   }, [viols]);
   const teamNameMap = useMemo(() => Object.fromEntries(teams.map((t) => [t.number, t.name])), [teams]);
-  const teamWatch = useMemo(() => Object.fromEntries(teams.filter((t) => t.watchlisted).map((t) => [t.number, t.watchNote || ""])), [teams]);
+  const teamWatch = useMemo(() => {
+    const m = {};
+    for (const w of watchNotes) { (m[w.team] = m[w.team] || []).push(w); }
+    for (const k in m) m[k].sort((a, b) => a.createdAt - b.createdAt);
+    return m;
+  }, [watchNotes]);
   const matchNums = useMemo(() => Object.keys(matches).map(Number).sort((a, b) => a - b), [matches]);
 
   const exportCSV = () => {
@@ -700,7 +708,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       <main className="max-w-2xl mx-auto px-4 pb-28 pt-4">
         {openTeam ? (
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)}
-            onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} onSetWatchlist={setTeamWatchlist} onOpenPhoto={setLightbox} />
+            onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} />
         ) : openMatch ? (
           <MatchDetail num={openMatch} match={matches[openMatch]} teamName={teamNameMap} teamWatch={teamWatch} viols={viols} allNums={matchNums} onNav={setOpenMatch}
             onLogTeam={(n) => { setLogFor(n); setLogMatch(openMatch); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} />
@@ -752,7 +760,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                     <li key={t.number}>
                       <button onClick={() => setOpenTeam(t.number)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
                         <span className="font-mono font-bold text-lg text-slate-900 dark:text-slate-100">{t.number}</span>
-                        {t.watchlisted && <span title={t.watchNote || "Team watchlist"} className="inline-flex items-center gap-1 text-amber-600 text-xs font-semibold shrink-0"><Star size={15} fill="currentColor" /> WATCH</span>}
+                        {teamWatch[t.number]?.length > 0 && <span title={teamWatch[t.number].map((w) => `${w.by || "Ref"}: ${w.note}`).join("\n")} className="inline-flex items-center gap-1 text-amber-600 text-xs font-semibold shrink-0"><Star size={15} fill="currentColor" /> WATCH{teamWatch[t.number].length > 1 ? ` ${teamWatch[t.number].length}` : ""}</span>}
                         {t.name && <span className="text-sm text-slate-500 dark:text-slate-400 truncate flex-1">{t.name}</span>}
                         <div className="flex items-center gap-1.5 ml-auto">
                           {ORDER.map((ty) => c[ty] ? (
@@ -865,11 +873,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
 }
 
 /* ============================ TEAM DETAIL ============================ */
-function TeamDetail({ team, viols, onLog, onDeleteViolation, onEditViolation, onDeleteTeam, canDeleteTeam, onSetWatchlist, onOpenPhoto }) {
+function TeamDetail({ team, viols, onLog, onDeleteViolation, onEditViolation, onDeleteTeam, canDeleteTeam, watch = [], meName, onAddWatch, onRemoveWatch, onOpenPhoto }) {
+  const [wnote, setWnote] = useState("");
+  const addWatch = () => { const n = wnote.trim(); if (!n) return; onAddWatch(team.number, n); setWnote(""); };
   if (!team) return null;
-  const [editingWatch, setEditingWatch] = useState(false);
-  const [watchNote, setWatchNote] = useState(team.watchNote || "");
-  useEffect(() => { setWatchNote(team.watchNote || ""); setEditingWatch(false); }, [team.number, team.watchNote]);
   const sorted = [...viols].sort((a, b) => b.createdAt - a.createdAt);
   const byRule = useMemo(() => {
     const m = {};
@@ -900,32 +907,27 @@ function TeamDetail({ team, viols, onLog, onDeleteViolation, onEditViolation, on
           )}
         </div>
         <button onClick={onLog} className="mt-4 w-full bg-[#D7212B] text-white py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-[#B42024]"><Plus size={18} /> Log violation for {team.number}</button>
-        <div className="mt-3">
-          {team.watchlisted ? (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3">
-              <div className="flex items-center gap-2">
-                <Star size={16} className="text-amber-500 fill-amber-500" />
-                <span className="font-semibold text-amber-700 dark:text-amber-300 text-sm">On watchlist</span>
-                <button onClick={() => onSetWatchlist(team.number, false)} className="ml-auto text-xs text-slate-500 hover:text-red-600">Remove</button>
-              </div>
-              {editingWatch ? (
-                <div className="mt-2 flex gap-2">
-                  <input value={watchNote} onChange={(e) => setWatchNote(e.target.value)} placeholder="Why watch this team? (optional)"
-                    className="flex-1 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
-                  <button onClick={() => { onSetWatchlist(team.number, true, watchNote); setEditingWatch(false); }} className="px-3 rounded-lg bg-[#0D0F32] text-white text-sm font-medium">Save</button>
-                </div>
-              ) : (
-                <p onClick={() => setEditingWatch(true)} className="mt-1 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
-                  {team.watchNote ? team.watchNote : <span className="text-slate-400 italic">Tap to add a note…</span>}
-                </p>
-              )}
-            </div>
-          ) : (
-            <button onClick={() => onSetWatchlist(team.number, true, "")}
-              className="w-full py-2.5 rounded-lg border border-amber-300 text-amber-700 dark:text-amber-300 dark:border-amber-800 font-semibold flex items-center justify-center gap-2 hover:bg-amber-50 dark:hover:bg-amber-950/40">
-              <Star size={16} /> Watch this team
-            </button>
+        <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Star size={16} className="text-amber-500 fill-amber-500" />
+            <span className="font-semibold text-amber-700 dark:text-amber-300 text-sm">Watchlist{watch.length ? ` (${watch.length})` : ""}</span>
+          </div>
+          {watch.length > 0 && (
+            <ul className="space-y-1.5 mb-2">
+              {watch.map((w) => (
+                <li key={w.id} className="flex items-start gap-2 text-sm">
+                  <span className="text-slate-700 dark:text-slate-200 min-w-0"><span className="font-semibold">{w.by || "Ref"}:</span> {w.note || <span className="italic text-slate-400">(no note)</span>}</span>
+                  {(w.by === meName || canDeleteTeam) && <button onClick={() => onRemoveWatch(w.id)} className="ml-auto text-slate-400 hover:text-red-600 shrink-0" title="Remove note"><Trash2 size={13} /></button>}
+                </li>
+              ))}
+            </ul>
           )}
+          <div className="flex gap-2">
+            <input value={wnote} onChange={(e) => setWnote(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addWatch(); }} placeholder="Add a watch note…"
+              className="flex-1 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+            <button onClick={addWatch} disabled={!wnote.trim()} className="px-3 rounded-lg bg-[#0D0F32] text-white text-sm font-medium disabled:bg-slate-300">Add</button>
+          </div>
+          {!meName && <p className="mt-1.5 text-[11px] text-amber-700 dark:text-amber-300">Set your ref name so notes are attributed to you.</p>}
         </div>
       </div>
       {byRule.length > 0 && (
@@ -1573,10 +1575,16 @@ function MatchDetail({ num, match, teamName, teamWatch = {}, viols, allNums, onN
               <div className="flex items-center gap-2">
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{n}</span>
                 {teamName[n] && <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{teamName[n]}</span>}
-                {n in teamWatch && <span title={teamWatch[n] || "On watchlist"} className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 text-[11px] font-bold shrink-0"><Star size={13} fill="currentColor" /> WATCH</span>}
+                {teamWatch[n]?.length > 0 && <span title={teamWatch[n].map((w) => `${w.by || "Ref"}: ${w.note}`).join("\n")} className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 text-[11px] font-bold shrink-0"><Star size={13} fill="currentColor" /> WATCH{teamWatch[n].length > 1 ? ` ${teamWatch[n].length}` : ""}</span>}
                 <span className="ml-auto text-xs font-semibold text-[#D7212B] flex items-center gap-1 shrink-0"><Plus size={14} /> Log</span>
               </div>
-              {n in teamWatch && teamWatch[n] && <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">{teamWatch[n]}</p>}
+              {teamWatch[n]?.length > 0 && (
+                <div className="mt-1 space-y-0.5">
+                  {teamWatch[n].map((w) => (
+                    <p key={w.id} className="text-[11px] text-amber-700 dark:text-amber-300"><span className="font-semibold">{w.by || "Ref"}:</span> {w.note}</p>
+                  ))}
+                </div>
+              )}
               {s && s.total > 0 && (
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <span className="text-[11px] text-slate-400">Prior:</span>

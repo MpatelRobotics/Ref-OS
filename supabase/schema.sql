@@ -225,3 +225,22 @@ begin
   if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'shortlist')
     then alter publication supabase_realtime add table public.shortlist; end if;
 end $$;
+
+-- ---------- team watchlist notes (multiple refs per team) ----------
+create table if not exists public.watch_notes (
+  id         uuid primary key,
+  event_id   uuid references public.events(id) on delete cascade,
+  team       text not null,
+  ref_name   text,
+  note       text,
+  created_at timestamptz default now()
+);
+alter table public.watch_notes enable row level security;
+drop policy if exists "open rw watch_notes" on public.watch_notes;
+create policy "open rw watch_notes" on public.watch_notes for all using (true) with check (true);
+create index if not exists watch_notes_event_idx on public.watch_notes(event_id);
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'watch_notes')
+    then alter publication supabase_realtime add table public.watch_notes; end if;
+end $$;

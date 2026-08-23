@@ -92,6 +92,24 @@ export async function setTeamWatchlist(eventId, number, watchlisted, watchNote =
   return { watchlisted: !!watchlisted, watchNote: watchlisted ? (watchNote || "").trim() : "" };
 }
 
+/* ---- team watchlist notes (multiple refs per team) ---- */
+const mapWatch = (r) => ({ id: r.id, team: r.team, by: r.ref_name || "", note: r.note || "", createdAt: new Date(r.created_at).getTime() });
+export async function listWatchNotes(eventId) {
+  const { data } = await supabase.from("watch_notes").select("*").eq("event_id", eventId).order("created_at");
+  return (data || []).map(mapWatch);
+}
+export async function addWatchNote(eventId, w) {
+  const id = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
+  const row = { id, event_id: eventId, team: (w.team || "").trim().toUpperCase(), ref_name: w.by || "", note: (w.note || "").trim() };
+  const { data, error } = await supabase.from("watch_notes").upsert(row, { onConflict: "id" }).select().single();
+  if (error) throw error;
+  return mapWatch(data);
+}
+export async function deleteWatchNote(id) {
+  const { error } = await supabase.from("watch_notes").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export async function bulkUpsertTeams(eventId, teams) {
   const rows = teams
     .map((t) => ({ number: (t.number || "").trim().toUpperCase(), name: (t.name || "").trim() || null }))
@@ -270,6 +288,7 @@ export function subscribeEvent(eventId, onChange) {
     .on("postgres_changes", { event: "*", schema: "public", table: "events", filter: `id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "nominations", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "shortlist", filter: `event_id=eq.${eventId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "watch_notes", filter: `event_id=eq.${eventId}` }, onChange)
     .subscribe();
   return () => supabase.removeChannel(ch);
 }
