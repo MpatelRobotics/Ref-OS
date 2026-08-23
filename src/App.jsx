@@ -995,12 +995,9 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
                 {teams.length > 0 && <button onClick={() => setCreatingNew(false)} className="text-sm text-slate-500 underline">Pick an existing team instead</button>}
               </div>
             ) : (
-              <div className="flex gap-2">
-                <select value={team} onChange={(e) => setTeam(e.target.value)} className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
-                  {teams.map((t) => <option key={t.number} value={t.number}>{t.number}{t.name ? ` — ${t.name}` : ""}</option>)}
-                </select>
-                <button onClick={() => setCreatingNew(true)} className="px-3 rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 flex items-center gap-1 text-sm"><Plus size={16} /> New</button>
-              </div>
+              <select value={team} onChange={(e) => setTeam(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+                {teams.map((t) => <option key={t.number} value={t.number}>{t.number}{t.name ? ` — ${t.name}` : ""}</option>)}
+              </select>
             )}
             {(() => {
               const rk = (teams.find((t) => t.number === team)?.photoKeys) || [];
@@ -1841,12 +1838,9 @@ function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSe
                 {teams.length > 0 && <button onClick={() => setCreatingNew(false)} className="text-sm text-slate-500 underline">Pick an existing team instead</button>}
               </div>
             ) : (
-              <div className="flex gap-2">
-                <select value={team} onChange={(e) => setTeam(e.target.value)} className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
-                  {teams.map((t) => <option key={t.number} value={t.number}>{t.number}{t.name ? ` — ${t.name}` : ""}</option>)}
-                </select>
-                <button onClick={() => setCreatingNew(true)} className="px-3 rounded-lg border border-slate-300 bg-white text-slate-600 hover:bg-slate-50 flex items-center gap-1 text-sm"><Plus size={16} /> New</button>
-              </div>
+              <select value={team} onChange={(e) => setTeam(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+                {teams.map((t) => <option key={t.number} value={t.number}>{t.number}{t.name ? ` — ${t.name}` : ""}</option>)}
+              </select>
             )}
           </div>
 
