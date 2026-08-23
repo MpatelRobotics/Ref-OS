@@ -1,7 +1,7 @@
 {
-  "name": "Ref-OS · Highlander Summit",
+  "name": "Ref-OS \u00b7 Highlander Summit",
   "short_name": "Ref-OS",
-  "description": "Referee Operating System — violation & judging tracker for The Highlander Summit.",
+  "description": "Referee Operating System \u2014 violation & judging tracker for The Highlander Summit.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -9,8 +9,32 @@
   "background_color": "#0D0F32",
   "theme_color": "#0D0F32",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "/",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone"
+  ],
+  "categories": [
+    "productivity",
+    "utilities"
   ]
 }
