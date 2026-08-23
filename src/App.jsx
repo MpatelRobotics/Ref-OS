@@ -475,6 +475,19 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     setTeams((cur) => cur.filter((t) => t.number !== num));
     setOpenTeam(null);
   };
+  const setTeamWatchlist = async (number, watchlisted, watchNote = "") => {
+    try {
+      const saved = await api.setTeamWatchlist(eventId, number, watchlisted, watchNote);
+      setTeams((cur) => cur.map((t) => t.number === number ? { ...t, ...saved } : t));
+    } catch (e) {
+      if (outbox.isOffline(e)) {
+        alert("You're offline — reconnect to update the team watchlist.");
+        return;
+      }
+      throw e;
+    }
+  };
+
   const addRobotPhoto = async (number, dataUrl) => {
     const paths = await api.addTeamPhoto(eventId, number, dataUrl);
     setTeams((cur) => cur.map((t) => (t.number === number ? { ...t, photoKeys: paths } : t)));
@@ -623,7 +636,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                     <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><Trophy size={12} /> Judge Advisor</div>
                     <button onClick={() => { setMenu(false); exportNominations(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export nominations</button>
                     <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
-                    {!isInstalled && <button onClick={installRefOS} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install Ref-OS</button>}
 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
                     <div className="border-t border-slate-100 my-1" />
                     <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
@@ -637,7 +649,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                 <button onClick={() => requireAdmin(exportNominations)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Trophy size={16} /> Export nominations</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowActivity(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><ListOrdered size={16} /> Activity feed {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowRankings(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Rankings {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
-                {!isInstalled && <button onClick={installRefOS} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install Ref-OS</button>}
 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
                 <div className="border-t border-slate-100 my-1" />
@@ -688,7 +699,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       <main className="max-w-2xl mx-auto px-4 pb-28 pt-4">
         {openTeam ? (
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)}
-            onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} onOpenPhoto={setLightbox} />
+            onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} onSetWatchlist={setTeamWatchlist} onOpenPhoto={setLightbox} />
         ) : openMatch ? (
           <MatchDetail num={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols} allNums={matchNums} onNav={setOpenMatch}
             onLogTeam={(n) => { setLogFor(n); setLogMatch(openMatch); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} />
@@ -740,6 +751,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                     <li key={t.number}>
                       <button onClick={() => setOpenTeam(t.number)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
                         <span className="font-mono font-bold text-lg text-slate-900 dark:text-slate-100">{t.number}</span>
+                        {t.watchlisted && <span title={t.watchNote || "Team watchlist"} className="inline-flex items-center gap-1 text-amber-600 text-xs font-semibold shrink-0"><Star size={15} fill="currentColor" /> WATCH</span>}
                         {t.name && <span className="text-sm text-slate-500 dark:text-slate-400 truncate flex-1">{t.name}</span>}
                         <div className="flex items-center gap-1.5 ml-auto">
                           {ORDER.map((ty) => c[ty] ? (
@@ -852,8 +864,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
 }
 
 /* ============================ TEAM DETAIL ============================ */
-function TeamDetail({ team, viols, onLog, onDeleteViolation, onEditViolation, onDeleteTeam, canDeleteTeam, onOpenPhoto }) {
+function TeamDetail({ team, viols, onLog, onDeleteViolation, onEditViolation, onDeleteTeam, canDeleteTeam, onSetWatchlist, onOpenPhoto }) {
   if (!team) return null;
+  const [editingWatch, setEditingWatch] = useState(false);
+  const [watchNote, setWatchNote] = useState(team.watchNote || "");
+  useEffect(() => { setWatchNote(team.watchNote || ""); setEditingWatch(false); }, [team.number, team.watchNote]);
   const sorted = [...viols].sort((a, b) => b.createdAt - a.createdAt);
   const byRule = useMemo(() => {
     const m = {};

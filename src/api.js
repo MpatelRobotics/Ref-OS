@@ -67,7 +67,7 @@ export async function listMembers(eventId) {
 }
 
 /* ================= teams ================= */
-const mapTeam = (r) => ({ number: r.number, name: r.name || "", photoKeys: r.photo_paths || [], createdAt: new Date(r.created_at).getTime() });
+const mapTeam = (r) => ({ number: r.number, name: r.name || "", photoKeys: r.photo_paths || [], watchlisted: !!r.watchlisted, watchNote: r.watch_note || "", createdAt: new Date(r.created_at).getTime() });
 export async function listTeams(eventId) {
   const { data } = await supabase.from("teams").select("*").eq("event_id", eventId);
   return (data || []).map(mapTeam);
@@ -82,6 +82,16 @@ export async function upsertTeam(eventId, number, name) {
   if (error) throw error;
   return num;
 }
+export async function setTeamWatchlist(eventId, number, watchlisted, watchNote = "") {
+  const { error } = await supabase
+    .from("teams")
+    .update({ watchlisted: !!watchlisted, watch_note: watchlisted ? (watchNote || "").trim() : null })
+    .eq("event_id", eventId)
+    .eq("number", number);
+  if (error) throw error;
+  return { watchlisted: !!watchlisted, watchNote: watchlisted ? (watchNote || "").trim() : "" };
+}
+
 export async function bulkUpsertTeams(eventId, teams) {
   const rows = teams
     .map((t) => ({ number: (t.number || "").trim().toUpperCase(), name: (t.name || "").trim() || null }))
