@@ -1,0 +1,16 @@
+{
+  "name": "Ref-OS · Highlander Summit",
+  "short_name": "Ref-OS",
+  "description": "Referee Operating System — violation & judging tracker for The Highlander Summit.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0D0F32",
+  "theme_color": "#0D0F32",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

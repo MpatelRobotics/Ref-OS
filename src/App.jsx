@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -117,11 +117,11 @@ function Thumb({ pkey, onOpen }) {
     api.photoUrl(pkey).then((u) => { if (live) { u ? setSrc(u) : setGone(true); } });
     return () => { live = false; };
   }, [pkey]);
-  if (gone) return <div className="w-16 h-16 rounded-lg bg-slate-100 border border-slate-200 grid place-items-center text-slate-300"><ImageOff size={18} /></div>;
-  if (!src) return <div className="w-16 h-16 rounded-lg bg-slate-100 border border-slate-200 animate-pulse" />;
+  if (gone) return <div className="w-16 h-16 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 grid place-items-center text-slate-300"><ImageOff size={18} /></div>;
+  if (!src) return <div className="w-16 h-16 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 animate-pulse" />;
   return (
     <button onClick={() => onOpen(src)} className="shrink-0">
-      <img src={src} alt="robot" className="w-16 h-16 rounded-lg object-cover border border-slate-200" />
+      <img src={src} alt="robot" className="w-16 h-16 rounded-lg object-cover border border-slate-200 dark:border-slate-700" />
     </button>
   );
 }
@@ -132,6 +132,12 @@ function Thumb({ pkey, onOpen }) {
 export default function App() {
   const [unlocked, setUnlocked] = useState(() => localStorage.getItem("unlocked") === "1");
   const [role, setRole] = useState(() => localStorage.getItem("refosRole") || "ref");
+  const [theme, setTheme] = useState(() => localStorage.getItem("refosTheme") || "light");
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "dark") root.classList.add("dark"); else root.classList.remove("dark");
+    localStorage.setItem("refosTheme", theme);
+  }, [theme]);
   const [meName, setMeName] = useState(() => localStorage.getItem("refName") || "");
   const [event, setEvent] = useState(null);
   const [loadErr, setLoadErr] = useState(false);
@@ -158,23 +164,23 @@ export default function App() {
   if (loadErr) return (
     <FullPage>
       <div className="max-w-sm">
-        <p className="font-semibold text-slate-700">Couldn't load the event</p>
+        <p className="font-semibold text-slate-700 dark:text-slate-200">Couldn't load the event</p>
         <p className="text-sm mt-1">Make sure <code>schema.sql</code> and <code>seed.sql</code> have been run in Supabase, then reload.</p>
       </div>
     </FullPage>
   );
   if (!event) return <FullPage>Loading…</FullPage>;
 
-  return <Tracker key={event.id} initialEvent={event} meName={meName} role={role} onEditName={saveName} onLock={lock} />;
+  return <Tracker key={event.id} initialEvent={event} meName={meName} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} onEditName={saveName} onLock={lock} />;
 }
 
 const FullPage = ({ children }) => (
-  <div className="min-h-screen grid place-items-center bg-slate-100 text-slate-400 font-sans p-6 text-center">{children}</div>
+  <div className="min-h-screen grid place-items-center bg-slate-100 dark:bg-slate-700 text-slate-400 font-sans p-6 text-center">{children}</div>
 );
 const ConfigError = () => (
   <FullPage>
     <div className="max-w-sm">
-      <p className="font-semibold text-slate-700">Not configured yet</p>
+      <p className="font-semibold text-slate-700 dark:text-slate-200">Not configured yet</p>
       <p className="text-sm mt-1">Copy <code>.env.example</code> to <code>.env</code> and add your Supabase URL and anon key, then restart.</p>
     </div>
   </FullPage>
@@ -201,14 +207,17 @@ function PasswordScreen({ onUnlock }) {
         <p className="text-sm text-slate-300 mb-4 text-center">Enter the referee, judge advisor, or admin password to open the log.</p>
         <input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} placeholder="Password" autoFocus
           onKeyDown={(e) => e.key === "Enter" && submit()}
-          className="w-full px-3 py-3 rounded-lg bg-[#1b1f4d] border border-[#2c3168] text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#D7212B]" />
+          className="w-full px-3 py-3 rounded-lg bg-[#1b1f4d] border border-[#2c3168] text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#D7212B]" />
         {err && <p className="text-sm text-red-400 mt-2">{err}</p>}
         <button onClick={submit} disabled={!pw}
           className="w-full mt-3 py-3 rounded-lg font-semibold bg-[#D7212B] text-white hover:bg-[#B42024] disabled:bg-[#2c3168] disabled:text-slate-400">Enter</button>
-        <p className="text-center text-xs text-slate-400 mt-8">
-          Made by Maharshi Patel ·{" "}
-          <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-white underline">@mpatel_ref</a>
-        </p>
+        <div className="flex flex-col items-center gap-2 mt-8">
+          <img src="/logo.svg" alt="Highlander Summit" className="h-12 w-12 object-contain" />
+          <p className="text-center text-xs text-slate-400">
+            Made by Maharshi Patel ·{" "}
+            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-white underline">@mpatel_ref</a>
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -218,15 +227,15 @@ function PasswordScreen({ onUnlock }) {
 function NameScreen({ onName }) {
   const [name, setName] = useState("");
   return (
-    <div className="min-h-screen bg-slate-100 grid place-items-center p-6 font-sans">
-      <div className="w-full max-w-sm bg-white rounded-2xl border border-slate-200 p-5">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-700 grid place-items-center p-6 font-sans">
+      <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
         <div className="flex items-center gap-2 mb-1"><img src="/logo.svg" alt="" className="h-6 w-6 object-contain" /><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Highlander Summit Signature</span></div>
-        <h1 className="font-bold text-slate-900 text-lg">Welcome, ref</h1>
-        <p className="text-sm text-slate-500 mt-1 mb-4">Your name is shown on every violation you log, so the crew knows who made the call.</p>
+        <h1 className="font-bold text-slate-900 dark:text-slate-100 text-lg">Welcome, ref</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">Your name is shown on every violation you log, so the crew knows who made the call.</p>
         <Label>Name or initials</Label>
         <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Alex R or ABR"
           onKeyDown={(e) => e.key === "Enter" && name.trim() && onName(name)}
-          className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+          className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
         <button onClick={() => name.trim() && onName(name)} disabled={!name.trim()}
           className={`w-full mt-3 py-2.5 rounded-lg font-semibold text-white ${name.trim() ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Start logging</button>
       </div>
@@ -237,7 +246,7 @@ function NameScreen({ onName }) {
 /* ==================================================================== */
 /*  TRACKER (the main app, scoped to one event)                        */
 /* ==================================================================== */
-function Tracker({ initialEvent, meName, role, onEditName, onLock }) {
+function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName, onLock }) {
   const isJudge = role === "judge";
   const eventId = initialEvent.id;
   const [event, setEvent] = useState(initialEvent);
@@ -279,6 +288,8 @@ function Tracker({ initialEvent, meName, role, onEditName, onLock }) {
   const [showClear, setShowClear] = useState(false);
   const [showOnline, setShowOnline] = useState(false);
   const [showByRule, setShowByRule] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
+  const [showRankings, setShowRankings] = useState(false);
   const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const pendingAdminAction = useRef(null);
@@ -535,7 +546,7 @@ function Tracker({ initialEvent, meName, role, onEditName, onLock }) {
       || a.number.localeCompare(b.number, undefined, { numeric: true }));
 
   return (
-    <div className="min-h-screen bg-slate-100 font-sans text-slate-800 antialiased">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-700 font-sans text-slate-800 dark:text-slate-100 antialiased">
       <header className="sticky top-0 z-20 bg-[#0D0F32] text-white shadow-lg">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           {(openTeam || openMatch || openRobot) ? (
@@ -582,30 +593,34 @@ function Tracker({ initialEvent, meName, role, onEditName, onLock }) {
           <div className="relative">
             <button onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
-              <div className="absolute right-0 mt-2 w-56 bg-white text-slate-700 rounded-xl shadow-xl border border-slate-200 py-1 text-sm">
+              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
                 {isJudge ? (
                   <>
                     <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><Trophy size={12} /> Judge Advisor</div>
-                    <button onClick={() => { setMenu(false); exportNominations(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Download size={16} /> Export nominations</button>
-                    <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
+                    <button onClick={() => { setMenu(false); exportNominations(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export nominations</button>
+                    <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
+                    <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
                     <div className="border-t border-slate-100 my-1" />
-                    <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
+                    <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
                   </>
                 ) : (
                 <>
-                <button onClick={() => { setMenu(false); requireAdmin(() => setShowEvent(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><CalendarDays size={16} /> Event setup {adminUnlocked && <span className="ml-auto text-[10px] text-emerald-600 font-semibold">ADMIN</span>}</button>
-                <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Users size={16} /> Ref status</button>
-                <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
-                <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Download size={16} /> Export violations</button>
-                <button onClick={() => requireAdmin(exportNominations)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><Trophy size={16} /> Export nominations</button>
-                <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
+                <button onClick={() => { setMenu(false); requireAdmin(() => setShowEvent(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><CalendarDays size={16} /> Event setup {adminUnlocked && <span className="ml-auto text-[10px] text-emerald-600 font-semibold">ADMIN</span>}</button>
+                <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Ref status</button>
+                <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
+                <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export violations</button>
+                <button onClick={() => requireAdmin(exportNominations)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Trophy size={16} /> Export nominations</button>
+                <button onClick={() => { setMenu(false); requireAdmin(() => setShowActivity(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><ListOrdered size={16} /> Activity feed {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
+                <button onClick={() => { setMenu(false); requireAdmin(() => setShowRankings(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Rankings {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
+                <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
+                <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
                 <div className="border-t border-slate-100 my-1" />
                 {!adminUnlocked ? (
-                  <button onClick={() => { setMenu(false); pendingAdminAction.current = null; setShowAdminPassword(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2"><KeyRound size={16} /> Admin login</button>
+                  <button onClick={() => { setMenu(false); pendingAdminAction.current = null; setShowAdminPassword(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><KeyRound size={16} /> Admin login</button>
                 ) : (
                   <>
                     <div className="w-full px-4 py-2.5 flex items-center gap-2 text-emerald-700 bg-emerald-50/60"><KeyRound size={16} /> Admin mode <span className="ml-auto text-[10px] font-semibold">ACTIVE</span></div>
-                    <button onClick={lockAdmin} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 flex items-center gap-2 text-amber-700"><KeyRound size={16} /> Lock admin access</button>
+                    <button onClick={lockAdmin} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2 text-amber-700"><KeyRound size={16} /> Lock admin access</button>
                   </>
                 )}
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowClear(true)); }}
@@ -671,12 +686,12 @@ function Tracker({ initialEvent, meName, role, onEditName, onLock }) {
                 <CalendarDays size={22} className="text-[#EBA622] shrink-0" />
                 <div className="flex-1"><p className="font-semibold leading-tight">Finish event setup</p>
                   <p className="text-xs text-slate-400 mt-0.5">Add how many matches so logging picks the match from a list.</p></div>
-                <ChevronRight size={18} className="text-slate-500" />
+                <ChevronRight size={18} className="text-slate-500 dark:text-slate-400" />
               </button>
             ) : (
-              <button onClick={() => requireAdmin(() => setShowEvent(true))} className="w-full mb-4 bg-white border border-slate-200 rounded-xl px-4 py-2.5 flex items-center gap-2 text-left hover:border-slate-300">
+              <button onClick={() => requireAdmin(() => setShowEvent(true))} className="w-full mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 flex items-center gap-2 text-left hover:border-slate-300 dark:border-slate-600">
                 <CalendarDays size={16} className="text-slate-400 shrink-0" />
-                <span className="text-sm font-medium text-slate-700 truncate flex-1">{event.name || "Event"}</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate flex-1">{event.name || "Event"}</span>
                 <span className="text-xs text-slate-400">{event.quals} quals{event.bracket ? ` · top ${event.bracket}` : ""}</span>
                 <ChevronRight size={16} className="text-slate-300" />
               </button>
@@ -685,9 +700,9 @@ function Tracker({ initialEvent, meName, role, onEditName, onLock }) {
               <div className="relative flex-1">
                 <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search team #"
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
               </div>
-              <button onClick={() => setAddTeam(true)} className="px-3 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 flex items-center gap-1 text-sm font-medium"><Plus size={17} /> Team</button>
+              <button onClick={() => setAddTeam(true)} className="px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Plus size={17} /> Team</button>
             </div>
             {filteredTeams.length === 0 ? (
               <Empty title={teams.length ? "No matches" : "No teams yet"} sub={teams.length ? "Try a different team number." : "Add a team, or just log a violation and the team is created for you."} />
@@ -697,9 +712,9 @@ function Tracker({ initialEvent, meName, role, onEditName, onLock }) {
                   const c = countsByTeam[t.number] || { total: 0 };
                   return (
                     <li key={t.number}>
-                      <button onClick={() => setOpenTeam(t.number)} className="w-full text-left bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3 hover:border-slate-300 hover:shadow-sm transition">
-                        <span className="font-mono font-bold text-lg text-slate-900">{t.number}</span>
-                        {t.name && <span className="text-sm text-slate-500 truncate flex-1">{t.name}</span>}
+                      <button onClick={() => setOpenTeam(t.number)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
+                        <span className="font-mono font-bold text-lg text-slate-900 dark:text-slate-100">{t.number}</span>
+                        {t.name && <span className="text-sm text-slate-500 dark:text-slate-400 truncate flex-1">{t.name}</span>}
                         <div className="flex items-center gap-1.5 ml-auto">
                           {ORDER.map((ty) => c[ty] ? (
                             <span key={ty} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold border ${TYPES[ty].badge}`}>
@@ -715,10 +730,13 @@ function Tracker({ initialEvent, meName, role, onEditName, onLock }) {
             )}
           </>
         )}
-        <p className="text-center text-xs text-slate-400 mt-10 pb-2">
-          Made by Maharshi Patel ·{" "}
-          <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 hover:text-slate-700 underline">@mpatel_ref</a>
-        </p>
+        <div className="flex flex-col items-center gap-2 mt-10 pb-2">
+          <img src="/logo.svg" alt="Highlander Summit" className="h-10 w-10 object-contain opacity-90" />
+          <p className="text-center text-xs text-slate-400">
+            Made by Maharshi Patel ·{" "}
+            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 underline">@mpatel_ref</a>
+          </p>
+        </div>
       </main>
 
       {!openTeam && !openMatch && !openRobot && view !== "judging" && (
@@ -747,9 +765,9 @@ function Tracker({ initialEvent, meName, role, onEditName, onLock }) {
       {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length }} onClear={clearSelected} onClose={() => setShowClear(false)} />}
       {showOnline && (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
-          <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 sticky top-0 bg-white">
-              <h2 className="font-bold text-slate-900 flex items-center gap-2"><Users size={18} /> Ref status</h2>
+          <div className="bg-white dark:bg-slate-800 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800">
+              <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Users size={18} /> Ref status</h2>
               <button onClick={() => setShowOnline(false)} className="text-slate-400"><X size={22} /></button>
             </div>
             <div className="p-4"><OnlineList presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} /></div>
@@ -757,12 +775,30 @@ function Tracker({ initialEvent, meName, role, onEditName, onLock }) {
         </div>
       )}
       {showByRule && (
-        <div className="fixed inset-0 z-50 bg-slate-50 flex flex-col font-sans">
-          <div className="px-3 py-3 border-b border-slate-200 bg-white flex items-center gap-2 shrink-0">
-            <button onClick={() => setShowByRule(false)} className="text-slate-500 p-1 -ml-1"><ChevronLeft size={22} /></button>
-            <h2 className="font-bold text-slate-900 flex items-center gap-2"><BarChart3 size={18} /> Violations by rule</h2>
+        <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
+          <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
+            <button onClick={() => setShowByRule(false)} className="text-slate-500 dark:text-slate-400 p-1 -ml-1"><ChevronLeft size={22} /></button>
+            <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><BarChart3 size={18} /> Violations by rule</h2>
           </div>
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><ByRule viols={viols} expandRule={expandRule} setExpandRule={setExpandRule} /></div></div>
+        </div>
+      )}
+      {showActivity && (
+        <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
+          <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
+            <button onClick={() => setShowActivity(false)} className="text-slate-500 dark:text-slate-400 p-1 -ml-1"><ChevronLeft size={22} /></button>
+            <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><ListOrdered size={18} /> Activity feed</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><ActivityFeed viols={viols} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} /></div></div>
+        </div>
+      )}
+      {showRankings && (
+        <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
+          <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
+            <button onClick={() => setShowRankings(false)} className="text-slate-500 dark:text-slate-400 p-1 -ml-1"><ChevronLeft size={22} /></button>
+            <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><BarChart3 size={18} /> Team rankings</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><Rankings viols={viols} teamName={teamNameMap} /></div></div>
         </div>
       )}
       {showShare && <ShareModal event={event} onClose={() => setShowShare(false)} />}
@@ -794,11 +830,11 @@ function TeamDetail({ team, viols, onLog, onDeleteViolation, onEditViolation, on
   }, [viols]);
   return (
     <>
-      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <div className="flex items-start justify-between">
           <div>
-            <div className="font-mono font-bold text-2xl text-slate-900 leading-none">{team.number}</div>
-            {team.name && <div className="text-sm text-slate-500 mt-1">{team.name}</div>}
+            <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">{team.number}</div>
+            {team.name && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{team.name}</div>}
           </div>
           {canDeleteTeam && (
             <button
@@ -815,14 +851,14 @@ function TeamDetail({ team, viols, onLog, onDeleteViolation, onEditViolation, on
       {byRule.length > 0 && (
         <div className="mb-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">Violations by rule</h2>
-          <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
             {byRule.map((r) => (
               <div key={r.code || "none"} className="px-4 py-2.5 flex items-center gap-3">
-                <span className="font-mono font-semibold text-slate-800">{fmtRule(r.code)}</span>
-                {r.desc && <span className="text-sm text-slate-500 truncate flex-1">{r.desc}</span>}
+                <span className="font-mono font-semibold text-slate-800 dark:text-slate-100">{fmtRule(r.code)}</span>
+                {r.desc && <span className="text-sm text-slate-500 dark:text-slate-400 truncate flex-1">{r.desc}</span>}
                 <div className="ml-auto flex items-center gap-1.5">
                   {ORDER.map((ty) => r.types[ty] ? <span key={ty} className={`w-1.5 h-1.5 rounded-full ${TYPES[ty].dot}`} title={TYPES[ty].label} /> : null)}
-                  <span className="font-bold text-slate-900 tabular-nums ml-1">×{r.count}</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-100 tabular-nums ml-1">×{r.count}</span>
                 </div>
               </div>
             ))}
@@ -844,19 +880,19 @@ function ViolationCard({ v, onDelete, onOpenPhoto, onEdit, showTeam }) {
     <li className={`rounded-xl border p-3 ${T.soft}`}>
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border ${T.badge}`}><T.Icon size={12} /> {T.label}</span>
-        {showTeam && <span className="font-mono font-bold text-slate-900 bg-slate-200 px-1.5 py-0.5 rounded-md text-sm">{v.team}</span>}
-        <span className="font-mono font-bold text-slate-900">{fmtRule(v.code)}</span>
-        {fmtMatch(v.match) && <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-700">{fmtMatch(v.match)}</span>}
+        {showTeam && <span className="font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-200 px-1.5 py-0.5 rounded-md text-sm">{v.team}</span>}
+        <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{fmtRule(v.code)}</span>
+        {fmtMatch(v.match) && <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-700 dark:text-slate-200">{fmtMatch(v.match)}</span>}
         {v._pending && <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-300"><RefreshCw size={9} className="animate-spin" /> Saving</span>}
         <span className="text-[11px] text-slate-400 ml-auto">{fmtTime(v.createdAt)}</span>
-        {canEdit && <button onClick={() => onEdit(v)} className="text-slate-300 hover:text-slate-700" title="Edit"><Pencil size={15} /></button>}
+        {canEdit && <button onClick={() => onEdit(v)} className="text-slate-300 hover:text-slate-700 dark:text-slate-200" title="Edit"><Pencil size={15} /></button>}
         <button onClick={() => { if (confirm(v._pending ? "Discard this unsynced violation?" : "Delete this violation?")) onDelete(v); }} className="text-slate-300 hover:text-red-600" title="Delete"><Trash2 size={15} /></button>
       </div>
       {v.desc && <p className={`text-sm mt-1.5 font-medium ${T.text}`}>{v.desc}</p>}
-      {v.notes && <p className="text-sm text-slate-600 mt-1">{v.notes}</p>}
+      {v.notes && <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{v.notes}</p>}
       {v._localPhotos?.length > 0 ? (
         <div className="flex gap-2 mt-2 overflow-x-auto">{v._localPhotos.map((src, i) => (
-          <button key={i} onClick={() => onOpenPhoto(src)} className="shrink-0"><img src={src} alt="robot" className="w-16 h-16 rounded-lg object-cover border border-slate-200 opacity-90" /></button>
+          <button key={i} onClick={() => onOpenPhoto(src)} className="shrink-0"><img src={src} alt="robot" className="w-16 h-16 rounded-lg object-cover border border-slate-200 dark:border-slate-700 opacity-90" /></button>
         ))}</div>
       ) : v.photoKeys?.length > 0 ? (
         <div className="flex gap-2 mt-2 overflow-x-auto">{v.photoKeys.map((k) => <Thumb key={k} pkey={k} onOpen={onOpenPhoto} />)}</div>
@@ -887,16 +923,16 @@ function ByRule({ viols, expandRule, setExpandRule }) {
         const teamCount = Object.keys(r.teams).length;
         const open = expandRule === (r.code || "—");
         return (
-          <li key={r.code || "none"} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <li key={r.code || "none"} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
             <button onClick={() => setExpandRule(open ? null : (r.code || "—"))} className="w-full text-left px-4 py-3">
               <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-slate-900">{fmtRule(r.code)}</span>
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{fmtRule(r.code)}</span>
                 <span className="text-xs text-slate-400">{teamCount} team{teamCount !== 1 ? "s" : ""}</span>
-                <span className="ml-auto font-bold text-lg text-slate-900 tabular-nums">{r.count}</span>
+                <span className="ml-auto font-bold text-lg text-slate-900 dark:text-slate-100 tabular-nums">{r.count}</span>
                 <ChevronRight size={16} className={`text-slate-300 transition-transform ${open ? "rotate-90" : ""}`} />
               </div>
-              {r.desc && <p className="text-sm text-slate-500 mt-0.5">{r.desc}</p>}
-              <div className="flex h-1.5 rounded-full overflow-hidden mt-2 bg-slate-100" style={{ width: `${Math.max(12, (r.count / max) * 100)}%` }}>
+              {r.desc && <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{r.desc}</p>}
+              <div className="flex h-1.5 rounded-full overflow-hidden mt-2 bg-slate-100 dark:bg-slate-700" style={{ width: `${Math.max(12, (r.count / max) * 100)}%` }}>
                 {ORDER.map((ty) => r.types[ty] ? <div key={ty} className={TYPES[ty].solid} style={{ flex: r.types[ty] }} /> : null)}
               </div>
             </button>
@@ -904,8 +940,8 @@ function ByRule({ viols, expandRule, setExpandRule }) {
               <div className="px-4 pb-3 pt-1 border-t border-slate-100">
                 {Object.entries(r.teams).sort((a, b) => b[1] - a[1]).map(([num, n]) => (
                   <div key={num} className="flex items-center justify-between py-1 text-sm">
-                    <span className="font-mono font-medium text-slate-700">{num}</span>
-                    <span className="text-slate-500 tabular-nums">×{n}</span>
+                    <span className="font-mono font-medium text-slate-700 dark:text-slate-200">{num}</span>
+                    <span className="text-slate-500 dark:text-slate-400 tabular-nums">×{n}</span>
                   </div>
                 ))}
               </div>
@@ -956,6 +992,20 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
     if (!valid || busy) return;
     const selectedTeam = normNum(creatingNew ? newNumber : team);
     const selectedRule = normNum(code).replace(/[<>]/g, "");
+    // duplicate guard (all users): same team + rule + match already logged
+    if (!edit && selectedTeam && selectedRule) {
+      const myKey = matchPhase !== "none" && matchNum ? `${matchPhase}:${matchNum}` : "";
+      const dup = (viols || []).some((v) => {
+        if (normNum(v.team) !== selectedTeam) return false;
+        if (normNum(v.code).replace(/[<>]/g, "") !== selectedRule) return false;
+        const vKey = v.match && v.match.phase && v.match.phase !== "none" && v.match.num ? `${v.match.phase}:${v.match.num}` : "";
+        return vKey === myKey;
+      });
+      if (dup) {
+        const where = myKey ? ` in ${fmtMatch({ phase: matchPhase, num: matchNum })}` : "";
+        if (!window.confirm(`Possible duplicate — ${selectedTeam} already has ${fmtRule(selectedRule)}${where} logged. Add it again anyway?`)) return;
+      }
+    }
     if (!edit && type === "minor" && selectedTeam && selectedRule) {
       const matchingRuleViolations = (viols || []).filter((v) =>
         normNum(v.team) === selectedTeam &&
@@ -973,15 +1023,15 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
 
   return (
     <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-slate-50 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
-        <div className="sticky top-0 bg-slate-50 px-4 py-3 flex items-center justify-between border-b border-slate-200">
-          <h2 className="font-bold text-slate-900">{edit ? "Edit violation" : "New violation"}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={22} /></button>
+      <div className="bg-slate-50 dark:bg-slate-900 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
+        <div className="sticky top-0 bg-slate-50 dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+          <h2 className="font-bold text-slate-900 dark:text-slate-100">{edit ? "Edit violation" : "New violation"}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:text-slate-300"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-4">
-          <button onClick={onSetName} className="w-full flex items-center gap-2 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg px-3 py-2">
+          <button onClick={onSetName} className="w-full flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
             <UserCircle2 size={15} className="text-slate-400" />
-            {me?.name ? <>Logging as <b className="text-slate-700">{me.name}</b></> : <span className="text-amber-600 font-medium">Tap to set your ref name (so entries are attributed)</span>}
+            {me?.name ? <>Logging as <b className="text-slate-700 dark:text-slate-200">{me.name}</b></> : <span className="text-amber-600 font-medium">Tap to set your ref name (so entries are attributed)</span>}
           </button>
 
           <div>
@@ -989,13 +1039,13 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
             {creatingNew ? (
               <div className="space-y-2">
                 <input autoFocus value={newNumber} onChange={(e) => setNewNumber(e.target.value)} placeholder="Team number (e.g. 1234A)"
-                  className="w-full px-3 py-2.5 rounded-lg border border-slate-300 font-mono focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                  className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-mono focus:outline-none focus:ring-2 focus:ring-slate-300" />
                 <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Team name (optional)"
-                  className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
-                {teams.length > 0 && <button onClick={() => setCreatingNew(false)} className="text-sm text-slate-500 underline">Pick an existing team instead</button>}
+                  className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                {teams.length > 0 && <button onClick={() => setCreatingNew(false)} className="text-sm text-slate-500 dark:text-slate-400 underline">Pick an existing team instead</button>}
               </div>
             ) : (
-              <select value={team} onChange={(e) => setTeam(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+              <select value={team} onChange={(e) => setTeam(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
                 {teams.map((t) => <option key={t.number} value={t.number}>{t.number}{t.name ? ` — ${t.name}` : ""}</option>)}
               </select>
             )}
@@ -1015,7 +1065,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
             <Label>Match</Label>
             <div className="flex gap-2">
               <select value={matchPhase} onChange={(e) => { setMatchPhase(e.target.value); setMatchNum(""); }}
-                className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+                className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
                 {availablePhases(event).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
               </select>
               {(() => {
@@ -1023,16 +1073,16 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
                 const count = phaseCount(matchPhase, event);
                 if (count) return (
                   <select value={matchNum} onChange={(e) => setMatchNum(e.target.value)}
-                    className="w-32 px-2 py-2.5 rounded-lg border border-slate-300 bg-white font-mono focus:outline-none focus:ring-2 focus:ring-slate-300">
+                    className="w-32 px-2 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono focus:outline-none focus:ring-2 focus:ring-slate-300">
                     <option value="">Match…</option>
                     {Array.from({ length: count }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{fmtMatch({ phase: matchPhase, num: String(n) })}</option>)}
                   </select>
                 );
                 return (<input value={matchNum} onChange={(e) => setMatchNum(e.target.value)} placeholder={matchPhase === "skills" ? "run" : "#"} inputMode="numeric"
-                  className="w-24 px-3 py-2.5 rounded-lg border border-slate-300 text-center focus:outline-none focus:ring-2 focus:ring-slate-300" />);
+                  className="w-24 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-center focus:outline-none focus:ring-2 focus:ring-slate-300" />);
               })()}
             </div>
-            {fmtMatch({ phase: matchPhase, num: matchNum }) && (<p className="text-[11px] text-slate-400 mt-1">Recorded as <b className="font-mono text-slate-600">{fmtMatch({ phase: matchPhase, num: matchNum })}</b></p>)}
+            {fmtMatch({ phase: matchPhase, num: matchNum }) && (<p className="text-[11px] text-slate-400 mt-1">Recorded as <b className="font-mono text-slate-600 dark:text-slate-300">{fmtMatch({ phase: matchPhase, num: matchNum })}</b></p>)}
             {(() => {
               const m = matchPhase === "qual" && matchNum ? matches?.[Number(matchNum)] : null;
               if (!m) return null;
@@ -1046,7 +1096,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
                 );
               };
               return (
-                <div className="mt-2 bg-slate-50 border border-slate-200 rounded-lg p-2.5">
+                <div className="mt-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5">
                   <p className="text-[11px] text-slate-400 mb-1.5">Teams in this match — tap the one that committed the violation:</p>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {m.red.map((n) => chip(n, "red"))}
@@ -1062,7 +1112,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
             <Label>Type</Label>
             <div className="grid grid-cols-3 gap-2">
               {ORDER.map((ty) => { const M = TYPES[ty]; const on = type === ty; return (
-                <button key={ty} onClick={() => setType(ty)} className={`py-2.5 rounded-lg border-2 font-semibold text-sm flex flex-col items-center gap-1 transition ${on ? `${M.solid} text-white border-transparent` : `bg-white ${M.text} border-slate-200`}`}>
+                <button key={ty} onClick={() => setType(ty)} className={`py-2.5 rounded-lg border-2 font-semibold text-sm flex flex-col items-center gap-1 transition ${on ? `${M.solid} text-white border-transparent` : `bg-white dark:bg-slate-800 ${M.text} border-slate-200 dark:border-slate-700`}`}>
                   <M.Icon size={18} /> {M.label}
                 </button>); })}
             </div>
@@ -1072,11 +1122,11 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
             <Label>Rule cited</Label>
             <div className="flex gap-2 items-start">
               <button type="button" onClick={() => setShowRulePicker(true)}
-                className="w-28 shrink-0 px-3 py-2.5 rounded-lg border border-slate-300 bg-white font-mono text-left hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300">
-                {code ? <span className="text-slate-900 font-semibold">{fmtRule(code)}</span> : <span className="text-slate-400 font-sans">Rule…</span>}
+                className="w-28 shrink-0 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono text-left hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                {code ? <span className="text-slate-900 dark:text-slate-100 font-semibold">{fmtRule(code)}</span> : <span className="text-slate-400 font-sans">Rule…</span>}
               </button>
               <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What the rule covers" rows={2}
-                className="flex-1 min-w-0 px-3 py-2.5 rounded-lg border border-slate-300 text-sm leading-snug resize-y focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                className="flex-1 min-w-0 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm leading-snug resize-y focus:outline-none focus:ring-2 focus:ring-slate-300" />
             </div>
             <p className="text-[11px] text-slate-400 mt-1">Tap the box to pick a rule — search by code or description.</p>
           </div>
@@ -1092,11 +1142,11 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
               ))}
               {photos.map((p, i) => (
                 <div key={i} className="relative">
-                  <img src={p} className="w-20 h-20 rounded-lg object-cover border border-slate-200" alt="robot" />
+                  <img src={p} className="w-20 h-20 rounded-lg object-cover border border-slate-200 dark:border-slate-700" alt="robot" />
                   <button onClick={() => setPhotos((ps) => ps.filter((_, j) => j !== i))} className="absolute -top-1.5 -right-1.5 bg-slate-900 text-white rounded-full p-0.5"><X size={13} /></button>
                 </div>
               ))}
-              {keepKeys.length + photos.length < 6 && (<button onClick={() => fileRef.current?.click()} className="w-20 h-20 rounded-lg border-2 border-dashed border-slate-300 grid place-items-center text-slate-400 hover:border-slate-400 hover:text-slate-500"><Camera size={22} /></button>)}
+              {keepKeys.length + photos.length < 6 && (<button onClick={() => fileRef.current?.click()} className="w-20 h-20 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 grid place-items-center text-slate-400 hover:border-slate-400 hover:text-slate-500 dark:text-slate-400"><Camera size={22} /></button>)}
               <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
             </div>
           </div>
@@ -1104,36 +1154,36 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
           <div>
             <Label>Notes</Label>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="What happened, where on the field, who was told…"
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-slate-300" />
+              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-slate-300" />
           </div>
         </div>
-        <div className="sticky bottom-0 bg-slate-50 border-t border-slate-200 p-4 flex gap-2">
-          <button onClick={onClose} className="px-4 py-3 rounded-lg border border-slate-300 bg-white font-medium text-slate-600">Cancel</button>
+        <div className="sticky bottom-0 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 p-4 flex gap-2">
+          <button onClick={onClose} className="px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
           <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? `${T.solid} ${T.solidHover}` : "bg-slate-300"}`}>{busy ? "Saving…" : edit ? "Save changes" : "Save violation"}</button>
         </div>
       </div>
       {repeatWarning && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden">
+          <div className="bg-white dark:bg-slate-800 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden">
             <div className="p-5">
               <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 grid place-items-center mb-3"><ShieldAlert size={26} /></div>
-              <h3 className="text-lg font-bold text-slate-900">Possible Major Violation</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Possible Major Violation</h3>
               {repeatWarning.previouslyMajor ? (
                 <>
-                  <p className="text-sm text-slate-600 mt-2">Team <b className="font-mono text-slate-900">{repeatWarning.team}</b> has already had <b className="text-red-700">{fmtRule(repeatWarning.rule)} recorded as a Major Violation</b> after repeated violations.</p>
-                  <p className="text-sm text-slate-600 mt-2">This rule was previously escalated to Major for this team. Confirm before recording another Minor Violation.</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">Team <b className="font-mono text-slate-900 dark:text-slate-100">{repeatWarning.team}</b> has already had <b className="text-red-700">{fmtRule(repeatWarning.rule)} recorded as a Major Violation</b> after repeated violations.</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">This rule was previously escalated to Major for this team. Confirm before recording another Minor Violation.</p>
                 </>
               ) : (
                 <>
-                  <p className="text-sm text-slate-600 mt-2">Team <b className="font-mono text-slate-900">{repeatWarning.team}</b> already has <b>{repeatWarning.count} Minor Violations</b> for <b className="font-mono text-slate-900">{fmtRule(repeatWarning.rule)}</b>.</p>
-                  <p className="text-sm text-slate-600 mt-2">Because this rule is being violated repeatedly, consider whether this should be recorded as a Major Violation before saving.</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">Team <b className="font-mono text-slate-900 dark:text-slate-100">{repeatWarning.team}</b> already has <b>{repeatWarning.count} Minor Violations</b> for <b className="font-mono text-slate-900 dark:text-slate-100">{fmtRule(repeatWarning.rule)}</b>.</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">Because this rule is being violated repeatedly, consider whether this should be recorded as a Major Violation before saving.</p>
                 </>
               )}
             </div>
-            <div className="border-t border-slate-200 p-3 flex flex-col gap-2">
+            <div className="border-t border-slate-200 dark:border-slate-700 p-3 flex flex-col gap-2">
               <button onClick={() => { setType("major"); setRepeatWarning(null); }} className="w-full py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold">Change to Major</button>
-              <button onClick={() => { setRepeatWarning(null); doSave(); }} className="w-full py-2.5 rounded-lg border border-slate-300 bg-white text-slate-700 font-semibold hover:bg-slate-50">Save as Minor anyway</button>
-              <button onClick={() => setRepeatWarning(null)} className="w-full py-2 text-sm text-slate-500 hover:text-slate-700">Review violation</button>
+              <button onClick={() => { setRepeatWarning(null); doSave(); }} className="w-full py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900">Save as Minor anyway</button>
+              <button onClick={() => setRepeatWarning(null)} className="w-full py-2 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200">Review violation</button>
             </div>
           </div>
         </div>
@@ -1167,33 +1217,33 @@ function RulePicker({ rules, knownRules, onPickRule, onPickCustom, onClose }) {
   const exact = all.some((r) => r.code.toUpperCase() === uq);
   const showCustom = query && !exact;
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col font-sans">
-      <div className="px-3 py-3 border-b border-slate-200 flex items-center gap-2 shrink-0">
-        <button onClick={onClose} className="text-slate-500 p-1 -ml-1"><ChevronLeft size={22} /></button>
-        <h2 className="font-bold text-slate-900">Cite a rule</h2>
+    <div className="fixed inset-0 z-50 bg-white dark:bg-slate-800 flex flex-col font-sans">
+      <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2 shrink-0">
+        <button onClick={onClose} className="text-slate-500 dark:text-slate-400 p-1 -ml-1"><ChevronLeft size={22} /></button>
+        <h2 className="font-bold text-slate-900 dark:text-slate-100">Cite a rule</h2>
       </div>
       <div className="p-3 border-b border-slate-100 shrink-0">
         <div className="relative">
           <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search code or description"
-            className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+            className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
         </div>
       </div>
       <div className="flex-1 overflow-y-auto overscroll-contain">
         {showCustom && (
-          <button onClick={() => onPickCustom(uq.replace(/[<>]/g, ""))} className="w-full text-left px-4 py-3 border-b border-slate-100 hover:bg-slate-50">
-            <span className="font-mono font-bold text-slate-900">Use {fmtRule(uq)}</span>
-            <span className="text-sm text-slate-500 ml-2">custom — not in the rulebook</span>
+          <button onClick={() => onPickCustom(uq.replace(/[<>]/g, ""))} className="w-full text-left px-4 py-3 border-b border-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900">
+            <span className="font-mono font-bold text-slate-900 dark:text-slate-100">Use {fmtRule(uq)}</span>
+            <span className="text-sm text-slate-500 dark:text-slate-400 ml-2">custom — not in the rulebook</span>
           </button>
         )}
         {groups.length === 0 && !showCustom && <p className="text-center text-slate-400 py-10">No rules match.</p>}
         {groups.map((g) => (
           <div key={g.cat}>
-            <div className="sticky top-0 bg-slate-100 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">{g.cat}</div>
+            <div className="sticky top-0 bg-slate-100 dark:bg-slate-700 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{g.cat}</div>
             {g.items.map((r) => (
-              <button key={r.code} onClick={() => onPickRule(r.code, r.desc)} className="w-full text-left px-4 py-2.5 border-b border-slate-100 hover:bg-slate-50 flex gap-3 items-baseline">
-                <span className="font-mono font-bold text-slate-900 w-16 shrink-0">{fmtRule(r.code)}</span>
-                <span className="text-sm text-slate-600">{r.desc}</span>
+              <button key={r.code} onClick={() => onPickRule(r.code, r.desc)} className="w-full text-left px-4 py-2.5 border-b border-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex gap-3 items-baseline">
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
+                <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
               </button>
             ))}
           </div>
@@ -1208,14 +1258,14 @@ function AddTeamModal({ onClose, onSave }) {
   const [num, setNum] = useState(""); const [name, setName] = useState("");
   return (
     <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
-        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200"><h2 className="font-bold text-slate-900">Add team</h2><button onClick={onClose} className="text-slate-400"><X size={22} /></button></div>
+      <div className="bg-white dark:bg-slate-800 w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
+        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700"><h2 className="font-bold text-slate-900 dark:text-slate-100">Add team</h2><button onClick={onClose} className="text-slate-400"><X size={22} /></button></div>
         <div className="p-4 space-y-3">
-          <div><Label>Team number</Label><input autoFocus value={num} onChange={(e) => setNum(e.target.value)} placeholder="e.g. 1234A" className="w-full px-3 py-2.5 rounded-lg border border-slate-300 font-mono focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
-          <div><Label>Team name (optional)</Label><input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
+          <div><Label>Team number</Label><input autoFocus value={num} onChange={(e) => setNum(e.target.value)} placeholder="e.g. 1234A" className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-mono focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
+          <div><Label>Team name (optional)</Label><input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
         </div>
         <div className="p-4 pt-0 flex gap-2">
-          <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 font-medium text-slate-600">Cancel</button>
+          <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
           <button onClick={() => num.trim() && onSave(num, name)} disabled={!num.trim()} className={`flex-1 py-2.5 rounded-lg font-semibold text-white ${num.trim() ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Add team</button>
         </div>
       </div>
@@ -1228,15 +1278,15 @@ function IdentityModal({ me, onSave, onClose }) {
   const [name, setName] = useState(me?.name || "");
   return (
     <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
-        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200">
-          <h2 className="font-bold text-slate-900">Your ref name</h2>
+      <div className="bg-white dark:bg-slate-800 w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
+        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+          <h2 className="font-bold text-slate-900 dark:text-slate-100">Your ref name</h2>
           <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-3">
           <div><Label>Name or initials</Label>
             <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Alex R or ABR"
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
           </div>
         </div>
         <div className="p-4 pt-0"><button onClick={() => name.trim() && onSave(name)} disabled={!name.trim()} className={`w-full py-2.5 rounded-lg font-semibold text-white ${name.trim() ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Save</button></div>
@@ -1252,24 +1302,24 @@ function ShareModal({ event, onClose }) {
   const copy = (text, which) => { navigator.clipboard?.writeText(text); setCopied(which); setTimeout(() => setCopied(""), 1500); };
   return (
     <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
-        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200">
-          <h2 className="font-bold text-slate-900 flex items-center gap-2"><Share2 size={18} /> Invite other refs</h2>
+      <div className="bg-white dark:bg-slate-800 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
+        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+          <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Share2 size={18} /> Invite other refs</h2>
           <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
         </div>
-        <div className="p-4 space-y-4 text-sm text-slate-600">
+        <div className="p-4 space-y-4 text-sm text-slate-600 dark:text-slate-300">
           <p>Everyone works from the same live Highlander Summit log and sees each other's entries within seconds.</p>
-          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+          <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-3">
             <div>
               <Label>Send your crew the site</Label>
               <div className="flex gap-2">
-                <input readOnly value={url} className="flex-1 px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-700 text-sm" />
+                <input readOnly value={url} className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm" />
                 <button onClick={() => copy(url, "url")} className="px-3 rounded-lg bg-slate-900 text-white flex items-center gap-1 text-sm">{copied === "url" ? <Check size={15} /> : <Copy size={15} />}</button>
               </div>
             </div>
-            <p className="text-[13px] text-slate-500">They open the link, enter the crew password, set a ref name, and they're in.</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400">They open the link, enter the crew password, set a ref name, and they're in.</p>
           </div>
-          <div className="flex items-start gap-2 text-xs text-slate-500 bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <div className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 bg-amber-50 border border-amber-200 rounded-lg p-3">
             <AlertTriangle size={15} className="text-amber-500 shrink-0 mt-0.5" />
             <span>Share the password only with your officiating crew — anyone who has it can view, add, and delete entries.</span>
           </div>
@@ -1291,16 +1341,16 @@ function AdminPasswordModal({ onUnlock, onClose }) {
   };
   return (
     <div className="fixed inset-0 z-[70] bg-slate-950/60 grid place-items-center p-4" onMouseDown={onClose}>
-      <form onSubmit={submit} onMouseDown={(e) => e.stopPropagation()} className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-5">
+      <form onSubmit={submit} onMouseDown={(e) => e.stopPropagation()} className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-5">
         <div className="flex items-center gap-3 mb-2">
           <span className="w-10 h-10 rounded-full bg-[#0D0F32] text-white grid place-items-center"><KeyRound size={19} /></span>
-          <div><h2 className="font-bold text-slate-900">Admin access required</h2><p className="text-xs text-slate-500">Event editing and CSV export are admin only.</p></div>
+          <div><h2 className="font-bold text-slate-900 dark:text-slate-100">Admin access required</h2><p className="text-xs text-slate-500 dark:text-slate-400">Event editing and CSV export are admin only.</p></div>
         </div>
         <input autoFocus type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} placeholder="Admin password"
-          className="w-full mt-4 px-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+          className="w-full mt-4 px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
         {err && <p className="text-xs text-red-600 mt-2">{err}</p>}
         <div className="flex gap-2 mt-4">
-          <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-medium">Cancel</button>
+          <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-medium">Cancel</button>
           <button type="submit" className="flex-1 px-4 py-2.5 rounded-xl bg-[#0D0F32] text-white font-semibold">Unlock admin</button>
         </div>
       </form>
@@ -1317,34 +1367,34 @@ function EventModal({ event, onSave, onClose }) {
   const creating = !event;
   return (
     <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white px-4 py-3 flex items-center justify-between border-b border-slate-200">
-          <h2 className="font-bold text-slate-900 flex items-center gap-2"><CalendarDays size={18} /> {creating ? "New event" : "Event setup"}</h2>
+      <div className="bg-white dark:bg-slate-800 w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white dark:bg-slate-800 px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+          <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><CalendarDays size={18} /> {creating ? "New event" : "Event setup"}</h2>
           <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-3">
           <div><Label>Event name</Label>
             <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Highlander Summit Signature"
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
+              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
           <div><Label>Number of qualification matches</Label>
             <div className="relative">
               <ListOrdered size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input value={quals} onChange={(e) => setQuals(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="e.g. 60"
-                className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
             </div>
             <p className="text-[11px] text-slate-400 mt-1">Logging will offer Q1–Q{quals || "n"} as a dropdown.</p>
           </div>
           <div><Label>Practice matches (optional)</Label>
             <input value={practice} onChange={(e) => setPractice(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="leave blank if none"
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
+              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
           <div className="grid grid-cols-2 gap-2">
             <div><Label>Elimination bracket</Label>
-              <select value={bracket} onChange={(e) => setBracket(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+              <select value={bracket} onChange={(e) => setBracket(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
                 <option value="0">None</option><option value="4">Top 4</option><option value="8">Top 8</option><option value="16">Top 16</option>
               </select>
             </div>
             <div><Label>Finals</Label>
-              <select value={finalsBestOf} onChange={(e) => setFinalsBestOf(e.target.value)} disabled={bracket === "0"} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white disabled:bg-slate-100 disabled:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300">
+              <select value={finalsBestOf} onChange={(e) => setFinalsBestOf(e.target.value)} disabled={bracket === "0"} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 disabled:bg-slate-100 dark:bg-slate-700 disabled:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300">
                 <option value="1">Single</option><option value="3">Best of 3</option>
               </select>
             </div>
@@ -1354,7 +1404,7 @@ function EventModal({ event, onSave, onClose }) {
           )}
         </div>
         <div className="p-4 pt-0 flex gap-2">
-          <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 font-medium text-slate-600">Cancel</button>
+          <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
           <button onClick={() => onSave({ name, quals, practice, bracket, finalsBestOf })} className="flex-1 py-2.5 rounded-lg font-semibold text-white bg-slate-900 hover:bg-slate-800">{creating ? "Create event" : "Save event"}</button>
         </div>
       </div>
@@ -1381,7 +1431,7 @@ function MatchList({ matches, teamName, viols, query, setQuery, onOpen }) {
         <div className="flex gap-1.5 mb-3 overflow-x-auto">
           {["all", ...fields].map((f) => (
             <button key={f} onClick={() => setField(f)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border ${field === f ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"}`}>
+              className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border ${field === f ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:border-slate-600"}`}>
               {f === "all" ? "All fields" : f}
             </button>
           ))}
@@ -1390,7 +1440,7 @@ function MatchList({ matches, teamName, viols, query, setQuery, onOpen }) {
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search match # or team"
-          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
       </div>
       {filtered.length === 0 ? (
         <Empty title="No matches" sub="Try a different match number or team." />
@@ -1398,15 +1448,15 @@ function MatchList({ matches, teamName, viols, query, setQuery, onOpen }) {
         <ul className="space-y-2">
           {filtered.map((m) => (
             <li key={m.num}>
-              <button onClick={() => onOpen(m.num)} className="w-full text-left bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3 hover:border-slate-300 hover:shadow-sm transition">
-                <span className="font-mono font-bold text-slate-900 w-11 shrink-0">Q{m.num}</span>
+              <button onClick={() => onOpen(m.num)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-11 shrink-0">Q{m.num}</span>
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
                   <span className="text-red-700 font-semibold">{m.red.join("  ")}</span>
                   <span className="text-slate-300 font-sans">vs</span>
                   <span className="text-blue-700 font-semibold">{m.blue.join("  ")}</span>
                 </div>
                 {m.field && <span className="text-[11px] text-slate-400 shrink-0">{m.field.replace("Field ", "F")}</span>}
-                {vcount[m.num] ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold border bg-slate-100 text-slate-600 border-slate-300 shrink-0">{vcount[m.num]}</span> : null}
+                {vcount[m.num] ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold border bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 shrink-0">{vcount[m.num]}</span> : null}
                 <ChevronRight size={16} className="text-slate-300 shrink-0" />
               </button>
             </li>
@@ -1439,10 +1489,10 @@ function MatchDetail({ num, match, teamName, viols, allNums, onNav, onLogTeam, o
         {teams.map((n) => {
           const s = stat[n];
           return (
-            <button key={n} onClick={() => onLogTeam(n)} className="w-full bg-white rounded-lg border border-slate-200 px-3 py-2.5 text-left hover:border-slate-300">
+            <button key={n} onClick={() => onLogTeam(n)} className="w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2.5 text-left hover:border-slate-300 dark:border-slate-600">
               <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-slate-900">{n}</span>
-                {teamName[n] && <span className="text-sm text-slate-500 truncate">{teamName[n]}</span>}
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{n}</span>
+                {teamName[n] && <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{teamName[n]}</span>}
                 <span className="ml-auto text-xs font-semibold text-[#D7212B] flex items-center gap-1 shrink-0"><Plus size={14} /> Log</span>
               </div>
               {s && s.total > 0 && (
@@ -1453,7 +1503,7 @@ function MatchDetail({ num, match, teamName, viols, allNums, onNav, onLogTeam, o
                       <span className={`w-1.5 h-1.5 rounded-full ${TYPES[ty].dot}`} />{s[ty]}
                     </span>) : null)}
                   {Object.entries(s.codes).sort((a, b) => b[1] - a[1]).map(([c, n2]) => (
-                    <span key={c} className="font-mono text-[11px] text-slate-500">{fmtRule(c)}{n2 > 1 ? <span className="text-slate-400">×{n2}</span> : null}</span>
+                    <span key={c} className="font-mono text-[11px] text-slate-500 dark:text-slate-400">{fmtRule(c)}{n2 > 1 ? <span className="text-slate-400">×{n2}</span> : null}</span>
                   ))}
                 </div>
               )}
@@ -1465,22 +1515,22 @@ function MatchDetail({ num, match, teamName, viols, allNums, onNav, onLogTeam, o
   );
   return (
     <>
-      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <div className="font-mono font-bold text-2xl text-slate-900 leading-none">Q{num}</div>
-            {match.field && <div className="text-sm text-slate-500 mt-1">{match.field}</div>}
+            <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">Q{num}</div>
+            {match.field && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{match.field}</div>}
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => prev && onNav(prev)} disabled={!prev} title="Previous match"
-              className={`p-2 rounded-lg border ${prev ? "border-slate-300 text-slate-600 hover:bg-slate-50" : "border-slate-200 text-slate-300"}`}><ChevronLeft size={18} /></button>
+              className={`p-2 rounded-lg border ${prev ? "border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900" : "border-slate-200 dark:border-slate-700 text-slate-300"}`}><ChevronLeft size={18} /></button>
             <button onClick={() => next && onNav(next)} disabled={!next}
               className={`px-3 py-2 rounded-lg font-semibold text-sm flex items-center gap-1 ${next ? "bg-[#D7212B] text-white hover:bg-[#B42024]" : "bg-slate-200 text-slate-400"}`}>Next <ChevronRight size={16} /></button>
           </div>
         </div>
         {nums.length > 1 && (
           <select value={num} onChange={(e) => onNav(Number(e.target.value))}
-            className="w-full mt-3 px-3 py-2 rounded-lg border border-slate-300 bg-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
+            className="w-full mt-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
             {nums.map((n) => <option key={n} value={n}>Jump to Q{n}</option>)}
           </select>
         )}
@@ -1515,29 +1565,29 @@ function ClearModal({ counts, onClear, onClose }) {
   };
   return (
     <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
-        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200">
-          <h2 className="font-bold text-slate-900 flex items-center gap-2"><Trash2 size={18} /> Clear data</h2>
+      <div className="bg-white dark:bg-slate-800 w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
+        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+          <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Trash2 size={18} /> Clear data</h2>
           <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-2">
-          <p className="text-sm text-slate-500 mb-1">Choose what to delete. Anything you leave unchecked is kept.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Choose what to delete. Anything you leave unchecked is kept.</p>
           {opts.map((o) => {
             const on = sel[o.key];
             return (
               <button key={o.key} onClick={() => toggle(o.key)}
-                className={`w-full flex items-start gap-3 text-left rounded-xl border-2 p-3 transition ${on ? "border-red-400 bg-red-50" : "border-slate-200 hover:border-slate-300"}`}>
-                <span className={`mt-0.5 w-5 h-5 rounded-md grid place-items-center shrink-0 border-2 ${on ? "bg-red-600 border-red-600 text-white" : "border-slate-300"}`}>{on && <Check size={13} />}</span>
+                className={`w-full flex items-start gap-3 text-left rounded-xl border-2 p-3 transition ${on ? "border-red-400 bg-red-50" : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:border-slate-600"}`}>
+                <span className={`mt-0.5 w-5 h-5 rounded-md grid place-items-center shrink-0 border-2 ${on ? "bg-red-600 border-red-600 text-white" : "border-slate-300 dark:border-slate-600"}`}>{on && <Check size={13} />}</span>
                 <span className="flex-1">
-                  <span className="flex items-center gap-2"><b className="text-slate-800">{o.label}</b><span className="text-xs text-slate-400">{o.desc}</span></span>
-                  <span className="block text-xs text-slate-500 mt-0.5">{o.note}</span>
+                  <span className="flex items-center gap-2"><b className="text-slate-800 dark:text-slate-100">{o.label}</b><span className="text-xs text-slate-400">{o.desc}</span></span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">{o.note}</span>
                 </span>
               </button>
             );
           })}
         </div>
         <div className="p-4 pt-0 flex gap-2">
-          <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 font-medium text-slate-600">Cancel</button>
+          <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
           <button onClick={doClear} disabled={!any}
             className={`flex-1 py-2.5 rounded-lg font-semibold text-white ${any ? "bg-red-600 hover:bg-red-700" : "bg-slate-300"}`}>Clear selected</button>
         </div>
@@ -1580,10 +1630,10 @@ function OnlineList({ presence, roster, meName, onRemove }) {
         {refs.map((r) => {
           const isOnline = !!onlineCounts[r.name];
           return (
-            <li key={r.name} className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex items-center gap-3">
+            <li key={r.name} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3">
               <span className={`w-8 h-8 rounded-full text-white text-xs font-bold grid place-items-center shrink-0 ${isOnline ? "bg-[#D7212B]" : "bg-slate-400"}`}>{initials(r.name)}</span>
               <div className="min-w-0">
-                <span className="font-medium text-slate-800 truncate">{r.name}{r.name === meName && <span className="text-xs text-slate-400 ml-1">(you)</span>}</span>
+                <span className="font-medium text-slate-800 dark:text-slate-100 truncate">{r.name}{r.name === meName && <span className="text-xs text-slate-400 ml-1">(you)</span>}</span>
                 {!isOnline && r.lastSeen > 0 && <div className="text-[11px] text-slate-400">last seen {ago(r.lastSeen)}</div>}
               </div>
               <span className={`ml-auto inline-flex items-center gap-1 text-xs shrink-0 ${isOnline ? "text-emerald-600" : "text-slate-400"}`}>
@@ -1614,7 +1664,7 @@ function RobotList({ teams, query, setQuery, onOpen }) {
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search team #"
-          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
       </div>
       {filtered.length === 0 ? (
         <Empty title="No teams" sub="Try a different team number." />
@@ -1624,12 +1674,12 @@ function RobotList({ teams, query, setQuery, onOpen }) {
             const key = (t.photoKeys || [])[0];
             return (
               <li key={t.number}>
-                <button onClick={() => onOpen(t.number)} className="w-full bg-white rounded-xl border border-slate-200 overflow-hidden hover:border-slate-300 hover:shadow-sm transition text-left">
-                  <div className="aspect-square bg-slate-100 grid place-items-center">
+                <button onClick={() => onOpen(t.number)} className="w-full bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition text-left">
+                  <div className="aspect-square bg-slate-100 dark:bg-slate-700 grid place-items-center">
                     {key ? <Thumb pkey={key} /> : <Camera size={26} className="text-slate-300" />}
                   </div>
                   <div className="px-2.5 py-2 flex items-center gap-1.5">
-                    <span className="font-mono font-bold text-slate-900 text-sm truncate">{t.number}</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm truncate">{t.number}</span>
                     {(t.photoKeys || []).length > 0 && <span className="ml-auto text-[10px] font-semibold text-slate-400">{t.photoKeys.length}</span>}
                   </div>
                 </button>
@@ -1658,9 +1708,9 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onOpenPhoto }) {
   };
   return (
     <>
-      <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
-        <div className="font-mono font-bold text-2xl text-slate-900 leading-none">{team.number}</div>
-        {team.name && <div className="text-sm text-slate-500 mt-1">{team.name}</div>}
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
+        <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">{team.number}</div>
+        {team.name && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{team.name}</div>}
       </div>
       <button onClick={() => fileRef.current?.click()} disabled={busy}
         className="w-full mb-4 bg-[#D7212B] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-[#B42024] disabled:bg-slate-300">
@@ -1672,7 +1722,7 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onOpenPhoto }) {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {photos.map((p) => (
-            <div key={p} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-100">
+            <div key={p} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700">
               <button onClick={() => onOpenPhoto(p)} className="w-full h-full"><Thumb pkey={p} /></button>
               <button onClick={() => { if (confirm("Delete this robot photo?")) onRemovePhoto(team.number, p); }}
                 className="absolute top-1 right-1 bg-slate-900/80 text-white rounded-full p-1"><Trash2 size={13} /></button>
@@ -1715,13 +1765,13 @@ function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNom
     <>
       {onExport && noms.length > 0 && (
         <div className="flex justify-end mb-2">
-          <button onClick={onExport} className="inline-flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 border border-slate-200 bg-white rounded-lg px-3 py-1.5"><Download size={15} /> Export nominations</button>
+          <button onClick={onExport} className="inline-flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg px-3 py-1.5"><Download size={15} /> Export nominations</button>
         </div>
       )}
       <div className="flex gap-1.5 mb-4">
         {AWARDS.map((a) => (
           <button key={a.key} onClick={() => { setAward(a.key); setOpenTeam(null); }}
-            className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold border ${award === a.key ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white text-slate-600 border-slate-200"}`}>{a.full}</button>
+            className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold border ${award === a.key ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"}`}>{a.full}</button>
         ))}
       </div>
 
@@ -1739,14 +1789,14 @@ function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNom
             const expanded = openTeam === row.team;
             const isFinalist = finalists && finalists.has(`${award}::${row.team}`);
             return (
-              <li key={row.team} className={`bg-white rounded-xl border overflow-hidden ${isFinalist ? "border-[#EBA622] ring-1 ring-[#EBA622]" : "border-slate-200"}`}>
+              <li key={row.team} className={`bg-white dark:bg-slate-800 rounded-xl border overflow-hidden ${isFinalist ? "border-[#EBA622] ring-1 ring-[#EBA622]" : "border-slate-200 dark:border-slate-700"}`}>
                 <div className="w-full px-4 py-3 flex items-center gap-3">
                   <button onClick={() => setOpenTeam(expanded ? null : row.team)} className="flex items-center gap-3 text-left flex-1 min-w-0">
-                    <span className={`w-7 h-7 rounded-full grid place-items-center text-sm font-bold shrink-0 ${i === 0 ? "bg-[#EBA622] text-white" : "bg-slate-100 text-slate-500"}`}>{i + 1}</span>
+                    <span className={`w-7 h-7 rounded-full grid place-items-center text-sm font-bold shrink-0 ${i === 0 ? "bg-[#EBA622] text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"}`}>{i + 1}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono font-bold text-slate-900">{row.team}</span>
-                        {teamName[row.team] && <span className="text-sm text-slate-500 truncate">{teamName[row.team]}</span>}
+                        <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{row.team}</span>
+                        {teamName[row.team] && <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{teamName[row.team]}</span>}
                         {isFinalist && <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#8a6100] bg-[#EBA622]/20 border border-[#EBA622] rounded-md px-1.5 py-0.5"><Star size={10} className="fill-[#EBA622] text-[#EBA622]" /> FINALIST</span>}
                       </div>
                       {gCodes.length > 0 && (
@@ -1755,23 +1805,23 @@ function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNom
                         </div>
                       )}
                     </div>
-                    <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-700 text-sm font-semibold">{row.count} <span className="text-slate-400 font-normal text-xs">nom{row.count !== 1 ? "s" : ""}</span></span>
+                    <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold">{row.count} <span className="text-slate-400 font-normal text-xs">nom{row.count !== 1 ? "s" : ""}</span></span>
                   </button>
                   <button onClick={() => onToggleFinalist(award, row.team)} title={isFinalist ? "Remove finalist" : "Mark finalist"} className="shrink-0 p-1">
                     <Star size={20} className={isFinalist ? "fill-[#EBA622] text-[#EBA622]" : "text-slate-300 hover:text-[#EBA622]"} />
                   </button>
                 </div>
                 {expanded && (
-                  <div className="border-t border-slate-100 divide-y divide-slate-100">
+                  <div className="border-t border-slate-100 divide-y divide-slate-100 dark:divide-slate-700">
                     {row.noms.sort((a, b) => b.createdAt - a.createdAt).map((n) => (
                       <div key={n.id} className="px-4 py-2.5 text-sm">
                         <div className="flex items-center gap-2 text-xs text-slate-400">
-                          {fmtMatch(n.match) && <span className="font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{fmtMatch(n.match)}</span>}
+                          {fmtMatch(n.match) && <span className="font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{fmtMatch(n.match)}</span>}
                           {n.by && <span className="flex items-center gap-1"><UserCircle2 size={12} /> {n.by}</span>}
                           <span className="ml-auto">{fmtTime(n.createdAt)}</span>
                           <button onClick={() => { if (confirm("Remove this nomination?")) onDeleteNom(n.id); }} className="text-slate-300 hover:text-red-600"><Trash2 size={14} /></button>
                         </div>
-                        {n.reason ? <p className="text-slate-700 mt-1">{n.reason}</p> : <p className="text-slate-400 italic mt-1">No reason given</p>}
+                        {n.reason ? <p className="text-slate-700 dark:text-slate-200 mt-1">{n.reason}</p> : <p className="text-slate-400 italic mt-1">No reason given</p>}
                       </div>
                     ))}
                   </div>
@@ -1804,15 +1854,15 @@ function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSe
   };
   return (
     <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-slate-50 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
-        <div className="sticky top-0 bg-slate-50 px-4 py-3 flex items-center justify-between border-b border-slate-200">
-          <h2 className="font-bold text-slate-900">Nominate for an award</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={22} /></button>
+      <div className="bg-slate-50 dark:bg-slate-900 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
+        <div className="sticky top-0 bg-slate-50 dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+          <h2 className="font-bold text-slate-900 dark:text-slate-100">Nominate for an award</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:text-slate-300"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-4">
-          <button onClick={onSetName} className="w-full flex items-center gap-2 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg px-3 py-2">
+          <button onClick={onSetName} className="w-full flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
             <UserCircle2 size={15} className="text-slate-400" />
-            {me?.name ? <>Nominating as <b className="text-slate-700">{me.name}</b></> : <span className="text-amber-600 font-medium">Tap to set your ref name</span>}
+            {me?.name ? <>Nominating as <b className="text-slate-700 dark:text-slate-200">{me.name}</b></> : <span className="text-amber-600 font-medium">Tap to set your ref name</span>}
           </button>
 
           <div>
@@ -1820,7 +1870,7 @@ function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSe
             <div className="grid grid-cols-2 gap-2">
               {AWARDS.map((a) => (
                 <button key={a.key} onClick={() => setAward(a.key)}
-                  className={`py-2.5 rounded-lg border-2 font-semibold text-sm flex items-center justify-center gap-1.5 ${award === a.key ? "bg-[#0D0F32] text-white border-transparent" : "bg-white text-slate-600 border-slate-200"}`}>
+                  className={`py-2.5 rounded-lg border-2 font-semibold text-sm flex items-center justify-center gap-1.5 ${award === a.key ? "bg-[#0D0F32] text-white border-transparent" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"}`}>
                   <Trophy size={15} /> {a.full}
                 </button>
               ))}
@@ -1832,13 +1882,13 @@ function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSe
             {creatingNew ? (
               <div className="space-y-2">
                 <input autoFocus value={newNumber} onChange={(e) => setNewNumber(e.target.value)} placeholder="Team number (e.g. 1234A)"
-                  className="w-full px-3 py-2.5 rounded-lg border border-slate-300 font-mono focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                  className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-mono focus:outline-none focus:ring-2 focus:ring-slate-300" />
                 <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Team name (optional)"
-                  className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
-                {teams.length > 0 && <button onClick={() => setCreatingNew(false)} className="text-sm text-slate-500 underline">Pick an existing team instead</button>}
+                  className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                {teams.length > 0 && <button onClick={() => setCreatingNew(false)} className="text-sm text-slate-500 dark:text-slate-400 underline">Pick an existing team instead</button>}
               </div>
             ) : (
-              <select value={team} onChange={(e) => setTeam(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+              <select value={team} onChange={(e) => setTeam(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
                 {teams.map((t) => <option key={t.number} value={t.number}>{t.number}{t.name ? ` — ${t.name}` : ""}</option>)}
               </select>
             )}
@@ -1847,11 +1897,11 @@ function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSe
           <div>
             <Label>Match</Label>
             <div className="flex gap-2">
-              <select value={matchPhase} onChange={(e) => { setMatchPhase(e.target.value); setMatchNum(""); }} className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+              <select value={matchPhase} onChange={(e) => { setMatchPhase(e.target.value); setMatchNum(""); }} className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
                 {availablePhases(event).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
               </select>
               {matchPhase !== "none" && count > 0 && (
-                <select value={matchNum} onChange={(e) => setMatchNum(e.target.value)} className="w-32 px-3 py-2.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <select value={matchNum} onChange={(e) => setMatchNum(e.target.value)} className="w-32 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
                   <option value="">#</option>
                   {Array.from({ length: count }, (_, i) => String(i + 1)).map((n) => <option key={n} value={n}>{fmtMatch({ phase: matchPhase, num: n })}</option>)}
                 </select>
@@ -1862,15 +1912,67 @@ function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSe
           <div>
             <Label>Why are you nominating them?</Label>
             <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="What did this team do that stood out…"
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
           </div>
         </div>
-        <div className="sticky bottom-0 bg-slate-50 border-t border-slate-200 p-4 flex gap-2">
-          <button onClick={onClose} className="px-4 py-3 rounded-lg border border-slate-300 font-medium text-slate-600">Cancel</button>
+        <div className="sticky bottom-0 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 p-4 flex gap-2">
+          <button onClick={onClose} className="px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
           <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? "bg-[#D7212B] hover:bg-[#B42024]" : "bg-slate-300"}`}>{busy ? "Saving…" : "Submit nomination"}</button>
         </div>
       </div>
     </div>
+  );
+}
+
+/* ============================ ACTIVITY FEED (admin) ============================ */
+function ActivityFeed({ viols, onOpenPhoto, onDeleteViolation, onEditViolation }) {
+  const sorted = [...viols].sort((a, b) => b.createdAt - a.createdAt);
+  if (sorted.length === 0) return <Empty title="No activity yet" sub="Violations will appear here as refs log them." />;
+  return (
+    <>
+      <p className="text-xs text-slate-400 mb-3">{sorted.length} violation{sorted.length !== 1 ? "s" : ""} logged, newest first.</p>
+      <ul className="space-y-2">{sorted.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} showTeam />)}</ul>
+    </>
+  );
+}
+
+/* ============================ RANKINGS (admin) ============================ */
+function Rankings({ viols, teamName }) {
+  const stat = {};
+  for (const v of viols) {
+    const t = v.team; if (!t) continue;
+    stat[t] = stat[t] || { team: t, total: 0, minor: 0, major: 0, inspection: 0 };
+    stat[t].total++; stat[t][v.type] = (stat[t][v.type] || 0) + 1;
+  }
+  // weight: major counts more than minor for ordering
+  const ranked = Object.values(stat).sort((a, b) =>
+    (b.major * 3 + b.minor + b.inspection) - (a.major * 3 + a.minor + a.inspection) ||
+    b.total - a.total || a.team.localeCompare(b.team, undefined, { numeric: true }));
+  if (ranked.length === 0) return <Empty title="No violations yet" sub="Team rankings appear once violations are logged." />;
+  return (
+    <>
+      <p className="text-xs text-slate-400 mb-3">{ranked.length} team{ranked.length !== 1 ? "s" : ""} with violations, most to least (Majors weighted highest).</p>
+      <ul className="space-y-2">
+        {ranked.map((r, i) => (
+          <li key={r.team} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3">
+            <span className={`w-7 h-7 rounded-full grid place-items-center text-sm font-bold shrink-0 ${i === 0 ? "bg-[#D7212B] text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"}`}>{i + 1}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{r.team}</span>
+                {teamName[r.team] && <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{teamName[r.team]}</span>}
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                {ORDER.map((ty) => r[ty] ? (
+                  <span key={ty} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold border ${TYPES[ty].badge}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${TYPES[ty].dot}`} />{TYPES[ty].label} {r[ty]}
+                  </span>) : null)}
+              </div>
+            </div>
+            <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold">{r.total} <span className="text-slate-400 font-normal text-xs">total</span></span>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
@@ -1891,7 +1993,7 @@ function RuleBook({ rules }) {
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search rules — code or wording"
-          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
       </div>
       {groups.length === 0 ? (
         <Empty title="No rules match" sub="Try a different word or code." />
@@ -1900,11 +2002,11 @@ function RuleBook({ rules }) {
           {groups.map((g) => (
             <div key={g.cat}>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">{g.cat}</h2>
-              <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
                 {g.items.map((r) => (
                   <div key={r.code} className="px-4 py-2.5 flex gap-3 items-baseline">
-                    <span className="font-mono font-bold text-slate-900 w-16 shrink-0">{fmtRule(r.code)}</span>
-                    <span className="text-sm text-slate-600">{r.desc}</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
+                    <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
                   </div>
                 ))}
               </div>
@@ -1919,5 +2021,5 @@ function RuleBook({ rules }) {
 /* ---------- shared bits ---------- */
 const Label = ({ children }) => <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1.5">{children}</label>;
 const Empty = ({ title, sub }) => (
-  <div className="text-center py-14 px-6"><p className="font-semibold text-slate-700">{title}</p><p className="text-sm text-slate-400 mt-1">{sub}</p></div>
+  <div className="text-center py-14 px-6"><p className="font-semibold text-slate-700 dark:text-slate-200">{title}</p><p className="text-sm text-slate-400 mt-1">{sub}</p></div>
 );
