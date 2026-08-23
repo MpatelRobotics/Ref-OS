@@ -281,6 +281,11 @@ export async function touchRefRoster(eventId, name) {
   if (error) console.warn("Could not update ref roster", error);
 }
 
+export async function deleteRefRoster(eventId, name) {
+  const { error } = await supabase.from("ref_roster").delete().eq("event_id", eventId).eq("name", name);
+  if (error) throw error;
+}
+
 export function joinPresence(eventId, meta, onChange) {
   const key = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
   const ch = supabase.channel(`presence-${eventId}`, { config: { presence: { key } } });

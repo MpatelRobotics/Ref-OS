@@ -461,6 +461,10 @@ function Tracker({ initialEvent, meName, role, onEditName, onLock }) {
     try { await api.deleteNomination(id); setNoms((cur) => cur.filter((x) => x.id !== id)); }
     catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to remove this nomination."); return; } throw e; }
   };
+  const removeRef = async (name) => {
+    try { await api.deleteRefRoster(eventId, name); setRefRoster((cur) => cur.filter((r) => r.name !== name)); }
+    catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to remove a ref."); return; } throw e; }
+  };
   const toggleFinalist = async (award, team) => {
     const key = `${award}::${team}`;
     const on = !finalists.has(key);
@@ -748,7 +752,7 @@ function Tracker({ initialEvent, meName, role, onEditName, onLock }) {
               <h2 className="font-bold text-slate-900 flex items-center gap-2"><Users size={18} /> Ref status</h2>
               <button onClick={() => setShowOnline(false)} className="text-slate-400"><X size={22} /></button>
             </div>
-            <div className="p-4"><OnlineList presence={presence} roster={refRoster} meName={meName} /></div>
+            <div className="p-4"><OnlineList presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} /></div>
           </div>
         </div>
       )}
@@ -1562,7 +1566,7 @@ function OnlineCluster({ presence, onClick }) {
   );
 }
 
-function OnlineList({ presence, roster, meName }) {
+function OnlineList({ presence, roster, meName, onRemove }) {
   const onlineCounts = {};
   for (const p of presence) { const n = p.name || "Ref"; onlineCounts[n] = (onlineCounts[n] || 0) + 1; }
   const all = new Map((roster || []).map((r) => [r.name, r]));
@@ -1574,7 +1578,7 @@ function OnlineList({ presence, roster, meName }) {
   const onlineTotal = refs.filter((r) => onlineCounts[r.name]).length;
   return (
     <>
-      <p className="text-xs text-slate-400 mb-3">{onlineTotal} online · {Math.max(0, refs.length - onlineTotal)} offline. Status updates live as refs join or leave.</p>
+      <p className="text-xs text-slate-400 mb-3">{onlineTotal} online · {Math.max(0, refs.length - onlineTotal)} offline. Status updates live as refs join or leave.{onRemove ? " Tap the trash on an offline ref to remove them." : ""}</p>
       <ul className="space-y-2">
         {refs.map((r) => {
           const isOnline = !!onlineCounts[r.name];
@@ -1589,6 +1593,9 @@ function OnlineList({ presence, roster, meName }) {
                 <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500" : "bg-slate-300"}`} />
                 {isOnline ? `online${onlineCounts[r.name] > 1 ? ` · ${onlineCounts[r.name]} devices` : ""}` : "offline"}
               </span>
+              {onRemove && !isOnline && (
+                <button onClick={() => { if (confirm(`Remove ${r.name} from the ref list?`)) onRemove(r.name); }} className="text-slate-300 hover:text-red-600 shrink-0" title="Remove ref"><Trash2 size={15} /></button>
+              )}
             </li>
           );
         })}
