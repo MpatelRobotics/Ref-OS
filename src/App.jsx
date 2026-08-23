@@ -1073,13 +1073,13 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
 
           <div>
             <Label>Rule cited</Label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-start">
               <button type="button" onClick={() => setShowRulePicker(true)}
-                className="w-28 px-3 py-2.5 rounded-lg border border-slate-300 bg-white font-mono text-left hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                className="w-28 shrink-0 px-3 py-2.5 rounded-lg border border-slate-300 bg-white font-mono text-left hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300">
                 {code ? <span className="text-slate-900 font-semibold">{fmtRule(code)}</span> : <span className="text-slate-400 font-sans">Rule…</span>}
               </button>
-              <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What the rule covers"
-                className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+              <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What the rule covers" rows={2}
+                className="flex-1 min-w-0 px-3 py-2.5 rounded-lg border border-slate-300 text-sm leading-snug resize-y focus:outline-none focus:ring-2 focus:ring-slate-300" />
             </div>
             <p className="text-[11px] text-slate-400 mt-1">Tap the box to pick a rule — search by code or description.</p>
           </div>
