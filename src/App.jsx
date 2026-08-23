@@ -560,6 +560,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     const m = {}; for (const v of viols) if (v.code && !m[v.code]) m[v.code] = v.desc || ""; return m;
   }, [viols]);
   const teamNameMap = useMemo(() => Object.fromEntries(teams.map((t) => [t.number, t.name])), [teams]);
+  const teamWatch = useMemo(() => Object.fromEntries(teams.filter((t) => t.watchlisted).map((t) => [t.number, t.watchNote || ""])), [teams]);
   const matchNums = useMemo(() => Object.keys(matches).map(Number).sort((a, b) => a - b), [matches]);
 
   const exportCSV = () => {
@@ -701,7 +702,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)}
             onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} onSetWatchlist={setTeamWatchlist} onOpenPhoto={setLightbox} />
         ) : openMatch ? (
-          <MatchDetail num={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols} allNums={matchNums} onNav={setOpenMatch}
+          <MatchDetail num={openMatch} match={matches[openMatch]} teamName={teamNameMap} teamWatch={teamWatch} viols={viols} allNums={matchNums} onNav={setOpenMatch}
             onLogTeam={(n) => { setLogFor(n); setLogMatch(openMatch); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} />
         ) : openRobot ? (
           <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onOpenPhoto={setLightbox} />
@@ -1546,7 +1547,7 @@ function MatchList({ matches, teamName, viols, query, setQuery, onOpen }) {
   );
 }
 
-function MatchDetail({ num, match, teamName, viols, allNums, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation }) {
+function MatchDetail({ num, match, teamName, teamWatch = {}, viols, allNums, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation }) {
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
   const nums = allNums || [num];
   const idx = nums.indexOf(num);
@@ -1572,8 +1573,10 @@ function MatchDetail({ num, match, teamName, viols, allNums, onNav, onLogTeam, o
               <div className="flex items-center gap-2">
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{n}</span>
                 {teamName[n] && <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{teamName[n]}</span>}
+                {n in teamWatch && <span title={teamWatch[n] || "On watchlist"} className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 text-[11px] font-bold shrink-0"><Star size={13} fill="currentColor" /> WATCH</span>}
                 <span className="ml-auto text-xs font-semibold text-[#D7212B] flex items-center gap-1 shrink-0"><Plus size={14} /> Log</span>
               </div>
+              {n in teamWatch && teamWatch[n] && <p className="mt-1 text-[11px] text-amber-700 dark:text-amber-300">{teamWatch[n]}</p>}
               {s && s.total > 0 && (
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <span className="text-[11px] text-slate-400">Prior:</span>
