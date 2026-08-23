@@ -932,9 +932,9 @@ function ViolationCard({ v, onDelete, onOpenPhoto, onEdit, showTeam }) {
     <li className={`rounded-xl border p-3 ${T.soft}`}>
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border ${T.badge}`}><T.Icon size={12} /> {T.label}</span>
-        {showTeam && <span className="font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-200 px-1.5 py-0.5 rounded-md text-sm">{v.team}</span>}
+        {showTeam && <span className="font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-200 dark:bg-slate-600 px-1.5 py-0.5 rounded-md text-sm">{v.team}</span>}
         <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{fmtRule(v.code)}</span>
-        {fmtMatch(v.match) && <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-700 dark:text-slate-200">{fmtMatch(v.match)}</span>}
+        {fmtMatch(v.match) && <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200">{fmtMatch(v.match)}</span>}
         {v._pending && <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-300"><RefreshCw size={9} className="animate-spin" /> Saving</span>}
         <span className="text-[11px] text-slate-400 ml-auto">{fmtTime(v.createdAt)}</span>
         {canEdit && <button onClick={() => onEdit(v)} className="text-slate-300 hover:text-slate-700 dark:text-slate-200" title="Edit"><Pencil size={15} /></button>}
@@ -1577,7 +1577,7 @@ function MatchDetail({ num, match, teamName, viols, allNums, onNav, onLogTeam, o
             <button onClick={() => prev && onNav(prev)} disabled={!prev} title="Previous match"
               className={`p-2 rounded-lg border ${prev ? "border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900" : "border-slate-200 dark:border-slate-700 text-slate-300"}`}><ChevronLeft size={18} /></button>
             <button onClick={() => next && onNav(next)} disabled={!next}
-              className={`px-3 py-2 rounded-lg font-semibold text-sm flex items-center gap-1 ${next ? "bg-[#D7212B] text-white hover:bg-[#B42024]" : "bg-slate-200 text-slate-400"}`}>Next <ChevronRight size={16} /></button>
+              className={`px-3 py-2 rounded-lg font-semibold text-sm flex items-center gap-1 ${next ? "bg-[#D7212B] text-white hover:bg-[#B42024]" : "bg-slate-200 dark:bg-slate-600 text-slate-400"}`}>Next <ChevronRight size={16} /></button>
           </div>
         </div>
         {nums.length > 1 && (

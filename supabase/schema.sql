@@ -76,6 +76,8 @@ create table if not exists public.teams (
 );
 alter table public.teams enable row level security;
 alter table public.teams add column if not exists photo_paths text[] default '{}';
+alter table public.teams add column if not exists watchlisted boolean default false;
+alter table public.teams add column if not exists watch_note text;
 drop policy if exists "members rw teams" on public.teams;
 drop policy if exists "open rw teams" on public.teams;
 create policy "open rw teams" on public.teams for all using (true) with check (true);
@@ -92,6 +94,8 @@ create table if not exists public.violations (
   match_info  jsonb,                  -- { phase, num }
   logged_by   text,                   -- ref name (denormalized for display)
   photo_paths text[] default '{}',    -- storage object paths in 'robot-photos'
+  watchlisted boolean default false,  -- team flagged to watch
+  watch_note  text,                   -- optional reason for the watch flag
   created_at  timestamptz default now()
 );
 alter table public.violations enable row level security;
