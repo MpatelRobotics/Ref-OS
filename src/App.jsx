@@ -899,6 +899,33 @@ function TeamDetail({ team, viols, onLog, onDeleteViolation, onEditViolation, on
           )}
         </div>
         <button onClick={onLog} className="mt-4 w-full bg-[#D7212B] text-white py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-[#B42024]"><Plus size={18} /> Log violation for {team.number}</button>
+        <div className="mt-3">
+          {team.watchlisted ? (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3">
+              <div className="flex items-center gap-2">
+                <Star size={16} className="text-amber-500 fill-amber-500" />
+                <span className="font-semibold text-amber-700 dark:text-amber-300 text-sm">On watchlist</span>
+                <button onClick={() => onSetWatchlist(team.number, false)} className="ml-auto text-xs text-slate-500 hover:text-red-600">Remove</button>
+              </div>
+              {editingWatch ? (
+                <div className="mt-2 flex gap-2">
+                  <input value={watchNote} onChange={(e) => setWatchNote(e.target.value)} placeholder="Why watch this team? (optional)"
+                    className="flex-1 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                  <button onClick={() => { onSetWatchlist(team.number, true, watchNote); setEditingWatch(false); }} className="px-3 rounded-lg bg-[#0D0F32] text-white text-sm font-medium">Save</button>
+                </div>
+              ) : (
+                <p onClick={() => setEditingWatch(true)} className="mt-1 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
+                  {team.watchNote ? team.watchNote : <span className="text-slate-400 italic">Tap to add a note…</span>}
+                </p>
+              )}
+            </div>
+          ) : (
+            <button onClick={() => onSetWatchlist(team.number, true, "")}
+              className="w-full py-2.5 rounded-lg border border-amber-300 text-amber-700 dark:text-amber-300 dark:border-amber-800 font-semibold flex items-center justify-center gap-2 hover:bg-amber-50 dark:hover:bg-amber-950/40">
+              <Star size={16} /> Watch this team
+            </button>
+          )}
+        </div>
       </div>
       {byRule.length > 0 && (
         <div className="mb-4">
