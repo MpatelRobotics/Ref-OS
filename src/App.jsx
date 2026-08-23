@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -295,6 +295,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   const [showOnline, setShowOnline] = useState(false);
   const [showByRule, setShowByRule] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
+  const [showFeatures, setShowFeatures] = useState(false);
   const [showRankings, setShowRankings] = useState(false);
   const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
   const [showAdminPassword, setShowAdminPassword] = useState(false);
@@ -647,7 +648,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                     <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
                     <div className="border-t border-slate-100 my-1" />
-                    <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
+                    <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
+                <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
                   </>
                 ) : (
                 <>
@@ -659,6 +661,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowActivity(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><ListOrdered size={16} /> Activity feed {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowRankings(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Rankings {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
+                <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
                 <div className="border-t border-slate-100 my-1" />
                 {!adminUnlocked ? (
@@ -828,6 +831,15 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><BarChart3 size={18} /> Violations by rule</h2>
           </div>
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><ByRule viols={viols} expandRule={expandRule} setExpandRule={setExpandRule} /></div></div>
+        </div>
+      )}
+      {showFeatures && (
+        <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
+          <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
+            <button onClick={() => setShowFeatures(false)} className="text-slate-500 p-1 -ml-1"><ChevronLeft size={22} /></button>
+            <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Info size={18} /> Features &amp; help</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><FeaturesGuide /></div></div>
         </div>
       )}
       {showActivity && (
@@ -2068,6 +2080,112 @@ function Rankings({ viols, teamName }) {
           </li>
         ))}
       </ul>
+    </>
+  );
+}
+
+/* ============================ FEATURES & HELP ============================ */
+function FeaturesGuide() {
+  const Section = ({ icon: Ic, title, children }) => (
+    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-3">
+      <h3 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-2">{Ic && <Ic size={17} className="text-[#D7212B]" />}{title}</h3>
+      <div className="text-sm text-slate-600 dark:text-slate-300 space-y-2 leading-relaxed">{children}</div>
+    </div>
+  );
+  const Li = ({ children }) => <li className="flex gap-2"><span className="text-[#D7212B] mt-0.5">•</span><span>{children}</span></li>;
+  return (
+    <>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Ref-OS is the referee & judging system for the Highlander Summit. Here's what every part does.</p>
+
+      <Section icon={KeyRound} title="Logins & roles">
+        <p>There are three passwords, all entered on the login screen (admin can also be entered later from this menu → “Admin login”):</p>
+        <ul className="space-y-1.5">
+          <Li><b>Referee / crew</b> — full access: log violations, matches, robots, rules, judging.</Li>
+          <Li><b>Judge Advisor</b> — sees only the Judging tab and can export nominations. Nothing on the violation side.</Li>
+          <Li><b>Admin</b> — unlocks event setup, CSV exports, clearing data, marking finalists, deleting teams, removing offline refs, and the Activity feed & Rankings. Entering the admin password at login signs you in as a ref with admin already on.</Li>
+        </ul>
+        <p>Set your <b>ref name</b> (tap your avatar, top right) so everything you log is attributed to you.</p>
+      </Section>
+
+      <Section icon={ListOrdered} title="Logging a violation">
+        <p>The fastest path is the <b>Matches</b> tab: tap a match → tap the offending team → the log opens pre-filled with that team and match.</p>
+        <ul className="space-y-1.5">
+          <Li>Pick a <b>type</b>: <b>Minor</b>, <b>Major</b>, or <b>Inspection</b>.</Li>
+          <Li>Tap the <b>rule box</b> to open the searchable rulebook; picking a rule fills in the code and description automatically (you can edit the description).</Li>
+          <Li>Add <b>robot photos</b> (rear camera) and <b>notes</b> if useful.</Li>
+          <Li>If the team already has a robot photo on file, it shows at the top for quick identification.</Li>
+        </ul>
+      </Section>
+
+      <Section icon={ShieldAlert} title="Guards while logging">
+        <ul className="space-y-1.5">
+          <Li><b>Duplicate check</b> — if the same team + rule + match was already logged, you'll get a confirm before adding it again (stops two refs double-logging one call).</Li>
+          <Li><b>Repeat-Major warning</b> — logging a 3rd+ minor of the same rule on a team, or one who already has a Major for it, prompts you to consider escalating.</Li>
+        </ul>
+      </Section>
+
+      <Section icon={CloudOff} title="Works offline">
+        <p>If Wi-Fi drops, entries save on your device and show a “Saving” tag, then sync automatically when the connection returns. Don't re-enter a “Saving” item — it'll upload on its own.</p>
+      </Section>
+
+      <Section icon={ListOrdered} title="Matches tab">
+        <ul className="space-y-1.5">
+          <Li><b>Field filter</b> — narrow the list to your field (Field 1/2/3).</Li>
+          <Li>Each team shows its <b>prior record</b> (severity + per-rule counts) so you have context before a call.</Li>
+          <Li><b>Jump to Q…</b> dropdown and <b>Next</b> button to move through the schedule.</Li>
+          <Li>A <b>Watchlist</b> panel and the full list of violations for that match appear below the alliances.</Li>
+        </ul>
+      </Section>
+
+      <Section icon={Users} title="Teams tab">
+        <p>Search any team, see its full history, add a team (“+ Team”), or open a team to log against it, add robot photos, or add watchlist notes. New teams are added here only — not from the log form.</p>
+      </Section>
+
+      <Section icon={Star} title="Watchlist">
+        <p>Open a team and add a <b>watch note</b> — multiple refs can each add their own, shown as <b>“Your name: note”</b>. Watched teams show a gold <b>WATCH</b> badge in the Teams list, and their notes appear in a Watchlist panel on the match screen so the whole crew is aware. You can remove your own notes; admins can remove any.</p>
+      </Section>
+
+      <Section icon={Camera} title="Robots tab">
+        <p>A photo grid of every team. Tap a team to add <b>inspection photos</b> (multiple angles, rear camera). These are stored on the team and can be pulled up any time — handy for R-rule checks during matches.</p>
+      </Section>
+
+      <Section icon={BookOpen} title="Rules tab">
+        <p>The full V5RC rulebook, searchable by code or description. It also powers the rule picker in the log form.</p>
+      </Section>
+
+      <Section icon={Trophy} title="Judging">
+        <p>Nominate teams for the <b>Sportsmanship</b> and <b>Energy</b> awards with a match (or none) and a required reason.</p>
+        <ul className="space-y-1.5">
+          <Li>Teams are <b>ranked by nomination count</b> per award; tap a team to read every nomination.</Li>
+          <Li>Teams with <b>G1–G5 conduct violations</b> are flagged red so judges are aware.</Li>
+          <Li>Admins/judge advisor tap the <b>star</b> to mark <b>finalists</b>.</Li>
+          <Li><b>Export nominations</b> to CSV for the judge advisor.</Li>
+        </ul>
+      </Section>
+
+      <Section icon={BarChart3} title="Oversight (admin)">
+        <ul className="space-y-1.5">
+          <Li><b>By Rule</b> (header chart icon) — violations broken down by rule and team.</Li>
+          <Li><b>Activity feed</b> — every violation across the event, newest first.</Li>
+          <Li><b>Rankings</b> — teams ranked by violations, Majors weighted highest.</Li>
+          <Li><b>Ref status</b> — who's online / last seen; admins can remove offline refs.</Li>
+          <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Clear data</b> wipes selected data (admin only).</Li>
+        </ul>
+      </Section>
+
+      <Section icon={Pencil} title="Editing & fixing">
+        <p>Every synced violation has a <b>pencil</b> (edit) and <b>trash</b> (delete) icon. Editing reopens the same form with everything pre-filled, including photos, and updates the record in place.</p>
+      </Section>
+
+      <Section icon={Info} title="Extras">
+        <ul className="space-y-1.5">
+          <Li><b>Dark / Light mode</b> — toggle in this menu, saved per device.</Li>
+          <Li><b>Install</b> — add Ref-OS to your home screen to launch it full-screen like an app (Add to Home Screen / the install prompt on the deployed site).</Li>
+          <Li><b>Live sync</b> — everything updates across all devices within seconds.</Li>
+        </ul>
+      </Section>
+
+      <p className="text-center text-xs text-slate-400 mt-4 mb-2">Made by Maharshi Patel · <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="underline">@mpatel_ref</a></p>
     </>
   );
 }
