@@ -2150,7 +2150,7 @@ function FeaturesGuide() {
       </Section>
 
       <Section icon={BookOpen} title="Rules tab">
-        <p>The full V5RC rulebook, searchable by code or description. It also powers the rule picker in the log form.</p>
+        <p>The full rulebook, searchable by code or description. It also powers the rule picker in the log form.</p>
       </Section>
 
       <Section icon={Trophy} title="Judging">
