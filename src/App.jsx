@@ -1575,16 +1575,8 @@ function MatchDetail({ num, match, teamName, teamWatch = {}, viols, allNums, onN
               <div className="flex items-center gap-2">
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{n}</span>
                 {teamName[n] && <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{teamName[n]}</span>}
-                {teamWatch[n]?.length > 0 && <span title={teamWatch[n].map((w) => `${w.by || "Ref"}: ${w.note}`).join("\n")} className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 text-[11px] font-bold shrink-0"><Star size={13} fill="currentColor" /> WATCH{teamWatch[n].length > 1 ? ` ${teamWatch[n].length}` : ""}</span>}
                 <span className="ml-auto text-xs font-semibold text-[#D7212B] flex items-center gap-1 shrink-0"><Plus size={14} /> Log</span>
               </div>
-              {teamWatch[n]?.length > 0 && (
-                <div className="mt-1 space-y-0.5">
-                  {teamWatch[n].map((w) => (
-                    <p key={w.id} className="text-[11px] text-amber-700 dark:text-amber-300"><span className="font-semibold">{w.by || "Ref"}:</span> {w.note}</p>
-                  ))}
-                </div>
-              )}
               {s && s.total > 0 && (
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <span className="text-[11px] text-slate-400">Prior:</span>
@@ -1629,6 +1621,20 @@ function MatchDetail({ num, match, teamName, teamWatch = {}, viols, allNums, onN
         <Alliance label="Red alliance" teams={match.red} color="red" />
         <Alliance label="Blue alliance" teams={match.blue} color="blue" />
       </div>
+      {(() => {
+        const inMatch = [...(match.red || []), ...(match.blue || [])].flatMap((n) => teamWatch[n] || []);
+        if (inMatch.length === 0) return null;
+        return (
+          <div className="mb-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1 flex items-center gap-1"><Star size={12} className="text-amber-500 fill-amber-500" /> Watchlist ({inMatch.length})</h2>
+            <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3 space-y-1.5">
+              {inMatch.map((w) => (
+                <p key={w.id} className="text-sm text-slate-700 dark:text-slate-200"><span className="font-mono font-bold">{w.team}</span> — <span className="font-semibold">{w.by || "Ref"}:</span> {w.note}</p>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
       <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">Violations in this match ({mv.length})</h2>
       {mv.length === 0 ? (
         <Empty title="No violations logged" sub="Tap a team above to log one for this match." />
