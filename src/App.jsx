@@ -2214,6 +2214,8 @@ const RULE_NOTES = {
   "GG11": "Intent is that robots obey the tournament software. Temporarily unplugging the cable for mid-match troubleshooting with an Event Partner or technical staff present is not a violation.",
   "GG13": "Minor SG-rule violations in auton generally only affect the auton outcome and shouldn't count toward repeat tracking. If the head ref judges an SG/GG auton violation to be intentional / strategic, record it as Minor or Major and count it toward repeats.",
   "GG14": "A Major here doesn't have to be match-affecting \u2014 intentional / egregious tipping, entanglement, or damage may be Major at head-ref discretion. Repeated violations within a match or tournament could become a G1 and/or S1.",
+  "GG16": "Usually the head ref just doesn't enforce the penalty on the forced opponent, and it's a Minor for the team that forced it. But if the forced situation ends up match-affecting in favor of the team that forced it, it's a Major for that team.",
+  "GG17": "No holding an opponent longer than a 3-count in driver control. Head refs count out loud; the count pauses/ends when the robots separate (~2 ft / one tile), when the held robot gets trapped or pinned by a different robot, or when an escape route opens. After a count ends you can't immediately re-hold the same robot \u2014 that resumes at a 5-count.\nWhen judging if a hold was match-affecting, weigh the full context: the first 3 seconds are legal, so only the extra time counts; how much extra time; how far/long they separated before returning; and what both robots were doing overall. Holding is inherently defensive, so GG15 may also apply on judgment calls.",
 };
 
 function RuleBook({ rules }) {
