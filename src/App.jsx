@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, ExternalLink,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -55,9 +55,6 @@ const TYPES = {
     solid: "bg-blue-600", solidHover: "hover:bg-blue-700", soft: "bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-900", text: "text-blue-700 dark:text-blue-300" },
 };
 const ORDER = ["minor", "major", "inspection"];
-// Official game manual — update this URL when VEX releases a new version.
-const MANUAL_URL = "https://content.vexrobotics.com/docs/2026-2027/override/files/override-v1.1.pdf";
-const manualLink = (code) => `${MANUAL_URL}#search=${encodeURIComponent((code || "").replace(/[<>]/g, ""))}`;
 
 const MATCH_PHASES = [
   { key: "qual", label: "Qualification", abbrev: "Q" },
@@ -2207,12 +2204,11 @@ function RuleBook({ rules }) {
   }
   return (
     <>
-      <div className="relative mb-2">
+      <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search rules — code or wording"
           className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
       </div>
-      <p className="text-[11px] text-slate-400 mb-3 px-1">Tap a rule to open it in the official game manual (new tab).</p>
       {groups.length === 0 ? (
         <Empty title="No rules match" sub="Try a different word or code." />
       ) : (
@@ -2222,12 +2218,10 @@ function RuleBook({ rules }) {
               <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">{g.cat}</h2>
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
                 {g.items.map((r) => (
-                  <a key={r.code} href={manualLink(r.code)} target="_blank" rel="noopener noreferrer"
-                    className="px-4 py-2.5 flex gap-3 items-baseline hover:bg-slate-50 dark:hover:bg-slate-700 group">
+                  <div key={r.code} className="px-4 py-2.5 flex gap-3 items-baseline">
                     <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
-                    <span className="text-sm text-slate-600 dark:text-slate-300 flex-1">{r.desc}</span>
-                    <ExternalLink size={14} className="text-slate-300 group-hover:text-[#D7212B] shrink-0 self-center" />
-                  </a>
+                    <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
+                  </div>
                 ))}
               </div>
             </div>
