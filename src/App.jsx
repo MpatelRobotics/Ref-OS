@@ -2191,8 +2191,34 @@ function FeaturesGuide() {
 }
 
 /* ============================ RULEBOOK (reference) ============================ */
+// Referee notes per rule (shown in a popup when a rule is tapped in the Rules tab).
+// Keyed by rule code. Fill these in as needed; rules without an entry show a default message.
+const RULE_NOTES = {
+  "SG1": "Match won't start until every condition is met. If a robot can't get legal in time, it's removed from the field (R2d and GG2 then apply) \u2014 no DQ, but log a Minor and it can't play that match.",
+  "SG2": "Incidental / insignificant in-match issues are Minor; escalate to Major only in extreme cases.\nTypical Minors: loose wires; broken zip ties or rubber bands; bent or broken parts not used for strategic gain.",
+  "SG4": "Match-affecting impact is hard to judge, so most are Minor. Blatantly intentional or clearly match-affecting cases (especially in elims) can be escalated to Major at head-ref discretion.",
+  "SG7": "Any violation (Major or Minor) awards the Autonomous Bonus to the opponents (see SG8b for the exception).\nIntentional / strategic / egregious cases \u2014 e.g., deliberately contacting an opposing robot while on foam on the opponents' side, or SG7e interactions \u2014 are Major and should be a DQ.\nDeliberate defensive auton (SG7a) may also be recorded as G1.",
+  "SG8": "The Midfield and auton-line objects are shared, so robot-to-robot contact (incidental and intentional) is expected and should almost never be a violation \u2014 teams own their robots' actions and shouldn't claim GG14 on their own tippy robot.\nBut the Midfield isn't a free-for-all: head refs may still act on teams exploiting the rule, and reckless / unsafe play aimed at destruction, damage, tipping, entanglement, trapping, or forcing a penalty is still prohibited.",
+  "SG9": "Incidental / unintentional contact with a goal or its stacked objects is usually Minor.\nIntentional / strategic / egregious interactions \u2014 including adding or removing placed objects on the goal \u2014 are Major.\nRepeated Minors can escalate to Major, especially after prior warnings.",
+  "SG10": "Treat as match-affecting if the offender's alliance ties or wins by 15 or fewer points, unless the head ref can indisputably rule it had no effect.\nIntentional / strategic / egregious cases are Major.\nRepeated Minors can escalate to Major, especially after warnings.",
+  "SG11": "For match-affecting math, count each illegal match load as 3 points (not added to the score) \u2014 if removing 3 per illegal load would flip the result, it's match-affecting.\nQuals escalation to Major: 6+ illegal loads in one qual match, OR a 3rd (and later) qual match that each have at least one illegal load.\nIn elims, only match-affecting violations count (Minors don't compound); the 6-load and 3-match guidelines don't apply in elims.",
+  "SG12": "Most are Minor; repeated Minors can escalate to Major, especially after warnings.\nViolations involving Pins placed on the Midfield Goal that change the match outcome in the offender's favor are Match Affecting.\n(Enforcement focuses on vertically expanded lifts in the Midfield during endgame, not small pop-up mechanisms.)",
+  "SG13": "Egregious cases are Major; repeated Minors can escalate to Major, especially after warnings.\n(Protects load zones from opponent interference; does not apply during auton.)",
+  "G1": "Any G1 can be treated as a Major, handled case-by-case. Teams at risk usually get a 'final warning,' though the head ref isn't required to give one.",
+  "G2": "Reviewed case-by-case. By definition it becomes match-affecting the moment an adult-built or adult-programmed robot scores in a match.",
+  "G3": "Common sense applies. Obvious typos aren't taken literally; understand the realities of the V5 system; if you have to ask whether something violates S1 / G1 / T1, it's probably outside the spirit. Teams get benefit of the doubt for accidental / edge cases, but not repeated or strategic infractions. If no rule makes a part legal, it isn't.",
+  "G4": "Report suspected violations to the Judge Advisor, Head Referee, or Event Partner to investigate with VEX. The team may be removed from further matches, have skills scores removed, and/or be removed from judged-award consideration. Handled case-by-case with VEX (per G1 / G2).",
+  "G5": "A team that circumvents a robot rule for competitive advantage should get an immediate DQ for the current match.",
+  "GG1": "Major violations don't have to be match-affecting, and may also invoke G1, G2, or G4.",
+  "GG8": "Major should be rare (robots shouldn't be designed to detach parts). Minors are usually from gameplay damage, like a wheel falling off.",
+  "GG11": "Intent is that robots obey the tournament software. Temporarily unplugging the cable for mid-match troubleshooting with an Event Partner or technical staff present is not a violation.",
+  "GG13": "Minor SG-rule violations in auton generally only affect the auton outcome and shouldn't count toward repeat tracking. If the head ref judges an SG/GG auton violation to be intentional / strategic, record it as Minor or Major and count it toward repeats.",
+  "GG14": "A Major here doesn't have to be match-affecting \u2014 intentional / egregious tipping, entanglement, or damage may be Major at head-ref discretion. Repeated violations within a match or tournament could become a G1 and/or S1.",
+};
+
 function RuleBook({ rules }) {
   const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState(null); // rule object shown in the notes popup
   if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
   const q = query.trim().toUpperCase();
   const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
@@ -2217,15 +2243,43 @@ function RuleBook({ rules }) {
             <div key={g.cat}>
               <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">{g.cat}</h2>
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
-                {g.items.map((r) => (
-                  <div key={r.code} className="px-4 py-2.5 flex gap-3 items-baseline">
-                    <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
-                    <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
-                  </div>
-                ))}
+                {g.items.map((r) => {
+                  const note = RULE_NOTES[r.code];
+                  return note ? (
+                    <button key={r.code} onClick={() => setSelected(r)} className="w-full text-left px-4 py-2.5 flex gap-3 items-baseline hover:bg-slate-50 dark:hover:bg-slate-700">
+                      <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
+                      <span className="text-sm text-slate-600 dark:text-slate-300 flex-1">{r.desc}</span>
+                      <span className="text-[10px] font-semibold text-[#D7212B] shrink-0 self-center flex items-center gap-1">Notes <ChevronRight size={14} /></span>
+                    </button>
+                  ) : (
+                    <div key={r.code} className="px-4 py-2.5 flex gap-3 items-baseline">
+                      <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
+                      <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {selected && (
+        <div className="fixed inset-0 z-[55] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setSelected(null)}>
+          <div className="bg-white dark:bg-slate-800 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white dark:bg-slate-800 px-4 py-3 flex items-center gap-2 border-b border-slate-200 dark:border-slate-700">
+              <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{fmtRule(selected.code)}</span>
+              <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{selected.desc}</span>
+              <button onClick={() => setSelected(null)} className="ml-auto text-slate-400 hover:text-slate-600 shrink-0"><X size={22} /></button>
+            </div>
+            <div className="p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Violation notes</h3>
+              {RULE_NOTES[selected.code] ? (
+                <div className="text-sm text-slate-700 dark:text-slate-200 space-y-2 leading-relaxed whitespace-pre-line">{RULE_NOTES[selected.code]}</div>
+              ) : (
+                <p className="text-sm text-slate-400 italic">No notes for this rule yet.</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </>
