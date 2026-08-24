@@ -2151,6 +2151,7 @@ function FeaturesGuide() {
 
       <Section icon={BookOpen} title="Rules tab">
         <p>The full rulebook, searchable by code or description. It also powers the rule picker in the log form.</p>
+        <p>Rules that have referee guidance show a red <b>“Notes ›”</b> tag — tap one to open a popup with <b>violation notes</b> for that rule: when it's Minor vs. Major, when it's match-affecting, escalation thresholds, and DQ conditions. Rules without notes aren't tappable.</p>
       </Section>
 
       <Section icon={Trophy} title="Judging">
