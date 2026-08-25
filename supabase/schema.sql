@@ -259,6 +259,7 @@ create table if not exists public.field_log (
   match_id   text,                     -- composite match id this entry is tied to (e.g. '54' or 'qf-1')
   alliance   text,                     -- 'red' | 'blue' (for timeouts)
   team       text,                     -- optional team a timeout is tied to
+  teams      text[],                   -- alliance roster at time of a timeout (for one-per-alliance enforcement)
   note       text,
   logged_by  text,
   created_at timestamptz default now()
@@ -266,6 +267,7 @@ create table if not exists public.field_log (
 alter table public.field_log add column if not exists match_id text;
 alter table public.field_log add column if not exists alliance text;
 alter table public.field_log add column if not exists team text;
+alter table public.field_log add column if not exists teams text[];
 alter table public.field_log enable row level security;
 drop policy if exists "open rw field_log" on public.field_log;
 create policy "open rw field_log" on public.field_log for all using (true) with check (true);

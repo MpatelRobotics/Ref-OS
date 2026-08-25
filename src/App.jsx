@@ -1655,15 +1655,23 @@ function MatchDetail({ match, matches, teamName, teamWatch = {}, viols, onNav, o
   const replayEntry = matchEntries.find((e) => e.kind === "replay");
   const allTimeouts = fieldLog.filter((e) => e.kind === "timeout");
   const allianceTeams = toAlliance === "red" ? (m.red || []) : (m.blue || []);
+  const isElim = m.phase && m.phase !== "qual" && m.phase !== "practice";
   const doTimeout = async () => {
     if (busy) return;
-    if (toTeam && allTimeouts.some((e) => e.team === toTeam)) {
+    // one timeout per alliance for the whole elimination bracket — an alliance is its set of teams
+    const usedTeams = new Set();
+    for (const e of allTimeouts) {
+      const roster = (e.teams && e.teams.length) ? e.teams : (e.team ? [e.team] : []);
+      roster.forEach((t) => usedTeams.add(t));
+    }
+    const clash = allianceTeams.find((t) => usedTeams.has(t));
+    if (clash) {
+      if (!confirm(`This alliance already used its timeout — each alliance gets only one for the elimination bracket. Log another anyway?`)) return;
+    } else if (toTeam && usedTeams.has(toTeam)) {
       if (!confirm(`Team ${toTeam} already called a timeout. Log another anyway?`)) return;
-    } else if (allTimeouts.some((e) => e.matchId === m.id && e.alliance === toAlliance)) {
-      if (!confirm(`The ${toAlliance} alliance already has a timeout in this match. Log another anyway?`)) return;
     }
     setBusy(true);
-    try { await onAddField({ kind: "timeout", matchId: m.id, matchRef: heading, alliance: toAlliance, team: toTeam || "", note: "" }); setToOpen(false); setToTeam(""); setToAlliance("red"); }
+    try { await onAddField({ kind: "timeout", matchId: m.id, matchRef: heading, alliance: toAlliance, team: toTeam || "", teams: allianceTeams, note: "" }); setToOpen(false); setToTeam(""); setToAlliance("red"); }
     catch (e) { alert("Could not save: " + (e.message || e)); }
     setBusy(false);
   };
@@ -1755,11 +1763,11 @@ function MatchDetail({ match, matches, teamName, teamWatch = {}, viols, onNav, o
       </div>
       <div className="mb-4">
         <div className="flex gap-2">
-          <button onClick={() => { setToOpen((v) => !v); setFaultOpen(false); }} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${toOpen ? "bg-blue-600 text-white border-blue-600" : "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700"}`}><Clock size={15} /> Timeout</button>
+          {isElim && <button onClick={() => { setToOpen((v) => !v); setFaultOpen(false); }} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${toOpen ? "bg-blue-600 text-white border-blue-600" : "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700"}`}><Clock size={15} /> Timeout</button>}
           <button onClick={() => { setFaultOpen((v) => !v); setToOpen(false); }} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${faultOpen ? "bg-red-600 text-white border-red-600" : "bg-white dark:bg-slate-800 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700"}`}><AlertTriangle size={15} /> Field fault</button>
           <button onClick={toggleReplay} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${replayEntry ? "bg-amber-500 text-white border-amber-500" : "bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"}`}><RefreshCw size={15} /> {replayEntry ? "For replay ✓" : "Replay"}</button>
         </div>
-        {toOpen && (
+        {isElim && toOpen && (
           <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2">
             <div className="flex gap-2">
               {["red", "blue"].map((a) => (
@@ -2418,9 +2426,9 @@ function FeaturesGuide() {
       </Section>
 
       <Section icon={Clock} title="Timeouts, field faults & replays (in a match)">
-        <p>Open any match to find three quick actions under the alliances:</p>
+        <p>Open any match to find quick actions under the alliances (Timeout appears in elimination matches only):</p>
         <ul className="space-y-1.5">
-          <Li><b>Timeout</b> — pick the <b>Red</b> or <b>Blue</b> alliance and optionally tie it to a specific team. If that team (or that alliance in this match) already has a timeout, you'll get a warning so a team can't call two.</Li>
+          <Li><b>Timeout</b> (elimination matches only) — pick the <b>Red</b> or <b>Blue</b> alliance and optionally tie it to a team. Each alliance gets <b>one timeout for the whole elimination bracket</b>, so if that alliance already used theirs you'll be warned before logging another.</Li>
           <Li><b>Field fault</b> — log a field problem with an optional note.</Li>
           <Li><b>Replay</b> — mark the match to be re-run; tap again to unmark.</Li>
         </ul>
