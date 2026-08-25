@@ -596,6 +596,27 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   }, [watchNotes]);
   const matchNums = useMemo(() => Object.keys(matches), [matches]);
 
+  const backupAll = () => {
+    const snapshot = {
+      app: "Ref-OS",
+      exportedAt: new Date().toISOString(),
+      event: { id: eventId, name: event.name || "", ...event },
+      counts: { teams: teams.length, violations: viols.length, nominations: noms.length, matches: Object.keys(matches).length, watchNotes: watchNotes.length, fieldLog: fieldLog.length },
+      teams,
+      matches: Object.values(matches),
+      violations: viols,
+      nominations: noms,
+      finalists: Array.from(finalists),
+      watchNotes,
+      fieldLog,
+    };
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" }));
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
+    a.download = `${(event.name || "vex").replace(/\W+/g, "-").toLowerCase()}-backup-${stamp}.json`;
+    a.click(); setMenu(false);
+  };
+
   const exportCSV = () => {
     const rows = [["Team", "Team Name", "Match", "Type", "Rule", "Rule Description", "Notes", "Logged By", "Photos", "Time"]];
     for (const v of [...viols].sort((a, b) => a.createdAt - b.createdAt)) {
@@ -684,6 +705,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
                 <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export violations</button>
                 <button onClick={() => requireAdmin(exportNominations)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Trophy size={16} /> Export nominations</button>
+                <button onClick={() => requireAdmin(backupAll)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Backup all (JSON) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowActivity(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><ListOrdered size={16} /> Activity feed {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowRankings(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Rankings {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
@@ -2472,7 +2494,7 @@ function FeaturesGuide() {
           <Li><b>Activity feed</b> — every violation across the event, newest first.</Li>
           <Li><b>Rankings</b> — teams ranked by violations, Majors weighted highest.</Li>
           <Li><b>Ref status</b> — who's online / last seen; admins can remove offline refs.</Li>
-          <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Clear data</b> wipes selected data (admin only).</Li>
+          <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Backup all (JSON)</b> downloads a complete snapshot of the event (teams, matches, violations, nominations, finalists, watchlist, field log) — grab one periodically as insurance. <b>Clear data</b> wipes selected data (admin only).</Li>
         </ul>
       </Section>
 
