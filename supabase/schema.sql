@@ -76,8 +76,6 @@ create table if not exists public.teams (
 );
 alter table public.teams enable row level security;
 alter table public.teams add column if not exists photo_paths text[] default '{}';
-alter table public.teams add column if not exists watchlisted boolean default false;
-alter table public.teams add column if not exists watch_note text;
 drop policy if exists "members rw teams" on public.teams;
 drop policy if exists "open rw teams" on public.teams;
 create policy "open rw teams" on public.teams for all using (true) with check (true);
@@ -94,8 +92,6 @@ create table if not exists public.violations (
   match_info  jsonb,                  -- { phase, num }
   logged_by   text,                   -- ref name (denormalized for display)
   photo_paths text[] default '{}',    -- storage object paths in 'robot-photos'
-  watchlisted boolean default false,  -- team flagged to watch
-  watch_note  text,                   -- optional reason for the watch flag
   created_at  timestamptz default now()
 );
 alter table public.violations enable row level security;
@@ -164,13 +160,20 @@ create policy "open delete photos" on storage.objects for delete using (bucket_i
 -- ---------- match schedule (qualification) ----------
 create table if not exists public.matches (
   event_id uuid references public.events(id) on delete cascade,
-  num      int not null,               -- qualification match number (Q<num>)
+  num      int not null,               -- match number within its phase
+  phase    text not null default 'qual',-- 'qual' | 'r16' | 'qf' | 'sf' | 'final' | 'practice'
+  label    text,                        -- optional display label (e.g. 'QF 1-1')
   red      text[] not null default '{}',
   blue     text[] not null default '{}',
   field    text,
   scheduled timestamptz,
-  primary key (event_id, num)
+  primary key (event_id, phase, num)
 );
+-- for tables created before elimination support: add columns + widen the primary key
+alter table public.matches add column if not exists phase text not null default 'qual';
+alter table public.matches add column if not exists label text;
+alter table public.matches drop constraint if exists matches_pkey;
+alter table public.matches add primary key (event_id, phase, num);
 alter table public.matches enable row level security;
 drop policy if exists "open rw matches" on public.matches;
 create policy "open rw matches" on public.matches for all using (true) with check (true);
@@ -243,4 +246,28 @@ do $$
 begin
   if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'watch_notes')
     then alter publication supabase_realtime add table public.watch_notes; end if;
+end $$;
+
+
+-- ---------- field log (timeouts, field faults, match replays) ----------
+create table if not exists public.field_log (
+  id         uuid primary key,
+  event_id   uuid references public.events(id) on delete cascade,
+  kind       text not null,            -- 'timeout' | 'field_fault' | 'replay' | 'other'
+  field      text,
+  match_ref  text,
+  note       text,
+  logged_by  text,
+  created_at timestamptz default now()
+);
+alter table public.field_log enable row level security;
+drop policy if exists "open rw field_log" on public.field_log;
+create policy "open rw field_log" on public.field_log for all using (true) with check (true);
+create index if not exists field_log_event_idx on public.field_log(event_id);
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'field_log')
+    then alter publication supabase_realtime add table public.field_log; end if;
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'matches')
+    then alter publication supabase_realtime add table public.matches; end if;
 end $$;

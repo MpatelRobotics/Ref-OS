@@ -67,7 +67,7 @@ export async function listMembers(eventId) {
 }
 
 /* ================= teams ================= */
-const mapTeam = (r) => ({ number: r.number, name: r.name || "", photoKeys: r.photo_paths || [], watchlisted: !!r.watchlisted, watchNote: r.watch_note || "", createdAt: new Date(r.created_at).getTime() });
+const mapTeam = (r) => ({ number: r.number, name: r.name || "", photoKeys: r.photo_paths || [], createdAt: new Date(r.created_at).getTime() });
 export async function listTeams(eventId) {
   const { data } = await supabase.from("teams").select("*").eq("event_id", eventId);
   return (data || []).map(mapTeam);
@@ -81,15 +81,6 @@ export async function upsertTeam(eventId, number, name) {
   const { error } = await supabase.from("teams").upsert(payload, { onConflict: "event_id,number", ignoreDuplicates: !hasName });
   if (error) throw error;
   return num;
-}
-export async function setTeamWatchlist(eventId, number, watchlisted, watchNote = "") {
-  const { error } = await supabase
-    .from("teams")
-    .update({ watchlisted: !!watchlisted, watch_note: watchlisted ? (watchNote || "").trim() : null })
-    .eq("event_id", eventId)
-    .eq("number", number);
-  if (error) throw error;
-  return { watchlisted: !!watchlisted, watchNote: watchlisted ? (watchNote || "").trim() : "" };
 }
 
 /* ---- team watchlist notes (multiple refs per team) ---- */
@@ -152,8 +143,38 @@ export async function removeTeamPhoto(eventId, number, path) {
 
 /* ================= matches (qualification schedule) ================= */
 export async function listMatches(eventId) {
-  const { data } = await supabase.from("matches").select("num,red,blue,field").eq("event_id", eventId).order("num");
-  return (data || []).map((m) => ({ num: m.num, red: m.red || [], blue: m.blue || [], field: m.field || "" }));
+  const { data } = await supabase.from("matches").select("num,red,blue,field,phase,label").eq("event_id", eventId).order("num");
+  return (data || []).map((m) => {
+    const phase = m.phase || "qual";
+    return { id: phase === "qual" ? String(m.num) : `${phase}-${m.num}`, phase, num: m.num, label: m.label || "", red: m.red || [], blue: m.blue || [], field: m.field || "" };
+  });
+}
+export async function addMatch(eventId, m) {
+  const row = { event_id: eventId, phase: m.phase || "qual", num: Number(m.num), red: m.red || [], blue: m.blue || [], field: m.field || null, label: m.label || null };
+  const { error } = await supabase.from("matches").upsert(row, { onConflict: "event_id,phase,num" });
+  if (error) throw error;
+}
+export async function deleteMatch(eventId, phase, num) {
+  const { error } = await supabase.from("matches").delete().eq("event_id", eventId).eq("phase", phase).eq("num", Number(num));
+  if (error) throw error;
+}
+
+/* ================= field log (timeouts / faults / replays) ================= */
+const mapFieldLog = (r) => ({ id: r.id, kind: r.kind, field: r.field || "", matchRef: r.match_ref || "", note: r.note || "", by: r.logged_by || "", createdAt: new Date(r.created_at).getTime() });
+export async function listFieldLog(eventId) {
+  const { data } = await supabase.from("field_log").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
+  return (data || []).map(mapFieldLog);
+}
+export async function addFieldLog(eventId, e) {
+  const id = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
+  const row = { id, event_id: eventId, kind: e.kind, field: e.field || null, match_ref: e.matchRef || null, note: (e.note || "").trim(), logged_by: e.by || "" };
+  const { data, error } = await supabase.from("field_log").upsert(row, { onConflict: "id" }).select().single();
+  if (error) throw error;
+  return mapFieldLog(data);
+}
+export async function deleteFieldLog(id) {
+  const { error } = await supabase.from("field_log").delete().eq("id", id);
+  if (error) throw error;
 }
 
 /* ================= rulebook ================= */
@@ -289,6 +310,8 @@ export function subscribeEvent(eventId, onChange) {
     .on("postgres_changes", { event: "*", schema: "public", table: "nominations", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "shortlist", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "watch_notes", filter: `event_id=eq.${eventId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `event_id=eq.${eventId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "field_log", filter: `event_id=eq.${eventId}` }, onChange)
     .subscribe();
   return () => supabase.removeChannel(ch);
 }

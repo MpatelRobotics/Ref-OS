@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -279,10 +279,14 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   const [isInstalled, setIsInstalled] = useState(() =>
     typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true)
   );
+  const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent); // covers Chrome + Samsung Internet
   const [logFor, setLogFor] = useState(null);
   const [noms, setNoms] = useState([]);
   const [finalists, setFinalists] = useState(new Set()); // `${award}::${team}`
   const [watchNotes, setWatchNotes] = useState([]);
+  const [fieldLog, setFieldLog] = useState([]);
+  const [showFieldLog, setShowFieldLog] = useState(false);
+  const [addMatchOpen, setAddMatchOpen] = useState(false);
   const [nominating, setNominating] = useState(null); // award key when the nominate modal is open
   const [editing, setEditing] = useState(null); // violation being edited
   const [logMatch, setLogMatch] = useState(null);
@@ -354,6 +358,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     setNoms(nm);
     setFinalists(new Set(sl.map((s) => `${s.award}::${s.team}`)));
     setWatchNotes(wn);
+    api.listFieldLog(eventId).then(setFieldLog).catch(() => {});
     setSyncedAt(Date.now()); setSyncing(false);
   }, [eventId]);
 
@@ -368,7 +373,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     (async () => {
       await refresh();
       api.listMatches(eventId).then((list) => {
-        const map = {}; for (const m of list) map[m.num] = m; setMatches(map);
+        const map = {}; for (const m of list) map[m.id] = m; setMatches(map);
       });
       api.listRules(eventId).then(setRules);
       // restore violations still waiting in the queue (e.g. after a reload while offline)
@@ -517,6 +522,25 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     try { await api.deleteRefRoster(eventId, name); setRefRoster((cur) => cur.filter((r) => r.name !== name)); }
     catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to remove a ref."); return; } throw e; }
   };
+  const addFieldLog = async (entry) => {
+    try {
+      const saved = await api.addFieldLog(eventId, { ...entry, by: meName });
+      setFieldLog((cur) => [saved, ...cur.filter((x) => x.id !== saved.id)]);
+    } catch (e) {
+      if (outbox.isOffline(e)) throw new Error("You're offline — reconnect to log this.");
+      throw e;
+    }
+  };
+  const removeFieldLog = async (id) => {
+    try { await api.deleteFieldLog(id); setFieldLog((cur) => cur.filter((x) => x.id !== id)); }
+    catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to remove this."); return; } throw e; }
+  };
+  const addElimMatch = async (m) => {
+    await api.addMatch(eventId, m);
+    const list = await api.listMatches(eventId);
+    const map = {}; for (const x of list) map[x.id] = x; setMatches(map);
+    setAddMatchOpen(false);
+  };
   const toggleFinalist = async (award, team) => {
     const key = `${award}::${team}`;
     const on = !finalists.has(key);
@@ -570,7 +594,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     for (const k in m) m[k].sort((a, b) => a.createdAt - b.createdAt);
     return m;
   }, [watchNotes]);
-  const matchNums = useMemo(() => Object.keys(matches).map(Number).sort((a, b) => a - b), [matches]);
+  const matchNums = useMemo(() => Object.keys(matches), [matches]);
 
   const exportCSV = () => {
     const rows = [["Team", "Team Name", "Match", "Type", "Rule", "Rule Description", "Notes", "Logged By", "Photos", "Time"]];
@@ -648,7 +672,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                     <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
                     <div className="border-t border-slate-100 my-1" />
-                    <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
+                    <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field log</button>
+                {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
+                <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
                   </>
                 ) : (
@@ -661,6 +687,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowActivity(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><ListOrdered size={16} /> Activity feed {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowRankings(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Rankings {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
+                <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field log</button>
+                {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
                 <div className="border-t border-slate-100 my-1" />
@@ -713,12 +741,12 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)}
             onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} />
         ) : openMatch ? (
-          <MatchDetail num={openMatch} match={matches[openMatch]} teamName={teamNameMap} teamWatch={teamWatch} viols={viols} allNums={matchNums} onNav={setOpenMatch}
-            onLogTeam={(n) => { setLogFor(n); setLogMatch(openMatch); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} />
+          <MatchDetail match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch}
+            onLogTeam={(n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} />
         ) : openRobot ? (
           <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onOpenPhoto={setLightbox} />
         ) : view === "matches" ? (
-          <MatchList matches={matches} teamName={teamNameMap} viols={viols} query={query} setQuery={setQuery} onOpen={setOpenMatch} />
+          <MatchList matches={matches} teamName={teamNameMap} viols={viols} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} />
         ) : view === "robots" ? (
           <RobotList teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "judging" ? (
@@ -833,6 +861,18 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><ByRule viols={viols} expandRule={expandRule} setExpandRule={setExpandRule} /></div></div>
         </div>
       )}
+      {addMatchOpen && <AddMatchModal teams={teams} onSave={addElimMatch} onClose={() => setAddMatchOpen(false)} />}
+      {showFieldLog && (
+        <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
+          <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
+            <button onClick={() => setShowFieldLog(false)} className="text-slate-500 p-1 -ml-1"><ChevronLeft size={22} /></button>
+            <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Flag size={18} /> Field log</h2>
+          </div>
+          <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4">
+            <FieldLogView entries={fieldLog} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
+          </div></div>
+        </div>
+      )}
       {showFeatures && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
           <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
@@ -866,9 +906,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
         <Modal onClose={() => setShowInstallHelp(false)}>
           <h2 className="font-bold text-slate-900 dark:text-slate-100 text-lg">Install Ref-OS</h2>
           <div className="mt-3 space-y-3 text-sm text-slate-600 dark:text-slate-300">
-            <p><b>iPhone / iPad:</b> Open Ref-OS in Safari, tap the Share button, then tap <b>Add to Home Screen</b> and confirm with <b>Add</b>.</p>
-            <p><b>Android:</b> Open Ref-OS in Chrome, open the browser menu, then choose <b>Install app</b> or <b>Add to Home screen</b>.</p>
-            <p className="text-xs text-slate-500">If the install option is missing, make sure you are using the deployed HTTPS website rather than an in-app browser.</p>
+            <p><b>Chrome:</b> Open the browser menu (⋮), then choose <b>Install app</b> or <b>Add to Home screen</b>.</p>
+            <p><b>Samsung Internet:</b> Open the menu (☰), tap <b>Add page to</b>, then <b>Home screen</b>.</p>
+            <p className="text-xs text-slate-500">If the install option is missing, make sure you are on the deployed HTTPS website rather than an in-app browser.</p>
           </div>
           <button onClick={() => setShowInstallHelp(false)} className="w-full mt-4 py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold">Got it</button>
         </Modal>
@@ -1056,8 +1096,8 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
   const [creatingNew, setCreatingNew] = useState(!edit && teams.length === 0);
   const [newNumber, setNewNumber] = useState("");
   const [newName, setNewName] = useState("");
-  const [matchPhase, setMatchPhase] = useState((edit && edit.match?.phase) || (presetMatch ? "qual" : (lastMatch?.phase || "qual")));
-  const [matchNum, setMatchNum] = useState((edit && edit.match?.num) || (presetMatch ? String(presetMatch) : (lastMatch?.num || "")));
+  const [matchPhase, setMatchPhase] = useState((edit && edit.match?.phase) || (presetMatch?.phase) || (lastMatch?.phase || "qual"));
+  const [matchNum, setMatchNum] = useState((edit && edit.match?.num) || (presetMatch && presetMatch.num != null ? String(presetMatch.num) : (lastMatch?.num || "")));
   const [type, setType] = useState((edit && edit.type) || "minor");
   const [code, setCode] = useState((edit && edit.code) || "");
   const [desc, setDesc] = useState((edit && edit.desc) || "");
@@ -1178,7 +1218,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
             </div>
             {fmtMatch({ phase: matchPhase, num: matchNum }) && (<p className="text-[11px] text-slate-400 mt-1">Recorded as <b className="font-mono text-slate-600 dark:text-slate-300">{fmtMatch({ phase: matchPhase, num: matchNum })}</b></p>)}
             {(() => {
-              const m = matchPhase === "qual" && matchNum ? matches?.[Number(matchNum)] : null;
+              const m = matchNum && matchPhase !== "none" ? matches?.[matchPhase === "qual" ? String(matchNum) : `${matchPhase}-${matchNum}`] : null;
               if (!m) return null;
               const chip = (num, color) => {
                 const on = !creatingNew && team === num;
@@ -1508,19 +1548,37 @@ function EventModal({ event, onSave, onClose }) {
 
 
 /* ============================ MATCHES ============================ */
-function MatchList({ matches, teamName, viols, query, setQuery, onOpen }) {
+function MatchList({ matches, teamName, viols, query, setQuery, onOpen, canAdd, onAddMatch }) {
   const [field, setField] = useState("all");
-  const list = Object.values(matches).sort((a, b) => a.num - b.num);
+  const all = Object.values(matches);
+  const hasElims = all.some((m) => m.phase && m.phase !== "qual");
+  const [tab, setTab] = useState("qual"); // "qual" | "elim"
+  const inTab = all.filter((m) => (tab === "qual" ? (m.phase || "qual") === "qual" : (m.phase && m.phase !== "qual")));
+  const PHASE_ORDER = { qual: 0, practice: 1, r16: 2, qf: 3, sf: 4, final: 5 };
+  const list = inTab.sort((a, b) => (PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase]) || (a.num - b.num));
   const fields = [...new Set(list.map((m) => m.field).filter(Boolean))].sort();
   const vcount = {};
-  for (const v of viols) if (v.match && v.match.phase === "qual" && v.match.num) vcount[v.match.num] = (vcount[v.match.num] || 0) + 1;
+  for (const v of viols) {
+    if (!v.match || !v.match.phase || v.match.phase === "none" || v.match.num == null) continue;
+    const id = v.match.phase === "qual" ? String(v.match.num) : `${v.match.phase}-${v.match.num}`;
+    vcount[id] = (vcount[id] || 0) + 1;
+  }
   const q = query.trim().toUpperCase();
   const base = field === "all" ? list : list.filter((m) => m.field === field);
   const filtered = q
-    ? base.filter((m) => String(m.num) === q || String(m.num).startsWith(q) || m.red.some((t) => t.includes(q)) || m.blue.some((t) => t.includes(q)))
+    ? base.filter((m) => String(m.num) === q || String(m.num).startsWith(q) || (m.label || "").toUpperCase().includes(q) || m.red.some((t) => t.includes(q)) || m.blue.some((t) => t.includes(q)))
     : base;
+  const rowLabel = (m) => (m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`));
   return (
     <>
+      {hasElims && (
+        <div className="flex gap-1.5 mb-3">
+          {[["qual", "Qualifications"], ["elim", "Eliminations"]].map(([k, lbl]) => (
+            <button key={k} onClick={() => { setTab(k); setField("all"); }}
+              className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold border ${tab === k ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"}`}>{lbl}</button>
+          ))}
+        </div>
+      )}
       {fields.length > 1 && (
         <div className="flex gap-1.5 mb-3 overflow-x-auto">
           {["all", ...fields].map((f) => (
@@ -1536,21 +1594,24 @@ function MatchList({ matches, teamName, viols, query, setQuery, onOpen }) {
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search match # or team"
           className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
       </div>
+      {tab === "elim" && canAdd && (
+        <button onClick={onAddMatch} className="w-full mb-3 py-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-medium flex items-center justify-center gap-2 hover:border-slate-400"><Plus size={16} /> Add elimination match</button>
+      )}
       {filtered.length === 0 ? (
-        <Empty title="No matches" sub="Try a different match number or team." />
+        <Empty title={tab === "elim" ? "No elimination matches" : "No matches"} sub={tab === "elim" ? (canAdd ? "Add an elimination match, or import the bracket from Tournament Manager." : "Elimination matches will appear here once loaded.") : "Try a different match number or team."} />
       ) : (
         <ul className="space-y-2">
           {filtered.map((m) => (
-            <li key={m.num}>
-              <button onClick={() => onOpen(m.num)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
-                <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-11 shrink-0">Q{m.num}</span>
+            <li key={m.id}>
+              <button onClick={() => onOpen(m.id)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-14 shrink-0">{rowLabel(m)}</span>
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
                   <span className="text-red-700 font-semibold">{m.red.join("  ")}</span>
                   <span className="text-slate-300 font-sans">vs</span>
                   <span className="text-blue-700 font-semibold">{m.blue.join("  ")}</span>
                 </div>
                 {m.field && <span className="text-[11px] text-slate-400 shrink-0">{m.field.replace("Field ", "F")}</span>}
-                {vcount[m.num] ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold border bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 shrink-0">{vcount[m.num]}</span> : null}
+                {vcount[m.id] ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold border bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 shrink-0">{vcount[m.id]}</span> : null}
                 <ChevronRight size={16} className="text-slate-300 shrink-0" />
               </button>
             </li>
@@ -1561,13 +1622,17 @@ function MatchList({ matches, teamName, viols, query, setQuery, onOpen }) {
   );
 }
 
-function MatchDetail({ num, match, teamName, teamWatch = {}, viols, allNums, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation }) {
+function MatchDetail({ match, matches, teamName, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation }) {
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
-  const nums = allNums || [num];
-  const idx = nums.indexOf(num);
-  const prev = idx > 0 ? nums[idx - 1] : null;
-  const next = idx >= 0 && idx < nums.length - 1 ? nums[idx + 1] : null;
-  const mv = viols.filter((v) => v.match && v.match.phase === "qual" && String(v.match.num) === String(num)).sort((a, b) => b.createdAt - a.createdAt);
+  const m = match;
+  const heading = m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`);
+  // siblings in the same phase, ordered by num, for prev/next + jump
+  const siblings = Object.values(matches || {}).filter((x) => (x.phase || "qual") === (m.phase || "qual")).sort((a, b) => a.num - b.num);
+  const ids = siblings.map((x) => x.id);
+  const idx = ids.indexOf(m.id);
+  const prev = idx > 0 ? ids[idx - 1] : null;
+  const next = idx >= 0 && idx < ids.length - 1 ? ids[idx + 1] : null;
+  const mv = viols.filter((v) => v.match && v.match.phase === m.phase && String(v.match.num) === String(m.num)).sort((a, b) => b.createdAt - a.createdAt);
   const stat = {};
   for (const v of viols) {
     const t = v.team;
@@ -1612,7 +1677,7 @@ function MatchDetail({ num, match, teamName, teamWatch = {}, viols, allNums, onN
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">Q{num}</div>
+            <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">{heading}</div>
             {match.field && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{match.field}</div>}
           </div>
           <div className="flex items-center gap-2">
@@ -1622,10 +1687,10 @@ function MatchDetail({ num, match, teamName, teamWatch = {}, viols, allNums, onN
               className={`px-3 py-2 rounded-lg font-semibold text-sm flex items-center gap-1 ${next ? "bg-[#D7212B] text-white hover:bg-[#B42024]" : "bg-slate-200 dark:bg-slate-600 text-slate-400"}`}>Next <ChevronRight size={16} /></button>
           </div>
         </div>
-        {nums.length > 1 && (
-          <select value={num} onChange={(e) => onNav(Number(e.target.value))}
+        {ids.length > 1 && (
+          <select value={m.id} onChange={(e) => onNav(e.target.value)}
             className="w-full mt-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
-            {nums.map((n) => <option key={n} value={n}>Jump to Q{n}</option>)}
+            {siblings.map((x) => <option key={x.id} value={x.id}>Jump to {x.phase === "qual" ? `Q${x.num}` : (fmtMatch({ phase: x.phase, num: x.num }) || x.label)}</option>)}
           </select>
         )}
       </div>
@@ -2080,6 +2145,123 @@ function Rankings({ viols, teamName }) {
           </li>
         ))}
       </ul>
+    </>
+  );
+}
+
+/* ============================ ADD ELIMINATION MATCH (admin) ============================ */
+function AddMatchModal({ teams, onSave, onClose }) {
+  const ELIM = [{ key: "r16", label: "Round of 16" }, { key: "qf", label: "Quarterfinal" }, { key: "sf", label: "Semifinal" }, { key: "final", label: "Final" }];
+  const [phase, setPhase] = useState("qf");
+  const [num, setNum] = useState("1");
+  const [field, setField] = useState("");
+  const [r1, setR1] = useState(""); const [r2, setR2] = useState("");
+  const [b1, setB1] = useState(""); const [b2, setB2] = useState("");
+  const [busy, setBusy] = useState(false);
+  const opts = teams.map((t) => t.number);
+  const valid = num.trim() && (r1 || r2) && (b1 || b2);
+  const submit = async () => {
+    if (!valid || busy) return; setBusy(true);
+    try {
+      await onSave({ phase, num: Number(num), field: field.trim(), red: [r1, r2].filter(Boolean), blue: [b1, b2].filter(Boolean) });
+    } catch (e) { alert("Could not save: " + (e.message || e)); setBusy(false); }
+  };
+  const Sel = ({ v, set, label }) => (
+    <select value={v} onChange={(e) => set(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm">
+      <option value="">{label}</option>
+      {opts.map((n) => <option key={n} value={n}>{n}</option>)}
+    </select>
+  );
+  return (
+    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
+      <div className="bg-slate-50 dark:bg-slate-900 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
+        <div className="sticky top-0 bg-slate-50 dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+          <h2 className="font-bold text-slate-900 dark:text-slate-100">Add elimination match</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={22} /></button>
+        </div>
+        <div className="p-4 space-y-4">
+          <div className="flex gap-2">
+            <div className="flex-1"><Label>Round</Label>
+              <select value={phase} onChange={(e) => setPhase(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm">
+                {ELIM.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+              </select>
+            </div>
+            <div className="w-24"><Label>Match #</Label>
+              <input value={num} onChange={(e) => setNum(e.target.value.replace(/\D/g, ""))} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-mono text-sm" />
+            </div>
+          </div>
+          <div><Label>Field (optional)</Label>
+            <input value={field} onChange={(e) => setField(e.target.value)} placeholder="e.g. Field 1" className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm" />
+          </div>
+          <div><Label>Red alliance</Label>
+            <div className="flex gap-2"><Sel v={r1} set={setR1} label="Team 1" /><Sel v={r2} set={setR2} label="Team 2" /></div>
+          </div>
+          <div><Label>Blue alliance</Label>
+            <div className="flex gap-2"><Sel v={b1} set={setB1} label="Team 1" /><Sel v={b2} set={setB2} label="Team 2" /></div>
+          </div>
+          <p className="text-[11px] text-slate-400">Shows as {fmtMatch({ phase, num }) || `${phase} ${num}`} in the Eliminations tab.</p>
+        </div>
+        <div className="sticky bottom-0 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 p-4 flex gap-2">
+          <button onClick={onClose} className="px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
+          <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white ${valid && !busy ? "bg-[#D7212B] hover:bg-[#B42024]" : "bg-slate-300"}`}>{busy ? "Saving…" : "Add match"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================ FIELD LOG (timeouts / faults / replays) ============================ */
+const FIELD_KINDS = [{ key: "timeout", label: "Timeout" }, { key: "field_fault", label: "Field fault" }, { key: "replay", label: "Match replay" }, { key: "other", label: "Other" }];
+const kindLabel = (k) => (FIELD_KINDS.find((x) => x.key === k) || {}).label || "Other";
+const kindColor = (k) => k === "field_fault" ? "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-200 dark:border-red-700"
+  : k === "replay" ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700"
+  : k === "timeout" ? "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700"
+  : "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600";
+
+function FieldLogView({ entries, onAdd, onRemove, meName, canDelete }) {
+  const [kind, setKind] = useState("timeout");
+  const [field, setField] = useState("");
+  const [matchRef, setMatchRef] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const add = async () => {
+    if (busy) return; setBusy(true);
+    try { await onAdd({ kind, field: field.trim(), matchRef: matchRef.trim(), note: note.trim() }); setField(""); setMatchRef(""); setNote(""); setKind("timeout"); }
+    catch (e) { alert("Could not save: " + (e.message || e)); }
+    setBusy(false);
+  };
+  return (
+    <>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-3 mb-4 space-y-2">
+        <div className="flex gap-2">
+          <select value={kind} onChange={(e) => setKind(e.target.value)} className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm">
+            {FIELD_KINDS.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
+          </select>
+          <input value={field} onChange={(e) => setField(e.target.value)} placeholder="Field (opt)" className="w-28 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm" />
+          <input value={matchRef} onChange={(e) => setMatchRef(e.target.value)} placeholder="Match (opt)" className="w-28 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm" />
+        </div>
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="What happened…" className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm" />
+        <button onClick={add} disabled={busy} className="w-full py-2.5 rounded-lg bg-[#D7212B] text-white font-semibold disabled:bg-slate-300">{busy ? "Saving…" : "Log it"}</button>
+      </div>
+      {entries.length === 0 ? (
+        <Empty title="Nothing logged yet" sub="Timeouts, field faults, and replays you log will appear here." />
+      ) : (
+        <ul className="space-y-2">
+          {entries.map((e) => (
+            <li key={e.id} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold border ${kindColor(e.kind)}`}>{kindLabel(e.kind)}</span>
+                {e.field && <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{e.field}</span>}
+                {e.matchRef && <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{e.matchRef}</span>}
+                <span className="text-[11px] text-slate-400 ml-auto">{fmtTime(e.createdAt)}</span>
+                {(e.by === meName || canDelete) && <button onClick={() => { if (confirm("Remove this entry?")) onRemove(e.id); }} className="text-slate-300 hover:text-red-600"><Trash2 size={14} /></button>}
+              </div>
+              {e.note && <p className="text-sm text-slate-700 dark:text-slate-200 mt-1.5">{e.note}</p>}
+              {e.by && <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1"><UserCircle2 size={12} /> {e.by}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   );
 }
