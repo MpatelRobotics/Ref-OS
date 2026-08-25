@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -742,11 +742,12 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
             onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} />
         ) : openMatch ? (
           <MatchDetail match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch}
+            fieldLog={fieldLog} onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={(n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} />
         ) : openRobot ? (
           <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onOpenPhoto={setLightbox} />
         ) : view === "matches" ? (
-          <MatchList matches={matches} teamName={teamNameMap} viols={viols} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} />
+          <MatchList matches={matches} teamName={teamNameMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} />
         ) : view === "robots" ? (
           <RobotList teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "judging" ? (
@@ -1548,11 +1549,14 @@ function EventModal({ event, onSave, onClose }) {
 
 
 /* ============================ MATCHES ============================ */
-function MatchList({ matches, teamName, viols, query, setQuery, onOpen, canAdd, onAddMatch }) {
+function MatchList({ matches, teamName, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch }) {
   const [field, setField] = useState("all");
   const all = Object.values(matches);
   const hasElims = all.some((m) => m.phase && m.phase !== "qual");
   const [tab, setTab] = useState("qual"); // "qual" | "elim"
+  const replaySet = new Set(fieldLog.filter((e) => e.kind === "replay" && e.matchId).map((e) => e.matchId));
+  const timeoutSet = new Set(fieldLog.filter((e) => e.kind === "timeout" && e.matchId).map((e) => e.matchId));
+  const faultSet = new Set(fieldLog.filter((e) => e.kind === "field_fault" && e.matchId).map((e) => e.matchId));
   const inTab = all.filter((m) => (tab === "qual" ? (m.phase || "qual") === "qual" : (m.phase && m.phase !== "qual")));
   const PHASE_ORDER = { qual: 0, practice: 1, r16: 2, qf: 3, sf: 4, final: 5 };
   const list = inTab.sort((a, b) => (PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase]) || (a.num - b.num));
@@ -1571,6 +1575,18 @@ function MatchList({ matches, teamName, viols, query, setQuery, onOpen, canAdd, 
   const rowLabel = (m) => (m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`));
   return (
     <>
+      {replaySet.size > 0 && (
+        <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300 mb-1.5 flex items-center gap-1"><RefreshCw size={13} /> Matches to re-run ({replaySet.size})</p>
+          <div className="flex flex-wrap gap-1.5">
+            {all.filter((m) => replaySet.has(m.id)).sort((a, b) => a.num - b.num).map((m) => (
+              <button key={m.id} onClick={() => onOpen(m.id)} className="font-mono text-xs font-bold px-2 py-1 rounded-md bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200">
+                {m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {hasElims && (
         <div className="flex gap-1.5 mb-3">
           {[["qual", "Qualifications"], ["elim", "Eliminations"]].map(([k, lbl]) => (
@@ -1611,6 +1627,9 @@ function MatchList({ matches, teamName, viols, query, setQuery, onOpen, canAdd, 
                   <span className="text-blue-700 font-semibold">{m.blue.join("  ")}</span>
                 </div>
                 {m.field && <span className="text-[11px] text-slate-400 shrink-0">{m.field.replace("Field ", "F")}</span>}
+                {replaySet.has(m.id) && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700 shrink-0"><RefreshCw size={10} /> REPLAY</span>}
+                {timeoutSet.has(m.id) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700 shrink-0">TO</span>}
+                {faultSet.has(m.id) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-red-100 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-200 dark:border-red-700 shrink-0">FAULT</span>}
                 {vcount[m.id] ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold border bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 shrink-0">{vcount[m.id]}</span> : null}
                 <ChevronRight size={16} className="text-slate-300 shrink-0" />
               </button>
@@ -1622,10 +1641,46 @@ function MatchList({ matches, teamName, viols, query, setQuery, onOpen, canAdd, 
   );
 }
 
-function MatchDetail({ match, matches, teamName, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation }) {
+function MatchDetail({ match, matches, teamName, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, fieldLog = [], onAddField, onRemoveField, meName, canDelete }) {
+  const [toOpen, setToOpen] = useState(false);
+  const [toAlliance, setToAlliance] = useState("red");
+  const [toTeam, setToTeam] = useState("");
+  const [faultOpen, setFaultOpen] = useState(false);
+  const [faultNote, setFaultNote] = useState("");
+  const [busy, setBusy] = useState(false);
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
   const m = match;
   const heading = m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`);
+  const matchEntries = fieldLog.filter((e) => e.matchId === m.id).sort((a, b) => b.createdAt - a.createdAt);
+  const replayEntry = matchEntries.find((e) => e.kind === "replay");
+  const allTimeouts = fieldLog.filter((e) => e.kind === "timeout");
+  const allianceTeams = toAlliance === "red" ? (m.red || []) : (m.blue || []);
+  const doTimeout = async () => {
+    if (busy) return;
+    if (toTeam && allTimeouts.some((e) => e.team === toTeam)) {
+      if (!confirm(`Team ${toTeam} already called a timeout. Log another anyway?`)) return;
+    } else if (allTimeouts.some((e) => e.matchId === m.id && e.alliance === toAlliance)) {
+      if (!confirm(`The ${toAlliance} alliance already has a timeout in this match. Log another anyway?`)) return;
+    }
+    setBusy(true);
+    try { await onAddField({ kind: "timeout", matchId: m.id, matchRef: heading, alliance: toAlliance, team: toTeam || "", note: "" }); setToOpen(false); setToTeam(""); setToAlliance("red"); }
+    catch (e) { alert("Could not save: " + (e.message || e)); }
+    setBusy(false);
+  };
+  const doFault = async () => {
+    if (busy) return; setBusy(true);
+    try { await onAddField({ kind: "field_fault", matchId: m.id, matchRef: heading, note: faultNote.trim() }); setFaultOpen(false); setFaultNote(""); }
+    catch (e) { alert("Could not save: " + (e.message || e)); }
+    setBusy(false);
+  };
+  const toggleReplay = async () => {
+    if (busy) return; setBusy(true);
+    try {
+      if (replayEntry) { await onRemoveField(replayEntry.id); }
+      else { await onAddField({ kind: "replay", matchId: m.id, matchRef: heading, note: "" }); }
+    } catch (e) { alert("Could not save: " + (e.message || e)); }
+    setBusy(false);
+  };
   // siblings in the same phase, ordered by num, for prev/next + jump
   const siblings = Object.values(matches || {}).filter((x) => (x.phase || "qual") === (m.phase || "qual")).sort((a, b) => a.num - b.num);
   const ids = siblings.map((x) => x.id);
@@ -1697,6 +1752,47 @@ function MatchDetail({ match, matches, teamName, teamWatch = {}, viols, onNav, o
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
         <Alliance label="Red alliance" teams={match.red} color="red" />
         <Alliance label="Blue alliance" teams={match.blue} color="blue" />
+      </div>
+      <div className="mb-4">
+        <div className="flex gap-2">
+          <button onClick={() => { setToOpen((v) => !v); setFaultOpen(false); }} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${toOpen ? "bg-blue-600 text-white border-blue-600" : "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700"}`}><Clock size={15} /> Timeout</button>
+          <button onClick={() => { setFaultOpen((v) => !v); setToOpen(false); }} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${faultOpen ? "bg-red-600 text-white border-red-600" : "bg-white dark:bg-slate-800 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700"}`}><AlertTriangle size={15} /> Field fault</button>
+          <button onClick={toggleReplay} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${replayEntry ? "bg-amber-500 text-white border-amber-500" : "bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"}`}><RefreshCw size={15} /> {replayEntry ? "For replay ✓" : "Replay"}</button>
+        </div>
+        {toOpen && (
+          <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2">
+            <div className="flex gap-2">
+              {["red", "blue"].map((a) => (
+                <button key={a} onClick={() => { setToAlliance(a); setToTeam(""); }} className={`flex-1 py-2 rounded-lg text-sm font-semibold border capitalize ${toAlliance === a ? (a === "red" ? "bg-red-600 text-white border-red-600" : "bg-blue-600 text-white border-blue-600") : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>{a} alliance</button>
+              ))}
+            </div>
+            <select value={toTeam} onChange={(e) => setToTeam(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm">
+              <option value="">Tie to a team (optional)</option>
+              {allianceTeams.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <button onClick={doTimeout} disabled={busy} className="w-full py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold disabled:bg-slate-300">Log timeout</button>
+          </div>
+        )}
+        {faultOpen && (
+          <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2">
+            <textarea value={faultNote} onChange={(e) => setFaultNote(e.target.value)} rows={2} placeholder="What happened? (optional)" className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm" />
+            <button onClick={doFault} disabled={busy} className="w-full py-2.5 rounded-lg bg-[#D7212B] text-white font-semibold disabled:bg-slate-300">Log field fault</button>
+          </div>
+        )}
+        {matchEntries.length > 0 && (
+          <ul className="mt-2 space-y-1.5">
+            {matchEntries.map((e) => (
+              <li key={e.id} className="flex items-center gap-2 flex-wrap text-sm bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2">
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold border ${kindColor(e.kind)}`}>{kindLabel(e.kind)}</span>
+                {e.alliance && <span className={`text-[11px] font-semibold capitalize ${e.alliance === "red" ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}>{e.alliance}</span>}
+                {e.team && <span className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-200">{e.team}</span>}
+                {e.note && <span className="text-slate-600 dark:text-slate-300">{e.note}</span>}
+                <span className="text-[11px] text-slate-400 ml-auto">{e.by ? `${e.by} · ` : ""}{fmtTime(e.createdAt)}</span>
+                {(e.by === meName || canDelete) && <button onClick={() => onRemoveField(e.id)} className="text-slate-300 hover:text-red-600"><Trash2 size={13} /></button>}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       {(() => {
         const inMatch = [...(match.red || []), ...(match.blue || [])].flatMap((n) => teamWatch[n] || []);
@@ -2313,10 +2409,26 @@ function FeaturesGuide() {
       <Section icon={ListOrdered} title="Matches tab">
         <ul className="space-y-1.5">
           <Li><b>Field filter</b> — narrow the list to your field (Field 1/2/3).</Li>
+          <Li><b>Qualifications / Eliminations toggle</b> — appears once elimination matches exist. Elim matches (QF, SF, Final) use the same tap-to-log flow as quals.</Li>
           <Li>Each team shows its <b>prior record</b> (severity + per-rule counts) so you have context before a call.</Li>
           <Li><b>Jump to Q…</b> dropdown and <b>Next</b> button to move through the schedule.</Li>
+          <Li>Row badges flag matches with a <b>REPLAY</b>, a <b>TO</b> (timeout), or a <b>FAULT</b>, plus the violation count.</Li>
           <Li>A <b>Watchlist</b> panel and the full list of violations for that match appear below the alliances.</Li>
         </ul>
+      </Section>
+
+      <Section icon={Clock} title="Timeouts, field faults & replays (in a match)">
+        <p>Open any match to find three quick actions under the alliances:</p>
+        <ul className="space-y-1.5">
+          <Li><b>Timeout</b> — pick the <b>Red</b> or <b>Blue</b> alliance and optionally tie it to a specific team. If that team (or that alliance in this match) already has a timeout, you'll get a warning so a team can't call two.</Li>
+          <Li><b>Field fault</b> — log a field problem with an optional note.</Li>
+          <Li><b>Replay</b> — mark the match to be re-run; tap again to unmark.</Li>
+        </ul>
+        <p>Everything you log shows in that match's log, and (for replays) in the <b>“Matches to re-run”</b> banner at the top of the Matches tab so nothing is missed at the end of the day.</p>
+      </Section>
+
+      <Section icon={Flag} title="Field log">
+        <p>The gear-menu <b>Field log</b> is the running list of every timeout, field fault, match replay, and other note across the event — newest first, each attributed to the ref who logged it. You can add standalone entries here too, and remove your own (admins can remove any).</p>
       </Section>
 
       <Section icon={Users} title="Teams tab">
@@ -2365,6 +2477,7 @@ function FeaturesGuide() {
           <Li><b>Dark / Light mode</b> — toggle in this menu, saved per device.</Li>
           <Li><b>Install</b> — add Ref-OS to your home screen to launch it full-screen like an app (Add to Home Screen / the install prompt on the deployed site).</Li>
           <Li><b>Live sync</b> — everything updates across all devices within seconds.</Li>
+          <Li><b>Eliminations</b> — admins can add elimination matches (Add elimination match, in the Eliminations tab); they also arrive automatically when the bracket is imported from Tournament Manager.</Li>
         </ul>
       </Section>
 

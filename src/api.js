@@ -160,14 +160,14 @@ export async function deleteMatch(eventId, phase, num) {
 }
 
 /* ================= field log (timeouts / faults / replays) ================= */
-const mapFieldLog = (r) => ({ id: r.id, kind: r.kind, field: r.field || "", matchRef: r.match_ref || "", note: r.note || "", by: r.logged_by || "", createdAt: new Date(r.created_at).getTime() });
+const mapFieldLog = (r) => ({ id: r.id, kind: r.kind, field: r.field || "", matchRef: r.match_ref || "", matchId: r.match_id || "", alliance: r.alliance || "", team: r.team || "", note: r.note || "", by: r.logged_by || "", createdAt: new Date(r.created_at).getTime() });
 export async function listFieldLog(eventId) {
   const { data } = await supabase.from("field_log").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
   return (data || []).map(mapFieldLog);
 }
 export async function addFieldLog(eventId, e) {
   const id = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
-  const row = { id, event_id: eventId, kind: e.kind, field: e.field || null, match_ref: e.matchRef || null, note: (e.note || "").trim(), logged_by: e.by || "" };
+  const row = { id, event_id: eventId, kind: e.kind, field: e.field || null, match_ref: e.matchRef || null, match_id: e.matchId || null, alliance: e.alliance || null, team: e.team || null, note: (e.note || "").trim(), logged_by: e.by || "" };
   const { data, error } = await supabase.from("field_log").upsert(row, { onConflict: "id" }).select().single();
   if (error) throw error;
   return mapFieldLog(data);
