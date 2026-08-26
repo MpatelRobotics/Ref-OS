@@ -143,15 +143,19 @@ export async function removeTeamPhoto(eventId, number, path) {
 
 /* ================= matches (qualification schedule) ================= */
 export async function listMatches(eventId) {
-  const { data } = await supabase.from("matches").select("num,red,blue,field,phase,label").eq("event_id", eventId).order("num");
+  const { data } = await supabase.from("matches").select("num,red,blue,field,phase,label,winner").eq("event_id", eventId).order("num");
   return (data || []).map((m) => {
     const phase = m.phase || "qual";
-    return { id: phase === "qual" ? String(m.num) : `${phase}-${m.num}`, phase, num: m.num, label: m.label || "", red: m.red || [], blue: m.blue || [], field: m.field || "" };
+    return { id: phase === "qual" ? String(m.num) : `${phase}-${m.num}`, phase, num: m.num, label: m.label || "", winner: m.winner || "", red: m.red || [], blue: m.blue || [], field: m.field || "" };
   });
 }
 export async function addMatch(eventId, m) {
   const row = { event_id: eventId, phase: m.phase || "qual", num: Number(m.num), red: m.red || [], blue: m.blue || [], field: m.field || null, label: m.label || null };
   const { error } = await supabase.from("matches").upsert(row, { onConflict: "event_id,phase,num" });
+  if (error) throw error;
+}
+export async function setMatchWinner(eventId, phase, num, winner) {
+  const { error } = await supabase.from("matches").update({ winner: winner || null }).eq("event_id", eventId).eq("phase", phase).eq("num", Number(num));
   if (error) throw error;
 }
 export async function deleteMatch(eventId, phase, num) {

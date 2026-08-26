@@ -554,6 +554,30 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   const clearAlliances = async () => {
     await api.clearAlliances(eventId); setAlliances({});
   };
+  const reloadMatches = async () => {
+    const list = await api.listMatches(eventId);
+    const map = {}; for (const x of list) map[x.id] = x; setMatches(map); return map;
+  };
+  const winnerTeams = (m) => (m && m.winner ? (m.winner === "red" ? m.red : m.blue) : null);
+  const advanceBracket = async (map) => {
+    const get = (phase, num) => map[`${phase}-${num}`];
+    const toCreate = [];
+    const push = (phase, num, red, blue, label) => {
+      const ex = get(phase, num);
+      toCreate.push({ phase, num, red, blue, label, field: (ex && ex.field) || "" });
+    };
+    for (let i = 1; i <= 4; i++) { const w1 = winnerTeams(get("r16", 2 * i - 1)), w2 = winnerTeams(get("r16", 2 * i)); if (w1 && w2) push("qf", i, w1, w2, `QF ${i}`); }
+    for (let i = 1; i <= 2; i++) { const w1 = winnerTeams(get("qf", 2 * i - 1)), w2 = winnerTeams(get("qf", 2 * i)); if (w1 && w2) push("sf", i, w1, w2, `SF ${i}`); }
+    { const w1 = winnerTeams(get("sf", 1)), w2 = winnerTeams(get("sf", 2)); if (w1 && w2) for (let g = 1; g <= 3; g++) push("final", g, w1, w2, `Final ${g}`); }
+    if (toCreate.length) { for (const mm of toCreate) await api.addMatch(eventId, mm); await reloadMatches(); }
+  };
+  const setMatchWinner = async (m, winner) => {
+    const next = m.winner === winner ? "" : winner; // tapping the current winner clears it
+    await api.setMatchWinner(eventId, m.phase, m.num, next);
+    const map = { ...matches, [m.id]: { ...m, winner: next } };
+    setMatches(map);
+    await advanceBracket(map);
+  };
   // 16-alliance single-elimination Round of 16 seeding (higher seed = red)
   const ELIM16 = [[1, 16], [8, 9], [5, 12], [4, 13], [3, 14], [6, 11], [7, 10], [2, 15]];
   const finalizeAlliances = async () => {
@@ -816,7 +840,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
         ) : view === "rulebook" ? (
           <RuleBook rules={rules} />
         ) : view === "alliances" ? (
-          <AllianceSelection teams={teams} alliances={alliances} onSet={setAllianceTeam} onFinalize={finalizeAlliances} onClear={() => requireAdmin(() => { if (confirm("Clear all alliance picks? (This does not delete any matches already generated.)")) clearAlliances(); })} />
+          <AllianceSelection teams={teams} alliances={alliances} matches={matches} onSet={setAllianceTeam} onFinalize={finalizeAlliances} onSetWinner={setMatchWinner} onClear={() => requireAdmin(() => { if (confirm("Clear all alliance picks? (This does not delete any matches already generated.)")) clearAlliances(); })} />
         ) : (
           <>
             {!event?.quals ? (
@@ -2312,7 +2336,7 @@ function Rankings({ viols, teamName }) {
 }
 
 /* ============================ ALLIANCE SELECTION (admin) ============================ */
-function AllianceSelection({ teams, alliances, onSet, onFinalize, onClear }) {
+function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSetWinner, onClear }) {
   const opts = teams.map((t) => t.number);
   const SEEDS = Array.from({ length: 16 }, (_, i) => i + 1);
   const filled = SEEDS.filter((s) => (alliances[s] || []).filter(Boolean).length > 0).length;
@@ -2328,11 +2352,33 @@ function AllianceSelection({ teams, alliances, onSet, onFinalize, onClear }) {
       </select>
     );
   };
+  const ROUNDS = [["r16", "Round of 16"], ["qf", "Quarterfinals"], ["sf", "Semifinals"], ["final", "Finals (best of 3)"]];
+  const byPhase = (p) => Object.values(matches || {}).filter((m) => m.phase === p).sort((a, b) => a.num - b.num);
+  const hasBracket = byPhase("r16").length > 0;
+  // finals champion: an alliance that wins 2 of the 3 final games
+  const finals = byPhase("final");
+  let champion = null;
+  if (finals.length) {
+    const tally = {};
+    for (const f of finals) { const w = f.winner ? (f.winner === "red" ? f.red : f.blue) : null; if (w) { const key = w.join(" "); tally[key] = (tally[key] || 0) + 1; } }
+    for (const k in tally) if (tally[k] >= 2) champion = k;
+  }
+  const Side = ({ m, side }) => {
+    const teamsArr = side === "red" ? m.red : m.blue;
+    const won = m.winner === side;
+    return (
+      <button onClick={() => onSetWinner(m, side)}
+        className={`flex-1 min-w-0 px-2 py-1.5 rounded-lg border text-left ${won ? (side === "red" ? "bg-red-600 text-white border-red-600" : "bg-blue-600 text-white border-blue-600") : `bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 ${side === "red" ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}`}>
+        <span className="font-mono text-xs font-bold">{teamsArr.join(" ") || "—"}</span>
+        {won && <Check size={13} className="inline ml-1" />}
+      </button>
+    );
+  };
   return (
     <>
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><GitBranch size={18} className="text-[#D7212B]" /> Alliance selection</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Enter each alliance as it's picked (captain + 1st pick). When all 16 are set, finalize to generate the Round of 16 automatically. Everything syncs live.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Enter each alliance as it's picked (captain + 1st pick). When all 16 are set, finalize to generate the Round of 16. Then pick the winner of each match to advance the bracket. Everything syncs live.</p>
         <div className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">{filled} / 16 alliances entered</div>
       </div>
       <div className="space-y-2">
@@ -2349,7 +2395,41 @@ function AllianceSelection({ teams, alliances, onSet, onFinalize, onClear }) {
       </div>
       <button onClick={onFinalize} className="w-full mt-4 py-3 rounded-xl bg-[#D7212B] hover:bg-[#B42024] text-white font-bold flex items-center justify-center gap-2"><GitBranch size={18} /> Finalize alliances → create Round of 16</button>
       <button onClick={onClear} className="w-full mt-2 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-medium">Clear all picks</button>
-      <p className="text-[11px] text-slate-400 mt-3 text-center">Bracket: 1v16, 8v9, 5v12, 4v13, 3v14, 6v11, 7v10, 2v15 (higher seed = red). Add QF, SF, and Final as each round's winners are decided.</p>
+      <p className="text-[11px] text-slate-400 mt-3 text-center">Bracket: 1v16, 8v9, 5v12, 4v13, 3v14, 6v11, 7v10, 2v15 (higher seed = red).</p>
+
+      {hasBracket && (
+        <div className="mt-6">
+          <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-1"><Trophy size={18} className="text-[#D7212B]" /> Bracket</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">Tap the winning alliance in each match. Winners auto-advance — QF from R16, SF from QF, and a best-of-3 Final from SF. Tap a winner again to clear it.</p>
+          {champion && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3 mb-3 flex items-center gap-2">
+              <Trophy size={18} className="text-amber-500" />
+              <span className="text-sm text-amber-800 dark:text-amber-200">Champion alliance: <b className="font-mono">{champion}</b></span>
+            </div>
+          )}
+          {ROUNDS.map(([phase, label]) => {
+            const ms = byPhase(phase);
+            if (!ms.length) return null;
+            return (
+              <div key={phase} className="mb-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">{label}</h3>
+                <div className="space-y-2">
+                  {ms.map((m) => (
+                    <div key={m.id} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[11px] font-bold text-slate-400 w-16 shrink-0">{phase === "final" ? `Final ${m.num}` : fmtMatch({ phase: m.phase, num: m.num })}</span>
+                        <Side m={m} side="red" />
+                        <span className="text-slate-300 text-xs font-sans shrink-0">vs</span>
+                        <Side m={m} side="blue" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </>
   );
 }
@@ -2586,7 +2666,7 @@ function FeaturesGuide() {
           <Li><b>Dark / Light mode</b> — toggle in this menu, saved per device.</Li>
           <Li><b>Install</b> — add Ref-OS to your home screen to launch it full-screen like an app (Add to Home Screen / the install prompt on the deployed site).</Li>
           <Li><b>Live sync</b> — everything updates across all devices within seconds.</Li>
-          <Li><b>Alliance selection</b> (admin) — an <b>Alliances</b> tab lets you enter each alliance (captain + 1st pick) live as selection happens; <b>Finalize alliances</b> then auto-generates the Round of 16 in the Matches tab. Add QF/SF/Final as each round's winners are decided (or import the bracket from Tournament Manager).</Li>
+          <Li><b>Alliance selection</b> (admin) — an <b>Alliances</b> tab lets you enter each alliance (captain + 1st pick) live as selection happens; <b>Finalize alliances</b> auto-generates the Round of 16. Then tap the winning alliance in each match and the bracket advances itself — QF from R16, SF from QF, and a <b>best-of-3 Final</b> from SF, with the champion shown once an alliance wins two final games.</Li>
           <Li><b>Eliminations</b> — elimination matches use the same tap-to-log flow as quals, with timeouts enabled.</Li>
         </ul>
       </Section>
