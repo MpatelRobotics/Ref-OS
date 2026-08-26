@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -285,6 +285,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   const [finalists, setFinalists] = useState(new Set()); // `${award}::${team}`
   const [watchNotes, setWatchNotes] = useState([]);
   const [fieldLog, setFieldLog] = useState([]);
+  const [alliances, setAlliances] = useState({}); // seed -> [team1, team2]
   const [showFieldLog, setShowFieldLog] = useState(false);
   const [addMatchOpen, setAddMatchOpen] = useState(false);
   const [nominating, setNominating] = useState(null); // award key when the nominate modal is open
@@ -359,6 +360,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     setFinalists(new Set(sl.map((s) => `${s.award}::${s.team}`)));
     setWatchNotes(wn);
     api.listFieldLog(eventId).then(setFieldLog).catch(() => {});
+    api.listAlliances(eventId).then((rows) => { const m = {}; for (const a of rows) m[a.seed] = a.teams; setAlliances(m); }).catch(() => {});
     setSyncedAt(Date.now()); setSyncing(false);
   }, [eventId]);
 
@@ -540,6 +542,39 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     const list = await api.listMatches(eventId);
     const map = {}; for (const x of list) map[x.id] = x; setMatches(map);
     setAddMatchOpen(false);
+  };
+  const setAllianceTeam = async (seed, idx, team) => {
+    const cur = alliances[seed] ? [...alliances[seed]] : ["", ""];
+    cur[idx] = team;
+    const teams = cur;
+    setAlliances((a) => ({ ...a, [seed]: teams }));
+    try { await api.upsertAlliance(eventId, seed, teams.filter(Boolean).length ? teams : []); }
+    catch (e) { if (!outbox.isOffline(e)) throw e; }
+  };
+  const clearAlliances = async () => {
+    await api.clearAlliances(eventId); setAlliances({});
+  };
+  // 16-alliance single-elimination Round of 16 seeding (higher seed = red)
+  const ELIM16 = [[1, 16], [8, 9], [5, 12], [4, 13], [3, 14], [6, 11], [7, 10], [2, 15]];
+  const finalizeAlliances = async () => {
+    const complete = ELIM16.every(([a, b]) => (alliances[a] || []).filter(Boolean).length && (alliances[b] || []).filter(Boolean).length);
+    if (!complete) { alert("Every alliance (seeds 1–16) needs at least one team before finalizing."); return; }
+    const existingElims = Object.values(matches).some((m) => m.phase === "r16");
+    if (existingElims && !confirm("Round-of-16 matches already exist. Re-create them from the current alliances? (Existing R16 matches will be overwritten.)")) return;
+    if (!confirm("Generate the Round of 16 from these 16 alliances?")) return;
+    for (let i = 0; i < ELIM16.length; i++) {
+      const [hi, lo] = ELIM16[i];
+      await api.addMatch(eventId, {
+        phase: "r16", num: i + 1,
+        red: (alliances[hi] || []).filter(Boolean),
+        blue: (alliances[lo] || []).filter(Boolean),
+        label: `R16 ${i + 1} — A${hi} vs A${lo}`,
+      });
+    }
+    const list = await api.listMatches(eventId);
+    const map = {}; for (const x of list) map[x.id] = x; setMatches(map);
+    setView("matches");
+    alert("Round of 16 created. Open the Matches tab → Eliminations to see them. Add QF/SF/Final as each round's winners are known.");
   };
   const toggleFinalist = async (award, team) => {
     const key = `${award}::${team}`;
@@ -737,6 +772,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
               ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
               ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
               { k: "robots", label: "Robots", Icon: Camera },
+              ...(adminUnlocked ? [{ k: "alliances", label: "Alliances", Icon: GitBranch }] : []),
               { k: "judging", label: "Judging", Icon: Trophy }]).map(({ k, label, Icon }) => (
               <button key={k} onClick={() => { setView(k); setQuery(""); }}
                 className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
@@ -779,6 +815,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
             onExport={() => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
         ) : view === "rulebook" ? (
           <RuleBook rules={rules} />
+        ) : view === "alliances" ? (
+          <AllianceSelection teams={teams} alliances={alliances} onSet={setAllianceTeam} onFinalize={finalizeAlliances} onClear={() => requireAdmin(() => { if (confirm("Clear all alliance picks? (This does not delete any matches already generated.)")) clearAlliances(); })} />
         ) : (
           <>
             {!event?.quals ? (
@@ -1607,7 +1645,7 @@ function MatchList({ matches, teamName, viols, fieldLog = [], query, setQuery, o
           </div>
         </div>
       )}
-      {hasElims && (
+      {(hasElims || canAdd) && (
         <div className="flex gap-1.5 mb-3">
           {[["qual", "Qualifications"], ["elim", "Eliminations"]].map(([k, lbl]) => (
             <button key={k} onClick={() => { setTab(k); setField("all"); }}
@@ -2273,6 +2311,49 @@ function Rankings({ viols, teamName }) {
   );
 }
 
+/* ============================ ALLIANCE SELECTION (admin) ============================ */
+function AllianceSelection({ teams, alliances, onSet, onFinalize, onClear }) {
+  const opts = teams.map((t) => t.number);
+  const SEEDS = Array.from({ length: 16 }, (_, i) => i + 1);
+  const filled = SEEDS.filter((s) => (alliances[s] || []).filter(Boolean).length > 0).length;
+  const chosen = new Set();
+  for (const s of SEEDS) for (const t of (alliances[s] || [])) if (t) chosen.add(t);
+  const Sel = ({ seed, idx, label }) => {
+    const v = (alliances[seed] || [])[idx] || "";
+    return (
+      <select value={v} onChange={(e) => onSet(seed, idx, e.target.value)}
+        className="flex-1 min-w-0 px-2 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm">
+        <option value="">{label}</option>
+        {opts.map((n) => <option key={n} value={n} disabled={chosen.has(n) && n !== v}>{n}{chosen.has(n) && n !== v ? " ✓" : ""}</option>)}
+      </select>
+    );
+  };
+  return (
+    <>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
+        <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><GitBranch size={18} className="text-[#D7212B]" /> Alliance selection</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Enter each alliance as it's picked (captain + 1st pick). When all 16 are set, finalize to generate the Round of 16 automatically. Everything syncs live.</p>
+        <div className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">{filled} / 16 alliances entered</div>
+      </div>
+      <div className="space-y-2">
+        {SEEDS.map((seed) => {
+          const done = (alliances[seed] || []).filter(Boolean).length >= 2;
+          return (
+            <div key={seed} className={`rounded-xl border p-3 flex items-center gap-3 ${done ? "border-emerald-300 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20" : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"}`}>
+              <span className="w-8 shrink-0 text-center font-mono font-bold text-slate-900 dark:text-slate-100">A{seed}</span>
+              <Sel seed={seed} idx={0} label="Captain" />
+              <Sel seed={seed} idx={1} label="1st pick" />
+            </div>
+          );
+        })}
+      </div>
+      <button onClick={onFinalize} className="w-full mt-4 py-3 rounded-xl bg-[#D7212B] hover:bg-[#B42024] text-white font-bold flex items-center justify-center gap-2"><GitBranch size={18} /> Finalize alliances → create Round of 16</button>
+      <button onClick={onClear} className="w-full mt-2 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-medium">Clear all picks</button>
+      <p className="text-[11px] text-slate-400 mt-3 text-center">Bracket: 1v16, 8v9, 5v12, 4v13, 3v14, 6v11, 7v10, 2v15 (higher seed = red). Add QF, SF, and Final as each round's winners are decided.</p>
+    </>
+  );
+}
+
 /* ============================ ADD ELIMINATION MATCH (admin) ============================ */
 function AddMatchModal({ teams, onSave, onClose }) {
   const ELIM = [{ key: "r16", label: "Round of 16" }, { key: "qf", label: "Quarterfinal" }, { key: "sf", label: "Semifinal" }, { key: "final", label: "Final" }];
@@ -2505,7 +2586,8 @@ function FeaturesGuide() {
           <Li><b>Dark / Light mode</b> — toggle in this menu, saved per device.</Li>
           <Li><b>Install</b> — add Ref-OS to your home screen to launch it full-screen like an app (Add to Home Screen / the install prompt on the deployed site).</Li>
           <Li><b>Live sync</b> — everything updates across all devices within seconds.</Li>
-          <Li><b>Eliminations</b> — admins can add elimination matches (Add elimination match, in the Eliminations tab); they also arrive automatically when the bracket is imported from Tournament Manager.</Li>
+          <Li><b>Alliance selection</b> (admin) — an <b>Alliances</b> tab lets you enter each alliance (captain + 1st pick) live as selection happens; <b>Finalize alliances</b> then auto-generates the Round of 16 in the Matches tab. Add QF/SF/Final as each round's winners are decided (or import the bracket from Tournament Manager).</Li>
+          <Li><b>Eliminations</b> — elimination matches use the same tap-to-log flow as quals, with timeouts enabled.</Li>
         </ul>
       </Section>
 

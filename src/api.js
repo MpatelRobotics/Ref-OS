@@ -177,6 +177,22 @@ export async function deleteFieldLog(id) {
   if (error) throw error;
 }
 
+/* ================= elimination alliances ================= */
+const mapAlliance = (r) => ({ seed: r.seed, teams: r.teams || [] });
+export async function listAlliances(eventId) {
+  const { data } = await supabase.from("alliances").select("seed,teams").eq("event_id", eventId).order("seed");
+  return (data || []).map(mapAlliance);
+}
+export async function upsertAlliance(eventId, seed, teams) {
+  const row = { event_id: eventId, seed: Number(seed), teams: teams || [], updated_at: new Date().toISOString() };
+  const { error } = await supabase.from("alliances").upsert(row, { onConflict: "event_id,seed" });
+  if (error) throw error;
+}
+export async function clearAlliances(eventId) {
+  const { error } = await supabase.from("alliances").delete().eq("event_id", eventId);
+  if (error) throw error;
+}
+
 /* ================= rulebook ================= */
 export async function listRules(eventId) {
   const { data } = await supabase.from("rules").select("code,description,category,ord").eq("event_id", eventId).order("ord");
@@ -312,6 +328,7 @@ export function subscribeEvent(eventId, onChange) {
     .on("postgres_changes", { event: "*", schema: "public", table: "watch_notes", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "field_log", filter: `event_id=eq.${eventId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "alliances", filter: `event_id=eq.${eventId}` }, onChange)
     .subscribe();
   return () => supabase.removeChannel(ch);
 }

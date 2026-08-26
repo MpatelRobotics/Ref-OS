@@ -279,3 +279,20 @@ begin
   if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'matches')
     then alter publication supabase_realtime add table public.matches; end if;
 end $$;
+
+-- ---------- elimination alliances (admin-entered during alliance selection) ----------
+create table if not exists public.alliances (
+  event_id   uuid references public.events(id) on delete cascade,
+  seed       int not null,
+  teams      text[] not null default '{}',
+  updated_at timestamptz default now(),
+  primary key (event_id, seed)
+);
+alter table public.alliances enable row level security;
+drop policy if exists "open rw alliances" on public.alliances;
+create policy "open rw alliances" on public.alliances for all using (true) with check (true);
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'alliances')
+    then alter publication supabase_realtime add table public.alliances; end if;
+end $$;
