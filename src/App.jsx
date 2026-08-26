@@ -2426,8 +2426,8 @@ function FeaturesGuide() {
       <Section icon={ShieldAlert} title="Guards while logging">
         <ul className="space-y-1.5">
           <Li><b>Duplicate check</b> — if the same team + rule + match was already logged, you'll get a confirm before adding it again (stops two refs double-logging one call).</Li>
-          <Li><b>Repeat check</b> — a small number of rules carry a defined limit on repeated occurrences. When a logged violation reaches that limit, the app simply notes that the Head Referee <i>may</i> choose to escalate — nothing is automatic. Every other rule has no escalation prompt at all: referees warn rather than punish, and escalation is always Head Referee discretion.</Li>
         </ul>
+        <p>There is no automatic escalation in Ref-OS — there's no general "three strikes" rule. Referees warn rather than punish, and any escalation to a Major is always Head Referee discretion.</p>
       </Section>
 
       <Section icon={CloudOff} title="Works offline">
