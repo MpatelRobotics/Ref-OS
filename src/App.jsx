@@ -70,7 +70,7 @@ const fmtMatch = (m) => {
   if (!m || !m.phase || m.phase === "none") return null;
   const p = MATCH_PHASES.find((x) => x.key === m.phase);
   if (!p) return null;
-  const num = (m.num || "").trim();
+  const num = String(m.num == null ? "" : m.num).trim();
   if (m.phase === "skills") return num ? `Skills ${num}` : "Skills";
   if (!num) return p.abbrev;
   return /\d$/.test(p.abbrev) ? `${p.abbrev}-${num}` : `${p.abbrev}${num}`;
