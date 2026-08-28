@@ -836,7 +836,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
           <div className="relative">
             <button onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
-              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
+              <div className="absolute right-0 mt-2 w-56 max-h-[75vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
                 {isJudge ? (
                   <>
                     <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><Trophy size={12} /> Judge Advisor</div>
