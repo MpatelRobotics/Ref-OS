@@ -115,6 +115,7 @@ function parseMatchesFile(text, filename = "") {
   if (matchCol < 0) warnings.push("Couldn't find a 'Match' column.");
   if (!redCols.length || !blueCols.length) warnings.push("Couldn't find Red/Blue team columns — check the export includes team columns.");
   const clean = (v) => String(v == null ? "" : v).trim().toUpperCase();
+  const isTeam = (v) => /^[0-9]{1,6}[A-Z]{1,2}$/.test(clean(v)); // e.g. 1234A, 25335A, 119B — not "0"/"FALSE"/scores
   const rows = [];
   for (let i = 1; i < table.length; i++) {
     const r = table[i];
@@ -122,8 +123,8 @@ function parseMatchesFile(text, filename = "") {
     const roundVal = roundCol >= 0 ? r[roundCol] : "";
     const phase = phaseFrom(roundVal, matchVal);
     const num = _numFrom(matchVal) ?? _numFrom(r[roundCol]) ?? i;
-    const red = redCols.map((c) => clean(r[c])).filter(Boolean);
-    const blue = blueCols.map((c) => clean(r[c])).filter(Boolean);
+    const red = redCols.map((c) => clean(r[c])).filter(isTeam);
+    const blue = blueCols.map((c) => clean(r[c])).filter(isTeam);
     const field = fieldCol >= 0 ? String(r[fieldCol] || "").trim() : "";
     if (num > 0 && (red.length || blue.length)) rows.push({ phase, num, red, blue, field });
   }
