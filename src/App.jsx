@@ -56,6 +56,80 @@ const TYPES = {
 };
 const ORDER = ["minor", "major", "inspection"];
 
+/* ---- Parse a Tournament Manager export (CSV or JSON) into match rows ---- */
+function parseCSV(text) {
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+      else if (c === '"') q = false;
+      else cell += c;
+    } else if (c === '"') q = true;
+    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") { if (cell !== "" || row.length) { row.push(cell); rows.push(row); row = []; cell = ""; } if (c === "\r" && text[i + 1] === "\n") i++; }
+    else cell += c;
+  }
+  if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter((r) => r.some((x) => String(x).trim() !== ""));
+}
+const _roundMap = { qualification: "qual", qual: "qual", q: "qual", qualifier: "qual", qualifying: "qual", practice: "practice", p: "practice", "round of 16": "r16", r16: "r16", ro16: "r16", quarterfinal: "qf", quarterfinals: "qf", qf: "qf", semifinal: "sf", semifinals: "sf", sf: "sf", final: "final", finals: "final", f: "final" };
+function phaseFrom(roundVal, matchVal) {
+  const r = String(roundVal || "").trim().toLowerCase();
+  if (_roundMap[r]) return _roundMap[r];
+  const name = String(matchVal || "").trim().toUpperCase();
+  if (/^R\s?16/.test(name)) return "r16";
+  if (/^QF/.test(name)) return "qf";
+  if (/^SF/.test(name)) return "sf";
+  if (/^F\b|^FINAL/.test(name)) return "final";
+  if (/^P\b|^PRAC/.test(name)) return "practice";
+  return "qual";
+}
+const _numFrom = (s) => { const m = String(s == null ? "" : s).match(/\d+/); return m ? Number(m[0]) : null; };
+
+// Returns { rows:[{phase,num,red,blue,field}], warnings:[] }
+function parseMatchesFile(text, filename = "") {
+  const t = text.trim();
+  if (filename.toLowerCase().endsWith(".json") || t.startsWith("{") || t.startsWith("[")) {
+    const data = JSON.parse(t);
+    const list = Array.isArray(data) ? data : (data.matches || data.items || []);
+    const rows = list.map((m) => {
+      const info = m.matchInfo || m; const tuple = info.matchTuple || {};
+      const al = info.alliances || [];
+      const teams = (a) => ((a && a.teams) || []).map((x) => String(x.number)).filter(Boolean);
+      return { phase: phaseFrom(tuple.round, ""), num: Number(tuple.match ?? tuple.instance ?? 0), red: teams(al[0]), blue: teams(al[1]), field: info.field || "" };
+    }).filter((r) => r.num > 0 && (r.red.length || r.blue.length));
+    return { rows, warnings: [] };
+  }
+  // CSV
+  const table = parseCSV(text);
+  if (table.length < 2) return { rows: [], warnings: ["No rows found in the file."] };
+  const header = table[0].map((h) => String(h).trim().toLowerCase());
+  const find = (...keys) => header.findIndex((h) => keys.some((k) => h.includes(k)));
+  const matchCol = (() => { const exact = header.indexOf("match"); return exact >= 0 ? exact : find("match #", "match number", "match"); })();
+  const roundCol = find("round", "type", "phase");
+  const fieldCol = find("field");
+  const redCols = header.map((h, i) => ({ h, i })).filter((x) => x.h.includes("red")).map((x) => x.i);
+  const blueCols = header.map((h, i) => ({ h, i })).filter((x) => x.h.includes("blue")).map((x) => x.i);
+  const warnings = [];
+  if (matchCol < 0) warnings.push("Couldn't find a 'Match' column.");
+  if (!redCols.length || !blueCols.length) warnings.push("Couldn't find Red/Blue team columns — check the export includes team columns.");
+  const clean = (v) => String(v == null ? "" : v).trim().toUpperCase();
+  const rows = [];
+  for (let i = 1; i < table.length; i++) {
+    const r = table[i];
+    const matchVal = matchCol >= 0 ? r[matchCol] : "";
+    const roundVal = roundCol >= 0 ? r[roundCol] : "";
+    const phase = phaseFrom(roundVal, matchVal);
+    const num = _numFrom(matchVal) ?? _numFrom(r[roundCol]) ?? i;
+    const red = redCols.map((c) => clean(r[c])).filter(Boolean);
+    const blue = blueCols.map((c) => clean(r[c])).filter(Boolean);
+    const field = fieldCol >= 0 ? String(r[fieldCol] || "").trim() : "";
+    if (num > 0 && (red.length || blue.length)) rows.push({ phase, num, red, blue, field });
+  }
+  return { rows, warnings };
+}
+
 const MATCH_PHASES = [
   { key: "qual", label: "Qualification", abbrev: "Q" },
   { key: "practice", label: "Practice", abbrev: "P" },
@@ -280,6 +354,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true)
   );
   const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent); // covers Chrome + Samsung Internet
+  const matchFileRef = useRef(null);
   const [logFor, setLogFor] = useState(null);
   const [noms, setNoms] = useState([]);
   const [finalists, setFinalists] = useState(new Set()); // `${award}::${team}`
@@ -543,6 +618,22 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     const map = {}; for (const x of list) map[x.id] = x; setMatches(map);
     setAddMatchOpen(false);
   };
+  const importMatchesFile = async (file) => {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const { rows, warnings } = parseMatchesFile(text, file.name);
+      if (!rows.length) { alert("No matches found in that file.\n" + warnings.join("\n")); return; }
+      const counts = rows.reduce((a, r) => { a[r.phase] = (a[r.phase] || 0) + 1; return a; }, {});
+      const summary = Object.entries(counts).map(([p, n]) => `${n} ${p}`).join(", ");
+      if (!confirm(`Import ${rows.length} matches (${summary})?\nExisting matches with the same number are updated in place.`)) return;
+      for (const r of rows) await api.addMatch(eventId, { phase: r.phase, num: r.num, red: r.red, blue: r.blue, field: r.field });
+      await reloadMatches();
+      alert(`Imported ${rows.length} matches (${summary}).` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
+    } catch (e) {
+      alert("Could not read that file: " + (e.message || e) + "\n\nExport the match list from Tournament Manager as CSV and try again.");
+    }
+  };
   const setAllianceTeam = async (seed, idx, team) => {
     const cur = alliances[seed] ? [...alliances[seed]] : ["", ""];
     cur[idx] = team;
@@ -760,6 +851,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                 ) : (
                 <>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowEvent(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><CalendarDays size={16} /> Event setup {adminUnlocked && <span className="ml-auto text-[10px] text-emerald-600 font-semibold">ADMIN</span>}</button>
+                <button onClick={() => { setMenu(false); requireAdmin(() => matchFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Import matches (file) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Ref status</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
                 <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export violations</button>
@@ -946,6 +1038,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><ByRule viols={viols} expandRule={expandRule} setExpandRule={setExpandRule} /></div></div>
         </div>
       )}
+      <input ref={matchFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importMatchesFile(f); }} />
       {addMatchOpen && <AddMatchModal teams={teams} onSave={addElimMatch} onClose={() => setAddMatchOpen(false)} />}
       {showFieldLog && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
@@ -2653,6 +2747,7 @@ function FeaturesGuide() {
           <Li><b>Activity feed</b> — every violation across the event, newest first.</Li>
           <Li><b>Rankings</b> — teams ranked by violations, Majors weighted highest.</Li>
           <Li><b>Ref status</b> — who's online / last seen; admins can remove offline refs.</Li>
+          <Li><b>Import matches (file)</b> — load the whole schedule at once: export the match list from Tournament Manager (CSV) and pick it here. It reads quals and elims, matched by number so re-importing updates in place. No API or bridge needed.</Li>
           <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Backup all (JSON)</b> downloads a complete snapshot of the event (teams, matches, violations, nominations, finalists, watchlist, field log) — grab one periodically as insurance. <b>Clear data</b> wipes selected data (admin only).</Li>
         </ul>
       </Section>
