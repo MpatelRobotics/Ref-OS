@@ -141,7 +141,19 @@ function parseCSV(text) {
 }
 const _roundMap = { qualification: "qual", qual: "qual", q: "qual", qualifier: "qual", qualifying: "qual", practice: "practice", p: "practice", "round of 16": "r16", r16: "r16", ro16: "r16", quarterfinal: "qf", quarterfinals: "qf", qf: "qf", semifinal: "sf", semifinals: "sf", sf: "sf", final: "final", finals: "final", f: "final" };
 function phaseFrom(roundVal, matchVal) {
-  const r = String(roundVal || "").trim().toLowerCase();
+  const raw = String(roundVal == null ? "" : roundVal).trim();
+  const r = raw.toLowerCase();
+
+  // Tournament Manager elimination CSVs often use numeric Round values.
+  // For VRC 16-alliance brackets: 2 = Round of 16, 3 = QF, 4 = SF, 5 = Final.
+  if (/^\d+$/.test(raw)) {
+    const n = Number(raw);
+    if (n === 2) return "r16";
+    if (n === 3) return "qf";
+    if (n === 4) return "sf";
+    if (n === 5) return "final";
+  }
+
   if (_roundMap[r]) return _roundMap[r];
   const name = String(matchVal || "").trim().toUpperCase();
   if (/^R\s?16/.test(name)) return "r16";
@@ -174,8 +186,8 @@ function parseMatchesFile(text, filename = "") {
   if (table.length < 2) return { rows: [], warnings: ["No rows found in the file."] };
   const header = table[0].map((h) => String(h).trim().toLowerCase());
   const find = (...keys) => header.findIndex((h) => keys.some((k) => h.includes(k)));
-  const matchCol = (() => { const exact = header.indexOf("match"); return exact >= 0 ? exact : find("match #", "match number", "match"); })();
-  const roundCol = find("round", "type", "phase");
+  const matchCol = (() => { const tm = header.indexOf("matchnum"); if (tm >= 0) return tm; const exact = header.indexOf("match"); return exact >= 0 ? exact : find("match #", "match number", "match"); })();
+  const roundCol = (() => { const exact = header.indexOf("round"); return exact >= 0 ? exact : find("round", "type", "phase"); })();
   const fieldCol = find("field");
   const redScoreCol = header.findIndex((h) => h.includes("red") && h.includes("score"));
   const blueScoreCol = header.findIndex((h) => h.includes("blue") && h.includes("score"));
@@ -721,7 +733,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       const r16 = rows.filter((m) => m.phase === "r16").sort((a, b) => a.num - b.num);
 
       if (!r16.length) {
-        alert("No Round of 16 matches found in that file.\n\nExport a match list from Tournament Manager that includes the R16 matches.");
+        alert("No Round of 16 matches found in that file.\n\nRef-OS supports Tournament Manager elimination CSVs where Round 2 is the Round of 16.");
         return;
       }
 
@@ -3041,7 +3053,7 @@ function FeaturesGuide() {
           <Li><b>Import teams (file)</b> — load the team roster the same way: export the team list from Tournament Manager (CSV) and pick it here. Team numbers and names are added/updated; nothing is deleted.</Li>
           <Li><b>Import scores (file)</b> — after matches are played, export match <b>results</b> (with scores) from TM and pick it here. Each match gets its final score and winner, the score shows on the match and in the list, and every team's <b>W-L-T record</b> (from quals) updates automatically.</Li>
           <Li><b>Upload rankings</b> — import the Tournament Manager qualification rankings CSV. Ref-OS matches <b>TeamNum</b> to each team and stores its <b>Rank</b>. Rankings appear on the Teams tab and inside individual match cards.</Li>
-          <Li><b>Upload alliances</b> — import a Tournament Manager match CSV containing the <b>Round of 16</b>. Ref-OS creates or updates the R16 elimination matches and automatically fills A1 through A16 in the Alliances tab using the standard 16-alliance bracket mapping.</Li>
+          <Li><b>Upload alliances</b> — import a Tournament Manager elimination CSV. Ref-OS recognizes numeric TM rounds, including <b>Round 2 = Round of 16</b>, creates or updates the R16 elimination matches, and automatically fills A1 through A16 in the Alliances tab using the standard 16-alliance bracket mapping.</Li>
           <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Backup all (JSON)</b> downloads a complete snapshot of the event (teams, matches, violations, nominations, finalists, watchlist, field log) — grab one periodically as insurance. <b>Clear data</b> wipes selected data (admin only).</Li>
         </ul>
       </Section>
