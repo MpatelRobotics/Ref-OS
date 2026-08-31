@@ -895,15 +895,45 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     try {
       const text = await file.text();
       const { rows } = parseMatchesFile(text, file.name);
-      const scored = rows.filter((r) => r.scored && r.redScore != null && r.blueScore != null);
-      if (!scored.length) { alert("No scored matches found in that file. Export match results (with scores) from Tournament Manager after matches are played."); return; }
-      if (!confirm(`Update scores for ${scored.length} matches?\nThis sets each match's final score and winner, and updates team W-L-T records.`)) return;
+
+      const allScored = rows.filter((r) => r.scored && r.redScore != null && r.blueScore != null);
+      const eliminationPhases = new Set(["r16", "qf", "sf", "final"]);
+      const eliminationScored = allScored.filter((r) => eliminationPhases.has(r.phase));
+      const scored = eliminationScored.length
+        ? eliminationScored
+        : allScored.filter((r) => r.phase === "qual");
+
+      if (!scored.length) {
+        alert("No scored matches found in that file. Export match results (with scores) from Tournament Manager after matches are played.");
+        return;
+      }
+
+      const eliminationMode = eliminationScored.length > 0;
+      if (!confirm(
+        `${eliminationMode ? "Elimination scores detected. Qualification matches in this file will be ignored.\n\n" : ""}` +
+        `Update scores for ${scored.length} ${eliminationMode ? "elimination " : "qualification "}matches?`
+      )) return;
+
       for (const r of scored) {
         const winner = r.redScore > r.blueScore ? "red" : r.blueScore > r.redScore ? "blue" : "tie";
-        await api.addMatch(eventId, { phase: r.phase, num: r.num, red: r.red, blue: r.blue, field: r.field, redScore: r.redScore, blueScore: r.blueScore, winner });
+        await api.addMatch(eventId, {
+          phase: r.phase,
+          num: r.num,
+          red: r.red,
+          blue: r.blue,
+          field: r.field,
+          redScore: r.redScore,
+          blueScore: r.blueScore,
+          winner
+        });
       }
+
       await reloadMatches();
-      alert(`Updated scores for ${scored.length} matches. Team records refreshed.`);
+      alert(
+        eliminationMode
+          ? `Updated scores for ${scored.length} elimination matches. Qualification matches were ignored.`
+          : `Updated scores for ${scored.length} qualification matches. Team records refreshed.`
+      );
     } catch (e) {
       alert("Could not read that file: " + (e.message || e) + "\n\nExport match results (with scores) from Tournament Manager as CSV and try again.");
     }
@@ -3153,7 +3183,7 @@ function FeaturesGuide() {
           <Li><b>Ref status</b> — who's online / last seen; admins can remove offline refs.</Li>
           <Li><b>Import matches (file)</b> — load the whole schedule at once: export the match list from Tournament Manager (CSV) and pick it here. It reads quals and elims, matched by number so re-importing updates in place. No API or bridge needed.</Li>
           <Li><b>Import teams (file)</b> — load the team roster the same way: export the team list from Tournament Manager (CSV) and pick it here. Team numbers and names are added/updated; nothing is deleted.</Li>
-          <Li><b>Import scores (file)</b> — after matches are played, export match <b>results</b> (with scores) from TM and pick it here. Each match gets its final score and winner, the score shows on the match and in the list, and every team's <b>W-L-T record</b> (from quals) updates automatically.</Li>
+          <Li><b>Import scores (file)</b> — export match <b>results</b> from Tournament Manager. If any scored elimination matches are present, Ref-OS ignores qualification rows in that file and updates only R16, QF, SF, and Final scores. If no elimination scores are present, qualification scores import normally and team <b>W-L-T records</b> update automatically.</Li>
           <Li><b>Upload rankings</b> — import the Tournament Manager qualification rankings CSV. Ref-OS matches <b>TeamNum</b> to each team and stores its <b>Rank</b>. Rankings appear on the Teams tab and inside individual match cards.</Li>
           <Li><b>Upload alliances</b> — import a Tournament Manager elimination CSV. Ref-OS reads the Tournament Manager elimination CSV directly: <b>Round 6</b> identifies the Round of 16 and <b>Instance 1 through 8</b> becomes R16 1 through R16 8. Red1 + Red2 and Blue1 + Blue2 are used exactly as the alliance pairs in the exported bracket.</Li>
           <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Backup all (JSON)</b> downloads a complete snapshot of the event (teams, matches, violations, nominations, finalists, watchlist, field log) — grab one periodically as insurance. <b>Clear data</b> wipes selected data (admin only).</Li>
