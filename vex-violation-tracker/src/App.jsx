@@ -2194,7 +2194,19 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
   const [field, setField] = useState("all");
   const all = Object.values(matches);
   const hasElims = all.some((m) => m.phase && m.phase !== "qual");
-  const [tab, setTab] = useState("qual"); // "qual" | "elim"
+  const [tab, setTab] = useState(() => hasElims ? "elim" : "qual"); // "qual" | "elim"
+
+  // Elimination matches take priority once they exist. This also handles the
+  // normal async load where MatchList first renders before matches arrive.
+  useEffect(() => {
+    if (hasElims) {
+      setTab("elim");
+      setField("all");
+    } else {
+      setTab("qual");
+    }
+  }, [hasElims]);
+
   const replaySet = new Set(fieldLog.filter((e) => e.kind === "replay" && e.matchId).map((e) => e.matchId));
   const timeoutSet = new Set(fieldLog.filter((e) => e.kind === "timeout" && e.matchId).map((e) => e.matchId));
   const faultSet = new Set(fieldLog.filter((e) => e.kind === "field_fault" && e.matchId).map((e) => e.matchId));
@@ -3253,6 +3265,7 @@ function FeaturesGuide() {
           <Li><b>Dark / Light mode</b> — toggle in this menu, saved per device.</Li>
           <Li><b>Install</b> — add Ref-OS to your home screen to launch it full-screen like an app (Add to Home Screen / the install prompt on the deployed site).</Li>
           <Li><b>Live sync</b> — everything updates across all devices within seconds.</Li>
+          <Li><b>Elimination priority view</b> — once elimination matches exist, the Matches tab opens directly to <b>Eliminations</b>. Qualifications remain available with one tap.</Li>
           <Li><b>Alliance selection</b> (admin) — qualification rankings automatically seed the alliance captains. A higher seeded captain can select a lower ranked team even if that team is currently shown as a future captain. When that happens, the selected team joins the picking alliance and the remaining ranked teams automatically shift upward to fill the open captain spots. Enter each alliance's <b>1st pick</b> live as selection happens, then <b>Finalize alliances</b> to auto-generate the Round of 16. Winners advance automatically through QF, SF, and the <b>best-of-3 Final</b>.</Li>
           <Li><b>Eliminations</b> — elimination matches use the same tap-to-log flow as quals, with timeouts enabled.</Li>
         </ul>
