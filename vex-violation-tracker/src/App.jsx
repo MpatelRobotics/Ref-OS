@@ -433,6 +433,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   const teamFileRef = useRef(null);
   const scoreFileRef = useRef(null);
   const rankingFileRef = useRef(null);
+  const allianceFileRef = useRef(null);
   const [logFor, setLogFor] = useState(null);
   const [noms, setNoms] = useState([]);
   const [finalists, setFinalists] = useState(new Set()); // `${award}::${team}`
@@ -709,6 +710,62 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       alert(`Imported ${rows.length} teams.` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
     } catch (e) {
       alert("Could not read that file: " + (e.message || e) + "\n\nExport the team list from Tournament Manager as CSV and try again.");
+    }
+  };
+
+  const importAlliancesFile = async (file) => {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const { rows, warnings } = parseMatchesFile(text, file.name);
+      const r16 = rows.filter((m) => m.phase === "r16").sort((a, b) => a.num - b.num);
+
+      if (!r16.length) {
+        alert("No Round of 16 matches found in that file.\n\nExport a match list from Tournament Manager that includes the R16 matches.");
+        return;
+      }
+
+      if (!confirm(`Import ${r16.length} Round of 16 matches and populate alliance selection from them?`)) return;
+
+      // Standard 16-alliance bracket:
+      // R16 1 = A1 vs A16, R16 2 = A8 vs A9, etc.
+      const seedPairs = [[1,16],[8,9],[5,12],[4,13],[3,14],[6,11],[7,10],[2,15]];
+      const nextAlliances = { ...alliances };
+
+      for (let i = 0; i < r16.length; i++) {
+        const m = r16[i];
+        await api.addMatch(eventId, {
+          phase: "r16",
+          num: m.num,
+          red: m.red,
+          blue: m.blue,
+          field: m.field || "",
+          redScore: m.redScore,
+          blueScore: m.blueScore,
+          scored: m.scored,
+          label: `R16 ${m.num}`,
+        });
+
+        const pair = seedPairs[m.num - 1];
+        if (!pair) continue;
+        const [redSeed, blueSeed] = pair;
+
+        nextAlliances[redSeed] = [...m.red];
+        nextAlliances[blueSeed] = [...m.blue];
+
+        await api.upsertAlliance(eventId, redSeed, m.red);
+        await api.upsertAlliance(eventId, blueSeed, m.blue);
+      }
+
+      setAlliances(nextAlliances);
+      await reloadMatches();
+
+      alert(
+        `Imported ${r16.length} Round of 16 matches and updated the Alliances tab.` +
+        (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : "")
+      );
+    } catch (e) {
+      alert("Could not import alliances: " + (e.message || e));
     }
   };
 
@@ -1051,6 +1108,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                 <button onClick={() => { setMenu(false); requireAdmin(() => teamFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Import teams (file) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => scoreFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Import scores (file) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => rankingFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Upload rankings {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
+                <button onClick={() => { setMenu(false); requireAdmin(() => allianceFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><GitBranch size={16} /> Upload alliances {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Ref status</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
                 <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export violations</button>
@@ -1246,6 +1304,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importScoresFile(f); }} />
       <input ref={rankingFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importRankingsFile(f); }} />
+      <input ref={allianceFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importAlliancesFile(f); }} />
       {addMatchOpen && <AddMatchModal teams={teams} onSave={addElimMatch} onClose={() => setAddMatchOpen(false)} />}
       {showFieldLog && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
@@ -2981,6 +3041,7 @@ function FeaturesGuide() {
           <Li><b>Import teams (file)</b> — load the team roster the same way: export the team list from Tournament Manager (CSV) and pick it here. Team numbers and names are added/updated; nothing is deleted.</Li>
           <Li><b>Import scores (file)</b> — after matches are played, export match <b>results</b> (with scores) from TM and pick it here. Each match gets its final score and winner, the score shows on the match and in the list, and every team's <b>W-L-T record</b> (from quals) updates automatically.</Li>
           <Li><b>Upload rankings</b> — import the Tournament Manager qualification rankings CSV. Ref-OS matches <b>TeamNum</b> to each team and stores its <b>Rank</b>. Rankings appear on the Teams tab and inside individual match cards.</Li>
+          <Li><b>Upload alliances</b> — import a Tournament Manager match CSV containing the <b>Round of 16</b>. Ref-OS creates or updates the R16 elimination matches and automatically fills A1 through A16 in the Alliances tab using the standard 16-alliance bracket mapping.</Li>
           <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Backup all (JSON)</b> downloads a complete snapshot of the event (teams, matches, violations, nominations, finalists, watchlist, field log) — grab one periodically as insurance. <b>Clear data</b> wipes selected data (admin only).</Li>
         </ul>
       </Section>
