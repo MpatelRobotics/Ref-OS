@@ -865,7 +865,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
         await api.upsertAlliance(eventId, blueSeed, m.blue);
       }
 
-      setAlliances(nextAlliances);
+      const savedAlliances = await api.listAlliances(eventId);
+      const savedAllianceMap = {};
+      for (const a of savedAlliances) savedAllianceMap[a.seed] = a.teams;
+      setAlliances(savedAllianceMap);
       setAlliancesLoaded(true);
       await reloadMatches();
 
@@ -1133,10 +1136,12 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   useEffect(() => {
     if (!eventId || !alliancesLoaded || !rankedTeamsForAlliance.length) return;
 
-    // Once all 16 two-team alliances are present, alliance selection is complete.
-    // This includes alliances reconstructed from an uploaded R16 bracket.
-    // At that point the stored alliance data is the source of truth and rankings
-    // must not rewrite captains or first picks.
+    // Once an R16 bracket exists, Tournament Manager is the source of truth
+    // for alliance membership. Never let ranking-based captain logic rewrite
+    // uploaded alliance captains or first picks.
+    const hasR16Bracket = Object.values(matches).some((m) => m.phase === "r16");
+    if (hasR16Bracket) return;
+
     const completeAllianceCount = Array.from({ length: 16 }, (_, i) => i + 1)
       .filter((seed) => (alliances[seed] || []).filter(Boolean).length >= 2).length;
     if (completeAllianceCount === 16) return;
@@ -1173,7 +1178,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
         if (!outbox.isOffline(e)) console.error("Could not sync ranked alliance captain", e);
       });
     }
-  }, [eventId, alliancesLoaded, rankedTeamsForAlliance.join("|"), Object.values(alliances).map((a) => (a || [])[1] || "").join("|")]);
+  }, [eventId, alliancesLoaded, rankedTeamsForAlliance.join("|"), Object.values(matches).map((m) => `${m.phase}:${m.num}`).join("|"), Object.values(alliances).map((a) => (a || [])[1] || "").join("|")]);
 
   const teamRecords = useMemo(() => {
     const rec = {};
@@ -3266,7 +3271,7 @@ function FeaturesGuide() {
           <Li><b>Install</b> — add Ref-OS to your home screen to launch it full-screen like an app (Add to Home Screen / the install prompt on the deployed site).</Li>
           <Li><b>Live sync</b> — everything updates across all devices within seconds.</Li>
           <Li><b>Elimination priority view</b> — once elimination matches exist, the Matches tab opens directly to <b>Eliminations</b>. Qualifications remain available with one tap.</Li>
-          <Li><b>Alliance selection</b> (admin) — qualification rankings automatically seed the alliance captains. A higher seeded captain can select a lower ranked team even if that team is currently shown as a future captain. When that happens, the selected team joins the picking alliance and the remaining ranked teams automatically shift upward to fill the open captain spots. Enter each alliance's <b>1st pick</b> live as selection happens, then <b>Finalize alliances</b> to auto-generate the Round of 16. Winners advance automatically through QF, SF, and the <b>best-of-3 Final</b>.</Li>
+          <Li><b>Alliance selection</b> (admin) — qualification rankings automatically seed captains before eliminations exist. Once an R16 bracket is uploaded or generated, that bracket becomes the source of truth and rankings can no longer rewrite alliance captains or first picks. A higher seeded captain can still select a lower ranked team during live alliance selection before the bracket is finalized.</Li>
           <Li><b>Eliminations</b> — elimination matches use the same tap-to-log flow as quals, with timeouts enabled.</Li>
         </ul>
       </Section>
