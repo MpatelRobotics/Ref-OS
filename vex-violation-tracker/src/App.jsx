@@ -1345,7 +1345,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
         </div>
         {!openTeam && !openMatch && !openRobot && (
           <div className="max-w-2xl mx-auto px-4 flex gap-1 overflow-x-auto">
-            {(isJudge ? [{ k: "judging", label: "Judging", Icon: Trophy }] : [
+            {(isJudge ? [
+              { k: "judging", label: "Judging", Icon: Trophy },
+              { k: "alliances", label: "Alliances", Icon: GitBranch }
+            ] : [
               { k: "teams", label: "Teams", Icon: Users },
               ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
               ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
@@ -1394,7 +1397,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
         ) : view === "rulebook" ? (
           <RuleBook rules={rules} />
         ) : view === "alliances" ? (
-          <AllianceSelection teams={teams} alliances={alliances} matches={matches} canEdit={adminUnlocked} onSet={setAllianceTeam} onFinalize={finalizeAlliances} onSetWinner={setMatchWinner} onClear={() => requireAdmin(() => { if (confirm("Clear all alliance picks? (This does not delete any matches already generated.)")) clearAlliances(); })} />
+          <AllianceSelection teams={teams} alliances={alliances} matches={matches} canEditAlliances={adminUnlocked && !isJudge} canEditBracket={!isJudge} onSet={setAllianceTeam} onFinalize={finalizeAlliances} onSetWinner={setMatchWinner} onClear={() => requireAdmin(() => { if (confirm("Clear all alliance picks? (This does not delete any matches already generated.)")) clearAlliances(); })} />
         ) : (
           <>
             {!event?.quals ? (
@@ -2927,7 +2930,7 @@ function Rankings({ viols, teamName }) {
 }
 
 /* ============================ ALLIANCE SELECTION (admin) ============================ */
-function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSetWinner, onClear, canEdit = false }) {
+function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSetWinner, onClear, canEditAlliances = false, canEditBracket = false }) {
   const opts = [...teams].sort((a, b) => (Number(a.rank ?? 999999) - Number(b.rank ?? 999999)) || a.number.localeCompare(b.number, undefined, { numeric: true })).map((t) => t.number);
   const SEEDS = Array.from({ length: 16 }, (_, i) => i + 1);
   const filled = SEEDS.filter((s) => (alliances[s] || []).filter(Boolean).length > 0).length;
@@ -2941,7 +2944,7 @@ function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSet
     const captain = (alliances[seed] || [])[0] || "";
     return (
       <select value={v} onChange={(e) => onSet(seed, idx, e.target.value)}
-        disabled={!canEdit || idx === 0}
+        disabled={!canEditAlliances || idx === 0}
         className="flex-1 min-w-0 px-2 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:text-slate-500">
         <option value="">{label}</option>
         {opts.map((n) => {
@@ -2968,7 +2971,7 @@ function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSet
     const teamsArr = side === "red" ? m.red : m.blue;
     const won = m.winner === side;
     return (
-      <button disabled={!canEdit} onClick={() => canEdit && onSetWinner(m, side)}
+      <button disabled={!canEditBracket} onClick={() => canEditBracket && onSetWinner(m, side)}
         className={`flex-1 min-w-0 px-2 py-1.5 rounded-lg border text-left disabled:cursor-default ${won ? (side === "red" ? "bg-red-600 text-white border-red-600" : "bg-blue-600 text-white border-blue-600") : `bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 ${side === "red" ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}`}>
         <span className="font-mono text-xs font-bold">{teamsArr.join(" ") || "—"}</span>
         {won && <Check size={13} className="inline ml-1" />}
@@ -2979,8 +2982,8 @@ function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSet
     <>
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><GitBranch size={18} className="text-[#D7212B]" /> Alliance selection</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{canEdit ? "Enter each alliance as it's picked (captain + 1st pick). When all 16 are set, finalize to generate the Round of 16. Then pick the winner of each match to advance the bracket. Everything syncs live." : "View the current alliance selections and elimination bracket. Admin access is required to make changes."}</p>
-        <div className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">{filled} / 16 alliances entered{!canEdit ? " · view only" : ""}</div>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{canEditAlliances ? "Enter each alliance as it's picked (captain + 1st pick). Finalize to create the Round of 16. Bracket winners can then be advanced live." : "View the current alliance selections. Admin access is required to edit captains or picks."}</p>
+        <div className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">{filled} / 16 alliances entered{!canEditAlliances ? " · alliance picks view only" : ""}</div>
       </div>
       <div className="space-y-2">
         {SEEDS.map((seed) => {
@@ -2994,7 +2997,7 @@ function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSet
           );
         })}
       </div>
-      {canEdit && (
+      {canEditAlliances && (
         <>
           <button onClick={onFinalize} className="w-full mt-4 py-3 rounded-xl bg-[#D7212B] hover:bg-[#B42024] text-white font-bold flex items-center justify-center gap-2"><GitBranch size={18} /> Finalize alliances → create Round of 16</button>
           <button onClick={onClear} className="w-full mt-2 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-medium">Clear all picks</button>
@@ -3005,7 +3008,7 @@ function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSet
       {hasBracket && (
         <div className="mt-6">
           <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-1"><Trophy size={18} className="text-[#D7212B]" /> Bracket</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{canEdit ? "Tap the winning alliance in each match. Winners auto-advance — QF from R16, SF from QF, and a best-of-3 Final from SF. Tap a winner again to clear it." : "Current elimination bracket and winners. Admin access is required to advance or change results."}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{canEditBracket ? "Tap the winning alliance in each match. Winners auto-advance — QF from R16, SF from QF, and a best-of-3 Final from SF. Tap a winner again to clear it." : "Current elimination bracket and winners. Judge Advisor access is view only."}</p>
           {champion && (
             <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3 mb-3 flex items-center gap-2">
               <Trophy size={18} className="text-amber-500" />
@@ -3277,7 +3280,7 @@ function FeaturesGuide() {
           <Li><b>Install</b> — add Ref-OS to your home screen to launch it full-screen like an app (Add to Home Screen / the install prompt on the deployed site).</Li>
           <Li><b>Live sync</b> — everything updates across all devices within seconds.</Li>
           <Li><b>Elimination priority view</b> — once elimination matches exist, the Matches tab opens directly to <b>Eliminations</b>. Qualifications remain available with one tap.</Li>
-          <Li><b>Alliance selection</b> — the Alliances tab is visible to everyone. Admins can edit picks, finalize alliances, and advance bracket winners. Non admins have read only access to alliance selections and the elimination bracket.</Li>
+          <Li><b>Alliance selection</b> — the Alliances tab is visible to everyone, including Judge Advisors. Captains, picks, finalize, and clear controls remain admin only. The elimination bracket can be advanced by all regular refs, while Judge Advisors have read only bracket access.</Li>
           <Li><b>Eliminations</b> — elimination matches use the same tap-to-log flow as quals, with timeouts enabled.</Li>
         </ul>
       </Section>
