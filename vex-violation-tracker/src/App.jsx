@@ -185,6 +185,7 @@ function parseMatchesFile(text, filename = "") {
   const find = (...keys) => header.findIndex((h) => keys.some((k) => h.includes(k)));
   const matchCol = (() => { const tm = header.indexOf("matchnum"); if (tm >= 0) return tm; const exact = header.indexOf("match"); return exact >= 0 ? exact : find("match #", "match number", "match"); })();
   const roundCol = (() => { const exact = header.indexOf("round"); return exact >= 0 ? exact : find("round", "type", "phase"); })();
+    const instanceCol = header.indexOf("instance");
   const fieldCol = find("field");
   const redScoreCol = header.findIndex((h) => h.includes("red") && h.includes("score"));
   const blueScoreCol = header.findIndex((h) => h.includes("blue") && h.includes("score"));
@@ -727,7 +728,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     try {
       const text = await file.text();
       const { rows, warnings } = parseMatchesFile(text, file.name);
-      const r16 = rows.filter((m) => m.phase === "r16").sort((a, b) => a.num - b.num);
+      const r16 = rows
+        .filter((m) => m.phase === "r16")
+        .map((m, i) => ({ ...m, bracketNum: Number(m.instance || m.num || (i + 1)) }))
+        .sort((a, b) => a.bracketNum - b.bracketNum);
 
       if (!r16.length) {
         alert("No Round of 16 matches found in that file.\n\nRef-OS supports this Tournament Manager elimination export where Round 6 is the Round of 16.");
@@ -745,17 +749,17 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
         const m = r16[i];
         await api.addMatch(eventId, {
           phase: "r16",
-          num: m.num,
+          num: m.bracketNum,
           red: m.red,
           blue: m.blue,
           field: m.field || "",
           redScore: m.redScore,
           blueScore: m.blueScore,
           scored: m.scored,
-          label: `R16 ${m.num}`,
+          label: `R16 ${m.bracketNum}`,
         });
 
-        const pair = seedPairs[m.num - 1];
+        const pair = seedPairs[m.bracketNum - 1];
         if (!pair) continue;
         const [redSeed, blueSeed] = pair;
 
@@ -3050,7 +3054,7 @@ function FeaturesGuide() {
           <Li><b>Import teams (file)</b> — load the team roster the same way: export the team list from Tournament Manager (CSV) and pick it here. Team numbers and names are added/updated; nothing is deleted.</Li>
           <Li><b>Import scores (file)</b> — after matches are played, export match <b>results</b> (with scores) from TM and pick it here. Each match gets its final score and winner, the score shows on the match and in the list, and every team's <b>W-L-T record</b> (from quals) updates automatically.</Li>
           <Li><b>Upload rankings</b> — import the Tournament Manager qualification rankings CSV. Ref-OS matches <b>TeamNum</b> to each team and stores its <b>Rank</b>. Rankings appear on the Teams tab and inside individual match cards.</Li>
-          <Li><b>Upload alliances</b> — import a Tournament Manager elimination CSV. Ref-OS recognizes numeric TM rounds, including <b>Round 6 = Round of 16</b>, creates or updates the R16 elimination matches, and automatically fills A1 through A16 in the Alliances tab using the standard 16-alliance bracket mapping.</Li>
+          <Li><b>Upload alliances</b> — import a Tournament Manager elimination CSV. Ref-OS recognizes <b>Round 6</b> in column B as the Round of 16 and uses the <b>Instance</b> column to identify R16 matches 1 through 8. It creates or updates the elimination matches and automatically fills A1 through A16 in the Alliances tab using the standard 16-alliance bracket mapping.</Li>
           <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Backup all (JSON)</b> downloads a complete snapshot of the event (teams, matches, violations, nominations, finalists, watchlist, field log) — grab one periodically as insurance. <b>Clear data</b> wipes selected data (admin only).</Li>
         </ul>
       </Section>
