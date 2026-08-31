@@ -729,26 +729,98 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     if (!file) return;
     try {
       const text = await file.text();
-      const { rows, warnings } = parseMatchesFile(text, file.name);
-      const r16 = rows
-        .filter((m) => m.phase === "r16")
-        .map((m, i) => ({ ...m, bracketNum: Number(m.instance || m.num || (i + 1)) }))
-        .sort((a, b) => a.bracketNum - b.bracketNum);
-
-      if (!r16.length) {
-        alert("No Round of 16 matches found in that file.\n\nRef-OS supports this Tournament Manager elimination export where Round 6 is the Round of 16.");
+      const lines = text.replace(/\r/g, "").split("\n").filter((line) => line.trim());
+      if (lines.length < 2) {
+        alert("That CSV does not contain any match rows.");
         return;
       }
 
-      if (r16.length !== 8) {
-        alert(`Expected exactly 8 Round of 16 matches from Round 6, but found ${r16.length}. No changes were made.`);
+      const parseCsvLine = (line) => {
+        const cells = [];
+        let cur = "", quoted = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (quoted && line[i + 1] === '"') { cur += '"'; i++; }
+            else quoted = !quoted;
+          } else if (ch === "," && !quoted) {
+            cells.push(cur.trim());
+            cur = "";
+          } else cur += ch;
+        }
+        cells.push(cur.trim());
+        return cells;
+      };
+
+      const header = parseCsvLine(lines[0]).map((h) => h.trim().toLowerCase());
+      const col = (name) => header.indexOf(name.toLowerCase());
+
+      const roundCol = col("Round");
+      const instanceCol = col("Instance");
+      const red1Col = col("Red1");
+      const red2Col = col("Red2");
+      const blue1Col = col("Blue1");
+      const blue2Col = col("Blue2");
+      const fieldCol = col("Field");
+      const redScoreCol = col("RedScore");
+      const blueScoreCol = col("BlueScore");
+      const scoredCol = col("Scored");
+      const winnerCol = col("Winner");
+
+      const required = [
+        ["Round", roundCol], ["Instance", instanceCol],
+        ["Red1", red1Col], ["Red2", red2Col],
+        ["Blue1", blue1Col], ["Blue2", blue2Col],
+      ];
+      const missing = required.filter(([, i]) => i < 0).map(([name]) => name);
+      if (missing.length) {
+        alert("Missing required Tournament Manager columns: " + missing.join(", "));
         return;
       }
 
-      if (!confirm("Replace the current Round of 16 with these exact 8 Tournament Manager matches and populate alliance selection?")) return;
+      const cleanTeam = (v) => String(v || "").trim();
+      const r16 = [];
 
-      // Remove any previously imported R16 rows first. This also cleans up
-      // older incorrect imports that treated other TM rounds as R16.
+      for (let i = 1; i < lines.length; i++) {
+        const cells = parseCsvLine(lines[i]);
+        if (Number(cells[roundCol]) !== 6) continue;
+
+        const instance = Number(cells[instanceCol]);
+        if (!Number.isInteger(instance) || instance < 1 || instance > 8) continue;
+
+        const red = [cleanTeam(cells[red1Col]), cleanTeam(cells[red2Col])].filter(Boolean);
+        const blue = [cleanTeam(cells[blue1Col]), cleanTeam(cells[blue2Col])].filter(Boolean);
+
+        r16.push({
+          instance,
+          red,
+          blue,
+          field: fieldCol >= 0 ? String(cells[fieldCol] || "").trim() : "",
+          redScore: redScoreCol >= 0 && cells[redScoreCol] !== "" ? Number(cells[redScoreCol]) : null,
+          blueScore: blueScoreCol >= 0 && cells[blueScoreCol] !== "" ? Number(cells[blueScoreCol]) : null,
+          scored: scoredCol >= 0 ? String(cells[scoredCol] || "").toLowerCase() === "true" : false,
+          winner: winnerCol >= 0 ? String(cells[winnerCol] || "").trim().toLowerCase() : "",
+        });
+      }
+
+      r16.sort((a, b) => a.instance - b.instance);
+
+      const instances = r16.map((m) => m.instance);
+      const expected = [1,2,3,4,5,6,7,8];
+      const validInstances = instances.length === 8 && expected.every((n, i) => instances[i] === n);
+
+      if (!validInstances) {
+        alert(
+          "Expected exactly one Round 6 row for each Instance 1 through 8.\n\n" +
+          "Found instances: " + (instances.join(", ") || "none") +
+          "\n\nNo changes were made."
+        );
+        return;
+      }
+
+      if (!confirm("Replace the current R16 and Alliances with the 8 Round 6 matches from this Tournament Manager CSV?")) return;
+
+      // Remove all previous R16 matches and alliance assignments first.
       for (let n = 1; n <= 64; n++) {
         try {
           await api.deleteMatch(eventId, "r16", n);
@@ -756,30 +828,36 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
           if (!outbox.isOffline(e)) throw e;
         }
       }
+      await api.clearAlliances(eventId);
 
-      // Standard 16-alliance bracket:
-      // R16 1 = A1 vs A16, R16 2 = A8 vs A9, etc.
-      const seedPairs = [[1,16],[8,9],[5,12],[4,13],[3,14],[6,11],[7,10],[2,15]];
+      // Tournament Manager R16 instance to alliance seed mapping.
+      const seedPairs = {
+        1: [1,16],
+        2: [8,9],
+        3: [5,12],
+        4: [4,13],
+        5: [3,14],
+        6: [6,11],
+        7: [7,10],
+        8: [2,15],
+      };
+
       const nextAlliances = {};
 
-      for (let i = 0; i < r16.length; i++) {
-        const m = r16[i];
+      for (const m of r16) {
         await api.addMatch(eventId, {
           phase: "r16",
-          num: m.bracketNum,
+          num: m.instance,
           red: m.red,
           blue: m.blue,
-          field: m.field || "",
+          field: m.field,
           redScore: m.redScore,
           blueScore: m.blueScore,
-          scored: m.scored,
-          label: `R16 ${m.bracketNum}`,
+          winner: m.winner === "red" || m.winner === "blue" ? m.winner : null,
+          label: `R16 ${m.instance}`,
         });
 
-        const pair = seedPairs[m.bracketNum - 1];
-        if (!pair) continue;
-        const [redSeed, blueSeed] = pair;
-
+        const [redSeed, blueSeed] = seedPairs[m.instance];
         nextAlliances[redSeed] = [...m.red];
         nextAlliances[blueSeed] = [...m.blue];
 
@@ -788,12 +866,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       }
 
       setAlliances(nextAlliances);
+      setAlliancesLoaded(true);
       await reloadMatches();
 
-      alert(
-        `Replaced the Round of 16 with exactly ${r16.length} matches from TM Round 6 and updated the Alliances tab.` +
-        (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : "")
-      );
+      alert("Imported exactly 8 Round of 16 matches and rebuilt all 16 alliances from the Tournament Manager CSV.");
     } catch (e) {
       alert("Could not import alliances: " + (e.message || e));
     }
@@ -3079,7 +3155,7 @@ function FeaturesGuide() {
           <Li><b>Import teams (file)</b> — load the team roster the same way: export the team list from Tournament Manager (CSV) and pick it here. Team numbers and names are added/updated; nothing is deleted.</Li>
           <Li><b>Import scores (file)</b> — after matches are played, export match <b>results</b> (with scores) from TM and pick it here. Each match gets its final score and winner, the score shows on the match and in the list, and every team's <b>W-L-T record</b> (from quals) updates automatically.</Li>
           <Li><b>Upload rankings</b> — import the Tournament Manager qualification rankings CSV. Ref-OS matches <b>TeamNum</b> to each team and stores its <b>Rank</b>. Rankings appear on the Teams tab and inside individual match cards.</Li>
-          <Li><b>Upload alliances</b> — import a Tournament Manager elimination CSV. Ref-OS recognizes <b>Round 6</b> in column B as the Round of 16 and uses the <b>Instance</b> column to identify R16 matches 1 through 8. The two teams on each side of every R16 row become that alliance exactly as exported by Tournament Manager, and the uploaded bracket becomes the source of truth for A1 through A16.</Li>
+          <Li><b>Upload alliances</b> — import a Tournament Manager elimination CSV. Ref-OS reads the Tournament Manager elimination CSV directly: <b>Round 6</b> identifies the Round of 16 and <b>Instance 1 through 8</b> becomes R16 1 through R16 8. Red1 + Red2 and Blue1 + Blue2 are used exactly as the alliance pairs in the exported bracket.</Li>
           <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Backup all (JSON)</b> downloads a complete snapshot of the event (teams, matches, violations, nominations, finalists, watchlist, field log) — grab one periodically as insurance. <b>Clear data</b> wipes selected data (admin only).</Li>
         </ul>
       </Section>
