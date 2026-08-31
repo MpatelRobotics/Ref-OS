@@ -264,7 +264,9 @@ const ago = (ts) => {
   if (s < 5) return "just now";
   if (s < 60) return `${s}s ago`;
   if (s < 3600) return `${Math.round(s / 60)}m ago`;
-  return `${Math.round(s / 3600)}h ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  const days = Math.round(s / 86400);
+  return `${days} ${days === 1 ? "day" : "days"} ago`;
 };
 
 /* ---------- lazy photo thumbnail (signed URL from Supabase Storage) ---------- */
@@ -3251,7 +3253,7 @@ function FeaturesGuide() {
           <Li><b>By Rule</b> (header chart icon) — violations broken down by rule and team.</Li>
           <Li><b>Activity feed</b> — every violation across the event, newest first.</Li>
           <Li><b>Rankings</b> — teams ranked by violations, Majors weighted highest.</Li>
-          <Li><b>Ref status</b> — who's online / last seen; admins can remove offline refs.</Li>
+          <Li><b>Ref status</b> — who's online / last seen; after 24 hours, last seen is displayed in days instead of hours. Admins can remove offline refs.</Li>
           <Li><b>Import matches (file)</b> — load the whole schedule at once: export the match list from Tournament Manager (CSV) and pick it here. It reads quals and elims, matched by number so re-importing updates in place. No API or bridge needed.</Li>
           <Li><b>Import teams (file)</b> — load the team roster the same way: export the team list from Tournament Manager (CSV) and pick it here. Team numbers and names are added/updated; nothing is deleted.</Li>
           <Li><b>Import scores (file)</b> — export match <b>results</b> from Tournament Manager. If scored Round of 16 rows are present, Ref-OS uses <b>Round 6 + Instance</b> to update only each existing R16 match's score and winner. Alliance teams are never replaced by a score upload. If no R16 scores are present, qualification scores import normally and team <b>W-L-T records</b> update automatically.</Li>
