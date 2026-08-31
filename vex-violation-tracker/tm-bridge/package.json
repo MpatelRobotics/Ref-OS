@@ -1,0 +1,16 @@
+{
+  "name": "ref-os-tm-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Optional local bridge that syncs Tournament Manager match data into Ref-OS (Supabase). Not part of the web app.",
+  "bin": { "ref-os-tm-bridge": "bridge.mjs" },
+  "scripts": {
+    "start": "node bridge.mjs",
+    "dry-run": "cross-env DRY_RUN=1 node bridge.mjs"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4"
+  }
+}
