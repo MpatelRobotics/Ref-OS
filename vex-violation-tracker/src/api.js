@@ -67,7 +67,7 @@ export async function listMembers(eventId) {
 }
 
 /* ================= teams ================= */
-const mapTeam = (r) => ({ number: r.number, name: r.name || "", photoKeys: r.photo_paths || [], createdAt: new Date(r.created_at).getTime() });
+const mapTeam = (r) => ({ number: r.number, name: r.name || "", rank: r.rank == null ? null : Number(r.rank), photoKeys: r.photo_paths || [], createdAt: new Date(r.created_at).getTime() });
 export async function listTeams(eventId) {
   const { data } = await supabase.from("teams").select("*").eq("event_id", eventId);
   return (data || []).map(mapTeam);
@@ -106,6 +106,15 @@ export async function bulkUpsertTeams(eventId, teams) {
     .map((t) => ({ number: (t.number || "").trim().toUpperCase(), name: (t.name || "").trim() || null }))
     .filter((t) => t.number)
     .map((t) => ({ event_id: eventId, number: t.number, name: t.name }));
+  if (!rows.length) return 0;
+  const { error } = await supabase.from("teams").upsert(rows, { onConflict: "event_id,number" });
+  if (error) throw error;
+  return rows.length;
+}
+export async function bulkUpsertRankings(eventId, rankings) {
+  const rows = rankings
+    .map((r) => ({ event_id: eventId, number: (r.number || "").trim().toUpperCase(), rank: Number(r.rank) }))
+    .filter((r) => r.number && Number.isFinite(r.rank) && r.rank > 0);
   if (!rows.length) return 0;
   const { error } = await supabase.from("teams").upsert(rows, { onConflict: "event_id,number" });
   if (error) throw error;

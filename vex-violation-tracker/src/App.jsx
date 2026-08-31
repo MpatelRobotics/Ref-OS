@@ -87,6 +87,39 @@ function parseTeamsFile(text, filename = "") {
   return { rows, warnings };
 }
 
+// Returns { rows:[{number,rank}], warnings:[] } from a Tournament Manager rankings export (CSV or JSON)
+function parseRankingsFile(text, filename = "") {
+  const t = text.trim();
+  const cleanNum = (v) => String(v == null ? "" : v).trim().toUpperCase();
+  const cleanRank = (v) => { const m = String(v == null ? "" : v).match(/\d+/); return m ? Number(m[0]) : null; };
+  if (filename.toLowerCase().endsWith(".json") || t.startsWith("{") || t.startsWith("[")) {
+    const data = JSON.parse(t);
+    const list = Array.isArray(data) ? data : (data.rankings || data.teams || data.items || []);
+    const rows = list.map((x) => ({
+      number: cleanNum(x.number ?? x.team ?? x.teamNumber ?? x.team_number),
+      rank: cleanRank(x.rank ?? x.ranking ?? x.position ?? x.place),
+    })).filter((r) => r.number && r.rank != null);
+    return { rows, warnings: [] };
+  }
+  const table = parseCSV(text);
+  if (table.length < 2) return { rows: [], warnings: ["No rows found in the file."] };
+  const header = table[0].map((h) => String(h).trim().toLowerCase());
+  let numberCol = header.findIndex((h) => h === "team" || h === "team number" || h === "number" || h === "team #" || h === "team#");
+  if (numberCol < 0) numberCol = header.findIndex((h) => h.includes("team") && (h.includes("number") || h.includes("#")));
+  let rankCol = header.findIndex((h) => h === "rank" || h === "ranking" || h === "place" || h === "position");
+  if (rankCol < 0) rankCol = header.findIndex((h) => h.includes("rank"));
+  const warnings = [];
+  if (numberCol < 0) { warnings.push("Couldn't find a team-number column."); return { rows: [], warnings }; }
+  if (rankCol < 0) { warnings.push("Couldn't find a rank column."); return { rows: [], warnings }; }
+  const rows = [];
+  for (let i = 1; i < table.length; i++) {
+    const number = cleanNum(table[i][numberCol]);
+    const rank = cleanRank(table[i][rankCol]);
+    if (number && rank != null) rows.push({ number, rank });
+  }
+  return { rows, warnings };
+}
+
 const ORDER = ["minor", "major", "inspection"];
 
 /* ---- Parse a Tournament Manager export (CSV or JSON) into match rows ---- */
@@ -399,6 +432,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   const matchFileRef = useRef(null);
   const teamFileRef = useRef(null);
   const scoreFileRef = useRef(null);
+  const rankingFileRef = useRef(null);
   const [logFor, setLogFor] = useState(null);
   const [noms, setNoms] = useState([]);
   const [finalists, setFinalists] = useState(new Set()); // `${award}::${team}`
@@ -677,6 +711,22 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       alert("Could not read that file: " + (e.message || e) + "\n\nExport the team list from Tournament Manager as CSV and try again.");
     }
   };
+
+  const importRankingsFile = async (file) => {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const { rows, warnings } = parseRankingsFile(text, file.name);
+      if (!rows.length) { alert("No rankings found in that file.\n" + warnings.join("\n")); return; }
+      if (!confirm(`Upload rankings for ${rows.length} teams?\nExisting team ranks will be updated without changing team names or match data.`)) return;
+      await api.bulkUpsertRankings(eventId, rows);
+      const t = await api.listTeams(eventId);
+      setTeams((cur) => { const extra = cur.filter((x) => !t.some((serverTeam) => serverTeam.number === x.number)); return [...t, ...extra]; });
+      alert(`Uploaded rankings for ${rows.length} teams.` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
+    } catch (e) {
+      alert("Could not read that rankings file: " + (e.message || e) + "\n\nExport the rankings from Tournament Manager as CSV and try again.");
+    }
+  };
   const importScoresFile = async (file) => {
     if (!file) return;
     try {
@@ -820,6 +870,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     const m = {}; for (const v of viols) if (v.code && !m[v.code]) m[v.code] = v.desc || ""; return m;
   }, [viols]);
   const teamNameMap = useMemo(() => Object.fromEntries(teams.map((t) => [t.number, t.name])), [teams]);
+  const teamRankMap = useMemo(() => Object.fromEntries(teams.filter((t) => t.rank != null).map((t) => [t.number, t.rank])), [teams]);
   const teamRecords = useMemo(() => {
     const rec = {};
     const bump = (team, k) => { const x = rec[team] = rec[team] || { w: 0, l: 0, t: 0 }; x[k]++; };
@@ -950,6 +1001,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                 <button onClick={() => { setMenu(false); requireAdmin(() => matchFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Import matches (file) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => teamFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Import teams (file) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => scoreFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Import scores (file) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
+                <button onClick={() => { setMenu(false); requireAdmin(() => rankingFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Upload rankings {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Ref status</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
                 <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export violations</button>
@@ -1013,13 +1065,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={teamRecords[openTeam]}
             onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} />
         ) : openMatch ? (
-          <MatchDetail match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch}
+          <MatchDetail match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch}
             fieldLog={fieldLog} onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={(n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} />
         ) : openRobot ? (
           <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onOpenPhoto={setLightbox} />
         ) : view === "matches" ? (
-          <MatchList matches={matches} teamName={teamNameMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} />
+          <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} />
         ) : view === "robots" ? (
           <RobotList teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "judging" ? (
@@ -1066,6 +1118,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                     <li key={t.number}>
                       <button onClick={() => setOpenTeam(t.number)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
                         <span className="font-mono font-bold text-lg text-slate-900 dark:text-slate-100">{t.number}</span>
+                        {t.rank != null && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-200 dark:border-indigo-800 text-xs font-bold shrink-0">Rank {t.rank}</span>}
                         {teamWatch[t.number]?.length > 0 && <span title={teamWatch[t.number].map((w) => `${w.by || "Ref"}: ${w.note}`).join("\n")} className="inline-flex items-center gap-1 text-amber-600 text-xs font-semibold shrink-0"><Star size={15} fill="currentColor" /> WATCH{teamWatch[t.number].length > 1 ? ` ${teamWatch[t.number].length}` : ""}</span>}
                         {t.name && <span className="text-sm text-slate-500 dark:text-slate-400 truncate flex-1">{t.name}</span>}
                         <div className="flex items-center gap-1.5 ml-auto">
@@ -1142,6 +1195,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importTeamsFile(f); }} />
       <input ref={scoreFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importScoresFile(f); }} />
+      <input ref={rankingFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importRankingsFile(f); }} />
       {addMatchOpen && <AddMatchModal teams={teams} onSave={addElimMatch} onClose={() => setAddMatchOpen(false)} />}
       {showFieldLog && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
@@ -1828,7 +1883,7 @@ function EventModal({ event, onSave, onClose }) {
 
 
 /* ============================ MATCHES ============================ */
-function MatchList({ matches, teamName, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch }) {
+function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch }) {
   const [field, setField] = useState("all");
   const all = Object.values(matches);
   const hasElims = all.some((m) => m.phase && m.phase !== "qual");
@@ -1901,9 +1956,9 @@ function MatchList({ matches, teamName, viols, fieldLog = [], query, setQuery, o
               <button onClick={() => onOpen(m.id)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-14 shrink-0">{rowLabel(m)}</span>
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
-                  <span className="text-red-700 font-semibold">{m.red.join("  ")}</span>
+                  <span className="text-red-700 font-semibold">{m.red.map((n) => `${n}${teamRank[n] != null ? ` (#${teamRank[n]})` : ""}`).join("  ")}</span>
                   <span className="text-slate-300 font-sans">vs</span>
-                  <span className="text-blue-700 font-semibold">{m.blue.join("  ")}</span>
+                  <span className="text-blue-700 font-semibold">{m.blue.map((n) => `${n}${teamRank[n] != null ? ` (#${teamRank[n]})` : ""}`).join("  ")}</span>
                 </div>
                 {m.field && <span className="text-[11px] text-slate-400 shrink-0">{m.field.replace("Field ", "F")}</span>}
                 {m.redScore != null && m.blueScore != null && (
@@ -1923,7 +1978,7 @@ function MatchList({ matches, teamName, viols, fieldLog = [], query, setQuery, o
   );
 }
 
-function MatchDetail({ match, matches, teamName, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, fieldLog = [], onAddField, onRemoveField, meName, canDelete }) {
+function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, fieldLog = [], onAddField, onRemoveField, meName, canDelete }) {
   const [toOpen, setToOpen] = useState(false);
   const [toAlliance, setToAlliance] = useState("red");
   const [toTeam, setToTeam] = useState("");
@@ -1996,6 +2051,7 @@ function MatchDetail({ match, matches, teamName, teamWatch = {}, viols, onNav, o
             <button key={n} onClick={() => onLogTeam(n)} className="w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2.5 text-left hover:border-slate-300 dark:border-slate-600">
               <div className="flex items-center gap-2">
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{n}</span>
+                {teamRank[n] != null && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-200 dark:border-indigo-800 text-[11px] font-bold shrink-0">Rank {teamRank[n]}</span>}
                 {teamName[n] && <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{teamName[n]}</span>}
                 <span className="ml-auto text-xs font-semibold text-[#D7212B] flex items-center gap-1 shrink-0"><Plus size={14} /> Log</span>
               </div>
