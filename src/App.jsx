@@ -468,6 +468,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   const [showByRule, setShowByRule] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const [showFeatures, setShowFeatures] = useState(false);
+  const [showTMSync, setShowTMSync] = useState(false);
+  const [tmSyncStatus, setTmSyncStatus] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`refosTmSync:${eventId}`)) || {}; }
+    catch { return {}; }
+  });
   const [showRankings, setShowRankings] = useState(false);
   const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
   const [showAdminPassword, setShowAdminPassword] = useState(false);
@@ -514,6 +519,12 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     sessionStorage.removeItem("refosAdmin");
     setAdminUnlocked(false);
     setMenu(false);
+  };
+
+  const markTMSync = (key) => {
+    const next = { ...tmSyncStatus, [key]: Date.now() };
+    setTmSyncStatus(next);
+    try { localStorage.setItem(`refosTmSync:${eventId}`, JSON.stringify(next)); } catch {}
   };
 
   const refresh = useCallback(async () => {
@@ -721,6 +732,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       await api.bulkUpsertTeams(eventId, rows);
       const t = await api.listTeams(eventId);
       setTeams((cur) => { const extra = cur.filter((x) => !t.some((s) => s.number === x.number)); return [...t, ...extra]; });
+      markTMSync("teams");
       alert(`Imported ${rows.length} teams.` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
     } catch (e) {
       alert("Could not read that file: " + (e.message || e) + "\n\nExport the team list from Tournament Manager as CSV and try again.");
@@ -874,6 +886,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       setAlliancesLoaded(true);
       await reloadMatches();
 
+      markTMSync("alliances");
       alert("Imported exactly 8 Round of 16 matches and rebuilt all 16 alliances from the Tournament Manager CSV.");
     } catch (e) {
       alert("Could not import alliances: " + (e.message || e));
@@ -890,6 +903,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       await api.bulkUpsertRankings(eventId, rows);
       const t = await api.listTeams(eventId);
       setTeams((cur) => { const extra = cur.filter((x) => !t.some((serverTeam) => serverTeam.number === x.number)); return [...t, ...extra]; });
+      markTMSync("rankings");
       alert(`Uploaded rankings for ${rows.length} teams.` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
     } catch (e) {
       alert("Could not read that rankings file: " + (e.message || e) + "\n\nExport the rankings from Tournament Manager as CSV and try again.");
@@ -957,6 +971,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
         }
 
         await reloadMatches();
+        markTMSync("scores");
         alert(`Updated scores for ${elimScoreRows.length} R16 matches. Alliance teams were left unchanged.`);
         return;
       }
@@ -992,6 +1007,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       }
 
       await reloadMatches();
+      markTMSync("scores");
       alert(`Updated scores for ${scored.length} qualification matches. Team records refreshed.`);
     } catch (e) {
       alert("Could not read that file: " + (e.message || e) + "\n\nExport match results from Tournament Manager as CSV and try again.");
@@ -1008,6 +1024,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       if (!confirm(`Import ${rows.length} matches (${summary})?\nExisting matches with the same number are updated in place.`)) return;
       for (const r of rows) await api.addMatch(eventId, { phase: r.phase, num: r.num, red: r.red, blue: r.blue, field: r.field });
       await reloadMatches();
+      markTMSync("matches");
       alert(`Imported ${rows.length} matches (${summary}).` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
     } catch (e) {
       alert("Could not read that file: " + (e.message || e) + "\n\nExport the match list from Tournament Manager as CSV and try again.");
@@ -1309,11 +1326,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                 ) : (
                 <>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowEvent(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><CalendarDays size={16} /> Event setup {adminUnlocked && <span className="ml-auto text-[10px] text-emerald-600 font-semibold">ADMIN</span>}</button>
-                <button onClick={() => { setMenu(false); requireAdmin(() => matchFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Import matches (file) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
-                <button onClick={() => { setMenu(false); requireAdmin(() => teamFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Import teams (file) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
-                <button onClick={() => { setMenu(false); requireAdmin(() => scoreFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Import scores (file) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
-                <button onClick={() => { setMenu(false); requireAdmin(() => rankingFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Upload rankings {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
-                <button onClick={() => { setMenu(false); requireAdmin(() => allianceFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><GitBranch size={16} /> Upload alliances {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
+                <button onClick={() => { setMenu(false); requireAdmin(() => setShowTMSync(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><RefreshCw size={16} /> Tournament Manager Sync Center {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Ref status</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
                 <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export violations</button>
@@ -1503,6 +1516,24 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
           </div>
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><ByRule viols={viols} expandRule={expandRule} setExpandRule={setExpandRule} /></div></div>
         </div>
+      )}
+      {showTMSync && (
+        <TMSyncCenter
+          onClose={() => setShowTMSync(false)}
+          onImportTeams={() => teamFileRef.current?.click()}
+          onImportMatches={() => matchFileRef.current?.click()}
+          onImportRankings={() => rankingFileRef.current?.click()}
+          onImportAlliances={() => allianceFileRef.current?.click()}
+          onImportScores={() => scoreFileRef.current?.click()}
+          stats={{
+            teams: teams.length,
+            matches: Object.keys(matches).length,
+            ranked: teams.filter((t) => t.rank != null).length,
+            alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length >= 2).length,
+            scored: Object.values(matches).filter((m) => m.redScore != null && m.blueScore != null).length,
+          }}
+          syncStatus={tmSyncStatus}
+        />
       )}
       <input ref={matchFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importMatchesFile(f); }} />
@@ -2929,6 +2960,58 @@ function Rankings({ viols, teamName }) {
   );
 }
 
+
+/* ============================ TOURNAMENT MANAGER SYNC CENTER ============================ */
+function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRankings, onImportAlliances, onImportScores, stats, syncStatus }) {
+  const items = [
+    { key: "teams", title: "Teams", detail: `${stats.teams} teams loaded`, action: "Import teams", onClick: onImportTeams, Icon: Users },
+    { key: "matches", title: "Match schedule", detail: `${stats.matches} matches loaded`, action: "Import matches", onClick: onImportMatches, Icon: ListOrdered },
+    { key: "rankings", title: "Qualification rankings", detail: `${stats.ranked} ranked teams`, action: "Upload rankings", onClick: onImportRankings, Icon: BarChart3 },
+    { key: "alliances", title: "Alliance selection", detail: `${stats.alliances} / 16 alliances loaded`, action: "Upload alliances", onClick: onImportAlliances, Icon: GitBranch },
+    { key: "scores", title: "Match results", detail: `${stats.scored} scored matches`, action: "Import scores", onClick: onImportScores, Icon: Trophy },
+  ];
+  const when = (ts) => {
+    if (!ts) return "Not imported this session";
+    const d = new Date(ts);
+    return `Last updated ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+  };
+  return (
+    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
+      <div className="bg-slate-50 dark:bg-slate-900 w-full sm:max-w-xl sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
+        <div className="sticky top-0 bg-slate-50 dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700 z-10">
+          <div>
+            <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><RefreshCw size={18} className="text-[#D7212B]" /> Tournament Manager Sync Center</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Import and refresh event data from Tournament Manager CSV exports.</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={22} /></button>
+        </div>
+        <div className="p-4 space-y-3">
+          {items.map(({ key, title, detail, action, onClick, Icon }) => (
+            <div key={key} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center shrink-0">
+                  <Icon size={18} className="text-slate-600 dark:text-slate-300" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-slate-900 dark:text-slate-100">{title}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{detail}</div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">{when(syncStatus[key])}</div>
+                </div>
+                <button onClick={onClick} className="shrink-0 px-3 py-2 rounded-lg bg-[#0D0F32] text-white text-xs font-semibold hover:bg-[#171a45]">
+                  {action}
+                </button>
+              </div>
+            </div>
+          ))}
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3 text-xs text-slate-500 dark:text-slate-400">
+            Recommended event flow: teams and schedule first, rankings after qualifications, alliances when selection is complete, then results as matches are scored.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ============================ ALLIANCE SELECTION (admin) ============================ */
 function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSetWinner, onClear, canEditAlliances = false, canEditBracket = false }) {
   const opts = [...teams].sort((a, b) => (Number(a.rank ?? 999999) - Number(b.rank ?? 999999)) || a.number.localeCompare(b.number, undefined, { numeric: true })).map((t) => t.number);
@@ -3261,6 +3344,7 @@ function FeaturesGuide() {
           <Li><b>Activity feed</b> — every violation across the event, newest first.</Li>
           <Li><b>Rankings</b> — teams ranked by violations, Majors weighted highest.</Li>
           <Li><b>Ref status</b> — who's online / last seen; after 24 hours, last seen is displayed in days instead of hours. Admins can remove offline refs.</Li>
+          <Li><b>Tournament Manager Sync Center</b> (admin) — one place for all Tournament Manager imports: teams, match schedule, rankings, alliances, and scores. Each section shows the current data count and when it was last updated.</Li>
           <Li><b>Import matches (file)</b> — load the whole schedule at once: export the match list from Tournament Manager (CSV) and pick it here. It reads quals and elims, matched by number so re-importing updates in place. No API or bridge needed.</Li>
           <Li><b>Import teams (file)</b> — load the team roster the same way: export the team list from Tournament Manager (CSV) and pick it here. Team numbers and names are added/updated; nothing is deleted.</Li>
           <Li><b>Import scores (file)</b> — export match <b>results</b> from Tournament Manager. If scored Round of 16 rows are present, Ref-OS uses <b>Round 6 + Instance</b> to update only each existing R16 match's score and winner. Alliance teams are never replaced by a score upload. If no R16 scores are present, qualification scores import normally and team <b>W-L-T records</b> update automatically.</Li>
