@@ -871,6 +871,50 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   }, [viols]);
   const teamNameMap = useMemo(() => Object.fromEntries(teams.map((t) => [t.number, t.name])), [teams]);
   const teamRankMap = useMemo(() => Object.fromEntries(teams.filter((t) => t.rank != null).map((t) => [t.number, t.rank])), [teams]);
+  const rankedAllianceCaptains = useMemo(() =>
+    [...teams]
+      .filter((t) => t.rank != null && Number(t.rank) > 0)
+      .sort((a, b) => Number(a.rank) - Number(b.rank))
+      .slice(0, 16)
+      .map((t) => t.number),
+    [teams]
+  );
+
+  // Keep alliance captains synchronized with the uploaded qualification rankings.
+  // Rank 1 -> A1 captain, Rank 2 -> A2 captain, ... Rank 16 -> A16 captain.
+  useEffect(() => {
+    if (!eventId || !rankedAllianceCaptains.length) return;
+
+    const captainSet = new Set(rankedAllianceCaptains);
+    const next = { ...alliances };
+    let changed = false;
+    const updates = [];
+
+    for (let seed = 1; seed <= 16; seed++) {
+      const captain = rankedAllianceCaptains[seed - 1] || "";
+      const cur = next[seed] ? [...next[seed]] : ["", ""];
+      let firstPick = cur[1] || "";
+
+      // A team promoted into the ranked captain list cannot also remain a first pick.
+      if (firstPick && captainSet.has(firstPick)) firstPick = "";
+
+      const desired = [captain, firstPick];
+      if ((cur[0] || "") !== desired[0] || (cur[1] || "") !== desired[1]) {
+        next[seed] = desired;
+        changed = true;
+        updates.push([seed, desired]);
+      }
+    }
+
+    if (!changed) return;
+    setAlliances(next);
+    for (const [seed, teamsForSeed] of updates) {
+      api.upsertAlliance(eventId, seed, teamsForSeed.filter(Boolean)).catch((e) => {
+        if (!outbox.isOffline(e)) console.error("Could not sync ranked alliance captain", e);
+      });
+    }
+  }, [eventId, rankedAllianceCaptains.join("|")]);
+
   const teamRecords = useMemo(() => {
     const rec = {};
     const bump = (team, k) => { const x = rec[team] = rec[team] || { w: 0, l: 0, t: 0 }; x[k]++; };
@@ -2602,7 +2646,7 @@ function Rankings({ viols, teamName }) {
 
 /* ============================ ALLIANCE SELECTION (admin) ============================ */
 function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSetWinner, onClear }) {
-  const opts = teams.map((t) => t.number);
+  const opts = [...teams].sort((a, b) => (Number(a.rank ?? 999999) - Number(b.rank ?? 999999)) || a.number.localeCompare(b.number, undefined, { numeric: true })).map((t) => t.number);
   const SEEDS = Array.from({ length: 16 }, (_, i) => i + 1);
   const filled = SEEDS.filter((s) => (alliances[s] || []).filter(Boolean).length > 0).length;
   const chosen = new Set();
