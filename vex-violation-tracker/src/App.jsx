@@ -834,12 +834,12 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       const seedPairs = {
         1: [1,16],
         2: [8,9],
-        3: [5,12],
-        4: [4,13],
-        5: [3,14],
-        6: [6,11],
-        7: [7,10],
-        8: [2,15],
+        3: [4,13],
+        4: [5,12],
+        5: [2,15],
+        6: [7,10],
+        7: [3,14],
+        8: [6,11],
       };
 
       const nextAlliances = {};
