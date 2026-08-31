@@ -738,7 +738,22 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
         return;
       }
 
-      if (!confirm(`Import ${r16.length} Round of 16 matches and populate alliance selection from them?`)) return;
+      if (r16.length !== 8) {
+        alert(`Expected exactly 8 Round of 16 matches from Round 6, but found ${r16.length}. No changes were made.`);
+        return;
+      }
+
+      if (!confirm("Replace the current Round of 16 with these exact 8 Tournament Manager matches and populate alliance selection?")) return;
+
+      // Remove any previously imported R16 rows first. This also cleans up
+      // older incorrect imports that treated other TM rounds as R16.
+      for (let n = 1; n <= 64; n++) {
+        try {
+          await api.deleteMatch(eventId, "r16", n);
+        } catch (e) {
+          if (!outbox.isOffline(e)) throw e;
+        }
+      }
 
       // Standard 16-alliance bracket:
       // R16 1 = A1 vs A16, R16 2 = A8 vs A9, etc.
@@ -774,7 +789,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       await reloadMatches();
 
       alert(
-        `Imported ${r16.length} Round of 16 matches and updated the Alliances tab.` +
+        `Replaced the Round of 16 with exactly ${r16.length} matches from TM Round 6 and updated the Alliances tab.` +
         (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : "")
       );
     } catch (e) {
