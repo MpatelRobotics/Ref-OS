@@ -450,6 +450,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   const [watchNotes, setWatchNotes] = useState([]);
   const [fieldLog, setFieldLog] = useState([]);
   const [alliances, setAlliances] = useState({}); // seed -> [team1, team2]
+  const [alliancesLoaded, setAlliancesLoaded] = useState(false);
   const [showFieldLog, setShowFieldLog] = useState(false);
   const [addMatchOpen, setAddMatchOpen] = useState(false);
   const [nominating, setNominating] = useState(null); // award key when the nominate modal is open
@@ -515,6 +516,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
 
   const refresh = useCallback(async () => {
     setSyncing(true);
+    setAlliancesLoaded(false);
     const [ev, t, v, nm, sl, wn] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), api.listViolations(eventId), api.listNominations(eventId), api.listShortlist(eventId), api.listWatchNotes(eventId)]);
     if (ev) setEvent(ev);
     // keep optimistic items the server hasn't caught up on yet (unsynced writes)
@@ -524,7 +526,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     setFinalists(new Set(sl.map((s) => `${s.award}::${s.team}`)));
     setWatchNotes(wn);
     api.listFieldLog(eventId).then(setFieldLog).catch(() => {});
-    api.listAlliances(eventId).then((rows) => { const m = {}; for (const a of rows) m[a.seed] = a.teams; setAlliances(m); }).catch(() => {});
+    api.listAlliances(eventId).then((rows) => { const m = {}; for (const a of rows) m[a.seed] = a.teams; setAlliances(m); setAlliancesLoaded(true); }).catch(() => { setAlliancesLoaded(true); });
     setSyncedAt(Date.now()); setSyncing(false);
   }, [eventId]);
 
@@ -758,7 +760,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       // Standard 16-alliance bracket:
       // R16 1 = A1 vs A16, R16 2 = A8 vs A9, etc.
       const seedPairs = [[1,16],[8,9],[5,12],[4,13],[3,14],[6,11],[7,10],[2,15]];
-      const nextAlliances = { ...alliances };
+      const nextAlliances = {};
 
       for (let i = 0; i < r16.length; i++) {
         const m = r16[i];
@@ -969,7 +971,15 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   // listed as a future captain. Once selected, that team leaves the captain
   // pool and the remaining ranked teams shift upward automatically.
   useEffect(() => {
-    if (!eventId || !rankedTeamsForAlliance.length) return;
+    if (!eventId || !alliancesLoaded || !rankedTeamsForAlliance.length) return;
+
+    // Once all 16 two-team alliances are present, alliance selection is complete.
+    // This includes alliances reconstructed from an uploaded R16 bracket.
+    // At that point the stored alliance data is the source of truth and rankings
+    // must not rewrite captains or first picks.
+    const completeAllianceCount = Array.from({ length: 16 }, (_, i) => i + 1)
+      .filter((seed) => (alliances[seed] || []).filter(Boolean).length >= 2).length;
+    if (completeAllianceCount === 16) return;
 
     const selectedFirstPicks = new Set(
       Object.values(alliances)
@@ -1003,7 +1013,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
         if (!outbox.isOffline(e)) console.error("Could not sync ranked alliance captain", e);
       });
     }
-  }, [eventId, rankedTeamsForAlliance.join("|"), Object.values(alliances).map((a) => (a || [])[1] || "").join("|")]);
+  }, [eventId, alliancesLoaded, rankedTeamsForAlliance.join("|"), Object.values(alliances).map((a) => (a || [])[1] || "").join("|")]);
 
   const teamRecords = useMemo(() => {
     const rec = {};
@@ -3069,7 +3079,7 @@ function FeaturesGuide() {
           <Li><b>Import teams (file)</b> — load the team roster the same way: export the team list from Tournament Manager (CSV) and pick it here. Team numbers and names are added/updated; nothing is deleted.</Li>
           <Li><b>Import scores (file)</b> — after matches are played, export match <b>results</b> (with scores) from TM and pick it here. Each match gets its final score and winner, the score shows on the match and in the list, and every team's <b>W-L-T record</b> (from quals) updates automatically.</Li>
           <Li><b>Upload rankings</b> — import the Tournament Manager qualification rankings CSV. Ref-OS matches <b>TeamNum</b> to each team and stores its <b>Rank</b>. Rankings appear on the Teams tab and inside individual match cards.</Li>
-          <Li><b>Upload alliances</b> — import a Tournament Manager elimination CSV. Ref-OS recognizes <b>Round 6</b> in column B as the Round of 16 and uses the <b>Instance</b> column to identify R16 matches 1 through 8. It creates or updates the elimination matches and automatically fills A1 through A16 in the Alliances tab using the standard 16-alliance bracket mapping.</Li>
+          <Li><b>Upload alliances</b> — import a Tournament Manager elimination CSV. Ref-OS recognizes <b>Round 6</b> in column B as the Round of 16 and uses the <b>Instance</b> column to identify R16 matches 1 through 8. The two teams on each side of every R16 row become that alliance exactly as exported by Tournament Manager, and the uploaded bracket becomes the source of truth for A1 through A16.</Li>
           <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Backup all (JSON)</b> downloads a complete snapshot of the event (teams, matches, violations, nominations, finalists, watchlist, field log) — grab one periodically as insurance. <b>Clear data</b> wipes selected data (admin only).</Li>
         </ul>
       </Section>
