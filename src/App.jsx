@@ -1956,9 +1956,9 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
               <button onClick={() => onOpen(m.id)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-14 shrink-0">{rowLabel(m)}</span>
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
-                  <span className="text-red-700 font-semibold">{m.red.map((n) => `${n}${teamRank[n] != null ? ` (#${teamRank[n]})` : ""}`).join("  ")}</span>
+                  <span className="text-red-700 font-semibold">{m.red.join("  ")}</span>
                   <span className="text-slate-300 font-sans">vs</span>
-                  <span className="text-blue-700 font-semibold">{m.blue.map((n) => `${n}${teamRank[n] != null ? ` (#${teamRank[n]})` : ""}`).join("  ")}</span>
+                  <span className="text-blue-700 font-semibold">{m.blue.join("  ")}</span>
                 </div>
                 {m.field && <span className="text-[11px] text-slate-400 shrink-0">{m.field.replace("Field ", "F")}</span>}
                 {m.redScore != null && m.blueScore != null && (
