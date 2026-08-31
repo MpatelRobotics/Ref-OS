@@ -130,7 +130,9 @@ function parseMatchesFile(text, filename = "") {
       const info = m.matchInfo || m; const tuple = info.matchTuple || {};
       const al = info.alliances || [];
       const teams = (a) => ((a && a.teams) || []).map((x) => String(x.number)).filter(Boolean);
-      return { phase: phaseFrom(tuple.round, ""), num: Number(tuple.match ?? tuple.instance ?? 0), red: teams(al[0]), blue: teams(al[1]), field: info.field || "" };
+      const fs = m.finalScore || info.finalScore || [];
+      const scored = String(info.state || "").toUpperCase() === "SCORED" || (Array.isArray(fs) && fs.length === 2);
+      return { phase: phaseFrom(tuple.round, ""), num: Number(tuple.match ?? tuple.instance ?? 0), red: teams(al[0]), blue: teams(al[1]), field: info.field || "", redScore: scored ? Number(fs[0]) : null, blueScore: scored ? Number(fs[1]) : null, scored };
     }).filter((r) => r.num > 0 && (r.red.length || r.blue.length));
     return { rows, warnings: [] };
   }
@@ -142,8 +144,11 @@ function parseMatchesFile(text, filename = "") {
   const matchCol = (() => { const exact = header.indexOf("match"); return exact >= 0 ? exact : find("match #", "match number", "match"); })();
   const roundCol = find("round", "type", "phase");
   const fieldCol = find("field");
-  const redCols = header.map((h, i) => ({ h, i })).filter((x) => x.h.includes("red")).map((x) => x.i);
-  const blueCols = header.map((h, i) => ({ h, i })).filter((x) => x.h.includes("blue")).map((x) => x.i);
+  const redScoreCol = header.findIndex((h) => h.includes("red") && h.includes("score"));
+  const blueScoreCol = header.findIndex((h) => h.includes("blue") && h.includes("score"));
+  const stateCol = header.findIndex((h) => h.includes("state") || h.includes("scored") || h.includes("status"));
+  const redCols = header.map((h, i) => ({ h, i })).filter((x) => x.h.includes("red") && !x.h.includes("score") && !x.h.includes("won")).map((x) => x.i);
+  const blueCols = header.map((h, i) => ({ h, i })).filter((x) => x.h.includes("blue") && !x.h.includes("score") && !x.h.includes("won")).map((x) => x.i);
   const warnings = [];
   if (matchCol < 0) warnings.push("Couldn't find a 'Match' column.");
   if (!redCols.length || !blueCols.length) warnings.push("Couldn't find Red/Blue team columns — check the export includes team columns.");
@@ -159,7 +164,10 @@ function parseMatchesFile(text, filename = "") {
     const red = redCols.map((c) => clean(r[c])).filter(isTeam);
     const blue = blueCols.map((c) => clean(r[c])).filter(isTeam);
     const field = fieldCol >= 0 ? String(r[fieldCol] || "").trim() : "";
-    if (num > 0 && (red.length || blue.length)) rows.push({ phase, num, red, blue, field });
+    const rs = redScoreCol >= 0 ? _numFrom(r[redScoreCol]) : null;
+    const bs = blueScoreCol >= 0 ? _numFrom(r[blueScoreCol]) : null;
+    const scored = stateCol >= 0 ? /scored|complete|final|done|true|1/i.test(String(r[stateCol] || "")) : ((rs != null || bs != null) && ((rs || 0) > 0 || (bs || 0) > 0));
+    if (num > 0 && (red.length || blue.length)) rows.push({ phase, num, red, blue, field, redScore: scored ? rs : null, blueScore: scored ? bs : null, scored });
   }
   return { rows, warnings };
 }
@@ -390,6 +398,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent); // covers Chrome + Samsung Internet
   const matchFileRef = useRef(null);
   const teamFileRef = useRef(null);
+  const scoreFileRef = useRef(null);
   const [logFor, setLogFor] = useState(null);
   const [noms, setNoms] = useState([]);
   const [finalists, setFinalists] = useState(new Set()); // `${award}::${team}`
@@ -668,6 +677,24 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       alert("Could not read that file: " + (e.message || e) + "\n\nExport the team list from Tournament Manager as CSV and try again.");
     }
   };
+  const importScoresFile = async (file) => {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const { rows } = parseMatchesFile(text, file.name);
+      const scored = rows.filter((r) => r.scored && r.redScore != null && r.blueScore != null);
+      if (!scored.length) { alert("No scored matches found in that file. Export match results (with scores) from Tournament Manager after matches are played."); return; }
+      if (!confirm(`Update scores for ${scored.length} matches?\nThis sets each match's final score and winner, and updates team W-L-T records.`)) return;
+      for (const r of scored) {
+        const winner = r.redScore > r.blueScore ? "red" : r.blueScore > r.redScore ? "blue" : "tie";
+        await api.addMatch(eventId, { phase: r.phase, num: r.num, red: r.red, blue: r.blue, field: r.field, redScore: r.redScore, blueScore: r.blueScore, winner });
+      }
+      await reloadMatches();
+      alert(`Updated scores for ${scored.length} matches. Team records refreshed.`);
+    } catch (e) {
+      alert("Could not read that file: " + (e.message || e) + "\n\nExport match results (with scores) from Tournament Manager as CSV and try again.");
+    }
+  };
   const importMatchesFile = async (file) => {
     if (!file) return;
     try {
@@ -793,6 +820,20 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     const m = {}; for (const v of viols) if (v.code && !m[v.code]) m[v.code] = v.desc || ""; return m;
   }, [viols]);
   const teamNameMap = useMemo(() => Object.fromEntries(teams.map((t) => [t.number, t.name])), [teams]);
+  const teamRecords = useMemo(() => {
+    const rec = {};
+    const bump = (team, k) => { const x = rec[team] = rec[team] || { w: 0, l: 0, t: 0 }; x[k]++; };
+    for (const m of Object.values(matches)) {
+      if (m.phase !== "qual") continue; // W-L-T is the qualification record
+      let result = null;
+      if (m.winner === "red" || m.winner === "blue" || m.winner === "tie") result = m.winner;
+      else if (m.redScore != null && m.blueScore != null) result = m.redScore > m.blueScore ? "red" : m.blueScore > m.redScore ? "blue" : "tie";
+      if (!result) continue;
+      for (const t of (m.red || [])) bump(t, result === "red" ? "w" : result === "blue" ? "l" : "t");
+      for (const t of (m.blue || [])) bump(t, result === "blue" ? "w" : result === "red" ? "l" : "t");
+    }
+    return rec;
+  }, [matches]);
   const teamWatch = useMemo(() => {
     const m = {};
     for (const w of watchNotes) { (m[w.team] = m[w.team] || []).push(w); }
@@ -908,6 +949,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowEvent(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><CalendarDays size={16} /> Event setup {adminUnlocked && <span className="ml-auto text-[10px] text-emerald-600 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => matchFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Import matches (file) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => teamFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Import teams (file) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
+                <button onClick={() => { setMenu(false); requireAdmin(() => scoreFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Import scores (file) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Ref status</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
                 <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export violations</button>
@@ -968,7 +1010,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
 
       <main className="max-w-2xl mx-auto px-4 pb-28 pt-4">
         {openTeam ? (
-          <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)}
+          <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={teamRecords[openTeam]}
             onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} />
         ) : openMatch ? (
           <MatchDetail match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch}
@@ -1098,6 +1140,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importMatchesFile(f); }} />
       <input ref={teamFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importTeamsFile(f); }} />
+      <input ref={scoreFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importScoresFile(f); }} />
       {addMatchOpen && <AddMatchModal teams={teams} onSave={addElimMatch} onClose={() => setAddMatchOpen(false)} />}
       {showFieldLog && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
@@ -1162,7 +1206,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
 }
 
 /* ============================ TEAM DETAIL ============================ */
-function TeamDetail({ team, viols, onLog, onDeleteViolation, onEditViolation, onDeleteTeam, canDeleteTeam, watch = [], meName, onAddWatch, onRemoveWatch, onOpenPhoto }) {
+function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViolation, onDeleteTeam, canDeleteTeam, watch = [], meName, onAddWatch, onRemoveWatch, onOpenPhoto }) {
   const [wnote, setWnote] = useState("");
   const addWatch = () => { const n = wnote.trim(); if (!n) return; onAddWatch(team.number, n); setWnote(""); };
   if (!team) return null;
@@ -1184,6 +1228,7 @@ function TeamDetail({ team, viols, onLog, onDeleteViolation, onEditViolation, on
           <div>
             <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">{team.number}</div>
             {team.name && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{team.name}</div>}
+            {record && (record.w || record.l || record.t) ? <div className="mt-1 text-xs font-mono font-semibold text-slate-600 dark:text-slate-300">{record.w}-{record.l}-{record.t} <span className="font-sans font-normal text-slate-400">(W-L-T)</span></div> : null}
           </div>
           {canDeleteTeam && (
             <button
@@ -1861,6 +1906,9 @@ function MatchList({ matches, teamName, viols, fieldLog = [], query, setQuery, o
                   <span className="text-blue-700 font-semibold">{m.blue.join("  ")}</span>
                 </div>
                 {m.field && <span className="text-[11px] text-slate-400 shrink-0">{m.field.replace("Field ", "F")}</span>}
+                {m.redScore != null && m.blueScore != null && (
+                  <span className="font-mono text-xs font-bold shrink-0"><span className={m.winner === "red" ? "text-red-700 dark:text-red-300" : "text-slate-400"}>{m.redScore}</span><span className="text-slate-300">-</span><span className={m.winner === "blue" ? "text-blue-700 dark:text-blue-300" : "text-slate-400"}>{m.blueScore}</span></span>
+                )}
                 {replaySet.has(m.id) && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700 shrink-0"><RefreshCw size={10} /> REPLAY</span>}
                 {timeoutSet.has(m.id) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700 shrink-0">TO</span>}
                 {faultSet.has(m.id) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-red-100 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-200 dark:border-red-700 shrink-0">FAULT</span>}
@@ -1976,6 +2024,14 @@ function MatchDetail({ match, matches, teamName, teamWatch = {}, viols, onNav, o
           <div>
             <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">{heading}</div>
             {match.field && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{match.field}</div>}
+            {m.redScore != null && m.blueScore != null && (
+              <div className="mt-2 inline-flex items-center gap-2 text-sm font-mono font-bold">
+                <span className={`px-2 py-0.5 rounded ${m.winner === "red" ? "bg-red-600 text-white" : "text-red-700 dark:text-red-300"}`}>{m.redScore}</span>
+                <span className="text-slate-400">–</span>
+                <span className={`px-2 py-0.5 rounded ${m.winner === "blue" ? "bg-blue-600 text-white" : "text-blue-700 dark:text-blue-300"}`}>{m.blueScore}</span>
+                <span className="ml-1 text-xs font-sans font-semibold text-slate-500 dark:text-slate-400">{m.winner === "tie" ? "Tie" : m.winner === "red" ? "Red wins" : m.winner === "blue" ? "Blue wins" : ""}</span>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => prev && onNav(prev)} disabled={!prev} title="Previous match"
@@ -2808,6 +2864,7 @@ function FeaturesGuide() {
           <Li><b>Ref status</b> — who's online / last seen; admins can remove offline refs.</Li>
           <Li><b>Import matches (file)</b> — load the whole schedule at once: export the match list from Tournament Manager (CSV) and pick it here. It reads quals and elims, matched by number so re-importing updates in place. No API or bridge needed.</Li>
           <Li><b>Import teams (file)</b> — load the team roster the same way: export the team list from Tournament Manager (CSV) and pick it here. Team numbers and names are added/updated; nothing is deleted.</Li>
+          <Li><b>Import scores (file)</b> — after matches are played, export match <b>results</b> (with scores) from TM and pick it here. Each match gets its final score and winner, the score shows on the match and in the list, and every team's <b>W-L-T record</b> (from quals) updates automatically.</Li>
           <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Backup all (JSON)</b> downloads a complete snapshot of the event (teams, matches, violations, nominations, finalists, watchlist, field log) — grab one periodically as insurance. <b>Clear data</b> wipes selected data (admin only).</Li>
         </ul>
       </Section>

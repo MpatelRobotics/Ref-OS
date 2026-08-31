@@ -164,6 +164,8 @@ create table if not exists public.matches (
   phase    text not null default 'qual',-- 'qual' | 'r16' | 'qf' | 'sf' | 'final' | 'practice'
   label    text,                        -- optional display label (e.g. 'QF 1-1')
   winner   text,                         -- 'red' | 'blue' (elimination result, drives bracket advance)
+  red_score  int,
+  blue_score int,
   red      text[] not null default '{}',
   blue     text[] not null default '{}',
   field    text,
@@ -174,6 +176,8 @@ create table if not exists public.matches (
 alter table public.matches add column if not exists phase text not null default 'qual';
 alter table public.matches add column if not exists label text;
 alter table public.matches add column if not exists winner text;
+alter table public.matches add column if not exists red_score int;
+alter table public.matches add column if not exists blue_score int;
 alter table public.matches drop constraint if exists matches_pkey;
 alter table public.matches add primary key (event_id, phase, num);
 alter table public.matches enable row level security;
