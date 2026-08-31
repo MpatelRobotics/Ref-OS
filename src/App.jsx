@@ -54,6 +54,39 @@ const TYPES = {
     badge: "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700", dot: "bg-blue-500",
     solid: "bg-blue-600", solidHover: "hover:bg-blue-700", soft: "bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-900", text: "text-blue-700 dark:text-blue-300" },
 };
+// Returns { rows:[{number,name}], warnings:[] } from a TM team-list export (CSV or JSON)
+function parseTeamsFile(text, filename = "") {
+  const t = text.trim();
+  const isTeamNum = (v) => /^[0-9]{1,6}[A-Z]{1,3}$/.test(String(v == null ? "" : v).trim().toUpperCase());
+  if (filename.toLowerCase().endsWith(".json") || t.startsWith("{") || t.startsWith("[")) {
+    const data = JSON.parse(t);
+    const list = Array.isArray(data) ? data : (data.teams || data.items || []);
+    const rows = list.map((x) => ({ number: String(x.number ?? x.team ?? "").trim().toUpperCase(), name: String(x.name ?? x.teamName ?? "").trim() })).filter((r) => r.number);
+    return { rows, warnings: [] };
+  }
+  const table = parseCSV(text);
+  if (table.length < 2) return { rows: [], warnings: ["No rows found in the file."] };
+  const header = table[0].map((h) => String(h).trim().toLowerCase());
+  let numberCol = header.findIndex((h) => h === "number" || h === "team" || h === "team number" || h === "#");
+  if (numberCol < 0) numberCol = header.findIndex((h) => h.includes("number"));
+  let nameCol = header.findIndex((h) => h.includes("team name"));
+  if (nameCol < 0) nameCol = header.findIndex((h) => h.includes("name") && !h.includes("short") && !h.includes("user") && !h.includes("school") && !h.includes("first") && !h.includes("last"));
+  const warnings = [];
+  if (numberCol < 0) { // fall back: find a column whose values look like team numbers
+    for (let c = 0; c < header.length; c++) { let hits = 0; for (let i = 1; i < Math.min(table.length, 10); i++) if (isTeamNum(table[i][c])) hits++; if (hits >= 2) { numberCol = c; break; } }
+  }
+  if (numberCol < 0) { warnings.push("Couldn't find a team-number column."); return { rows: [], warnings }; }
+  if (nameCol < 0) warnings.push("No team-name column found — importing numbers only.");
+  const rows = [];
+  for (let i = 1; i < table.length; i++) {
+    const num = String(table[i][numberCol] || "").trim().toUpperCase();
+    if (!num) continue;
+    const name = nameCol >= 0 ? String(table[i][nameCol] || "").trim() : "";
+    rows.push({ number: num, name });
+  }
+  return { rows, warnings };
+}
+
 const ORDER = ["minor", "major", "inspection"];
 
 /* ---- Parse a Tournament Manager export (CSV or JSON) into match rows ---- */
@@ -356,6 +389,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   );
   const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent); // covers Chrome + Samsung Internet
   const matchFileRef = useRef(null);
+  const teamFileRef = useRef(null);
   const [logFor, setLogFor] = useState(null);
   const [noms, setNoms] = useState([]);
   const [finalists, setFinalists] = useState(new Set()); // `${award}::${team}`
@@ -619,6 +653,21 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     const map = {}; for (const x of list) map[x.id] = x; setMatches(map);
     setAddMatchOpen(false);
   };
+  const importTeamsFile = async (file) => {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const { rows, warnings } = parseTeamsFile(text, file.name);
+      if (!rows.length) { alert("No teams found in that file.\n" + warnings.join("\n")); return; }
+      if (!confirm(`Import ${rows.length} teams?\nExisting teams are updated (names filled in); nothing is deleted.`)) return;
+      await api.bulkUpsertTeams(eventId, rows);
+      const t = await api.listTeams(eventId);
+      setTeams((cur) => { const extra = cur.filter((x) => !t.some((s) => s.number === x.number)); return [...t, ...extra]; });
+      alert(`Imported ${rows.length} teams.` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
+    } catch (e) {
+      alert("Could not read that file: " + (e.message || e) + "\n\nExport the team list from Tournament Manager as CSV and try again.");
+    }
+  };
   const importMatchesFile = async (file) => {
     if (!file) return;
     try {
@@ -858,6 +907,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                 <>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowEvent(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><CalendarDays size={16} /> Event setup {adminUnlocked && <span className="ml-auto text-[10px] text-emerald-600 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => matchFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Import matches (file) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
+                <button onClick={() => { setMenu(false); requireAdmin(() => teamFileRef.current?.click()); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Upload size={16} /> Import teams (file) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Ref status</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
                 <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export violations</button>
@@ -1046,6 +1096,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       )}
       <input ref={matchFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importMatchesFile(f); }} />
+      <input ref={teamFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importTeamsFile(f); }} />
       {addMatchOpen && <AddMatchModal teams={teams} onSave={addElimMatch} onClose={() => setAddMatchOpen(false)} />}
       {showFieldLog && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
@@ -2755,6 +2807,7 @@ function FeaturesGuide() {
           <Li><b>Rankings</b> — teams ranked by violations, Majors weighted highest.</Li>
           <Li><b>Ref status</b> — who's online / last seen; admins can remove offline refs.</Li>
           <Li><b>Import matches (file)</b> — load the whole schedule at once: export the match list from Tournament Manager (CSV) and pick it here. It reads quals and elims, matched by number so re-importing updates in place. No API or bridge needed.</Li>
+          <Li><b>Import teams (file)</b> — load the team roster the same way: export the team list from Tournament Manager (CSV) and pick it here. Team numbers and names are added/updated; nothing is deleted.</Li>
           <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Backup all (JSON)</b> downloads a complete snapshot of the event (teams, matches, violations, nominations, finalists, watchlist, field log) — grab one periodically as insurance. <b>Clear data</b> wipes selected data (admin only).</Li>
         </ul>
       </Section>
