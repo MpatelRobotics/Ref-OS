@@ -2965,6 +2965,7 @@ function FeaturesGuide() {
           <Li><b>Import matches (file)</b> — load the whole schedule at once: export the match list from Tournament Manager (CSV) and pick it here. It reads quals and elims, matched by number so re-importing updates in place. No API or bridge needed.</Li>
           <Li><b>Import teams (file)</b> — load the team roster the same way: export the team list from Tournament Manager (CSV) and pick it here. Team numbers and names are added/updated; nothing is deleted.</Li>
           <Li><b>Import scores (file)</b> — after matches are played, export match <b>results</b> (with scores) from TM and pick it here. Each match gets its final score and winner, the score shows on the match and in the list, and every team's <b>W-L-T record</b> (from quals) updates automatically.</Li>
+          <Li><b>Upload rankings</b> — import the Tournament Manager qualification rankings CSV. Ref-OS matches <b>TeamNum</b> to each team and stores its <b>Rank</b>. Rankings appear on the Teams tab and inside individual match cards.</Li>
           <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Backup all (JSON)</b> downloads a complete snapshot of the event (teams, matches, violations, nominations, finalists, watchlist, field log) — grab one periodically as insurance. <b>Clear data</b> wipes selected data (admin only).</Li>
         </ul>
       </Section>
@@ -2978,7 +2979,7 @@ function FeaturesGuide() {
           <Li><b>Dark / Light mode</b> — toggle in this menu, saved per device.</Li>
           <Li><b>Install</b> — add Ref-OS to your home screen to launch it full-screen like an app (Add to Home Screen / the install prompt on the deployed site).</Li>
           <Li><b>Live sync</b> — everything updates across all devices within seconds.</Li>
-          <Li><b>Alliance selection</b> (admin) — an <b>Alliances</b> tab lets you enter each alliance (captain + 1st pick) live as selection happens; <b>Finalize alliances</b> auto-generates the Round of 16. Then tap the winning alliance in each match and the bracket advances itself — QF from R16, SF from QF, and a <b>best-of-3 Final</b> from SF, with the champion shown once an alliance wins two final games.</Li>
+          <Li><b>Alliance selection</b> (admin) — uploaded qualification rankings automatically set alliance captains from <b>Rank 1 → A1</b> through <b>Rank 16 → A16</b>. Enter each alliance's <b>1st pick</b> live as selection happens; if a picked team later becomes a ranked captain, Ref-OS removes it from the first-pick slot to prevent duplicates. <b>Finalize alliances</b> auto-generates the Round of 16. Then tap the winning alliance in each match and the bracket advances itself — QF from R16, SF from QF, and a <b>best-of-3 Final</b> from SF, with the champion shown once an alliance wins two final games.</Li>
           <Li><b>Eliminations</b> — elimination matches use the same tap-to-log flow as quals, with timeouts enabled.</Li>
         </ul>
       </Section>
