@@ -96,7 +96,7 @@ function parseRankingsFile(text, filename = "") {
     const data = JSON.parse(t);
     const list = Array.isArray(data) ? data : (data.rankings || data.teams || data.items || []);
     const rows = list.map((x) => ({
-      number: cleanNum(x.number ?? x.team ?? x.teamNumber ?? x.team_number),
+      number: cleanNum(x.number ?? x.team ?? x.teamNumber ?? x.teamNum ?? x.TeamNum ?? x.team_number),
       rank: cleanRank(x.rank ?? x.ranking ?? x.position ?? x.place),
     })).filter((r) => r.number && r.rank != null);
     return { rows, warnings: [] };
@@ -104,7 +104,7 @@ function parseRankingsFile(text, filename = "") {
   const table = parseCSV(text);
   if (table.length < 2) return { rows: [], warnings: ["No rows found in the file."] };
   const header = table[0].map((h) => String(h).trim().toLowerCase());
-  let numberCol = header.findIndex((h) => h === "team" || h === "team number" || h === "number" || h === "team #" || h === "team#");
+  let numberCol = header.findIndex((h) => h === "team" || h === "team number" || h === "teamnum" || h === "number" || h === "team #" || h === "team#");
   if (numberCol < 0) numberCol = header.findIndex((h) => h.includes("team") && (h.includes("number") || h.includes("#")));
   let rankCol = header.findIndex((h) => h === "rank" || h === "ranking" || h === "place" || h === "position");
   if (rankCol < 0) rankCol = header.findIndex((h) => h.includes("rank"));
