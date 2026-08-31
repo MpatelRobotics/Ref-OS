@@ -143,14 +143,17 @@ export async function removeTeamPhoto(eventId, number, path) {
 
 /* ================= matches (qualification schedule) ================= */
 export async function listMatches(eventId) {
-  const { data } = await supabase.from("matches").select("num,red,blue,field,phase,label,winner").eq("event_id", eventId).order("num");
+  const { data } = await supabase.from("matches").select("num,red,blue,field,phase,label,winner,red_score,blue_score").eq("event_id", eventId).order("num");
   return (data || []).map((m) => {
     const phase = m.phase || "qual";
-    return { id: phase === "qual" ? String(m.num) : `${phase}-${m.num}`, phase, num: m.num, label: m.label || "", winner: m.winner || "", red: m.red || [], blue: m.blue || [], field: m.field || "" };
+    return { id: phase === "qual" ? String(m.num) : `${phase}-${m.num}`, phase, num: m.num, label: m.label || "", winner: m.winner || "", redScore: m.red_score, blueScore: m.blue_score, red: m.red || [], blue: m.blue || [], field: m.field || "" };
   });
 }
 export async function addMatch(eventId, m) {
   const row = { event_id: eventId, phase: m.phase || "qual", num: Number(m.num), red: m.red || [], blue: m.blue || [], field: m.field || null, label: m.label || null };
+  if (m.redScore != null) row.red_score = Number(m.redScore);
+  if (m.blueScore != null) row.blue_score = Number(m.blueScore);
+  if (m.winner) row.winner = m.winner;
   const { error } = await supabase.from("matches").upsert(row, { onConflict: "event_id,phase,num" });
   if (error) throw error;
 }
