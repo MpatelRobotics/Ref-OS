@@ -871,34 +871,38 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
   }, [viols]);
   const teamNameMap = useMemo(() => Object.fromEntries(teams.map((t) => [t.number, t.name])), [teams]);
   const teamRankMap = useMemo(() => Object.fromEntries(teams.filter((t) => t.rank != null).map((t) => [t.number, t.rank])), [teams]);
-  const rankedAllianceCaptains = useMemo(() =>
+  const rankedTeamsForAlliance = useMemo(() =>
     [...teams]
       .filter((t) => t.rank != null && Number(t.rank) > 0)
       .sort((a, b) => Number(a.rank) - Number(b.rank))
-      .slice(0, 16)
       .map((t) => t.number),
     [teams]
   );
 
-  // Keep alliance captains synchronized with the uploaded qualification rankings.
-  // Rank 1 -> A1 captain, Rank 2 -> A2 captain, ... Rank 16 -> A16 captain.
+  // VEX alliance selection behavior:
+  // A higher seeded alliance may select a lower ranked team that is currently
+  // listed as a future captain. Once selected, that team leaves the captain
+  // pool and the remaining ranked teams shift upward automatically.
   useEffect(() => {
-    if (!eventId || !rankedAllianceCaptains.length) return;
+    if (!eventId || !rankedTeamsForAlliance.length) return;
 
-    const captainSet = new Set(rankedAllianceCaptains);
+    const selectedFirstPicks = new Set(
+      Object.values(alliances)
+        .map((a) => (a || [])[1])
+        .filter(Boolean)
+    );
+
+    const captainPool = rankedTeamsForAlliance.filter((team) => !selectedFirstPicks.has(team));
     const next = { ...alliances };
     let changed = false;
     const updates = [];
 
     for (let seed = 1; seed <= 16; seed++) {
-      const captain = rankedAllianceCaptains[seed - 1] || "";
+      const captain = captainPool[seed - 1] || "";
       const cur = next[seed] ? [...next[seed]] : ["", ""];
-      let firstPick = cur[1] || "";
-
-      // A team promoted into the ranked captain list cannot also remain a first pick.
-      if (firstPick && captainSet.has(firstPick)) firstPick = "";
-
+      const firstPick = cur[1] || "";
       const desired = [captain, firstPick];
+
       if ((cur[0] || "") !== desired[0] || (cur[1] || "") !== desired[1]) {
         next[seed] = desired;
         changed = true;
@@ -908,12 +912,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
 
     if (!changed) return;
     setAlliances(next);
+
     for (const [seed, teamsForSeed] of updates) {
       api.upsertAlliance(eventId, seed, teamsForSeed.filter(Boolean)).catch((e) => {
         if (!outbox.isOffline(e)) console.error("Could not sync ranked alliance captain", e);
       });
     }
-  }, [eventId, rankedAllianceCaptains.join("|")]);
+  }, [eventId, rankedTeamsForAlliance.join("|"), Object.values(alliances).map((a) => (a || [])[1] || "").join("|")]);
 
   const teamRecords = useMemo(() => {
     const rec = {};
@@ -2649,15 +2654,25 @@ function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSet
   const opts = [...teams].sort((a, b) => (Number(a.rank ?? 999999) - Number(b.rank ?? 999999)) || a.number.localeCompare(b.number, undefined, { numeric: true })).map((t) => t.number);
   const SEEDS = Array.from({ length: 16 }, (_, i) => i + 1);
   const filled = SEEDS.filter((s) => (alliances[s] || []).filter(Boolean).length > 0).length;
-  const chosen = new Set();
-  for (const s of SEEDS) for (const t of (alliances[s] || [])) if (t) chosen.add(t);
+  const selectedPicks = new Set();
+  for (const s of SEEDS) {
+    const pick = (alliances[s] || [])[1];
+    if (pick) selectedPicks.add(pick);
+  }
   const Sel = ({ seed, idx, label }) => {
     const v = (alliances[seed] || [])[idx] || "";
+    const captain = (alliances[seed] || [])[0] || "";
     return (
       <select value={v} onChange={(e) => onSet(seed, idx, e.target.value)}
-        className="flex-1 min-w-0 px-2 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm">
+        disabled={idx === 0}
+        className="flex-1 min-w-0 px-2 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:text-slate-500">
         <option value="">{label}</option>
-        {opts.map((n) => <option key={n} value={n} disabled={chosen.has(n) && n !== v}>{n}{chosen.has(n) && n !== v ? " ✓" : ""}</option>)}
+        {opts.map((n) => {
+          const usedAsPick = selectedPicks.has(n) && n !== v;
+          const isSelf = idx === 1 && n === captain;
+          const disabled = usedAsPick || isSelf;
+          return <option key={n} value={n} disabled={disabled}>{n}{usedAsPick ? " ✓" : ""}</option>;
+        })}
       </select>
     );
   };
@@ -2979,7 +2994,7 @@ function FeaturesGuide() {
           <Li><b>Dark / Light mode</b> — toggle in this menu, saved per device.</Li>
           <Li><b>Install</b> — add Ref-OS to your home screen to launch it full-screen like an app (Add to Home Screen / the install prompt on the deployed site).</Li>
           <Li><b>Live sync</b> — everything updates across all devices within seconds.</Li>
-          <Li><b>Alliance selection</b> (admin) — uploaded qualification rankings automatically set alliance captains from <b>Rank 1 → A1</b> through <b>Rank 16 → A16</b>. Enter each alliance's <b>1st pick</b> live as selection happens; if a picked team later becomes a ranked captain, Ref-OS removes it from the first-pick slot to prevent duplicates. <b>Finalize alliances</b> auto-generates the Round of 16. Then tap the winning alliance in each match and the bracket advances itself — QF from R16, SF from QF, and a <b>best-of-3 Final</b> from SF, with the champion shown once an alliance wins two final games.</Li>
+          <Li><b>Alliance selection</b> (admin) — qualification rankings automatically seed the alliance captains. A higher seeded captain can select a lower ranked team even if that team is currently shown as a future captain. When that happens, the selected team joins the picking alliance and the remaining ranked teams automatically shift upward to fill the open captain spots. Enter each alliance's <b>1st pick</b> live as selection happens, then <b>Finalize alliances</b> to auto-generate the Round of 16. Winners advance automatically through QF, SF, and the <b>best-of-3 Final</b>.</Li>
           <Li><b>Eliminations</b> — elimination matches use the same tap-to-log flow as quals, with timeouts enabled.</Li>
         </ul>
       </Section>
