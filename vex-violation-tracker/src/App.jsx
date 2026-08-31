@@ -145,13 +145,10 @@ function phaseFrom(roundVal, matchVal) {
   const r = raw.toLowerCase();
 
   // Tournament Manager elimination CSVs often use numeric Round values.
-  // For VRC 16-alliance brackets: 2 = Round of 16, 3 = QF, 4 = SF, 5 = Final.
+  // Tournament Manager elimination exports for this event use Round 6 for the Round of 16.
   if (/^\d+$/.test(raw)) {
     const n = Number(raw);
-    if (n === 2) return "r16";
-    if (n === 3) return "qf";
-    if (n === 4) return "sf";
-    if (n === 5) return "final";
+    if (n === 6) return "r16";
   }
 
   if (_roundMap[r]) return _roundMap[r];
@@ -733,7 +730,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       const r16 = rows.filter((m) => m.phase === "r16").sort((a, b) => a.num - b.num);
 
       if (!r16.length) {
-        alert("No Round of 16 matches found in that file.\n\nRef-OS supports Tournament Manager elimination CSVs where Round 2 is the Round of 16.");
+        alert("No Round of 16 matches found in that file.\n\nRef-OS supports this Tournament Manager elimination export where Round 6 is the Round of 16.");
         return;
       }
 
@@ -3053,7 +3050,7 @@ function FeaturesGuide() {
           <Li><b>Import teams (file)</b> — load the team roster the same way: export the team list from Tournament Manager (CSV) and pick it here. Team numbers and names are added/updated; nothing is deleted.</Li>
           <Li><b>Import scores (file)</b> — after matches are played, export match <b>results</b> (with scores) from TM and pick it here. Each match gets its final score and winner, the score shows on the match and in the list, and every team's <b>W-L-T record</b> (from quals) updates automatically.</Li>
           <Li><b>Upload rankings</b> — import the Tournament Manager qualification rankings CSV. Ref-OS matches <b>TeamNum</b> to each team and stores its <b>Rank</b>. Rankings appear on the Teams tab and inside individual match cards.</Li>
-          <Li><b>Upload alliances</b> — import a Tournament Manager elimination CSV. Ref-OS recognizes numeric TM rounds, including <b>Round 2 = Round of 16</b>, creates or updates the R16 elimination matches, and automatically fills A1 through A16 in the Alliances tab using the standard 16-alliance bracket mapping.</Li>
+          <Li><b>Upload alliances</b> — import a Tournament Manager elimination CSV. Ref-OS recognizes numeric TM rounds, including <b>Round 6 = Round of 16</b>, creates or updates the R16 elimination matches, and automatically fills A1 through A16 in the Alliances tab using the standard 16-alliance bracket mapping.</Li>
           <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Backup all (JSON)</b> downloads a complete snapshot of the event (teams, matches, violations, nominations, finalists, watchlist, field log) — grab one periodically as insurance. <b>Clear data</b> wipes selected data (admin only).</Li>
         </ul>
       </Section>
