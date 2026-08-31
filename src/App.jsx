@@ -894,25 +894,83 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     if (!file) return;
     try {
       const text = await file.text();
-      const { rows } = parseMatchesFile(text, file.name);
 
-      const allScored = rows.filter((r) => r.scored && r.redScore != null && r.blueScore != null);
-      const eliminationPhases = new Set(["r16", "qf", "sf", "final"]);
-      const eliminationScored = allScored.filter((r) => eliminationPhases.has(r.phase));
-      const scored = eliminationScored.length
-        ? eliminationScored
-        : allScored.filter((r) => r.phase === "qual");
+      // Read TM CSV directly for elimination score updates so Round 6 +
+      // Instance maps to the existing R16 match without replacing its teams.
+      const lines = text.replace(/\r/g, "").split("\n").filter((line) => line.trim());
+      const parseCsvLine = (line) => {
+        const cells = [];
+        let cur = "", quoted = false;
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i];
+          if (ch === '"') {
+            if (quoted && line[i + 1] === '"') { cur += '"'; i++; }
+            else quoted = !quoted;
+          } else if (ch === "," && !quoted) {
+            cells.push(cur.trim());
+            cur = "";
+          } else cur += ch;
+        }
+        cells.push(cur.trim());
+        return cells;
+      };
 
-      if (!scored.length) {
-        alert("No scored matches found in that file. Export match results (with scores) from Tournament Manager after matches are played.");
+      const header = lines.length ? parseCsvLine(lines[0]).map((h) => h.trim().toLowerCase()) : [];
+      const col = (name) => header.indexOf(name.toLowerCase());
+      const roundCol = col("Round");
+      const instanceCol = col("Instance");
+      const redScoreCol = col("RedScore");
+      const blueScoreCol = col("BlueScore");
+      const scoredCol = col("Scored");
+
+      const elimScoreRows = [];
+      if (roundCol >= 0 && instanceCol >= 0 && redScoreCol >= 0 && blueScoreCol >= 0) {
+        for (let i = 1; i < lines.length; i++) {
+          const cells = parseCsvLine(lines[i]);
+          const round = Number(cells[roundCol]);
+          const instance = Number(cells[instanceCol]);
+          const scoredFlag = scoredCol < 0 || String(cells[scoredCol] || "").trim().toLowerCase() === "true";
+
+          if (round !== 6 || !Number.isInteger(instance) || instance < 1 || instance > 8 || !scoredFlag) continue;
+
+          const redScore = Number(cells[redScoreCol]);
+          const blueScore = Number(cells[blueScoreCol]);
+          if (!Number.isFinite(redScore) || !Number.isFinite(blueScore)) continue;
+
+          elimScoreRows.push({ instance, redScore, blueScore });
+        }
+      }
+
+      if (elimScoreRows.length) {
+        if (!confirm(
+          `Elimination scores detected.\n\nUpdate ${elimScoreRows.length} R16 matches? Qualification rows will be ignored and alliance teams will not be changed.`
+        )) return;
+
+        for (const r of elimScoreRows) {
+          const winner = r.redScore > r.blueScore ? "red" : r.blueScore > r.redScore ? "blue" : "tie";
+          await api.updateMatchScore(eventId, "r16", r.instance, r.redScore, r.blueScore, winner);
+        }
+
+        await reloadMatches();
+        alert(`Updated scores for ${elimScoreRows.length} R16 matches. Alliance teams were left unchanged.`);
         return;
       }
 
-      const eliminationMode = eliminationScored.length > 0;
-      if (!confirm(
-        `${eliminationMode ? "Elimination scores detected. Qualification matches in this file will be ignored.\n\n" : ""}` +
-        `Update scores for ${scored.length} ${eliminationMode ? "elimination " : "qualification "}matches?`
-      )) return;
+      // No scored R16 rows were found, so use the normal qualification score import.
+      const { rows } = parseMatchesFile(text, file.name);
+      const scored = rows.filter((r) =>
+        r.phase === "qual" &&
+        r.scored &&
+        r.redScore != null &&
+        r.blueScore != null
+      );
+
+      if (!scored.length) {
+        alert("No scored qualification or Round of 16 matches found in that file.");
+        return;
+      }
+
+      if (!confirm(`Update scores for ${scored.length} qualification matches?\nThis updates team W-L-T records.`)) return;
 
       for (const r of scored) {
         const winner = r.redScore > r.blueScore ? "red" : r.blueScore > r.redScore ? "blue" : "tie";
@@ -929,13 +987,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       }
 
       await reloadMatches();
-      alert(
-        eliminationMode
-          ? `Updated scores for ${scored.length} elimination matches. Qualification matches were ignored.`
-          : `Updated scores for ${scored.length} qualification matches. Team records refreshed.`
-      );
+      alert(`Updated scores for ${scored.length} qualification matches. Team records refreshed.`);
     } catch (e) {
-      alert("Could not read that file: " + (e.message || e) + "\n\nExport match results (with scores) from Tournament Manager as CSV and try again.");
+      alert("Could not read that file: " + (e.message || e) + "\n\nExport match results from Tournament Manager as CSV and try again.");
     }
   };
   const importMatchesFile = async (file) => {
@@ -3183,7 +3237,7 @@ function FeaturesGuide() {
           <Li><b>Ref status</b> — who's online / last seen; admins can remove offline refs.</Li>
           <Li><b>Import matches (file)</b> — load the whole schedule at once: export the match list from Tournament Manager (CSV) and pick it here. It reads quals and elims, matched by number so re-importing updates in place. No API or bridge needed.</Li>
           <Li><b>Import teams (file)</b> — load the team roster the same way: export the team list from Tournament Manager (CSV) and pick it here. Team numbers and names are added/updated; nothing is deleted.</Li>
-          <Li><b>Import scores (file)</b> — export match <b>results</b> from Tournament Manager. If any scored elimination matches are present, Ref-OS ignores qualification rows in that file and updates only R16, QF, SF, and Final scores. If no elimination scores are present, qualification scores import normally and team <b>W-L-T records</b> update automatically.</Li>
+          <Li><b>Import scores (file)</b> — export match <b>results</b> from Tournament Manager. If scored Round of 16 rows are present, Ref-OS uses <b>Round 6 + Instance</b> to update only each existing R16 match's score and winner. Alliance teams are never replaced by a score upload. If no R16 scores are present, qualification scores import normally and team <b>W-L-T records</b> update automatically.</Li>
           <Li><b>Upload rankings</b> — import the Tournament Manager qualification rankings CSV. Ref-OS matches <b>TeamNum</b> to each team and stores its <b>Rank</b>. Rankings appear on the Teams tab and inside individual match cards.</Li>
           <Li><b>Upload alliances</b> — import a Tournament Manager elimination CSV. Ref-OS reads the Tournament Manager elimination CSV directly: <b>Round 6</b> identifies the Round of 16 and <b>Instance 1 through 8</b> becomes R16 1 through R16 8. Red1 + Red2 and Blue1 + Blue2 are used exactly as the alliance pairs in the exported bracket.</Li>
           <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Backup all (JSON)</b> downloads a complete snapshot of the event (teams, matches, violations, nominations, finalists, watchlist, field log) — grab one periodically as insurance. <b>Clear data</b> wipes selected data (admin only).</Li>

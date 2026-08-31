@@ -166,6 +166,20 @@ export async function addMatch(eventId, m) {
   const { error } = await supabase.from("matches").upsert(row, { onConflict: "event_id,phase,num" });
   if (error) throw error;
 }
+export async function updateMatchScore(eventId, phase, num, redScore, blueScore, winner) {
+  const { error } = await supabase
+    .from("matches")
+    .update({
+      red_score: redScore != null ? Number(redScore) : null,
+      blue_score: blueScore != null ? Number(blueScore) : null,
+      winner: winner || null,
+    })
+    .eq("event_id", eventId)
+    .eq("phase", phase)
+    .eq("num", Number(num));
+  if (error) throw error;
+}
+
 export async function setMatchWinner(eventId, phase, num, winner) {
   const { error } = await supabase.from("matches").update({ winner: winner || null }).eq("event_id", eventId).eq("phase", phase).eq("num", Number(num));
   if (error) throw error;
