@@ -89,6 +89,12 @@ export async function listWatchNotes(eventId) {
   const { data } = await supabase.from("watch_notes").select("*").eq("event_id", eventId).order("created_at");
   return (data || []).map(mapWatch);
 }
+
+export async function clearWatchNotes(eventId) {
+  const { error } = await supabase.from("watch_notes").delete().eq("event_id", eventId);
+  if (error) throw error;
+}
+
 export async function addWatchNote(eventId, w) {
   const id = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
   const row = { id, event_id: eventId, team: (w.team || "").trim().toUpperCase(), ref_name: w.by || "", note: (w.note || "").trim() };
