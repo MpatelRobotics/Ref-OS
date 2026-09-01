@@ -207,9 +207,13 @@ create table if not exists public.nominations (
   team        text not null,
   match_info  jsonb,
   reason      text,
+  criteria    text[],                 -- observed-criteria the ref checked
+  where_when  text,                   -- where/when observed
   nominated_by text,
   created_at  timestamptz default now()
 );
+alter table public.nominations add column if not exists criteria text[];
+alter table public.nominations add column if not exists where_when text;
 alter table public.nominations enable row level security;
 drop policy if exists "open rw nominations" on public.nominations;
 create policy "open rw nominations" on public.nominations for all using (true) with check (true);

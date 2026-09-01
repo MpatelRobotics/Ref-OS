@@ -1098,13 +1098,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     }
   };
   const exportNominations = () => {
-    const rows = [["Award", "Team", "Team Name", "Finalist", "Match", "Reason", "Nominated By", "Time"]];
+    const rows = [["Award", "Team", "Team Name", "Finalist", "Match", "Observed Criteria", "Specific Example", "Where/When", "Nominated By", "Time"]];
     const sorted = [...noms].sort((a, b) => a.award.localeCompare(b.award) || a.team.localeCompare(b.team, undefined, { numeric: true }) || a.createdAt - b.createdAt);
     for (const n of sorted) {
       const t = teams.find((x) => x.number === n.team);
       const awardName = (AWARDS.find((a) => a.key === n.award) || {}).full || n.award;
       const fin = finalists.has(`${n.award}::${n.team}`) ? "Yes" : "No";
-      rows.push([awardName, n.team, t?.name || "", fin, fmtMatch(n.match) || "", n.reason || "", n.by || "", new Date(n.createdAt).toISOString()]);
+      rows.push([awardName, n.team, t?.name || "", fin, fmtMatch(n.match) || "", (n.criteria || []).join("; "), n.reason || "", n.whereWhen || "", n.by || "", new Date(n.createdAt).toISOString()]);
     }
     const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     const a = document.createElement("a");
@@ -2720,8 +2720,12 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onOpenPhoto }) {
 
 /* ============================ JUDGING (award nominations) ============================ */
 const AWARDS = [
-  { key: "sportsmanship", label: "Sportsmanship", full: "Sportsmanship Award" },
-  { key: "energy", label: "Energy", full: "Energy Award" },
+  { key: "sportsmanship", label: "Sportsmanship", full: "Sportsmanship Award",
+    blurb: "Recognizes a team that consistently shows respect, professionalism, fairness, and positive conduct.",
+    criteria: ["Courteous, respectful, and kind to everyone", "Cooperative and competes in a friendly spirit", "Honest, professional, and acts with integrity", "Adds positively to the event for others"] },
+  { key: "energy", label: "Energy", full: "Energy Award",
+    blurb: "Recognizes a team that brings enthusiasm, excitement, positivity, and spirit to the competition.",
+    criteria: ["Keeps energy and positivity high", "Passion for robotics that lifts the event", "Encourages and supports other participants", "Shows strong, positive team or school spirit", "Cheers and celebrates positively and appropriately", "Engages positively with teams, volunteers, and spectators"] },
 ];
 const G_RULE = /^G[1-5]$/i;
 
@@ -2806,6 +2810,12 @@ function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNom
                           <button onClick={() => { if (confirm("Remove this nomination?")) onDeleteNom(n.id); }} className="text-slate-300 hover:text-red-600"><Trash2 size={14} /></button>
                         </div>
                         {n.reason ? <p className="text-slate-700 dark:text-slate-200 mt-1">{n.reason}</p> : <p className="text-slate-400 italic mt-1">No reason given</p>}
+                        {n.criteria && n.criteria.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {n.criteria.map((c) => <span key={c} className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{c}</span>)}
+                          </div>
+                        )}
+                        {n.whereWhen && <p className="text-[11px] text-slate-400 mt-1">Where/when: {n.whereWhen}</p>}
                       </div>
                     ))}
                   </div>
@@ -2828,12 +2838,17 @@ function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSe
   const [matchPhase, setMatchPhase] = useState("none");
   const [matchNum, setMatchNum] = useState("");
   const [reason, setReason] = useState("");
+  const [whereWhen, setWhereWhen] = useState("");
+  const [criteria, setCriteria] = useState([]);
   const [busy, setBusy] = useState(false);
+  const awardDef = AWARDS.find((a) => a.key === award) || AWARDS[0];
+  const toggleCriterion = (c) => setCriteria((cur) => cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]);
+  const pickAward = (k) => { setAward(k); setCriteria([]); };
   const count = phaseCount(matchPhase, event);
   const valid = (creatingNew ? newNumber.trim() : team) && reason.trim();
   const submit = async () => {
     if (!valid || busy) return; setBusy(true);
-    try { await onSave({ award, team: creatingNew ? "" : team, newNumber, newName, reason, match: { phase: matchPhase, num: matchNum } }); }
+    try { await onSave({ award, team: creatingNew ? "" : team, newNumber, newName, reason, criteria, whereWhen, match: { phase: matchPhase, num: matchNum } }); }
     catch (e) { alert("Could not save: " + (e.message || e)); setBusy(false); }
   };
   return (
@@ -2853,12 +2868,13 @@ function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSe
             <Label>Award</Label>
             <div className="grid grid-cols-2 gap-2">
               {AWARDS.map((a) => (
-                <button key={a.key} onClick={() => setAward(a.key)}
+                <button key={a.key} onClick={() => pickAward(a.key)}
                   className={`py-2.5 rounded-lg border-2 font-semibold text-sm flex items-center justify-center gap-1.5 ${award === a.key ? "bg-[#0D0F32] text-white border-transparent" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"}`}>
                   <Trophy size={15} /> {a.full}
                 </button>
               ))}
             </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 italic">{awardDef.blurb}</p>
           </div>
 
           <div>
@@ -2894,8 +2910,26 @@ function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSe
           </div>
 
           <div>
-            <Label>Why are you nominating them?</Label>
-            <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="What did this team do that stood out…"
+            <Label>Observed criteria <span className="font-normal text-slate-400">(check all that apply)</span></Label>
+            <div className="space-y-1.5 mt-1">
+              {awardDef.criteria.map((c) => (
+                <button key={c} onClick={() => toggleCriterion(c)} className={`w-full text-left flex items-start gap-2 px-3 py-2 rounded-lg border text-sm ${criteria.includes(c) ? "border-[#0D0F32] bg-slate-50 dark:bg-slate-800 dark:border-slate-500" : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"}`}>
+                  <span className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 ${criteria.includes(c) ? "bg-[#0D0F32] border-[#0D0F32]" : "border-slate-300 dark:border-slate-600"}`}>{criteria.includes(c) && <Check size={12} className="text-white" />}</span>
+                  <span className="text-slate-700 dark:text-slate-200">{c}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <Label>Specific example observed</Label>
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="Briefly describe what the team did…"
+              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+          </div>
+
+          <div>
+            <Label>Where / when observed <span className="font-normal text-slate-400">(optional)</span></Label>
+            <input value={whereWhen} onChange={(e) => setWhereWhen(e.target.value)} placeholder="e.g. pit area during lunch, Field 2 after Q34"
               className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
           </div>
         </div>
@@ -3329,12 +3363,12 @@ function FeaturesGuide() {
       </Section>
 
       <Section icon={Trophy} title="Judging">
-        <p>Nominate teams for the <b>Sportsmanship</b> and <b>Energy</b> awards with a match (or none) and a required reason.</p>
+        <p>Nominate teams for the <b>Sportsmanship</b> and <b>Energy</b> awards. The nomination form mirrors the official award forms: pick the team and match, <b>check the observed criteria</b> that apply (they change per award), give a <b>specific example</b>, and optionally note <b>where/when</b> you saw it.</p>
         <ul className="space-y-1.5">
-          <Li>Teams are <b>ranked by nomination count</b> per award; tap a team to read every nomination.</Li>
+          <Li>Teams are <b>ranked by nomination count</b> per award; tap a team to read every nomination with its checked criteria.</Li>
           <Li>Teams with <b>G1–G5 conduct violations</b> are flagged red so judges are aware.</Li>
           <Li>Admins/judge advisor tap the <b>star</b> to mark <b>finalists</b>.</Li>
-          <Li><b>Export nominations</b> to CSV for the judge advisor.</Li>
+          <Li><b>Export nominations</b> to CSV (includes criteria and where/when) for the judge advisor.</Li>
         </ul>
       </Section>
 
