@@ -1158,10 +1158,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
         output.addPage(page);
 
         // Header fields from the nomination record.
-        page.drawText(String(event.name || "The Highlander Summit Signature Event"), { x: 116, y: 648, size: 9, font });
-        page.drawText(fmtDate(n.createdAt), { x: 444, y: 648, size: 9, font });
-        page.drawText(String(n.by || ""), { x: 168, y: 624, size: 9, font });
-        page.drawText(String(n.team || ""), { x: 474, y: 624, size: 10, font: bold });
+        page.drawText(String(event.name || "The Highlander Summit Signature Event"), { x: 116, y: 653, size: 8, font });
+        page.drawText(fmtDate(n.createdAt), { x: 453, y: 653, size: 8, font });
+        page.drawText(String(n.by || ""), { x: 190, y: 629, size: 8, font });
+        page.drawText(String(n.team || ""), { x: 474, y: 629, size: 8.5, font: bold });
 
         // Check the same observed criteria selected in Ref OS.
         const selected = new Set(n.criteria || []);
@@ -1171,15 +1171,15 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
           : [567, 545, 523, 501];
         criteria.forEach((criterion, idx) => {
           if (!selected.has(criterion) || checkYs[idx] == null) return;
-          page.drawText("X", { x: 57.5, y: checkYs[idx], size: 10, font: bold, color: rgb(0, 0, 0) });
+          page.drawText("X", { x: 57.2, y: checkYs[idx] + 0.8, size: 8.5, font: bold, color: rgb(0, 0, 0) });
         });
 
         // The app's reason maps to "Specific Example Observed".
-        drawWrapped(page, n.reason || "", 39, isEnergy ? 402 : 405, 532, 9, 14, 4);
+        drawWrapped(page, n.reason || "", 39, isEnergy ? 416 : 419, 532, 8.5, 14, 4);
 
         // The app already stores a separate where/when field.
         const where = n.whereWhen || (fmtMatch(n.match) ? fmtMatch(n.match) : "");
-        drawWrapped(page, where, 39, isEnergy ? 300 : 302, 532, 9, 14, 3);
+        drawWrapped(page, where, 39, isEnergy ? 314 : 316, 532, 8.5, 14, 3);
       }
 
       const bytes = await output.save();
