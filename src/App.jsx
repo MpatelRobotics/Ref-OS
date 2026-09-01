@@ -441,6 +441,17 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [query, setQuery] = useState("");
   const [lightbox, setLightbox] = useState(null);
   const [menu, setMenu] = useState(false);
+  const menuRef = useRef(null);
+  const menuTimer = useRef(null);
+  useEffect(() => {
+    if (!menu) return;
+    const el = menuRef.current;
+    const reset = () => { clearTimeout(menuTimer.current); menuTimer.current = setTimeout(() => setMenu(false), 3500); };
+    reset();
+    const evs = ["pointerdown", "pointermove", "touchstart", "wheel", "scroll", "keydown"];
+    evs.forEach((ev) => el && el.addEventListener(ev, reset, { passive: true }));
+    return () => { clearTimeout(menuTimer.current); evs.forEach((ev) => el && el.removeEventListener(ev, reset)); };
+  }, [menu]);
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const [isInstalled, setIsInstalled] = useState(() =>
@@ -1316,7 +1327,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           <div className="relative">
             <button onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
-              <div className="absolute right-0 mt-2 w-56 max-h-[75vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
+              <div ref={menuRef} className="absolute right-0 mt-2 w-56 max-h-[75vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
                 {isJudge ? (
                   <>
                     <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><Trophy size={12} /> Judge Advisor</div>
