@@ -8,6 +8,7 @@ import {
 import { configured } from "./supabaseClient";
 import * as api from "./api";
 import * as outbox from "./outbox";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 /* This build is locked to one event: The Highlander Summit Signature Event.
    EVENT_ID must match supabase/seed.sql. A shared site password gates entry. */
@@ -1114,19 +1115,102 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       if (outbox.isOffline(e)) alert("You're offline — reconnect to change finalists."); else throw e;
     }
   };
-  const exportNominations = () => {
-    const rows = [["Award", "Team", "Team Name", "Finalist", "Match", "Observed Criteria", "Specific Example", "Where/When", "Nominated By", "Time"]];
-    const sorted = [...noms].sort((a, b) => a.award.localeCompare(b.award) || a.team.localeCompare(b.team, undefined, { numeric: true }) || a.createdAt - b.createdAt);
-    for (const n of sorted) {
-      const t = teams.find((x) => x.number === n.team);
-      const awardName = (AWARDS.find((a) => a.key === n.award) || {}).full || n.award;
-      const fin = finalists.has(`${n.award}::${n.team}`) ? "Yes" : "No";
-      rows.push([awardName, n.team, t?.name || "", fin, fmtMatch(n.match) || "", (n.criteria || []).join("; "), n.reason || "", n.whereWhen || "", n.by || "", new Date(n.createdAt).toISOString()]);
+  const exportNominations = async () => {
+    if (!noms.length) { alert("There are no nominations to export."); return; }
+
+    const sorted = [...noms].sort((a, b) =>
+      a.award.localeCompare(b.award) ||
+      a.team.localeCompare(b.team, undefined, { numeric: true }) ||
+      a.createdAt - b.createdAt
+    );
+
+    try {
+      const [energyBytes, sportsmanshipBytes] = await Promise.all([
+        fetch("/forms/energy-award-nomination.pdf").then((r) => {
+          if (!r.ok) throw new Error("Energy Award PDF template could not be loaded.");
+          return r.arrayBuffer();
+        }),
+        fetch("/forms/sportsmanship-award-nomination.pdf").then((r) => {
+          if (!r.ok) throw new Error("Sportsmanship Award PDF template could not be loaded.");
+          return r.arrayBuffer();
+        }),
+      ]);
+
+      const output = await PDFDocument.create();
+      const font = await output.embedFont(StandardFonts.Helvetica);
+      const bold = await output.embedFont(StandardFonts.HelveticaBold);
+
+      const wrap = (text, maxWidth, size, useFont = font) => {
+        const words = String(text || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+        const lines = [];
+        let line = "";
+        for (const word of words) {
+          const test = line ? `${line} ${word}` : word;
+          if (useFont.widthOfTextAtSize(test, size) <= maxWidth) line = test;
+          else {
+            if (line) lines.push(line);
+            line = word;
+          }
+        }
+        if (line) lines.push(line);
+        return lines;
+      };
+
+      const drawWrapped = (page, text, x, y, width, size = 9, lineHeight = 13, maxLines = 4) => {
+        const lines = wrap(text, width, size).slice(0, maxLines);
+        lines.forEach((line, i) => page.drawText(line, { x, y: y - i * lineHeight, size, font, color: rgb(0, 0, 0) }));
+      };
+
+      const fmtDate = (value) => {
+        const d = new Date(value || Date.now());
+        return d.toLocaleDateString([], { month: "numeric", day: "numeric", year: "numeric" });
+      };
+
+      for (let i = 0; i < sorted.length; i++) {
+        const n = sorted[i];
+        const isEnergy = n.award === "energy";
+        const templateBytes = isEnergy ? energyBytes : sportsmanshipBytes;
+        const template = await PDFDocument.load(templateBytes);
+        const [page] = await output.copyPages(template, [0]);
+        output.addPage(page);
+
+        // Header fields from the nomination record.
+        page.drawText(String(event.name || "The Highlander Summit Signature Event"), { x: 116, y: 648, size: 9, font });
+        page.drawText(fmtDate(n.createdAt), { x: 444, y: 648, size: 9, font });
+        page.drawText(String(n.by || ""), { x: 168, y: 624, size: 9, font });
+        page.drawText(String(n.team || ""), { x: 474, y: 624, size: 10, font: bold });
+
+        // Check the same observed criteria selected in Ref OS.
+        const selected = new Set(n.criteria || []);
+        const criteria = (AWARDS.find((a) => a.key === n.award)?.criteria || []);
+        const checkYs = isEnergy
+          ? [567, 545, 523, 501, 479, 457]
+          : [567, 545, 523, 501];
+        criteria.forEach((criterion, idx) => {
+          if (!selected.has(criterion) || checkYs[idx] == null) return;
+          page.drawText("X", { x: 57.5, y: checkYs[idx], size: 10, font: bold, color: rgb(0, 0, 0) });
+        });
+
+        // The app's reason maps to "Specific Example Observed".
+        drawWrapped(page, n.reason || "", 39, isEnergy ? 402 : 405, 532, 9, 14, 4);
+
+        // The app already stores a separate where/when field.
+        const where = n.whereWhen || (fmtMatch(n.match) ? fmtMatch(n.match) : "");
+        drawWrapped(page, where, 39, isEnergy ? 300 : 302, 532, 9, 14, 3);
+      }
+
+      const bytes = await output.save();
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${(event.name || "vex").replace(/\W+/g, "-").toLowerCase()}-award-nominations.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      setMenu(false);
+    } catch (e) {
+      console.error(e);
+      alert("Could not export nomination PDF: " + (e.message || e));
     }
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    a.download = `${(event.name || "vex").replace(/\W+/g, "-").toLowerCase()}-nominations.csv`; a.click(); setMenu(false);
   };
   const clearSelected = async (sel) => {
     try {
@@ -3387,7 +3471,7 @@ function FeaturesGuide() {
           <Li>Teams are <b>ranked by nomination count</b> per award; tap a team to read every nomination with its checked criteria.</Li>
           <Li>Teams with <b>G1–G5 conduct violations</b> are flagged red so judges are aware.</Li>
           <Li>Admins/judge advisor tap the <b>star</b> to mark <b>finalists</b>.</Li>
-          <Li><b>Export nominations</b> to CSV (includes criteria and where/when) for the judge advisor.</Li>
+          <Li><b>Export nominations</b> — creates one combined PDF using the official Energy and Sportsmanship nomination forms, with one completed form per nomination.</Li>
         </ul>
       </Section>
 
