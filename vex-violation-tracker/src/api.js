@@ -246,6 +246,13 @@ export async function addNomination(eventId, n) {
 export async function deleteNomination(id) {
   await supabase.from("nominations").delete().eq("id", id);
 }
+export async function clearJudging(eventId) {
+  const { error: nomError } = await supabase.from("nominations").delete().eq("event_id", eventId);
+  if (nomError) throw nomError;
+  const { error: shortlistError } = await supabase.from("shortlist").delete().eq("event_id", eventId);
+  if (shortlistError) throw shortlistError;
+}
+
 
 /* ---- award shortlist / finalists ---- */
 export async function listShortlist(eventId) {

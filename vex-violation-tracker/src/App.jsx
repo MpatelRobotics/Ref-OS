@@ -1205,6 +1205,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       }
       if (sel.teams) { await api.clearTeams(eventId); setTeams([]); }
       if (sel.schedule) { await api.clearMatches(eventId); setMatches({}); }
+      if (sel.judging) { await api.clearJudging(eventId); setNoms([]); setFinalists(new Set()); }
+      if (sel.alliances) { await api.clearAlliances(eventId); setAlliances({}); setAlliancesLoaded(true); }
     } catch (e) {
       if (outbox.isOffline(e)) { alert("You're offline — reconnect to clear."); return; }
       throw e;
@@ -1772,7 +1774,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
       )}
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
       {showIdentity && <IdentityModal me={{ name: meName }} onSave={async (n) => { await onEditName(n); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
-      {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length }} onClear={clearSelected} onClose={() => setShowClear(false)} />}
+      {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length }} onClear={clearSelected} onClose={() => setShowClear(false)} />}
       {showOnline && (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
           <div className="bg-white dark:bg-slate-800 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -2810,12 +2812,14 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
 
 /* ============================ CLEAR MODAL ============================ */
 function ClearModal({ counts, onClear, onClose }) {
-  const [sel, setSel] = useState({ violations: false, teams: false, schedule: false, replays: false });
+  const [sel, setSel] = useState({ violations: false, teams: false, schedule: false, replays: false, judging: false, alliances: false });
   const opts = [
     { key: "violations", label: "Violations", desc: `${counts.violations} logged`, note: "Clears every violation and its photos." },
     { key: "replays", label: "Match replays", desc: `${counts.replays} flagged`, note: "Clears all matches marked to re-run (does not delete the matches)." },
     { key: "teams", label: "Teams", desc: `${counts.teams} teams`, note: "Removes the team roster." },
     { key: "schedule", label: "Match schedule", desc: `${counts.schedule} matches`, note: "Removes the imported qual schedule." },
+    { key: "judging", label: "Judging", desc: `${counts.judging} nominations`, note: "Clears all award nominations and finalist selections." },
+    { key: "alliances", label: "Alliances", desc: `${counts.alliances} alliances`, note: "Clears all alliance captain and first-pick assignments." },
   ];
   const any = opts.some((o) => sel[o.key]);
   const toggle = (k) => setSel((s) => ({ ...s, [k]: !s[k] }));
