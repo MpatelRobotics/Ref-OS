@@ -1116,18 +1116,165 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
     a.click(); setMenu(false);
   };
 
-  const exportCSV = () => {
-    const rows = [["Team", "Team Name", "Match", "Type", "Rule", "Rule Description", "Notes", "Logged By", "Photos", "Time"]];
-    for (const v of [...viols].sort((a, b) => a.createdAt - b.createdAt)) {
-      const t = teams.find((x) => x.number === v.team);
-      rows.push([v.team, t?.name || "", fmtMatch(v.match) || "", TYPES[v.type].label, fmtRule(v.code), v.desc || "",
-        v.notes || "", v.by || "", String((v.photoKeys || []).length), new Date(v.createdAt).toISOString()]);
+  const exportCSV = async () => {
+    if (!viols.length) {
+      alert("There are no violations to export.");
+      return;
     }
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
-    a.download = `${(event.name || "vex").replace(/\W+/g, "-").toLowerCase()}-violations.csv`; a.click(); setMenu(false);
+
+    try {
+      const templateBytes = await fetch("/forms/match-anomaly-log.pdf").then((r) => {
+        if (!r.ok) throw new Error("Match Anomaly Log PDF template could not be loaded.");
+        return r.arrayBuffer();
+      });
+
+      const pdf = await PDFDocument.load(templateBytes);
+      const font = await pdf.embedFont(StandardFonts.Helvetica);
+      const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+      // Team placement is fixed by the supplied 12-page Match Anomaly Log.
+      const pageTeams = [
+        ["37S","88S","96Z","119B","119P","119X","169A","169C","169R"],
+        ["169X","197E","197G","255H","293Z","295A","295Y","1028A","1281A"],
+        ["1523A","1584A","1698A","1755N","1769A","1862A","1862X","2145V","2145X"],
+        ["2145Y","2145Z","2429A","2498B","2502A","2502V","2523A","2523V","2627E"],
+        ["2702R","2982A","2982B","2982X","2982Z","3150Z","3151X","3760X","3866F"],
+        ["4478N","4610J","4610P","4610S","4610T","4610W","4610Z","5150D","5249Z"],
+        ["7405A","7405B","7405C","7405M","8737M","9039J","9364E","9909D","9909M"],
+        ["10702X","11753A","11753B","12125A","12914X","12914Y","16099A","16099B","16099C"],
+        ["16099D","16099E","16689A","16689G","20850G","20850T","20850V","20850W","20850X"],
+        ["20850Z","25335A","26767P","48730A","59218C","62880A","62880C","62880D","62880E"],
+        ["66300A","66556Z","81390E","88288A","90110X","91725A","93375B","96138A","96138E"],
+        ["96138X","99209X"],
+      ];
+
+      const teamLocation = new Map();
+      pageTeams.forEach((teamsOnPage, pageIndex) => {
+        teamsOnPage.forEach((team, rowIndex) => teamLocation.set(team, { pageIndex, rowIndex }));
+      });
+
+      const byTeam = {};
+      for (const v of [...viols].sort((a, b) => a.createdAt - b.createdAt)) {
+        (byTeam[v.team] = byTeam[v.team] || []).push(v);
+      }
+
+      const fitText = (text, maxWidth, maxLines, startSize = 6.2, minSize = 4.3) => {
+        const clean = String(text || "").replace(/\s+/g, " ").trim();
+        if (!clean) return { size: startSize, lines: [] };
+
+        const wrapAt = (size) => {
+          const words = clean.split(" ");
+          const lines = [];
+          let line = "";
+          for (const word of words) {
+            const test = line ? `${line} ${word}` : word;
+            if (font.widthOfTextAtSize(test, size) <= maxWidth) {
+              line = test;
+            } else {
+              if (line) lines.push(line);
+              line = word;
+            }
+          }
+          if (line) lines.push(line);
+          return lines;
+        };
+
+        for (let size = startSize; size >= minSize; size -= 0.25) {
+          const lines = wrapAt(size);
+          if (lines.length <= maxLines) return { size, lines };
+        }
+
+        const size = minSize;
+        const lines = wrapAt(size);
+        if (lines.length <= maxLines) return { size, lines };
+
+        const kept = lines.slice(0, maxLines);
+        let last = kept[maxLines - 1] || "";
+        while (last && font.widthOfTextAtSize(last + "...", size) > maxWidth) {
+          last = last.slice(0, -1);
+        }
+        kept[maxLines - 1] = last + "...";
+        return { size, lines: kept };
+      };
+
+      const drawBlock = (page, text, x, topY, width, maxLines = 4, startSize = 6.2) => {
+        const fitted = fitText(text, width, maxLines, startSize);
+        const gap = 11.9;
+        fitted.lines.forEach((line, i) => {
+          page.drawText(line, {
+            x,
+            y: topY - i * gap,
+            size: fitted.size,
+            font,
+            color: rgb(0, 0, 0),
+          });
+        });
+      };
+
+      const violationResult = (v) => {
+        if (v.type === "major") return "Major";
+        if (v.type === "minor") return "Minor";
+        if (v.type === "inspection") return "Inspection";
+        return TYPES[v.type]?.label || v.type || "";
+      };
+
+      const detailFor = (v) => {
+        const matchLabel = fmtMatch(v.match) || "No match";
+        const rule = v.code ? fmtRule(v.code) : "";
+        const note = (v.notes || v.desc || "").replace(/\s+/g, " ").trim();
+        return [matchLabel, rule, note, violationResult(v)].filter(Boolean).join(" | ");
+      };
+
+      const pages = pdf.getPages();
+
+      for (const [team, entries] of Object.entries(byTeam)) {
+        const loc = teamLocation.get(team);
+        if (!loc || !pages[loc.pageIndex]) continue;
+
+        const page = pages[loc.pageIndex];
+        // Each team block is 48.24 pt high and contains four ruled writing lines.
+        const topY = 532 - loc.rowIndex * 48.24;
+
+        const majorCodes = entries
+          .filter((v) => v.type === "major")
+          .map((v) => v.code ? fmtRule(v.code) : "Major")
+          .join("  ");
+
+        const minorCodes = entries
+          .filter((v) => v.type === "minor")
+          .map((v) => v.code ? fmtRule(v.code) : "Minor")
+          .join("  ");
+
+        const details = entries.map(detailFor).join("   •   ");
+
+        drawBlock(page, majorCodes, 96, topY, 102, 4, 6.2);
+        drawBlock(page, minorCodes, 212, topY, 102, 4, 6.2);
+        drawBlock(page, details, 326, topY, 447, 4, 6.2);
+      }
+
+      // Warn if Ref-OS contains a team that is not present on this specific template.
+      const missingTeams = Object.keys(byTeam).filter((team) => !teamLocation.has(team));
+
+      const bytes = await pdf.save();
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${(event.name || "vex").replace(/\W+/g, "-").toLowerCase()}-match-anomaly-log.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      setMenu(false);
+
+      if (missingTeams.length) {
+        alert(
+          `The PDF was exported, but ${missingTeams.length} team${missingTeams.length === 1 ? "" : "s"} are not printed on this Match Anomaly Log template: ${missingTeams.join(", ")}`
+        );
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Could not export Match Anomaly Log PDF: " + (e.message || e));
+    }
   };
+
 
   if (!ready) return <FullPage>Loading event…</FullPage>;
 
