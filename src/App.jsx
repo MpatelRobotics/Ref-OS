@@ -1454,29 +1454,74 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 
       const pages = pdf.getPages();
 
+      const fitSingleLine = (text, maxWidth, startSize = 6.4, minSize = 4.4) => {
+        const clean = String(text || "").replace(/\s+/g, " ").trim();
+        if (!clean) return { text: "", size: startSize };
+
+        for (let size = startSize; size >= minSize; size -= 0.2) {
+          if (font.widthOfTextAtSize(clean, size) <= maxWidth) return { text: clean, size };
+        }
+
+        let clipped = clean;
+        while (clipped.length > 1 && font.widthOfTextAtSize(clipped + "...", minSize) > maxWidth) {
+          clipped = clipped.slice(0, -1);
+        }
+        return { text: clipped + "...", size: minSize };
+      };
+
+      const drawCentered = (page, text, left, right, y, startSize = 6.4) => {
+        const fitted = fitSingleLine(text, right - left - 6, startSize, 4.8);
+        if (!fitted.text) return;
+        const width = font.widthOfTextAtSize(fitted.text, fitted.size);
+        page.drawText(fitted.text, {
+          x: left + ((right - left) - width) / 2,
+          y,
+          size: fitted.size,
+          font,
+          color: rgb(0, 0, 0),
+        });
+      };
+
       for (const [team, entries] of Object.entries(byTeam)) {
         const loc = teamLocation.get(team);
         if (!loc || !pages[loc.pageIndex]) continue;
 
         const page = pages[loc.pageIndex];
-        // Each team block is 48.24 pt high and contains four ruled writing lines.
-        const topY = 532 - loc.rowIndex * 48.24;
 
-        const majorCodes = entries
-          .filter((v) => v.type === "major")
-          .map((v) => v.code ? fmtRule(v.code) : "Major")
-          .join("  ");
+        // The supplied form has four ruled lines per team.
+        // PDF coordinates are calibrated to the printed grid:
+        // Major(s) 105.29-214.30, Minor(s) 214.30-323.33,
+        // details begin just inside the 323.33 divider.
+        const firstLineY = 535.2 - loc.rowIndex * 48.22;
+        const lineGap = 12.05;
+        const visible = entries.slice(0, 4);
 
-        const minorCodes = entries
-          .filter((v) => v.type === "minor")
-          .map((v) => v.code ? fmtRule(v.code) : "Minor")
-          .join("  ");
+        visible.forEach((v, entryIndex) => {
+          const y = firstLineY - entryIndex * lineGap;
+          const ruleText = v.code ? fmtRule(v.code) : "";
 
-        const details = entries.map(detailFor).join("   •   ");
+          if (v.type === "major") {
+            drawCentered(page, ruleText || "Major", 105.29, 214.30, y, 6.3);
+          } else if (v.type === "minor") {
+            drawCentered(page, ruleText || "Minor", 214.30, 323.33, y, 6.3);
+          }
 
-        drawBlock(page, majorCodes, 96, topY, 102, 4, 6.2);
-        drawBlock(page, minorCodes, 212, topY, 102, 4, 6.2);
-        drawBlock(page, details, 326, topY, 447, 4, 6.2);
+          let detail = detailFor(v);
+          if (entryIndex === 3 && entries.length > 4) {
+            detail += ` | +${entries.length - 4} more`;
+          }
+
+          const fitted = fitSingleLine(detail, 759.39 - 327.5 - 5, 6.15, 4.35);
+          if (fitted.text) {
+            page.drawText(fitted.text, {
+              x: 327.5,
+              y,
+              size: fitted.size,
+              font,
+              color: rgb(0, 0, 0),
+            });
+          }
+        });
       }
 
       // Warn if Ref-OS contains a team that is not present on this specific template.
