@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -299,6 +299,12 @@ export default function App() {
     if (theme === "dark") root.classList.add("dark"); else root.classList.remove("dark");
     localStorage.setItem("refosTheme", theme);
   }, [theme]);
+  const [textScale, setTextScale] = useState(() => localStorage.getItem("refosTextScale") || "normal");
+  useEffect(() => {
+    document.documentElement.style.fontSize = ({ normal: "100%", large: "115%", xl: "130%" })[textScale] || "100%";
+    localStorage.setItem("refosTextScale", textScale);
+  }, [textScale]);
+  const cycleTextSize = () => setTextScale((s) => (s === "normal" ? "large" : s === "large" ? "xl" : "normal"));
   const [meName, setMeName] = useState(() => localStorage.getItem("refName") || "");
   const [event, setEvent] = useState(null);
   const [loadErr, setLoadErr] = useState(false);
@@ -332,7 +338,7 @@ export default function App() {
   );
   if (!event) return <FullPage>Loading…</FullPage>;
 
-  return <Tracker key={event.id} initialEvent={event} meName={meName} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} onEditName={saveName} onLock={lock} />;
+  return <Tracker key={event.id} initialEvent={event} meName={meName} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveName} onLock={lock} />;
 }
 
 const FullPage = ({ children }) => (
@@ -407,7 +413,7 @@ function NameScreen({ onName }) {
 /* ==================================================================== */
 /*  TRACKER (the main app, scoped to one event)                        */
 /* ==================================================================== */
-function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName, onLock }) {
+function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock }) {
   const isJudge = role === "judge";
   const eventId = initialEvent.id;
   const [event, setEvent] = useState(initialEvent);
@@ -1317,6 +1323,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                     <button onClick={() => { setMenu(false); exportNominations(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export nominations</button>
                     <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
+<button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                     <div className="border-t border-slate-100 my-1" />
                     <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field log</button>
                 {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
@@ -1335,6 +1342,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, onEditName,
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowActivity(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><ListOrdered size={16} /> Activity feed {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowRankings(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Rankings {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
+<button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                 <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field log</button>
                 {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
@@ -3395,6 +3403,7 @@ function FeaturesGuide() {
       <Section icon={Info} title="Extras">
         <ul className="space-y-1.5">
           <Li><b>Dark / Light mode</b> — toggle in this menu, saved per device.</Li>
+          <Li><b>Text size</b> — cycle Normal → Large → Extra large in this menu to enlarge text and buttons across the whole app (saved per device), without changing your phone's zoom.</Li>
           <Li><b>Install</b> — add Ref-OS to your home screen to launch it full-screen like an app (Add to Home Screen / the install prompt on the deployed site).</Li>
           <Li><b>Live sync</b> — everything updates across all devices within seconds.</Li>
           <Li><b>Elimination priority view</b> — once elimination matches exist, the Matches tab opens directly to <b>Eliminations</b>. Qualifications remain available with one tap.</Li>
