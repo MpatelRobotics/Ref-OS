@@ -1035,6 +1035,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       }
 
       await reloadMatches();
+      const newFromScores = [...inFileS].filter((x) => !rosterS.has(x)).map((number) => ({ number, name: "" }));
+      if (newFromScores.length) { await api.bulkUpsertTeams(eventId, newFromScores); const t = await api.listTeams(eventId); setTeams((cur) => { const extra = cur.filter((x) => !t.some((s) => s.number === x.number)); return [...t, ...extra]; }); }
       markTMSync("scores");
       alert(`Updated scores for ${scored.length} qualification matches. Team records refreshed.`);
     } catch (e) {
@@ -1057,6 +1059,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       chips.push({ label: `${inFile.size - unknown} teams recognized` }, { label: `${unknown} unknown teams`, warn: unknown > 0 });
       if (!(await confirmImport({ title: "Match schedule", chips, warnings }))) return;
       for (const r of rows) await api.addMatch(eventId, { phase: r.phase, num: r.num, red: r.red, blue: r.blue, field: r.field });
+      const newTeams = [...inFile].filter((x) => !roster.has(x)).map((number) => ({ number, name: "" }));
+      if (newTeams.length) { await api.bulkUpsertTeams(eventId, newTeams); const t = await api.listTeams(eventId); setTeams((cur) => { const extra = cur.filter((x) => !t.some((s) => s.number === x.number)); return [...t, ...extra]; }); }
       await reloadMatches();
       markTMSync("matches");
       alert(`Imported ${rows.length} matches (${summary}).` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
@@ -1237,7 +1241,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         setFieldLog((cur) => cur.filter((e) => e.kind !== "replay"));
       }
       if (sel.teams) { await api.clearTeams(eventId); setTeams([]); }
-      if (sel.schedule) { await api.clearMatches(eventId); setMatches({}); }
+      if (sel.schedule) { await api.clearMatches(eventId); setMatches({}); await api.clearRankings(eventId); setTeams((cur) => cur.map((t) => ({ ...t, rank: null }))); }
       if (sel.judging) { await api.clearJudging(eventId); setNoms([]); setFinalists(new Set()); }
       if (sel.alliances) { await api.clearAlliances(eventId); setAlliances({}); setAlliancesLoaded(true); }
       if (sel.watchlist) { await api.clearWatchNotes(eventId); setWatchNotes([]); }
@@ -2856,7 +2860,7 @@ function ClearModal({ counts, onClear, onClose }) {
     { key: "violations", label: "Violations", desc: `${counts.violations} logged`, note: "Clears every violation and its photos." },
     { key: "replays", label: "Match replays", desc: `${counts.replays} flagged`, note: "Clears all matches marked to re-run (does not delete the matches)." },
     { key: "teams", label: "Teams", desc: `${counts.teams} teams`, note: "Removes the team roster." },
-    { key: "schedule", label: "Match schedule", desc: `${counts.schedule} matches`, note: "Removes the imported qual schedule." },
+    { key: "schedule", label: "Match schedule", desc: `${counts.schedule} matches`, note: "Removes the imported matches. Also clears team rankings and W-L-T (both come from the schedule)." },
     { key: "judging", label: "Judging", desc: `${counts.judging} nominations`, note: "Clears all award nominations and finalist selections." },
     { key: "alliances", label: "Alliances", desc: `${counts.alliances} alliances`, note: "Clears all alliance captain and first-pick assignments." },
     { key: "watchlist", label: "Watchlist", desc: `${counts.watchlist} entries`, note: "Removes all teams and notes from the watchlist." },

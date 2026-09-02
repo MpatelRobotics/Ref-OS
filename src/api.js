@@ -345,6 +345,10 @@ export async function clearTeams(eventId) {
 export async function clearMatches(eventId) {
   await supabase.from("matches").delete().eq("event_id", eventId);
 }
+export async function clearRankings(eventId) {
+  const { error } = await supabase.from("teams").update({ rank: null }).eq("event_id", eventId);
+  if (error) throw error;
+}
 
 /* ================= photos ================= */
 export async function photoUrl(path) {
