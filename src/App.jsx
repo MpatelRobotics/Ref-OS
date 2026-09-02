@@ -1174,29 +1174,29 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         const [page] = await output.copyPages(template, [0]);
         output.addPage(page);
 
-        // Header fields from the nomination record.
-        page.drawText(String(event.name || "The Highlander Summit Signature Event"), { x: 116, y: 653, size: 8, font });
-        page.drawText(fmtDate(n.createdAt), { x: 453, y: 653, size: 8, font });
-        page.drawText(String(n.by || ""), { x: 190, y: 629, size: 8, font });
-        page.drawText(String(n.team || ""), { x: 474, y: 629, size: 8.5, font: bold });
+        // Header fields (measured coordinates; energy/sports differ by ~1pt, negligible).
+        page.drawText(String(event.name || "The Highlander Summit Signature Event"), { x: 116, y: 650, size: 9, font });
+        page.drawText(fmtDate(n.createdAt), { x: 434, y: 650, size: 9, font });
+        page.drawText(String(n.by || ""), { x: 188, y: 625, size: 9, font });
+        page.drawText(String(n.team || ""), { x: 472, y: 625, size: 9.5, font: bold });
 
         // Check the same observed criteria selected in Ref OS.
         const selected = new Set(n.criteria || []);
         const criteria = (AWARDS.find((a) => a.key === n.award)?.criteria || []);
         const checkYs = isEnergy
-          ? [567, 545, 523, 501, 479, 457]
-          : [567, 545, 523, 501];
+          ? [562.8, 541.7, 520.6, 499.5, 478.4, 457.3]
+          : [564.2, 543.1, 522.0, 500.8];
         criteria.forEach((criterion, idx) => {
           if (!selected.has(criterion) || checkYs[idx] == null) return;
-          page.drawText("X", { x: 57.2, y: checkYs[idx] + 0.8, size: 8.5, font: bold, color: rgb(0, 0, 0) });
+          page.drawText("X", { x: 56, y: checkYs[idx], size: 9, font: bold, color: rgb(0, 0, 0) });
         });
 
-        // The app's reason maps to "Specific Example Observed".
-        drawWrapped(page, n.reason || "", 39, isEnergy ? 416 : 419, 532, 8.5, 14, 4);
+        // The app's reason maps to "Specific Example Observed" (answer lines are ~21pt apart).
+        drawWrapped(page, n.reason || "", 42, isEnergy ? 413.5 : 457.5, 531, 9, 21, 4);
 
         // The app already stores a separate where/when field.
         const where = n.whereWhen || (fmtMatch(n.match) ? fmtMatch(n.match) : "");
-        drawWrapped(page, where, 39, isEnergy ? 314 : 316, 532, 8.5, 14, 3);
+        drawWrapped(page, where, 42, isEnergy ? 305.5 : 348.5, 531, 9, 21, 3);
       }
 
       const bytes = await output.save();
