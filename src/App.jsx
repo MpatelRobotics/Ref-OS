@@ -442,6 +442,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [query, setQuery] = useState("");
   const [lightbox, setLightbox] = useState(null);
   const [menu, setMenu] = useState(false);
+  const [importPreview, setImportPreview] = useState(null); // { title, chips, warnings, resolve }
+  const confirmImport = (p) => new Promise((resolve) => setImportPreview({ ...p, resolve }));
   const menuRef = useRef(null);
   const menuTimer = useRef(null);
   useEffect(() => {
@@ -746,7 +748,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       const text = await file.text();
       const { rows, warnings } = parseTeamsFile(text, file.name);
       if (!rows.length) { alert("No teams found in that file.\n" + warnings.join("\n")); return; }
-      if (!confirm(`Import ${rows.length} teams?\nExisting teams are updated (names filled in); nothing is deleted.`)) return;
+      const rosterT = new Set(teams.map((t) => t.number));
+      const newCount = rows.filter((r) => !rosterT.has(r.number)).length;
+      const chipsT = [{ label: `${rows.length} teams in file` }, { label: `${newCount} new` }, { label: `${rows.length - newCount} already in roster` }];
+      if (!(await confirmImport({ title: "Team list", chips: chipsT, warnings }))) return;
       await api.bulkUpsertTeams(eventId, rows);
       const t = await api.listTeams(eventId);
       setTeams((cur) => { const extra = cur.filter((x) => !t.some((s) => s.number === x.number)); return [...t, ...extra]; });
@@ -917,7 +922,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       const text = await file.text();
       const { rows, warnings } = parseRankingsFile(text, file.name);
       if (!rows.length) { alert("No rankings found in that file.\n" + warnings.join("\n")); return; }
-      if (!confirm(`Upload rankings for ${rows.length} teams?\nExisting team ranks will be updated without changing team names or match data.`)) return;
+      const rosterR = new Set(teams.map((t) => t.number));
+      const unknownR = rows.filter((r) => !rosterR.has(r.number)).length;
+      const chipsR = [{ label: `${rows.length} ranked teams` }, { label: `${rows.length - unknownR} recognized` }, { label: `${unknownR} unknown teams`, warn: unknownR > 0 }];
+      if (!(await confirmImport({ title: "Qualification rankings", chips: chipsR, warnings }))) return;
       await api.bulkUpsertRankings(eventId, rows);
       const t = await api.listTeams(eventId);
       setTeams((cur) => { const extra = cur.filter((x) => !t.some((serverTeam) => serverTeam.number === x.number)); return [...t, ...extra]; });
@@ -979,9 +987,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       }
 
       if (elimScoreRows.length) {
-        if (!confirm(
-          `Elimination scores detected.\n\nUpdate ${elimScoreRows.length} R16 matches? Qualification rows will be ignored and alliance teams will not be changed.`
-        )) return;
+        if (!(await confirmImport({ title: "Match results — eliminations", chips: [{ label: `${elimScoreRows.length} R16 results` }, { label: "alliance teams unchanged" }], warnings: [] }))) return;
 
         for (const r of elimScoreRows) {
           const winner = r.redScore > r.blueScore ? "red" : r.blueScore > r.redScore ? "blue" : "tie";
@@ -1008,7 +1014,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         return;
       }
 
-      if (!confirm(`Update scores for ${scored.length} qualification matches?\nThis updates team W-L-T records.`)) return;
+      const rosterS = new Set(teams.map((t) => t.number));
+      const inFileS = new Set(); scored.forEach((r) => { (r.red || []).forEach((x) => inFileS.add(x)); (r.blue || []).forEach((x) => inFileS.add(x)); });
+      let unknownS = 0; inFileS.forEach((x) => { if (!rosterS.has(x)) unknownS++; });
+      const chipsS = [{ label: `${scored.length} scored matches` }, { label: `${inFileS.size - unknownS} teams recognized` }, { label: `${unknownS} unknown teams`, warn: unknownS > 0 }];
+      if (!(await confirmImport({ title: "Match results", chips: chipsS, warnings: [] }))) return;
 
       for (const r of scored) {
         const winner = r.redScore > r.blueScore ? "red" : r.blueScore > r.redScore ? "blue" : "tie";
@@ -1039,7 +1049,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       if (!rows.length) { alert("No matches found in that file.\n" + warnings.join("\n")); return; }
       const counts = rows.reduce((a, r) => { a[r.phase] = (a[r.phase] || 0) + 1; return a; }, {});
       const summary = Object.entries(counts).map(([p, n]) => `${n} ${p}`).join(", ");
-      if (!confirm(`Import ${rows.length} matches (${summary})?\nExisting matches with the same number are updated in place.`)) return;
+      const roster = new Set(teams.map((t) => t.number));
+      const inFile = new Set(); for (const r of rows) { (r.red || []).forEach((x) => inFile.add(x)); (r.blue || []).forEach((x) => inFile.add(x)); }
+      let unknown = 0; inFile.forEach((x) => { if (!roster.has(x)) unknown++; });
+      const pl = { qual: "qualification", r16: "R16", qf: "QF", sf: "SF", final: "final", practice: "practice" };
+      const chips = Object.entries(counts).map(([p, n]) => ({ label: `${n} ${pl[p] || p} matches` }));
+      chips.push({ label: `${inFile.size - unknown} teams recognized` }, { label: `${unknown} unknown teams`, warn: unknown > 0 });
+      if (!(await confirmImport({ title: "Match schedule", chips, warnings }))) return;
       for (const r of rows) await api.addMatch(eventId, { phase: r.phase, num: r.num, red: r.red, blue: r.blue, field: r.field });
       await reloadMatches();
       markTMSync("matches");
@@ -1841,6 +1857,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importScoresFile(f); }} />
       <input ref={rankingFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importRankingsFile(f); }} />
+      {importPreview && <ImportPreviewModal preview={importPreview}
+        onImport={() => { const p = importPreview; setImportPreview(null); p.resolve(true); }}
+        onCancel={() => { const p = importPreview; setImportPreview(null); p.resolve(false); }} />}
       <input ref={allianceFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importAlliancesFile(f); }} />
       {addMatchOpen && <AddMatchModal teams={teams} onSave={addElimMatch} onClose={() => setAddMatchOpen(false)} />}
@@ -3297,6 +3316,34 @@ function Rankings({ viols, teamName }) {
 
 
 /* ============================ TOURNAMENT MANAGER SYNC CENTER ============================ */
+/* ============================ IMPORT VALIDATION PREVIEW ============================ */
+function ImportPreviewModal({ preview, onImport, onCancel }) {
+  if (!preview) return null;
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={onCancel}>
+      <div className="bg-white dark:bg-slate-800 w-full max-w-sm rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
+        <h2 className="font-bold text-slate-900 dark:text-slate-100 text-lg flex items-center gap-2"><Upload size={18} /> Confirm import</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">File detected: <b className="text-slate-700 dark:text-slate-200">{preview.title}</b></p>
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          {preview.chips.map((c, i) => (
+            <span key={i} className={`text-xs font-mono px-2 py-1 rounded-md ${c.warn ? "bg-red-100 text-red-700 border border-red-300 dark:bg-red-900/40 dark:text-red-200 dark:border-red-700 font-bold" : "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200"}`}>{c.label || c}</span>
+          ))}
+        </div>
+        {preview.warnings && preview.warnings.length > 0 && (
+          <div className="mt-3 text-[11px] text-amber-700 dark:text-amber-300 space-y-0.5">
+            {preview.warnings.map((w, i) => <div key={i}>• {w}</div>)}
+          </div>
+        )}
+        {preview.chips.some((c) => c.warn) && <p className="mt-3 text-[11px] text-red-600 dark:text-red-300">Unknown teams aren\'t in your roster — check you picked the right file, or import teams first.</p>}
+        <div className="flex gap-2 mt-5">
+          <button onClick={onCancel} className="flex-1 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
+          <button onClick={onImport} className="flex-1 py-2.5 rounded-lg bg-[#D7212B] text-white font-semibold hover:bg-[#B42024]">Import</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRankings, onImportAlliances, onImportScores, stats, syncStatus }) {
   const items = [
     { key: "teams", title: "Teams", detail: `${stats.teams} teams loaded`, action: "Import teams", onClick: onImportTeams, Icon: Users },
