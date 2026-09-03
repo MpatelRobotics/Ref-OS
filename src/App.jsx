@@ -1780,7 +1780,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         ) : openRobot ? (
           <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : view === "matches" ? (
-          <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} />
+          <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} onOpenAwp={() => setView("awp")} />
         ) : view === "robots" ? (
           <RobotList teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "judging" ? (
@@ -2603,7 +2603,7 @@ function EventModal({ event, onSave, onClose }) {
 
 
 /* ============================ MATCHES ============================ */
-function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee }) {
+function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee, onOpenAwp }) {
   const [field, setField] = useState("all");
   const all = Object.values(matches);
   const hasElims = all.some((m) => m.phase && m.phase !== "qual");
@@ -2669,8 +2669,8 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
               {f === "all" ? "All fields" : f}
             </button>
           ))}
-          <button onClick={() => setView("awp")}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border ${view === "awp" ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:border-slate-600"}`}>
+          <button onClick={onOpenAwp}
+            className="px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600">
             AWP
           </button>
         </div>
