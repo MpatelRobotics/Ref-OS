@@ -23,6 +23,9 @@ const normNum = (n) => (n || "").trim().toUpperCase();
 const initials = (name) =>
   (name || "").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 3).toUpperCase() || "?";
 
+// A full name = at least a first and last word (blocks single names / initials like "ABR").
+const isFullName = (name) => (name || "").trim().split(/\s+/).filter(Boolean).length >= 2;
+
 function compress(file, maxDim = 1200, quality = 0.6) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -401,13 +404,14 @@ function NameScreen({ onName }) {
       <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
         <div className="flex items-center gap-2 mb-1"><img src="/logo.svg" alt="" className="h-6 w-6 object-contain" /><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Highlander Summit Signature</span></div>
         <h1 className="font-bold text-slate-900 dark:text-slate-100 text-lg">Welcome, ref</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">Your name is shown on every violation you log, so the crew knows who made the call.</p>
-        <Label>Name or initials</Label>
-        <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Alex R or ABR"
-          onKeyDown={(e) => e.key === "Enter" && name.trim() && onName(name)}
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">Your full name is shown on everything you log, so the crew knows exactly who made each call.</p>
+        <Label>Full name</Label>
+        <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Alex Rodriguez"
+          onKeyDown={(e) => e.key === "Enter" && isFullName(name) && onName(name.trim())}
           className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
-        <button onClick={() => name.trim() && onName(name)} disabled={!name.trim()}
-          className={`w-full mt-3 py-2.5 rounded-lg font-semibold text-white ${name.trim() ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Start logging</button>
+        {name.trim() && !isFullName(name) && <p className="text-xs text-[#D7212B] mt-1.5">Please enter your first and last name.</p>}
+        <button onClick={() => isFullName(name) && onName(name.trim())} disabled={!isFullName(name)}
+          className={`w-full mt-3 py-2.5 rounded-lg font-semibold text-white ${isFullName(name) ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Start logging</button>
       </div>
     </div>
   );
@@ -1647,7 +1651,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           </div>
           <OnlineCluster presence={presence} onClick={() => setShowOnline(true)} />
           {!isJudge && !isEmcee && <button onClick={() => setShowByRule(true)} title="By rule" className="p-1.5 rounded hover:bg-white/10"><BarChart3 size={18} /></button>}
-          <button onClick={() => setShowIdentity(true)} title="Your ref name"
+          <button onClick={() => setShowIdentity(true)} title="Your full name"
             className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-full pl-1 pr-2.5 py-1">
             <span className="w-6 h-6 rounded-full bg-[#D7212B] text-white text-[11px] font-bold grid place-items-center">{meName ? initials(meName) : "?"}</span>
             <span className="text-xs font-medium max-w-[70px] truncate">{meName || "Set name"}</span>
@@ -2468,16 +2472,17 @@ function IdentityModal({ me, onSave, onClose }) {
     <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
       <div className="bg-white dark:bg-slate-800 w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
         <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
-          <h2 className="font-bold text-slate-900 dark:text-slate-100">Your ref name</h2>
+          <h2 className="font-bold text-slate-900 dark:text-slate-100">Your full name</h2>
           <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-3">
-          <div><Label>Name or initials</Label>
-            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Alex R or ABR"
+          <div><Label>Full name</Label>
+            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Alex Rodriguez"
               className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+            {name.trim() && !isFullName(name) && <p className="text-xs text-[#D7212B] mt-1.5">Please enter your first and last name.</p>}
           </div>
         </div>
-        <div className="p-4 pt-0"><button onClick={() => name.trim() && onSave(name)} disabled={!name.trim()} className={`w-full py-2.5 rounded-lg font-semibold text-white ${name.trim() ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Save</button></div>
+        <div className="p-4 pt-0"><button onClick={() => isFullName(name) && onSave(name.trim())} disabled={!isFullName(name)} className={`w-full py-2.5 rounded-lg font-semibold text-white ${isFullName(name) ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Save</button></div>
       </div>
     </div>
   );
