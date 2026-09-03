@@ -498,6 +498,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   });
   const [showRankings, setShowRankings] = useState(false);
   const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
+  const myRole = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const pendingAdminAction = useRef(null);
 
@@ -608,13 +609,12 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 
   useEffect(() => {
     const name = meName || "Ref";
-    const roleLabel = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
     const loadRoster = () => api.listRefRoster(eventId).then(setRefRoster);
-    api.touchRefRoster(eventId, name, roleLabel).then(loadRoster);
-    const leave = api.joinPresence(eventId, { name, role: roleLabel, online_at: Date.now() }, setPresence);
-    const iv = setInterval(() => { api.touchRefRoster(eventId, name, roleLabel); loadRoster(); }, 60000);
+    api.touchRefRoster(eventId, name, myRole).then(loadRoster);
+    const leave = api.joinPresence(eventId, { name, role: myRole, online_at: Date.now() }, setPresence);
+    const iv = setInterval(() => { api.touchRefRoster(eventId, name, myRole); loadRoster(); }, 60000);
     return () => { clearInterval(iv); leave(); };
-  }, [eventId, meName, isEmcee, isJudge, adminUnlocked]);
+  }, [eventId, meName, myRole]);
 
   const saveEvent = async (data) => {
     const ev = await api.updateEvent(eventId, {
@@ -717,7 +717,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   };
   const addNomination = async (form) => {
     try {
-      const saved = await api.addNomination(eventId, { ...form, by: meName });
+      const saved = await api.addNomination(eventId, { ...form, by: meName, byRole: myRole });
       setNoms((cur) => [saved, ...cur.filter((x) => x.id !== saved.id)]);
     } catch (e) {
       if (outbox.isOffline(e)) throw new Error("You're offline — reconnect to nominate.");
@@ -3196,6 +3196,7 @@ function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNom
                         <div className="flex items-center gap-2 text-xs text-slate-400">
                           {fmtMatch(n.match) && <span className="font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{fmtMatch(n.match)}</span>}
                           {n.by && <span className="flex items-center gap-1"><UserCircle2 size={12} /> {n.by}</span>}
+                          {n.byRole && <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md border ${roleChip(n.byRole)}`}>{n.byRole}</span>}
                           <span className="ml-auto">{fmtTime(n.createdAt)}</span>
                           {!emcee && <button onClick={() => { if (confirm("Remove this nomination?")) onDeleteNom(n.id); }} className="text-slate-300 hover:text-red-600"><Trash2 size={14} /></button>}
                         </div>

@@ -236,7 +236,7 @@ export async function listRules(eventId) {
 }
 
 /* ================= award nominations (Judging) ================= */
-const mapNom = (r) => ({ id: r.id, award: r.award, team: r.team, match: r.match_info || null, reason: r.reason || "", criteria: r.criteria || [], whereWhen: r.where_when || "", by: r.nominated_by || "", createdAt: new Date(r.created_at).getTime() });
+const mapNom = (r) => ({ id: r.id, award: r.award, team: r.team, match: r.match_info || null, reason: r.reason || "", criteria: r.criteria || [], whereWhen: r.where_when || "", by: r.nominated_by || "", byRole: r.nominated_role || "", createdAt: new Date(r.created_at).getTime() });
 export async function listNominations(eventId) {
   const { data } = await supabase.from("nominations").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
   return (data || []).map(mapNom);
@@ -244,7 +244,7 @@ export async function listNominations(eventId) {
 export async function addNomination(eventId, n) {
   const id = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
   const cleanMatch = n.match && n.match.phase && n.match.phase !== "none" ? { phase: n.match.phase, num: (n.match.num || "").trim() } : null;
-  const row = { id, event_id: eventId, award: n.award, team: (n.team || "").trim().toUpperCase(), match_info: cleanMatch, reason: (n.reason || "").trim(), criteria: (n.criteria && n.criteria.length) ? n.criteria : null, where_when: (n.whereWhen || "").trim() || null, nominated_by: n.by || "" };
+  const row = { id, event_id: eventId, award: n.award, team: (n.team || "").trim().toUpperCase(), match_info: cleanMatch, reason: (n.reason || "").trim(), criteria: (n.criteria && n.criteria.length) ? n.criteria : null, where_when: (n.whereWhen || "").trim() || null, nominated_by: n.by || "", nominated_role: n.byRole || null };
   const { data, error } = await supabase.from("nominations").upsert(row, { onConflict: "id" }).select().single();
   if (error) throw error;
   return mapNom(data);

@@ -210,10 +210,12 @@ create table if not exists public.nominations (
   criteria    text[],                 -- observed-criteria the ref checked
   where_when  text,                   -- where/when observed
   nominated_by text,
+  nominated_role text,
   created_at  timestamptz default now()
 );
 alter table public.nominations add column if not exists criteria text[];
 alter table public.nominations add column if not exists where_when text;
+alter table public.nominations add column if not exists nominated_role text;
 alter table public.nominations enable row level security;
 drop policy if exists "open rw nominations" on public.nominations;
 create policy "open rw nominations" on public.nominations for all using (true) with check (true);
