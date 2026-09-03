@@ -2708,12 +2708,74 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
   );
 }
 
+function AwpStep({ label, sub, val, set }) {
+  return (
+    <div className="flex items-center justify-between">
+      <div><div className="text-sm font-medium text-slate-700 dark:text-slate-200">{label}</div><div className="text-[11px] text-slate-400">{sub}</div></div>
+      <div className="flex items-center gap-2">
+        <button onClick={() => set(Math.max(0, val - 1))} className="w-8 h-8 rounded-lg border border-slate-300 dark:border-slate-600 text-lg font-bold leading-none">−</button>
+        <span className="w-7 text-center font-mono font-bold text-lg">{val}</span>
+        <button onClick={() => set(val + 1)} className="w-8 h-8 rounded-lg border border-slate-300 dark:border-slate-600 text-lg font-bold leading-none">+</button>
+      </div>
+    </div>
+  );
+}
+
+// AWP (Autonomous Win Point) checklist — a manual aid for the head ref. No live field
+// data exists in the app, so the ref enters what they saw at the end of auton and this
+// evaluates it against the v2.0 criteria. Signature/Worlds-qualifying = 7 Pins / 3 Goals;
+// standard events = 6 Pins / 2 Goals.
+function AwpChecker() {
+  const [alliance, setAlliance] = useState("red");
+  const [pins, setPins] = useState(0);
+  const [goals, setGoals] = useState(0);
+  const [perim, setPerim] = useState(true);
+  const [noViol, setNoViol] = useState(true);
+  const [sig, setSig] = useState(true);
+  const th = sig ? { pins: 7, goals: 3 } : { pins: 6, goals: 2 };
+  const pinsOk = pins >= th.pins, goalsOk = goals >= th.goals;
+  const pass = pinsOk && goalsOk && perim && noViol;
+  return (
+    <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-3">
+      <div className="flex gap-2">
+        {["red", "blue"].map((a) => (
+          <button key={a} onClick={() => setAlliance(a)} className={`flex-1 py-2 rounded-lg text-sm font-semibold border capitalize ${alliance === a ? (a === "red" ? "bg-red-600 text-white border-red-600" : "bg-blue-600 text-white border-blue-600") : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>{a} alliance</button>
+        ))}
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-slate-500 dark:text-slate-400">Criteria</span>
+        <div className="flex gap-1">
+          <button onClick={() => setSig(true)} className={`px-2 py-1 rounded-md text-xs font-semibold border ${sig ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>Signature 7/3</button>
+          <button onClick={() => setSig(false)} className={`px-2 py-1 rounded-md text-xs font-semibold border ${!sig ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>Standard 6/2</button>
+        </div>
+      </div>
+      <AwpStep label={`Pins Scored for ${alliance}`} sub={`Need ${th.pins}+ (exclude any across the auton line)`} val={pins} set={setPins} />
+      <AwpStep label="Goals with 2+ of these Pins" sub={`Need ${th.goals}+ (exclude any across the auton line)`} val={goals} set={setGoals} />
+      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"><input type="checkbox" checked={perim} onChange={(e) => setPerim(e.target.checked)} className="w-4 h-4 accent-emerald-600" /> Neither robot on the Field Perimeter at auton's end</label>
+      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"><input type="checkbox" checked={noViol} onChange={(e) => setNoViol(e.target.checked)} className="w-4 h-4 accent-emerald-600" /> No auton violations by this alliance</label>
+      <div className={`rounded-lg p-3 text-sm font-bold ${pass ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800" : "bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600"}`}>
+        {pass ? "\u2713 AWP can be awarded to this alliance" : "AWP not met yet"}
+        {!pass && (
+          <ul className="mt-1 font-normal text-xs space-y-0.5">
+            {!pinsOk && <li>\u2022 {th.pins}+ Pins (have {pins})</li>}
+            {!goalsOk && <li>\u2022 {th.goals}+ Goals with 2+ Pins (have {goals})</li>}
+            {!perim && <li>\u2022 Both robots clear of the Field Perimeter</li>}
+            {!noViol && <li>\u2022 No auton violations</li>}
+          </ul>
+        )}
+      </div>
+      <p className="text-[11px] text-slate-400">Manual aid — enter what you saw at the end of auton. It changes no scores; Tournament Manager records the official AWP.</p>
+    </div>
+  );
+}
+
 function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, fieldLog = [], onAddField, onRemoveField, meName, canDelete, emcee }) {
   const [toOpen, setToOpen] = useState(false);
   const [toAlliance, setToAlliance] = useState("red");
   const [toTeam, setToTeam] = useState("");
   const [faultOpen, setFaultOpen] = useState(false);
   const [faultNote, setFaultNote] = useState("");
+  const [awpOpen, setAwpOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
   const m = match;
@@ -2843,6 +2905,8 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
           <button onClick={() => { setFaultOpen((v) => !v); setToOpen(false); }} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${faultOpen ? "bg-red-600 text-white border-red-600" : "bg-white dark:bg-slate-800 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700"}`}><AlertTriangle size={15} /> Field fault</button>
           <button onClick={toggleReplay} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${replayEntry ? "bg-amber-500 text-white border-amber-500" : "bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"}`}><RefreshCw size={15} /> {replayEntry ? "For replay ✓" : "Replay"}</button>
         </div>
+        {!isElim && <button onClick={() => { setAwpOpen((v) => !v); setToOpen(false); setFaultOpen(false); }} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${awpOpen ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"}`}><ClipboardCheck size={15} /> AWP check</button>}
+        {!isElim && awpOpen && <AwpChecker />}
         {isElim && toOpen && (
           <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2">
             <div className="flex gap-2">
@@ -3790,7 +3854,7 @@ function FeaturesGuide() {
       <Section icon={BookOpen} title="Rules tab">
         <p>The full rulebook, searchable by code or description. It also powers the rule picker in the log form.</p>
         <p>Rules that have referee guidance show a red <b>“Notes ›”</b> tag — tap one to open a popup with <b>violation notes</b> for that rule: when it's Minor vs. Major, when it's match-affecting, escalation thresholds, and DQ conditions. Rules without notes aren't tappable.</p>
-        <p><b>Autonomous Win Point (SC8) — this event:</b> as a Signature Event, the Summit uses the v2.0 Worlds-qualifying AWP bar — <b>7+ Pins</b> Scored for your alliance, <b>3+ Goals</b> each holding <b>2+</b> of your alliance's Pins, and neither of your robots touching the Field Perimeter at the end of auton, with no auton violations. (Standard events stay at 6 Pins / 2 Goals.) Pins and Goals across the Autonomous Line from you don't count, and any auton violation voids the AWP.</p>
+        <p><b>Autonomous Win Point (SC8) — this event:</b> as a Signature Event, the Summit uses the v2.0 Worlds-qualifying AWP bar — <b>7+ Pins</b> Scored for your alliance, <b>3+ Goals</b> each holding <b>2+</b> of your alliance's Pins, and neither of your robots touching the Field Perimeter at the end of auton, with no auton violations. (Standard events stay at 6 Pins / 2 Goals.) Pins and Goals across the Autonomous Line from you don't count, and any auton violation voids the AWP. On qualification matches, the match view has an <b>AWP check</b> button that runs this checklist for you — enter what you saw at the end of auton and it tells you pass/fail (it changes no scores; TM records the official AWP).</p>
       </Section>
 
       <Section icon={Trophy} title="Judging">
