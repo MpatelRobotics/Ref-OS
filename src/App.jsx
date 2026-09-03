@@ -703,8 +703,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     setTeams((cur) => cur.map((t) => (t.number === number ? { ...t, photoKeys: paths } : t)));
   };
   const removeRobotPhoto = async (number, path) => {
-    const paths = await api.removeTeamPhoto(eventId, number, path);
-    setTeams((cur) => cur.map((t) => (t.number === number ? { ...t, photoKeys: paths } : t)));
+    try {
+      const paths = await api.removeTeamPhoto(eventId, number, path);
+      setTeams((cur) => cur.map((t) => (t.number === number ? { ...t, photoKeys: paths } : t)));
+    } catch (e) {
+      if (outbox.isOffline(e)) { alert("You're offline — reconnect to delete this photo."); return; }
+      throw e;
+    }
   };
   const addNomination = async (form) => {
     try {
@@ -737,9 +742,14 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to remove this."); return; } throw e; }
   };
   const addElimMatch = async (m) => {
-    await api.addMatch(eventId, m);
-    const list = await api.listMatches(eventId);
-    const map = {}; for (const x of list) map[x.id] = x; setMatches(map);
+    try {
+      await api.addMatch(eventId, m);
+      const list = await api.listMatches(eventId);
+      const map = {}; for (const x of list) map[x.id] = x; setMatches(map);
+    } catch (e) {
+      if (outbox.isOffline(e)) { alert("You're offline — reconnect to add this match."); return; }
+      throw e;
+    }
     setAddMatchOpen(false);
   };
   const importTeamsFile = async (file) => {
@@ -1098,10 +1108,20 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   };
   const setMatchWinner = async (m, winner) => {
     const next = m.winner === winner ? "" : winner; // tapping the current winner clears it
-    await api.setMatchWinner(eventId, m.phase, m.num, next);
+    try {
+      await api.setMatchWinner(eventId, m.phase, m.num, next);
+    } catch (e) {
+      if (outbox.isOffline(e)) { alert("You're offline — reconnect to set the match winner."); return; }
+      throw e;
+    }
     const map = { ...matches, [m.id]: { ...m, winner: next } };
     setMatches(map);
-    await advanceBracket(map);
+    try {
+      await advanceBracket(map);
+    } catch (e) {
+      if (outbox.isOffline(e)) { alert("Winner saved, but you went offline before the next round could be created — reconnect and tap the winner again to advance the bracket."); return; }
+      throw e;
+    }
   };
   // 16-alliance single-elimination Round of 16 seeding (higher seed = red)
   const ELIM16 = [[1, 16], [8, 9], [5, 12], [4, 13], [3, 14], [6, 11], [7, 10], [2, 15]];
@@ -1111,17 +1131,22 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     const existingElims = Object.values(matches).some((m) => m.phase === "r16");
     if (existingElims && !confirm("Round-of-16 matches already exist. Re-create them from the current alliances? (Existing R16 matches will be overwritten.)")) return;
     if (!confirm("Generate the Round of 16 from these 16 alliances?")) return;
-    for (let i = 0; i < ELIM16.length; i++) {
-      const [hi, lo] = ELIM16[i];
-      await api.addMatch(eventId, {
-        phase: "r16", num: i + 1,
-        red: (alliances[hi] || []).filter(Boolean),
-        blue: (alliances[lo] || []).filter(Boolean),
-        label: `R16 ${i + 1} — A${hi} vs A${lo}`,
-      });
+    try {
+      for (let i = 0; i < ELIM16.length; i++) {
+        const [hi, lo] = ELIM16[i];
+        await api.addMatch(eventId, {
+          phase: "r16", num: i + 1,
+          red: (alliances[hi] || []).filter(Boolean),
+          blue: (alliances[lo] || []).filter(Boolean),
+          label: `R16 ${i + 1} — A${hi} vs A${lo}`,
+        });
+      }
+      const list = await api.listMatches(eventId);
+      const map = {}; for (const x of list) map[x.id] = x; setMatches(map);
+    } catch (e) {
+      if (outbox.isOffline(e)) { alert("You're offline — the Round of 16 wasn't fully created. Reconnect and tap Finalize again to rebuild it."); return; }
+      throw e;
     }
-    const list = await api.listMatches(eventId);
-    const map = {}; for (const x of list) map[x.id] = x; setMatches(map);
     setView("matches");
     alert("Round of 16 created. Open the Matches tab → Eliminations to see them. Add QF/SF/Final as each round's winners are known.");
   };
