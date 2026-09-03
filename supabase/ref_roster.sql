@@ -3,8 +3,12 @@ create table if not exists public.ref_roster (
   event_id uuid not null references public.events(id) on delete cascade,
   name text not null,
   last_seen timestamptz not null default now(),
+  role text,
   primary key (event_id, name)
 );
+
+-- For databases created before the role column existed:
+alter table public.ref_roster add column if not exists role text;
 
 alter table public.ref_roster enable row level security;
 

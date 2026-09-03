@@ -608,12 +608,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 
   useEffect(() => {
     const name = meName || "Ref";
+    const roleLabel = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
     const loadRoster = () => api.listRefRoster(eventId).then(setRefRoster);
-    api.touchRefRoster(eventId, name).then(loadRoster);
-    const leave = api.joinPresence(eventId, { name, online_at: Date.now() }, setPresence);
-    const iv = setInterval(() => { api.touchRefRoster(eventId, name); loadRoster(); }, 60000);
+    api.touchRefRoster(eventId, name, roleLabel).then(loadRoster);
+    const leave = api.joinPresence(eventId, { name, role: roleLabel, online_at: Date.now() }, setPresence);
+    const iv = setInterval(() => { api.touchRefRoster(eventId, name, roleLabel); loadRoster(); }, 60000);
     return () => { clearInterval(iv); leave(); };
-  }, [eventId, meName]);
+  }, [eventId, meName, isEmcee, isJudge, adminUnlocked]);
 
   const saveEvent = async (data) => {
     const ev = await api.updateEvent(eventId, {
@@ -1682,7 +1683,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 <>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowEvent(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><CalendarDays size={16} /> Event setup {adminUnlocked && <span className="ml-auto text-[10px] text-emerald-600 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); setShowTMSync(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><RefreshCw size={16} /> Tournament Manager Sync Center</button>
-                <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Ref status</button>
+                <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Key Volunteer Status</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
                 <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export violations</button>
                 <button onClick={() => requireAdmin(exportNominations)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Trophy size={16} /> Export nominations</button>
@@ -1866,7 +1867,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
           <div className="bg-white dark:bg-slate-800 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800">
-              <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Users size={18} /> Ref status</h2>
+              <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Users size={18} /> Key Volunteer Status</h2>
               <button onClick={() => setShowOnline(false)} className="text-slate-400"><X size={22} /></button>
             </div>
             <div className="p-4"><OnlineList presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} /></div>
@@ -2972,9 +2973,19 @@ function OnlineCluster({ presence, onClick }) {
   );
 }
 
+function roleChip(role) {
+  switch (role) {
+    case "Admin": return "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800";
+    case "Judge Advisor": return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800";
+    case "Emcee": return "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800";
+    default: return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600";
+  }
+}
+
 function OnlineList({ presence, roster, meName, onRemove }) {
   const onlineCounts = {};
-  for (const p of presence) { const n = p.name || "Ref"; onlineCounts[n] = (onlineCounts[n] || 0) + 1; }
+  const roleByName = {};
+  for (const p of presence) { const n = p.name || "Ref"; onlineCounts[n] = (onlineCounts[n] || 0) + 1; if (p.role) roleByName[n] = p.role; }
   const all = new Map((roster || []).map((r) => [r.name, r]));
   Object.keys(onlineCounts).forEach((name) => { if (!all.has(name)) all.set(name, { name, lastSeen: Date.now() }); });
   const refs = [...all.values()].sort((a, b) => {
@@ -2984,15 +2995,19 @@ function OnlineList({ presence, roster, meName, onRemove }) {
   const onlineTotal = refs.filter((r) => onlineCounts[r.name]).length;
   return (
     <>
-      <p className="text-xs text-slate-400 mb-3">{onlineTotal} online · {Math.max(0, refs.length - onlineTotal)} offline. Status updates live as refs join or leave.{onRemove ? " Tap the trash on an offline ref to remove them." : ""}</p>
+      <p className="text-xs text-slate-400 mb-3">{onlineTotal} online · {Math.max(0, refs.length - onlineTotal)} offline. Status updates live as volunteers join or leave.{onRemove ? " Tap the trash on an offline volunteer to remove them." : ""}</p>
       <ul className="space-y-2">
         {refs.map((r) => {
           const isOnline = !!onlineCounts[r.name];
+          const role = roleByName[r.name] || r.role || "";
           return (
             <li key={r.name} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3">
               <span className={`w-8 h-8 rounded-full text-white text-xs font-bold grid place-items-center shrink-0 ${isOnline ? "bg-[#D7212B]" : "bg-slate-400"}`}>{initials(r.name)}</span>
               <div className="min-w-0">
-                <span className="font-medium text-slate-800 dark:text-slate-100 truncate">{r.name}{r.name === meName && <span className="text-xs text-slate-400 ml-1">(you)</span>}</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-medium text-slate-800 dark:text-slate-100 truncate">{r.name}{r.name === meName && <span className="text-xs text-slate-400 ml-1">(you)</span>}</span>
+                  {role && <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md border shrink-0 ${roleChip(role)}`}>{role}</span>}
+                </div>
                 {!isOnline && r.lastSeen > 0 && <div className="text-[11px] text-slate-400">last seen {ago(r.lastSeen)}</div>}
               </div>
               <span className={`ml-auto inline-flex items-center gap-1 text-xs shrink-0 ${isOnline ? "text-emerald-600" : "text-slate-400"}`}>
@@ -3000,12 +3015,12 @@ function OnlineList({ presence, roster, meName, onRemove }) {
                 {isOnline ? `online${onlineCounts[r.name] > 1 ? ` · ${onlineCounts[r.name]} devices` : ""}` : "offline"}
               </span>
               {onRemove && !isOnline && (
-                <button onClick={() => { if (confirm(`Remove ${r.name} from the ref list?`)) onRemove(r.name); }} className="text-slate-300 hover:text-red-600 shrink-0" title="Remove ref"><Trash2 size={15} /></button>
+                <button onClick={() => { if (confirm(`Remove ${r.name} from the volunteer list?`)) onRemove(r.name); }} className="text-slate-300 hover:text-red-600 shrink-0" title="Remove volunteer"><Trash2 size={15} /></button>
               )}
             </li>
           );
         })}
-        {refs.length === 0 && <li className="text-sm text-slate-400 text-center py-6">No refs have joined this event yet.</li>}
+        {refs.length === 0 && <li className="text-sm text-slate-400 text-center py-6">No volunteers have joined this event yet.</li>}
       </ul>
     </>
   );
@@ -3792,7 +3807,7 @@ function FeaturesGuide() {
           <Li><b>By Rule</b> (header chart icon) — violations broken down by rule and team.</Li>
           <Li><b>Activity feed</b> — every violation across the event, newest first.</Li>
           <Li><b>Rankings</b> — teams ranked by violations, Majors weighted highest.</Li>
-          <Li><b>Ref status</b> — who's online / last seen; after 24 hours, last seen is displayed in days instead of hours. Admins can remove offline refs.</Li>
+          <Li><b>Key Volunteer Status</b> — who's online / last seen, each tagged with the role they logged in as (Referee, Emcee, Judge Advisor, or Admin); after 24 hours, last seen is displayed in days instead of hours. Admins can remove offline volunteers.</Li>
           <Li><b>Tournament Manager Sync Center</b> (admin) — one place for all Tournament Manager imports: teams, match schedule, rankings, alliances, and scores. Each section shows the current data count and when it was last updated.</Li>
           <Li><b>Import matches (file)</b> — load the whole schedule at once: export the match list from Tournament Manager (CSV) and pick it here. It reads quals and elims, matched by number so re-importing updates in place. No API or bridge needed.</Li>
           <Li><b>Import teams (file)</b> — load the team roster the same way: export the team list from Tournament Manager (CSV) and pick it here. Team numbers and names are added/updated; nothing is deleted.</Li>
