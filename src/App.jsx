@@ -2197,7 +2197,6 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
   const [keepKeys, setKeepKeys] = useState((edit && edit.photoKeys) || []);
   const [busy, setBusy] = useState(false);
   const [showRulePicker, setShowRulePicker] = useState(false);
-  const [repeatWarning, setRepeatWarning] = useState(null);
   const fileRef = useRef(null);
   const T = TYPES[type];
 
@@ -2229,21 +2228,6 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
       if (dup) {
         const where = myKey ? ` in ${fmtMatch({ phase: matchPhase, num: matchNum })}` : "";
         if (!window.confirm(`Possible duplicate — ${selectedTeam} already has ${fmtRule(selectedRule)}${where} logged. Add it again anyway?`)) return;
-      }
-    }
-    if (!edit && type === "minor" && selectedTeam && selectedRule === "SG11") {
-      // SG11 is the one rule with a defined repeat limit before Major (illegal Match Loads).
-      // Guideline: 6+ illegal loads in one qual match, OR a 3rd+ qual match that each have one.
-      const sg11 = (viols || []).filter((v) =>
-        normNum(v.team) === selectedTeam && normNum(v.code).replace(/[<>]/g, "") === "SG11"
-      );
-      const thisNum = matchPhase === "qual" && matchNum ? String(matchNum) : null;
-      const qualMatches = new Set(sg11.filter((v) => v.match && v.match.phase === "qual" && v.match.num != null).map((v) => String(v.match.num)));
-      if (thisNum) qualMatches.add(thisNum);
-      const sameMatchCount = thisNum ? sg11.filter((v) => v.match && v.match.phase === "qual" && String(v.match.num) === thisNum).length + 1 : 0;
-      if (matchPhase === "qual" && (qualMatches.size >= 3 || sameMatchCount >= 6)) {
-        setRepeatWarning({ team: selectedTeam, matches: qualMatches.size, inMatch: sameMatchCount });
-        return;
       }
     }
     await doSave();
@@ -2390,27 +2374,6 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
           <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? `${T.solid} ${T.solidHover}` : "bg-slate-300"}`}>{busy ? "Saving…" : edit ? "Save changes" : "Save violation"}</button>
         </div>
       </div>
-      {repeatWarning && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-800 w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden">
-            <div className="p-5">
-              <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-600 grid place-items-center mb-3"><AlertTriangle size={26} /></div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">SG11 — repeated Match Loads</h3>
-              <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">
-                Team <b className="font-mono text-slate-900 dark:text-slate-100">{repeatWarning.team}</b> now has an SG11 violation in <b>{repeatWarning.matches} qualification match{repeatWarning.matches !== 1 ? "es" : ""}</b>{repeatWarning.inMatch >= 6 ? <> (and <b>{repeatWarning.inMatch}</b> in this match)</> : null}.
-              </p>
-              <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">
-                SG11 has a defined repeat limit for illegal Match Loads (6+ in one qualification match, or a 3rd qualification match with one). At this point the Head Referee <b>may</b> escalate to a Major — this stays their discretion.
-              </p>
-            </div>
-            <div className="border-t border-slate-200 dark:border-slate-700 p-3 flex flex-col gap-2">
-              <button onClick={() => { setType("major"); setRepeatWarning(null); }} className="w-full py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold">Record as Major</button>
-              <button onClick={() => { setRepeatWarning(null); doSave(); }} className="w-full py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700">Keep as Minor</button>
-              <button onClick={() => setRepeatWarning(null)} className="w-full py-2 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200">Review violation</button>
-            </div>
-          </div>
-        </div>
-      )}
       {showRulePicker && (
         <RulePicker rules={rules} knownRules={knownRules}
           onPickRule={(c, d) => { setCode(c); setDesc(d || ""); setShowRulePicker(false); }}
@@ -3886,10 +3849,10 @@ const RULE_NOTES = {
   "SG7": "Any violation (Major or Minor) awards the Autonomous Bonus to the opponents (see SG8b for the exception).\nIntentional / strategic / egregious cases \u2014 e.g., deliberately contacting an opposing robot while on foam on the opponents' side, or SG7e interactions \u2014 are Major and should be a DQ.\nDeliberate defensive auton (SG7a) may also be recorded as G1.",
   "SG8": "The Midfield and auton-line objects are shared, so robot-to-robot contact (incidental and intentional) is expected and should almost never be a violation \u2014 teams own their robots' actions and shouldn't claim GG14 on their own tippy robot.\nBut the Midfield isn't a free-for-all: head refs may still act on teams exploiting the rule, and reckless / unsafe play aimed at destruction, damage, tipping, entanglement, trapping, or forcing a penalty is still prohibited.",
   "SG9": "Incidental / unintentional contact with a goal or its stacked objects is usually Minor.\nIntentional / strategic / egregious interactions \u2014 including adding or removing placed objects on the goal \u2014 are Major.\nRepeated Minors can escalate to Major, especially after prior warnings.",
-  "SG10": "Treat as match-affecting if the offender's alliance ties or wins by 15 or fewer points, unless the head ref can indisputably rule it had no effect.\nIntentional / strategic / egregious cases are Major.\nRepeated Minors can escalate to Major, especially after warnings.",
-  "SG11": "For match-affecting math, count each illegal match load as 3 points (not added to the score) \u2014 if removing 3 per illegal load would flip the result, it's match-affecting.\nQuals escalation to Major: 6+ illegal loads in one qual match, OR a 3rd (and later) qual match that each have at least one illegal load.\nIn elims, only match-affecting violations count (Minors don't compound); the 6-load and 3-match guidelines don't apply in elims.",
-  "SG12": "Most are Minor; repeated Minors can escalate to Major, especially after warnings.\nViolations involving Pins placed on the Midfield Goal that change the match outcome in the offender's favor are Match Affecting.\n(Enforcement focuses on vertically expanded lifts in the Midfield during endgame, not small pop-up mechanisms.)",
-  "SG13": "Egregious cases are Major; repeated Minors can escalate to Major, especially after warnings.\n(Protects load zones from opponent interference; does not apply during auton.)",
+  "SG10": "v2.0 match-affecting math for Placed objects pulled out of a neutral Goal uses a fixed pin value: 10 pts per Pin for an interaction that removes 1\u20133 Pins, or a flat 50 pts total once an interaction removes 4+ Pins. If deducting that from the offender's final score would flip the result, it's Match Affecting (the value is never added to the real score). Refs just make a best-guess count \u2014 teams accept it.\nIntentional / strategic / egregious cases are Major.\nRepeated Minors can escalate to Major, especially after warnings.",
+  "SG11": "v2.0: match loads may only be introduced through your own alliance-colored Loaders, only during driver control, and only via the top or back (dropped or placed, nested is fine); they're removed only through the bottom. Momentary simultaneous contact between a match load, a drive-team member, and a robot is now allowed until it's released. The custom SG11 point math and repeat thresholds were removed \u2014 handle violations with standard Minor/Major judgment (excessive or unsafe actions can also invoke S1 / G1).",
+  "SG12": "Most are Minor; repeated Minors can escalate to Major, especially after warnings.\nv2.0: the Endgame restriction is now no Placing Scoring Objects on the Midfield Goal (the old vertical-expansion height cap in the Midfield was removed).\nA Midfield-Goal placement that changes the outcome in the offender's favor is Match Affecting.",
+  "SG13": "Egregious cases are Major; repeated Minors can escalate to Major, especially after warnings.\n(Protects Load Zones from opponent interference during driver control; doesn't apply during auton. v2.0 also bars adding objects to, or removing them from, an opposing alliance's Loaders.)",
   "G1": "Any G1 can be treated as a Major, handled case-by-case. Teams at risk usually get a 'final warning,' though the head ref isn't required to give one.",
   "G2": "Reviewed case-by-case. By definition it becomes match-affecting the moment an adult-built or adult-programmed robot scores in a match.",
   "G3": "Common sense applies. Obvious typos aren't taken literally; understand the realities of the V5 system; if you have to ask whether something violates S1 / G1 / T1, it's probably outside the spirit. Teams get benefit of the doubt for accidental / edge cases, but not repeated or strategic infractions. If no rule makes a part legal, it isn't.",
