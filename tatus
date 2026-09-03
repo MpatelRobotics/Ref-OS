@@ -1,0 +1,81 @@
+[33mcommit abb9086e68e367413f87f9ee74731b96fb136140[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: MpatelRobotics <maharshi13patel@gmail.com>
+Date:   Thu Sep 3 00:45:51 2026 -0400
+
+    Offline-safe elim winner/bracket/photo handlers; remove nested duplicate
+
+ src/App.jsx                                        |   59 [32m+[m[31m-[m
+ vex-violation-tracker/.env.example                 |   16 [31m-[m
+ vex-violation-tracker/.gitignore                   |    8 [31m-[m
+ vex-violation-tracker/DEPLOY.md                    |  199 [31m--[m
+ vex-violation-tracker/README.md                    |  124 [31m-[m
+ vex-violation-tracker/index.html                   |   19 [31m-[m
+ vex-violation-tracker/package-lock.json            | 2793 [31m---------------[m
+ vex-violation-tracker/package.json                 |   27 [31m-[m
+ vex-violation-tracker/postcss.config.js            |    6 [31m-[m
+ .../public/forms/energy-award-nomination.pdf       |  Bin [31m200294[m -> [32m0[m bytes
+ .../public/forms/match-anomaly-log.pdf             |  Bin [31m279001[m -> [32m0[m bytes
+ .../forms/sportsmanship-award-nomination.pdf       |  Bin [31m199668[m -> [32m0[m bytes
+ vex-violation-tracker/public/icon-180.png          |  Bin [31m16151[m -> [32m0[m bytes
+ vex-violation-tracker/public/icon-192.png          |  Bin [31m17066[m -> [32m0[m bytes
+ vex-violation-tracker/public/icon-512.png          |  Bin [31m53995[m -> [32m0[m bytes
+ vex-violation-tracker/public/logo.svg              |  453 [31m---[m
+ vex-violation-tracker/public/manifest.webmanifest  |   40 [31m-[m
+ vex-violation-tracker/public/sw.js                 |   30 [31m-[m
+ vex-violation-tracker/scripts/check-schema.mjs     |  158 [31m-[m
+ vex-violation-tracker/src/App.jsx                  | 3761 [31m--------------------[m
+ vex-violation-tracker/src/api.js                   |  407 [31m---[m
+ vex-violation-tracker/src/index.css                |   21 [31m-[m
+ vex-violation-tracker/src/main.jsx                 |   16 [31m-[m
+ vex-violation-tracker/src/outbox.js                |   91 [31m-[m
+ vex-violation-tracker/src/supabaseClient.js        |   14 [31m-[m
+ vex-violation-tracker/supabase/rankings.sql        |    2 [31m-[m
+ vex-violation-tracker/supabase/ref_roster.sql      |   21 [31m-[m
+ vex-violation-tracker/supabase/schema.sql          |  305 [31m--[m
+ vex-violation-tracker/supabase/seed.sql            |  130 [31m-[m
+ vex-violation-tracker/supabase/seed_matches.sql    |  216 [31m--[m
+ vex-violation-tracker/supabase/seed_rules.sql      |  115 [31m-[m
+ vex-violation-tracker/supabase/watchlist.sql       |    9 [31m-[m
+ vex-violation-tracker/tailwind.config.js           |   14 [31m-[m
+ vex-violation-tracker/tm-bridge/.env.example       |   26 [31m-[m
+ vex-violation-tracker/tm-bridge/README.md          |   80 [31m-[m
+ vex-violation-tracker/tm-bridge/bridge.mjs         |  171 [31m-[m
+ vex-violation-tracker/tm-bridge/package.json       |   16 [31m-[m
+ .../vex-violation-tracker/.env.example             |   16 [31m-[m
+ .../vex-violation-tracker/.gitignore               |    8 [31m-[m
+ .../vex-violation-tracker/DEPLOY.md                |  199 [31m--[m
+ .../vex-violation-tracker/README.md                |  124 [31m-[m
+ .../vex-violation-tracker/index.html               |   19 [31m-[m
+ .../vex-violation-tracker/package.json             |   27 [31m-[m
+ .../vex-violation-tracker/postcss.config.js        |    6 [31m-[m
+ .../public/forms/energy-award-nomination.pdf       |  Bin [31m200294[m -> [32m0[m bytes
+ .../public/forms/match-anomaly-log.pdf             |  Bin [31m279001[m -> [32m0[m bytes
+ .../forms/sportsmanship-award-nomination.pdf       |  Bin [31m199668[m -> [32m0[m bytes
+ .../vex-violation-tracker/public/icon-180.png      |  Bin [31m16151[m -> [32m0[m bytes
+ .../vex-violation-tracker/public/icon-192.png      |  Bin [31m17066[m -> [32m0[m bytes
+ .../vex-violation-tracker/public/icon-512.png      |  Bin [31m53995[m -> [32m0[m bytes
+ .../vex-violation-tracker/public/logo.svg          |  453 [31m---[m
+ .../public/manifest.webmanifest                    |   40 [31m-[m
+ .../vex-violation-tracker/public/sw.js             |   30 [31m-[m
+ .../vex-violation-tracker/scripts/check-schema.mjs |  158 [31m-[m
+ .../vex-violation-tracker/src/App.jsx              | 3464 [31m------------------[m
+ .../vex-violation-tracker/src/api.js               |  393 [31m--[m
+ .../vex-violation-tracker/src/index.css            |   21 [31m-[m
+ .../vex-violation-tracker/src/main.jsx             |   16 [31m-[m
+ .../vex-violation-tracker/src/outbox.js            |   91 [31m-[m
+ .../vex-violation-tracker/src/supabaseClient.js    |   14 [31m-[m
+ .../vex-violation-tracker/supabase/rankings.sql    |    2 [31m-[m
+ .../vex-violation-tracker/supabase/ref_roster.sql  |   21 [31m-[m
+ .../vex-violation-tracker/supabase/schema.sql      |  305 [31m--[m
+ .../vex-violation-tracker/supabase/seed.sql        |  130 [31m-[m
+ .../supabase/seed_matches.sql                      |  216 [31m--[m
+ .../vex-violation-tracker/supabase/seed_rules.sql  |  115 [31m-[m
+ .../vex-violation-tracker/supabase/watchlist.sql   |    9 [31m-[m
+ .../vex-violation-tracker/tailwind.config.js       |   14 [31m-[m
+ .../vex-violation-tracker/tm-bridge/.env.example   |   26 [31m-[m
+ .../vex-violation-tracker/tm-bridge/README.md      |   80 [31m-[m
+ .../vex-violation-tracker/tm-bridge/bridge.mjs     |  171 [31m-[m
+ .../vex-violation-tracker/tm-bridge/package.json   |   16 [31m-[m
+ .../vex-violation-tracker/vite.config.js           |    6 [31m-[m
+ vex-violation-tracker/vite.config.js               |    6 [31m-[m
+ 74 files changed, 42 insertions(+), 15501 deletions(-)

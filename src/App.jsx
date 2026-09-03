@@ -16,6 +16,7 @@ const EVENT_ID = "11111111-1111-4111-8111-111111111111";
 const SITE_PASSWORD = import.meta.env.VITE_SITE_PASSWORD || "";
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || "";
 const JUDGE_PASSWORD = import.meta.env.VITE_JUDGE_PASSWORD || "";
+const EMCEE_PASSWORD = import.meta.env.VITE_EMCEE_PASSWORD || "";
 
 /* ---------- helpers ---------- */
 const normNum = (n) => (n || "").trim().toUpperCase();
@@ -362,6 +363,7 @@ function PasswordScreen({ onUnlock }) {
     if (!SITE_PASSWORD && !JUDGE_PASSWORD) { setErr("Site password isn't set. Add VITE_SITE_PASSWORD to the environment."); return; }
     if (SITE_PASSWORD && pw === SITE_PASSWORD) { onUnlock("ref"); return; }
     if (JUDGE_PASSWORD && pw === JUDGE_PASSWORD) { onUnlock("judge"); return; }
+    if (EMCEE_PASSWORD && pw === EMCEE_PASSWORD) { onUnlock("emcee"); return; }
     if (ADMIN_PASSWORD && pw === ADMIN_PASSWORD) { onUnlock("ref", true); return; }
     setErr("Incorrect password.");
   };
@@ -372,7 +374,7 @@ function PasswordScreen({ onUnlock }) {
           <img src="/logo.svg" alt="Highlander Summit" className="h-72 w-72 object-contain mb-3" />
           <span className="font-bold text-lg">Highlander Summit — Violation Log</span>
         </div>
-        <p className="text-sm text-slate-300 mb-4 text-center">Enter the referee, judge advisor, or admin password to open the log.</p>
+        <p className="text-sm text-slate-300 mb-4 text-center">Enter the referee, judge advisor, emcee, or admin password to open the log.</p>
         <input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} placeholder="Password" autoFocus
           onKeyDown={(e) => e.key === "Enter" && submit()}
           className="w-full px-3 py-3 rounded-lg bg-[#1b1f4d] border border-[#2c3168] text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#D7212B]" />
@@ -416,6 +418,7 @@ function NameScreen({ onName }) {
 /* ==================================================================== */
 function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock }) {
   const isJudge = role === "judge";
+  const isEmcee = role === "emcee";
   const eventId = initialEvent.id;
   const [event, setEvent] = useState(initialEvent);
   const [teams, setTeams] = useState([]);
@@ -1642,7 +1645,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             </button>
           </div>
           <OnlineCluster presence={presence} onClick={() => setShowOnline(true)} />
-          {!isJudge && <button onClick={() => setShowByRule(true)} title="By rule" className="p-1.5 rounded hover:bg-white/10"><BarChart3 size={18} /></button>}
+          {!isJudge && !isEmcee && <button onClick={() => setShowByRule(true)} title="By rule" className="p-1.5 rounded hover:bg-white/10"><BarChart3 size={18} /></button>}
           <button onClick={() => setShowIdentity(true)} title="Your ref name"
             className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-full pl-1 pr-2.5 py-1">
             <span className="w-6 h-6 rounded-full bg-[#D7212B] text-white text-[11px] font-bold grid place-items-center">{meName ? initials(meName) : "?"}</span>
@@ -1664,6 +1667,16 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
+                  </>
+                ) : isEmcee ? (
+                  <>
+                    <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><Trophy size={12} /> Emcee</div>
+                    <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
+                    <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
+                    <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
+                    {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
+                    <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
+                    <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
                   </>
                 ) : (
                 <>
@@ -1704,6 +1717,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             {(isJudge ? [
               { k: "judging", label: "Judging", Icon: Trophy },
               { k: "alliances", label: "Alliances", Icon: GitBranch }
+            ] : isEmcee ? [
+              { k: "teams", label: "Teams", Icon: Users },
+              ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
+              ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
+              { k: "robots", label: "Robots", Icon: Camera },
+              { k: "alliances", label: "Alliances", Icon: GitBranch },
+              { k: "judging", label: "Judging", Icon: Trophy }
             ] : [
               { k: "teams", label: "Teams", Icon: Users },
               ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
@@ -1734,26 +1754,26 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       <main className="max-w-2xl mx-auto px-4 pb-28 pt-4">
         {openTeam ? (
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={teamRecords[openTeam]}
-            onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} />
+            onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : openMatch ? (
           <MatchDetail match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch}
             fieldLog={fieldLog} onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
-            onLogTeam={(n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} />
+            onLogTeam={(n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} emcee={isEmcee} />
         ) : openRobot ? (
-          <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onOpenPhoto={setLightbox} />
+          <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : view === "matches" ? (
-          <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} />
+          <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} />
         ) : view === "robots" ? (
           <RobotList teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "judging" ? (
-          <JudgingView noms={noms} viols={viols} teamName={teamNameMap} finalists={finalists}
+          <JudgingView noms={noms} viols={viols} teamName={teamNameMap} finalists={finalists} emcee={isEmcee}
             onToggleFinalist={(award, team) => (isJudge ? toggleFinalist(award, team) : requireAdmin(() => toggleFinalist(award, team)))}
             onNominate={(award) => setNominating(award || "sportsmanship")} onDeleteNom={removeNomination}
-            onExport={() => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
+            onExport={isEmcee ? undefined : () => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
         ) : view === "rulebook" ? (
           <RuleBook rules={rules} />
         ) : view === "alliances" ? (
-          <AllianceSelection teams={teams} alliances={alliances} matches={matches} canEditAlliances={adminUnlocked && !isJudge} canEditBracket={!isJudge} onSet={setAllianceTeam} onFinalize={finalizeAlliances} onSetWinner={setMatchWinner} onClear={() => requireAdmin(() => { if (confirm("Clear all alliance picks? (This does not delete any matches already generated.)")) clearAlliances(); })} />
+          <AllianceSelection teams={teams} alliances={alliances} matches={matches} canEditAlliances={adminUnlocked && !isJudge} canEditBracket={!isJudge && !isEmcee} onSet={setAllianceTeam} onFinalize={finalizeAlliances} onSetWinner={setMatchWinner} onClear={() => requireAdmin(() => { if (confirm("Clear all alliance picks? (This does not delete any matches already generated.)")) clearAlliances(); })} />
         ) : (
           <>
             {!event?.quals ? (
@@ -1777,7 +1797,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search team #"
                   className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
               </div>
-              <button onClick={() => setAddTeam(true)} className="px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Plus size={17} /> Team</button>
+              {!isEmcee && <button onClick={() => setAddTeam(true)} className="px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Plus size={17} /> Team</button>}
             </div>
             {filteredTeams.length === 0 ? (
               <Empty title={teams.length ? "No matches" : "No teams yet"} sub={teams.length ? "Try a different team number." : "Add a team, or just log a violation and the team is created for you."} />
@@ -1790,13 +1810,15 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                       <button onClick={() => setOpenTeam(t.number)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
                         <span className="font-mono font-bold text-lg text-slate-900 dark:text-slate-100">{t.number}</span>
                         {t.rank != null && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-200 dark:border-indigo-800 text-xs font-bold shrink-0">Rank {t.rank}</span>}
-                        {teamWatch[t.number]?.length > 0 && <span title={teamWatch[t.number].map((w) => `${w.by || "Ref"}: ${w.note}`).join("\n")} className="inline-flex items-center gap-1 text-amber-600 text-xs font-semibold shrink-0"><Star size={15} fill="currentColor" /> WATCH{teamWatch[t.number].length > 1 ? ` ${teamWatch[t.number].length}` : ""}</span>}
+                        {!isEmcee && teamWatch[t.number]?.length > 0 && <span title={teamWatch[t.number].map((w) => `${w.by || "Ref"}: ${w.note}`).join("\n")} className="inline-flex items-center gap-1 text-amber-600 text-xs font-semibold shrink-0"><Star size={15} fill="currentColor" /> WATCH{teamWatch[t.number].length > 1 ? ` ${teamWatch[t.number].length}` : ""}</span>}
                         {t.name && <span className="text-sm text-slate-500 dark:text-slate-400 truncate flex-1">{t.name}</span>}
                         <div className="flex items-center gap-1.5 ml-auto">
+                          {isEmcee ? (() => { const r = teamRecords[t.number]; return (r && (r.w || r.l || r.t)) ? <span className="font-mono text-xs font-semibold text-slate-600 dark:text-slate-300 tabular-nums">{r.w}-{r.l}-{r.t}</span> : <span className="text-xs text-slate-300">—</span>; })() : (<>
                           {ORDER.map((ty) => c[ty] ? (
                             <span key={ty} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold border ${TYPES[ty].badge}`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${TYPES[ty].dot}`} />{c[ty]}</span>) : null)}
                           {!c.total && <span className="text-xs text-slate-300">clean</span>}
+                          </>)}
                           <ChevronRight size={16} className="text-slate-300" />
                         </div>
                       </button>
@@ -1816,7 +1838,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         </div>
       </main>
 
-      {!openTeam && !openMatch && !openRobot && view !== "judging" && (
+      {!openTeam && !openMatch && !openRobot && view !== "judging" && !isEmcee && (
         <button onClick={() => setLogFor("")} className="fixed bottom-5 left-1/2 -translate-x-1/2 z-20 bg-[#D7212B] text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
           <Plus size={20} /> Log violation
         </button>
@@ -1955,7 +1977,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 }
 
 /* ============================ TEAM DETAIL ============================ */
-function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViolation, onDeleteTeam, canDeleteTeam, watch = [], meName, onAddWatch, onRemoveWatch, onOpenPhoto }) {
+function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViolation, onDeleteTeam, canDeleteTeam, watch = [], meName, onAddWatch, onRemoveWatch, onOpenPhoto, emcee }) {
   const [wnote, setWnote] = useState("");
   const addWatch = () => { const n = wnote.trim(); if (!n) return; onAddWatch(team.number, n); setWnote(""); };
   if (!team) return null;
@@ -1989,8 +2011,8 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
             </button>
           )}
         </div>
-        <button onClick={onLog} className="mt-4 w-full bg-[#D7212B] text-white py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-[#B42024]"><Plus size={18} /> Log violation for {team.number}</button>
-        <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3">
+        {!emcee && <button onClick={onLog} className="mt-4 w-full bg-[#D7212B] text-white py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-[#B42024]"><Plus size={18} /> Log violation for {team.number}</button>}
+        {!emcee && <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3">
           <div className="flex items-center gap-2 mb-2">
             <Star size={16} className="text-amber-500 fill-amber-500" />
             <span className="font-semibold text-amber-700 dark:text-amber-300 text-sm">Watchlist{watch.length ? ` (${watch.length})` : ""}</span>
@@ -2011,9 +2033,9 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
             <button onClick={addWatch} disabled={!wnote.trim()} className="px-3 rounded-lg bg-[#0D0F32] text-white text-sm font-medium disabled:bg-slate-300">Add</button>
           </div>
           {!meName && <p className="mt-1.5 text-[11px] text-amber-700 dark:text-amber-300">Set your ref name so notes are attributed to you.</p>}
-        </div>
+        </div>}
       </div>
-      {byRule.length > 0 && (
+      {!emcee && byRule.length > 0 && (
         <div className="mb-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">Violations by rule</h2>
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
@@ -2030,10 +2052,12 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
           </div>
         </div>
       )}
+      {!emcee && (<>
       <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">Log ({viols.length})</h2>
       {sorted.length === 0 ? <Empty title="No violations" sub="This team has a clean record." /> : (
         <ul className="space-y-2">{sorted.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} />)}</ul>
       )}
+      </>)}
     </>
   );
 }
@@ -2577,7 +2601,7 @@ function EventModal({ event, onSave, onClose }) {
 
 
 /* ============================ MATCHES ============================ */
-function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch }) {
+function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee }) {
   const [field, setField] = useState("all");
   const all = Object.values(matches);
   const hasElims = all.some((m) => m.phase && m.phase !== "qual");
@@ -2615,7 +2639,7 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
   const rowLabel = (m) => (m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`));
   return (
     <>
-      {replaySet.size > 0 && (
+      {!emcee && replaySet.size > 0 && (
         <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3">
           <p className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300 mb-1.5 flex items-center gap-1"><RefreshCw size={13} /> Matches to re-run ({replaySet.size})</p>
           <div className="flex flex-wrap gap-1.5">
@@ -2670,10 +2694,10 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
                 {m.redScore != null && m.blueScore != null && (
                   <span className="font-mono text-xs font-bold shrink-0"><span className={m.winner === "red" ? "text-red-700 dark:text-red-300" : "text-slate-400"}>{m.redScore}</span><span className="text-slate-300">-</span><span className={m.winner === "blue" ? "text-blue-700 dark:text-blue-300" : "text-slate-400"}>{m.blueScore}</span></span>
                 )}
-                {replaySet.has(m.id) && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700 shrink-0"><RefreshCw size={10} /> REPLAY</span>}
-                {timeoutSet.has(m.id) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700 shrink-0">TO</span>}
-                {faultSet.has(m.id) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-red-100 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-200 dark:border-red-700 shrink-0">FAULT</span>}
-                {vcount[m.id] ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold border bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 shrink-0">{vcount[m.id]}</span> : null}
+                {!emcee && replaySet.has(m.id) && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700 shrink-0"><RefreshCw size={10} /> REPLAY</span>}
+                {!emcee && timeoutSet.has(m.id) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700 shrink-0">TO</span>}
+                {!emcee && faultSet.has(m.id) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-red-100 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-200 dark:border-red-700 shrink-0">FAULT</span>}
+                {!emcee && vcount[m.id] ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold border bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 shrink-0">{vcount[m.id]}</span> : null}
                 <ChevronRight size={16} className="text-slate-300 shrink-0" />
               </button>
             </li>
@@ -2684,7 +2708,7 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
   );
 }
 
-function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, fieldLog = [], onAddField, onRemoveField, meName, canDelete }) {
+function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, fieldLog = [], onAddField, onRemoveField, meName, canDelete, emcee }) {
   const [toOpen, setToOpen] = useState(false);
   const [toAlliance, setToAlliance] = useState("red");
   const [toTeam, setToTeam] = useState("");
@@ -2754,14 +2778,14 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
         {teams.map((n) => {
           const s = stat[n];
           return (
-            <button key={n} onClick={() => onLogTeam(n)} className="w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2.5 text-left hover:border-slate-300 dark:border-slate-600">
+            <button key={n} onClick={emcee ? undefined : () => onLogTeam(n)} className={`w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2.5 text-left ${emcee ? "cursor-default" : "hover:border-slate-300 dark:border-slate-600"}`}>
               <div className="flex items-center gap-2">
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{n}</span>
                 {teamRank[n] != null && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-200 dark:border-indigo-800 text-[11px] font-bold shrink-0">Rank {teamRank[n]}</span>}
                 {teamName[n] && <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{teamName[n]}</span>}
-                <span className="ml-auto text-xs font-semibold text-[#D7212B] flex items-center gap-1 shrink-0"><Plus size={14} /> Log</span>
+                {!emcee && <span className="ml-auto text-xs font-semibold text-[#D7212B] flex items-center gap-1 shrink-0"><Plus size={14} /> Log</span>}
               </div>
-              {s && s.total > 0 && (
+              {!emcee && s && s.total > 0 && (
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <span className="text-[11px] text-slate-400">Prior:</span>
                   {ORDER.map((ty) => s[ty] ? (
@@ -2813,7 +2837,7 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
         <Alliance label="Red alliance" teams={match.red} color="red" />
         <Alliance label="Blue alliance" teams={match.blue} color="blue" />
       </div>
-      <div className="mb-4">
+      {!emcee && (<div className="mb-4">
         <div className="flex gap-2">
           {isElim && <button onClick={() => { setToOpen((v) => !v); setFaultOpen(false); }} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${toOpen ? "bg-blue-600 text-white border-blue-600" : "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700"}`}><Clock size={15} /> Timeout</button>}
           <button onClick={() => { setFaultOpen((v) => !v); setToOpen(false); }} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${faultOpen ? "bg-red-600 text-white border-red-600" : "bg-white dark:bg-slate-800 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700"}`}><AlertTriangle size={15} /> Field fault</button>
@@ -2853,10 +2877,10 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
             ))}
           </ul>
         )}
-      </div>
+      </div>)}
       {(() => {
         const inMatch = [...(match.red || []), ...(match.blue || [])].flatMap((n) => teamWatch[n] || []);
-        if (inMatch.length === 0) return null;
+        if (emcee || inMatch.length === 0) return null;
         return (
           <div className="mb-4">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1 flex items-center gap-1"><Star size={12} className="text-amber-500 fill-amber-500" /> Watchlist ({inMatch.length})</h2>
@@ -2868,12 +2892,14 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
           </div>
         );
       })()}
+      {!emcee && (<>
       <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">Violations in this match ({mv.length})</h2>
       {mv.length === 0 ? (
         <Empty title="No violations logged" sub="Tap a team above to log one for this match." />
       ) : (
         <ul className="space-y-2">{mv.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} showTeam />)}</ul>
       )}
+      </>)}
     </>
   );
 }
@@ -3025,7 +3051,7 @@ function RobotList({ teams, query, setQuery, onOpen }) {
   );
 }
 
-function RobotDetail({ team, onAddPhoto, onRemovePhoto, onOpenPhoto }) {
+function RobotDetail({ team, onAddPhoto, onRemovePhoto, onOpenPhoto, emcee }) {
   const [busy, setBusy] = useState(false);
   const fileRef = useRef(null);
   if (!team) return <Empty title="Team not found" sub="" />;
@@ -3045,20 +3071,20 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onOpenPhoto }) {
         <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">{team.number}</div>
         {team.name && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{team.name}</div>}
       </div>
-      <button onClick={() => fileRef.current?.click()} disabled={busy}
+      {!emcee && <button onClick={() => fileRef.current?.click()} disabled={busy}
         className="w-full mb-4 bg-[#D7212B] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-[#B42024] disabled:bg-slate-300">
         <Camera size={18} /> {busy ? "Saving…" : photos.length ? "Add another photo" : "Add robot photo"}
-      </button>
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => { add(e.target.files); e.target.value = ""; }} />
+      </button>}
+      {!emcee && <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => { add(e.target.files); e.target.value = ""; }} />}
       {photos.length === 0 ? (
-        <Empty title="No robot photos yet" sub="Snap the robot during inspection so refs can reference it later." />
+        <Empty title="No robot photos yet" sub={emcee ? "No inspection photos have been added for this team." : "Snap the robot during inspection so refs can reference it later."} />
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {photos.map((p) => (
             <div key={p} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700">
               <button onClick={() => onOpenPhoto(p)} className="w-full h-full"><Thumb pkey={p} /></button>
-              <button onClick={() => { if (confirm("Delete this robot photo?")) onRemovePhoto(team.number, p); }}
-                className="absolute top-1 right-1 bg-slate-900/80 text-white rounded-full p-1"><Trash2 size={13} /></button>
+              {!emcee && <button onClick={() => { if (confirm("Delete this robot photo?")) onRemovePhoto(team.number, p); }}
+                className="absolute top-1 right-1 bg-slate-900/80 text-white rounded-full p-1"><Trash2 size={13} /></button>}
             </div>
           ))}
         </div>
@@ -3078,7 +3104,7 @@ const AWARDS = [
 ];
 const G_RULE = /^G[1-5]$/i;
 
-function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNominate, onDeleteNom, onExport }) {
+function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNominate, onDeleteNom, onExport, emcee }) {
   const [award, setAward] = useState("sportsmanship");
   const [openTeam, setOpenTeam] = useState(null);
 
@@ -3126,7 +3152,7 @@ function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNom
             const expanded = openTeam === row.team;
             const isFinalist = finalists && finalists.has(`${award}::${row.team}`);
             return (
-              <li key={row.team} className={`bg-white dark:bg-slate-800 rounded-xl border overflow-hidden ${isFinalist ? "border-[#EBA622] ring-1 ring-[#EBA622]" : "border-slate-200 dark:border-slate-700"}`}>
+              <li key={row.team} className={`bg-white dark:bg-slate-800 rounded-xl border overflow-hidden ${(!emcee && isFinalist) ? "border-[#EBA622] ring-1 ring-[#EBA622]" : "border-slate-200 dark:border-slate-700"}`}>
                 <div className="w-full px-4 py-3 flex items-center gap-3">
                   <button onClick={() => setOpenTeam(expanded ? null : row.team)} className="flex items-center gap-3 text-left flex-1 min-w-0">
                     <span className={`w-7 h-7 rounded-full grid place-items-center text-sm font-bold shrink-0 ${i === 0 ? "bg-[#EBA622] text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"}`}>{i + 1}</span>
@@ -3134,9 +3160,9 @@ function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNom
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{row.team}</span>
                         {teamName[row.team] && <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{teamName[row.team]}</span>}
-                        {isFinalist && <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#8a6100] bg-[#EBA622]/20 border border-[#EBA622] rounded-md px-1.5 py-0.5"><Star size={10} className="fill-[#EBA622] text-[#EBA622]" /> FINALIST</span>}
+                        {!emcee && isFinalist && <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#8a6100] bg-[#EBA622]/20 border border-[#EBA622] rounded-md px-1.5 py-0.5"><Star size={10} className="fill-[#EBA622] text-[#EBA622]" /> FINALIST</span>}
                       </div>
-                      {gCodes.length > 0 && (
+                      {!emcee && gCodes.length > 0 && (
                         <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-md px-1.5 py-0.5">
                           <AlertTriangle size={11} /> Conduct: {gCodes.map((c) => `${c}${g[c] > 1 ? `×${g[c]}` : ""}`).join(", ")}
                         </div>
@@ -3144,9 +3170,9 @@ function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNom
                     </div>
                     <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold">{row.count} <span className="text-slate-400 font-normal text-xs">nom{row.count !== 1 ? "s" : ""}</span></span>
                   </button>
-                  <button onClick={() => onToggleFinalist(award, row.team)} title={isFinalist ? "Remove finalist" : "Mark finalist"} className="shrink-0 p-1">
+                  {!emcee && <button onClick={() => onToggleFinalist(award, row.team)} title={isFinalist ? "Remove finalist" : "Mark finalist"} className="shrink-0 p-1">
                     <Star size={20} className={isFinalist ? "fill-[#EBA622] text-[#EBA622]" : "text-slate-300 hover:text-[#EBA622]"} />
-                  </button>
+                  </button>}
                 </div>
                 {expanded && (
                   <div className="border-t border-slate-100 divide-y divide-slate-100 dark:divide-slate-700">
@@ -3156,7 +3182,7 @@ function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNom
                           {fmtMatch(n.match) && <span className="font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{fmtMatch(n.match)}</span>}
                           {n.by && <span className="flex items-center gap-1"><UserCircle2 size={12} /> {n.by}</span>}
                           <span className="ml-auto">{fmtTime(n.createdAt)}</span>
-                          <button onClick={() => { if (confirm("Remove this nomination?")) onDeleteNom(n.id); }} className="text-slate-300 hover:text-red-600"><Trash2 size={14} /></button>
+                          {!emcee && <button onClick={() => { if (confirm("Remove this nomination?")) onDeleteNom(n.id); }} className="text-slate-300 hover:text-red-600"><Trash2 size={14} /></button>}
                         </div>
                         {n.reason ? <p className="text-slate-700 dark:text-slate-200 mt-1">{n.reason}</p> : <p className="text-slate-400 italic mt-1">No reason given</p>}
                         {n.criteria && n.criteria.length > 0 && (
@@ -3502,7 +3528,7 @@ function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSet
       {hasBracket && (
         <div className="mt-6">
           <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-1"><Trophy size={18} className="text-[#D7212B]" /> Bracket</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{canEditBracket ? "Tap the winning alliance in each match. Winners auto-advance — QF from R16, SF from QF, and a best-of-3 Final from SF. Tap a winner again to clear it." : "Current elimination bracket and winners. Judge Advisor access is view only."}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{canEditBracket ? "Tap the winning alliance in each match. Winners auto-advance — QF from R16, SF from QF, and a best-of-3 Final from SF. Tap a winner again to clear it." : "Current elimination bracket and winners — view only."}</p>
           {champion && (
             <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3 mb-3 flex items-center gap-2">
               <Trophy size={18} className="text-amber-500" />
@@ -3667,13 +3693,25 @@ function FeaturesGuide() {
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Ref-OS is the referee & judging system for the Highlander Summit. Here's what every part does.</p>
 
       <Section icon={KeyRound} title="Logins & roles">
-        <p>There are three passwords, all entered on the login screen (admin can also be entered later from this menu → “Admin login”):</p>
+        <p>There are four passwords, all entered on the login screen (admin can also be entered later from this menu → “Admin login”):</p>
         <ul className="space-y-1.5">
           <Li><b>Referee / crew</b> — full access: log violations, matches, robots, rules, judging.</Li>
           <Li><b>Judge Advisor</b> — sees only the Judging tab and can export nominations. Nothing on the violation side.</Li>
+          <Li><b>Emcee / announcer</b> — a read-only announcer view (see the section below). Sees teams, scores, winners, and records, but nothing on the violation side.</Li>
           <Li><b>Admin</b> — unlocks event setup, CSV exports, clearing data, marking finalists, deleting teams, removing offline refs, and the Activity feed & Rankings. Entering the admin password at login signs you in as a ref with admin already on.</Li>
         </ul>
         <p>Set your <b>ref name</b> (tap your avatar, top right) so everything you log is attributed to you.</p>
+      </Section>
+
+      <Section icon={Trophy} title="Emcee / announcer view">
+        <p>The <b>Emcee</b> password opens a read-only view built for whoever is running the mic — enough to hype the crowd, without exposing any disciplinary information.</p>
+        <ul className="space-y-1.5">
+          <Li><b>Can see:</b> Teams (with W-L-T records), Matches (scores and who won), Robots, Rules, the elimination Alliances bracket, and Judging.</Li>
+          <Li><b>Judging:</b> the emcee can add and view award nominations, so a great moment on the field gets captured — but can't mark finalists, export, or delete.</Li>
+          <Li><b>Rules & Alliances are view-only</b> — the emcee can read the rulebook and watch the bracket fill in, but can't advance winners, edit picks, or change anything.</Li>
+          <Li><b>Hidden entirely:</b> all violations, the watchlist, the field log, replay/timeout/fault flags, per-match violation counts, and the “conduct” flags on nominations. None of it reaches the announcer's screen.</Li>
+        </ul>
+        <p>This is a screen-level view for keeping referee calls off the announcer's display — it isn't a hard security wall, so only hand the emcee password to someone you'd trust with the tablet.</p>
       </Section>
 
       <Section icon={ListOrdered} title="Logging a violation">
