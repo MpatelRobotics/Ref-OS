@@ -451,6 +451,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [menu, setMenu] = useState(false);
   const [importPreview, setImportPreview] = useState(null); // { title, chips, warnings, resolve }
   const confirmImport = (p) => new Promise((resolve) => setImportPreview({ ...p, resolve }));
+  const [importing, setImporting] = useState(null); // { label, done, total } | null while an import is writing
   const menuRef = useRef(null);
   const menuTimer = useRef(null);
   useEffect(() => {
@@ -770,6 +771,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       const newCount = rows.filter((r) => !rosterT.has(r.number)).length;
       const chipsT = [{ label: `${rows.length} teams in file` }, { label: `${newCount} new` }, { label: `${rows.length - newCount} already in roster` }];
       if (!(await confirmImport({ title: "Team list", chips: chipsT, warnings }))) return;
+      setImporting({ label: "Importing teams…", done: 0, total: 0 });
       await api.bulkUpsertTeams(eventId, rows);
       const t = await api.listTeams(eventId);
       setTeams((cur) => { const extra = cur.filter((x) => !t.some((s) => s.number === x.number)); return [...t, ...extra]; });
@@ -777,7 +779,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       alert(`Imported ${rows.length} teams.` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
     } catch (e) {
       alert("Could not read that file: " + (e.message || e) + "\n\nExport the team list from Tournament Manager as CSV and try again.");
-    }
+    } finally { setImporting(null); }
   };
 
   const importAlliancesFile = async (file) => {
@@ -899,7 +901,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 
       const nextAlliances = {};
 
-      for (const m of r16) {
+      for (let i = 0; i < r16.length; i++) {
+        const m = r16[i];
+        setImporting({ label: "Importing alliances…", done: i + 1, total: r16.length });
         await api.addMatch(eventId, {
           phase: "r16",
           num: m.instance,
@@ -931,7 +935,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       alert("Imported exactly 8 Round of 16 matches and rebuilt all 16 alliances from the Tournament Manager CSV.");
     } catch (e) {
       alert("Could not import alliances: " + (e.message || e));
-    }
+    } finally { setImporting(null); }
   };
 
   const importRankingsFile = async (file) => {
@@ -944,6 +948,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       const unknownR = rows.filter((r) => !rosterR.has(r.number)).length;
       const chipsR = [{ label: `${rows.length} ranked teams` }, { label: `${rows.length - unknownR} recognized` }, { label: `${unknownR} unknown teams`, warn: unknownR > 0 }];
       if (!(await confirmImport({ title: "Qualification rankings", chips: chipsR, warnings }))) return;
+      setImporting({ label: "Importing rankings…", done: 0, total: 0 });
       await api.bulkUpsertRankings(eventId, rows);
       const t = await api.listTeams(eventId);
       setTeams((cur) => { const extra = cur.filter((x) => !t.some((serverTeam) => serverTeam.number === x.number)); return [...t, ...extra]; });
@@ -951,7 +956,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       alert(`Uploaded rankings for ${rows.length} teams.` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
     } catch (e) {
       alert("Could not read that rankings file: " + (e.message || e) + "\n\nExport the rankings from Tournament Manager as CSV and try again.");
-    }
+    } finally { setImporting(null); }
   };
   const importScoresFile = async (file) => {
     if (!file) return;
@@ -1007,7 +1012,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       if (elimScoreRows.length) {
         if (!(await confirmImport({ title: "Match results — eliminations", chips: [{ label: `${elimScoreRows.length} R16 results` }, { label: "alliance teams unchanged" }], warnings: [] }))) return;
 
-        for (const r of elimScoreRows) {
+        for (let i = 0; i < elimScoreRows.length; i++) {
+          const r = elimScoreRows[i];
+          setImporting({ label: "Importing scores…", done: i + 1, total: elimScoreRows.length });
           const winner = r.redScore > r.blueScore ? "red" : r.blueScore > r.redScore ? "blue" : "tie";
           await api.updateMatchScore(eventId, "r16", r.instance, r.redScore, r.blueScore, winner);
         }
@@ -1038,7 +1045,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       const chipsS = [{ label: `${scored.length} scored matches` }, { label: `${inFileS.size - unknownS} teams recognized` }, { label: `${unknownS} unknown teams`, warn: unknownS > 0 }];
       if (!(await confirmImport({ title: "Match results", chips: chipsS, warnings: [] }))) return;
 
-      for (const r of scored) {
+      for (let i = 0; i < scored.length; i++) {
+        const r = scored[i];
+        setImporting({ label: "Importing scores…", done: i + 1, total: scored.length });
         const winner = r.redScore > r.blueScore ? "red" : r.blueScore > r.redScore ? "blue" : "tie";
         await api.addMatch(eventId, {
           phase: r.phase,
@@ -1059,7 +1068,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       alert(`Updated scores for ${scored.length} qualification matches. Team records refreshed.`);
     } catch (e) {
       alert("Could not read that file: " + (e.message || e) + "\n\nExport match results from Tournament Manager as CSV and try again.");
-    }
+    } finally { setImporting(null); }
   };
   const importMatchesFile = async (file) => {
     if (!file) return;
@@ -1076,7 +1085,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       const chips = Object.entries(counts).map(([p, n]) => ({ label: `${n} ${pl[p] || p} matches` }));
       chips.push({ label: `${inFile.size - unknown} teams recognized` }, { label: `${unknown} unknown teams`, warn: unknown > 0 });
       if (!(await confirmImport({ title: "Match schedule", chips, warnings }))) return;
-      for (const r of rows) await api.addMatch(eventId, { phase: r.phase, num: r.num, red: r.red, blue: r.blue, field: r.field });
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        setImporting({ label: "Importing matches…", done: i + 1, total: rows.length });
+        await api.addMatch(eventId, { phase: r.phase, num: r.num, red: r.red, blue: r.blue, field: r.field });
+      }
       const newTeams = [...inFile].filter((x) => !roster.has(x)).map((number) => ({ number, name: "" }));
       if (newTeams.length) { await api.bulkUpsertTeams(eventId, newTeams); const t = await api.listTeams(eventId); setTeams((cur) => { const extra = cur.filter((x) => !t.some((s) => s.number === x.number)); return [...t, ...extra]; }); }
       await reloadMatches();
@@ -1084,7 +1097,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       alert(`Imported ${rows.length} matches (${summary}).` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
     } catch (e) {
       alert("Could not read that file: " + (e.message || e) + "\n\nExport the match list from Tournament Manager as CSV and try again.");
-    }
+    } finally { setImporting(null); }
   };
   const setAllianceTeam = async (seed, idx, team) => {
     const cur = alliances[seed] ? [...alliances[seed]] : ["", ""];
@@ -1916,6 +1929,24 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       {importPreview && <ImportPreviewModal preview={importPreview}
         onImport={() => { const p = importPreview; setImportPreview(null); p.resolve(true); }}
         onCancel={() => { const p = importPreview; setImportPreview(null); p.resolve(false); }} />}
+      {importing && (
+        <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-6">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 w-full max-w-xs shadow-xl">
+            <div className="flex items-center gap-2 mb-3">
+              <RefreshCw size={18} className="text-[#D7212B] animate-spin" />
+              <span className="font-semibold text-slate-900 dark:text-slate-100">{importing.label}</span>
+            </div>
+            <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+              {importing.total > 0
+                ? <div className="h-full bg-[#D7212B] transition-all duration-150" style={{ width: `${Math.round((importing.done / importing.total) * 100)}%` }} />
+                : <div className="h-full w-full bg-[#D7212B] animate-pulse" />}
+            </div>
+            <div className="text-xs text-slate-400 mt-2">
+              {importing.total > 0 ? `${importing.done} of ${importing.total}` : "Working… please keep this screen open."}
+            </div>
+          </div>
+        </div>
+      )}
       <input ref={allianceFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importAlliancesFile(f); }} />
       {addMatchOpen && <AddMatchModal teams={teams} onSave={addElimMatch} onClose={() => setAddMatchOpen(false)} />}
