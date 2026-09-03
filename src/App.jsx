@@ -2757,10 +2757,10 @@ function AwpChecker() {
         {pass ? "\u2713 AWP can be awarded to this alliance" : "AWP not met yet"}
         {!pass && (
           <ul className="mt-1 font-normal text-xs space-y-0.5">
-            {!pinsOk && <li>\u2022 {th.pins}+ Pins (have {pins})</li>}
-            {!goalsOk && <li>\u2022 {th.goals}+ Goals with 2+ Pins (have {goals})</li>}
-            {!perim && <li>\u2022 Both robots clear of the Field Perimeter</li>}
-            {!noViol && <li>\u2022 No auton violations</li>}
+            {!pinsOk && <li>• {th.pins}+ Pins (have {pins})</li>}
+            {!goalsOk && <li>• {th.goals}+ Goals with 2+ Pins (have {goals})</li>}
+            {!perim && <li>• Both robots clear of the Field Perimeter</li>}
+            {!noViol && <li>• No auton violations</li>}
           </ul>
         )}
       </div>
