@@ -1740,6 +1740,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
               ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
               ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
               { k: "robots", label: "Robots", Icon: Camera },
+              { k: "awp", label: "AWP", Icon: ClipboardCheck },
               { k: "alliances", label: "Alliances", Icon: GitBranch },
               { k: "judging", label: "Judging", Icon: Trophy }
             ] : [
@@ -1747,6 +1748,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
               ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
               ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
               { k: "robots", label: "Robots", Icon: Camera },
+              { k: "awp", label: "AWP", Icon: ClipboardCheck },
               { k: "alliances", label: "Alliances", Icon: GitBranch },
               { k: "judging", label: "Judging", Icon: Trophy }]).map(({ k, label, Icon }) => (
               <button key={k} onClick={() => { setView(k); setQuery(""); }}
@@ -1790,6 +1792,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             onExport={isEmcee ? undefined : () => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
         ) : view === "rulebook" ? (
           <RuleBook rules={rules} />
+        ) : view === "awp" ? (
+          <AWPHistory fieldLog={fieldLog} matches={matches} />
         ) : view === "alliances" ? (
           <AllianceSelection teams={teams} alliances={alliances} matches={matches} canEditAlliances={adminUnlocked && !isJudge} canEditBracket={!isJudge && !isEmcee} onSet={setAllianceTeam} onFinalize={finalizeAlliances} onSetWinner={setMatchWinner} onClear={() => requireAdmin(() => { if (confirm("Clear all alliance picks? (This does not delete any matches already generated.)")) clearAlliances(); })} />
         ) : (
@@ -2798,7 +2802,7 @@ function AwpChecker({ onSave }) {
         <button onClick={doSave} disabled={saving} className="w-full py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold flex items-center justify-center gap-2 disabled:bg-slate-300 hover:bg-[#171a45]"><Save size={16} /> {saving ? "Saving…" : "Save result to match log"}</button>
       )}
       {savedMsg && <p className="text-xs text-emerald-600 dark:text-emerald-400 text-center font-medium">{savedMsg}</p>}
-      <p className="text-[11px] text-slate-400">Manual aid — enter what you saw at the end of auton. It changes no scores; Tournament Manager records the official AWP. Saving keeps a copy in this match's log for later reference.</p>
+      <p className="text-[11px] text-slate-400">Manual aid — enter what you saw at the end of auton. It changes no scores; Tournament Manager records the official AWP. Saving keeps a copy in this match's log for later reference. Every saved result is also collected in the <b>AWP tab</b>, where you can see the match and which criteria each alliance met.</p>
     </div>
   );
 }
@@ -3732,6 +3736,115 @@ function AddMatchModal({ teams, onSave, onClose }) {
           <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white ${valid && !busy ? "bg-[#D7212B] hover:bg-[#B42024]" : "bg-slate-300"}`}>{busy ? "Saving…" : "Add match"}</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+/* ============================ AWP HISTORY ============================ */
+function AWPHistory({ fieldLog = [], matches = {} }) {
+  const entries = fieldLog
+    .filter((e) => e.kind === "awp")
+    .sort((a, b) => b.createdAt - a.createdAt);
+
+  const parseSide = (note, side) => {
+    const mode = /AWP\s+(Sig|Std)\s+(\d+)\/(\d+)/i.exec(note || "");
+    const pinsNeed = mode ? Number(mode[2]) : 0;
+    const goalsNeed = mode ? Number(mode[3]) : 0;
+    const re = new RegExp(`${side}:\\s*(MET|NOT met)\\s*\\((\\d+)P\\/(\\d+)G([^)]*)\\)`, "i");
+    const m = re.exec(note || "");
+    if (!m) return null;
+    const met = m[1].toUpperCase() === "MET";
+    const pins = Number(m[2]);
+    const goals = Number(m[3]);
+    const extra = String(m[4] || "").toLowerCase();
+    return {
+      met,
+      pins,
+      goals,
+      pinsNeed,
+      goalsNeed,
+      pinsMet: pinsNeed ? pins >= pinsNeed : true,
+      goalsMet: goalsNeed ? goals >= goalsNeed : true,
+      perimeterMet: !extra.includes("on perimeter"),
+      noViolationsMet: !extra.includes("auton violation"),
+      mode: mode ? (mode[1].toLowerCase() === "sig" ? "Signature" : "Standard") : "",
+    };
+  };
+
+  const Criteria = ({ ok, children }) => (
+    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-semibold ${
+      ok
+        ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
+        : "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700"
+    }`}>
+      {ok ? <Check size={12} /> : <X size={12} />} {children}
+    </span>
+  );
+
+  const AllianceCard = ({ label, color, data, teams }) => {
+    if (!data) return null;
+    const isRed = color === "red";
+    return (
+      <div className={`rounded-xl border p-3 ${isRed ? "border-red-200 bg-red-50/40 dark:border-red-900 dark:bg-red-950/20" : "border-blue-200 bg-blue-50/40 dark:border-blue-900 dark:bg-blue-950/20"}`}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-xs font-bold uppercase tracking-wide ${isRed ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}>{label}</span>
+          {teams?.length ? <span className="font-mono text-xs text-slate-500 dark:text-slate-400">{teams.join(" + ")}</span> : null}
+          <span className={`ml-auto inline-flex items-center px-2 py-0.5 rounded-md border text-xs font-bold ${
+            data.met
+              ? "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-200 dark:border-emerald-700"
+              : "bg-slate-100 text-slate-600 border-slate-300 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600"
+          }`}>
+            {data.met ? "AWP MET" : "AWP NOT MET"}
+          </span>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <Criteria ok={data.pinsMet}>{data.pins} Pins {data.pinsNeed ? `(${data.pinsNeed}+ needed)` : ""}</Criteria>
+          <Criteria ok={data.goalsMet}>{data.goals} Goals with 2+ Pins {data.goalsNeed ? `(${data.goalsNeed}+ needed)` : ""}</Criteria>
+          <Criteria ok={data.perimeterMet}>Robots off Field Perimeter</Criteria>
+          <Criteria ok={data.noViolationsMet}>No auton violations</Criteria>
+        </div>
+      </div>
+    );
+  };
+
+  if (!entries.length) {
+    return <Empty title="No AWP checks saved" sub="Saved AWP checks from qualification matches will appear here." />;
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+        <div className="flex items-center gap-2">
+          <ClipboardCheck size={20} className="text-emerald-600" />
+          <div>
+            <h2 className="font-bold text-slate-900 dark:text-slate-100">Autonomous Win Points</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{entries.length} saved AWP {entries.length === 1 ? "check" : "checks"}. Each entry shows the match and which criteria were met.</p>
+          </div>
+        </div>
+      </div>
+
+      {entries.map((e) => {
+        const red = parseSide(e.note, "Red");
+        const blue = parseSide(e.note, "Blue");
+        const match = e.matchId ? matches[e.matchId] : null;
+        const matchLabel = e.matchRef || (match ? fmtMatch({ phase: match.phase, num: match.num }) : "Match not recorded");
+        const mode = red?.mode || blue?.mode || "";
+        return (
+          <div key={e.id} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+            <div className="flex items-center gap-2 flex-wrap mb-3">
+              <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{matchLabel}</span>
+              {mode && <span className="text-[11px] px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300">{mode} criteria</span>}
+              <span className="ml-auto text-[11px] text-slate-400">{fmtTime(e.createdAt)}</span>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-2">
+              <AllianceCard label="Red alliance" color="red" data={red} teams={match?.red || []} />
+              <AllianceCard label="Blue alliance" color="blue" data={blue} teams={match?.blue || []} />
+            </div>
+            {e.by && <div className="mt-2 text-[11px] text-slate-400">Saved by {e.by}</div>}
+          </div>
+        );
+      })}
     </div>
   );
 }
