@@ -2721,48 +2721,55 @@ function AwpStep({ label, sub, val, set }) {
   );
 }
 
-// AWP (Autonomous Win Point) checklist — a manual aid for the head ref. No live field
-// data exists in the app, so the ref enters what they saw at the end of auton and this
-// evaluates it against the v2.0 criteria. Signature/Worlds-qualifying = 7 Pins / 3 Goals;
-// standard events = 6 Pins / 2 Goals.
-function AwpChecker() {
-  const [alliance, setAlliance] = useState("red");
+function AwpAlliance({ color, th }) {
   const [pins, setPins] = useState(0);
   const [goals, setGoals] = useState(0);
   const [perim, setPerim] = useState(true);
   const [noViol, setNoViol] = useState(true);
-  const [sig, setSig] = useState(true);
-  const th = sig ? { pins: 7, goals: 3 } : { pins: 6, goals: 2 };
   const pinsOk = pins >= th.pins, goalsOk = goals >= th.goals;
   const pass = pinsOk && goalsOk && perim && noViol;
+  const isRed = color === "red";
   return (
-    <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-3">
-      <div className="flex gap-2">
-        {["red", "blue"].map((a) => (
-          <button key={a} onClick={() => setAlliance(a)} className={`flex-1 py-2 rounded-lg text-sm font-semibold border capitalize ${alliance === a ? (a === "red" ? "bg-red-600 text-white border-red-600" : "bg-blue-600 text-white border-blue-600") : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>{a} alliance</button>
-        ))}
-      </div>
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-slate-500 dark:text-slate-400">Criteria</span>
-        <div className="flex gap-1">
-          <button onClick={() => setSig(true)} className={`px-2 py-1 rounded-md text-xs font-semibold border ${sig ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>Signature 7/3</button>
-          <button onClick={() => setSig(false)} className={`px-2 py-1 rounded-md text-xs font-semibold border ${!sig ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>Standard 6/2</button>
-        </div>
-      </div>
-      <AwpStep label={`Pins Scored for ${alliance}`} sub={`Need ${th.pins}+ (exclude any across the auton line)`} val={pins} set={setPins} />
-      <AwpStep label="Goals with 2+ of these Pins" sub={`Need ${th.goals}+ (exclude any across the auton line)`} val={goals} set={setGoals} />
-      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"><input type="checkbox" checked={perim} onChange={(e) => setPerim(e.target.checked)} className="w-4 h-4 accent-emerald-600" /> Neither robot on the Field Perimeter at auton's end</label>
-      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"><input type="checkbox" checked={noViol} onChange={(e) => setNoViol(e.target.checked)} className="w-4 h-4 accent-emerald-600" /> No auton violations by this alliance</label>
-      <div className={`rounded-lg p-3 text-sm font-bold ${pass ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800" : "bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600"}`}>
-        {pass ? "\u2713 AWP can be awarded to this alliance" : "AWP not met yet"}
+    <div className={`rounded-lg border p-3 space-y-2 ${isRed ? "border-red-200 dark:border-red-900 bg-red-50/40 dark:bg-red-950/20" : "border-blue-200 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/20"}`}>
+      <div className={`text-xs font-bold uppercase tracking-wide ${isRed ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}>{color} alliance</div>
+      <AwpStep label="Pins Scored" sub={`Need ${th.pins}+`} val={pins} set={setPins} />
+      <AwpStep label="Goals with 2+ Pins" sub={`Need ${th.goals}+`} val={goals} set={setGoals} />
+      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"><input type="checkbox" checked={perim} onChange={(e) => setPerim(e.target.checked)} className="w-4 h-4 accent-emerald-600" /> Robots off the Field Perimeter</label>
+      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"><input type="checkbox" checked={noViol} onChange={(e) => setNoViol(e.target.checked)} className="w-4 h-4 accent-emerald-600" /> No auton violations</label>
+      <div className={`rounded-lg p-2.5 text-sm font-bold ${pass ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"}`}>
+        {pass ? "\u2713 AWP can be awarded" : "AWP not met yet"}
         {!pass && (
           <ul className="mt-1 font-normal text-xs space-y-0.5">
             {!pinsOk && <li>• {th.pins}+ Pins (have {pins})</li>}
             {!goalsOk && <li>• {th.goals}+ Goals with 2+ Pins (have {goals})</li>}
-            {!perim && <li>• Both robots clear of the Field Perimeter</li>}
+            {!perim && <li>• Both robots off the Field Perimeter</li>}
             {!noViol && <li>• No auton violations</li>}
           </ul>
         )}
+      </div>
+    </div>
+  );
+}
+
+// AWP (Autonomous Win Point) checklist — a manual aid for the head ref. No live field
+// data exists in the app, so the ref enters what they saw at the end of auton for BOTH
+// alliances at once and this evaluates each against the v2.0 criteria.
+// Signature/Worlds-qualifying = 7 Pins / 3 Goals; standard events = 6 Pins / 2 Goals.
+function AwpChecker() {
+  const [sig, setSig] = useState(true);
+  const th = sig ? { pins: 7, goals: 3 } : { pins: 6, goals: 2 };
+  return (
+    <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-slate-500 dark:text-slate-400">Criteria (exclude anything across the auton line)</span>
+        <div className="flex gap-1 shrink-0">
+          <button onClick={() => setSig(true)} className={`px-2 py-1 rounded-md text-xs font-semibold border ${sig ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>Signature 7/3</button>
+          <button onClick={() => setSig(false)} className={`px-2 py-1 rounded-md text-xs font-semibold border ${!sig ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>Standard 6/2</button>
+        </div>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <AwpAlliance color="red" th={th} />
+        <AwpAlliance color="blue" th={th} />
       </div>
       <p className="text-[11px] text-slate-400">Manual aid — enter what you saw at the end of auton. It changes no scores; Tournament Manager records the official AWP.</p>
     </div>
