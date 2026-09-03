@@ -3790,6 +3790,7 @@ function FeaturesGuide() {
       <Section icon={BookOpen} title="Rules tab">
         <p>The full rulebook, searchable by code or description. It also powers the rule picker in the log form.</p>
         <p>Rules that have referee guidance show a red <b>“Notes ›”</b> tag — tap one to open a popup with <b>violation notes</b> for that rule: when it's Minor vs. Major, when it's match-affecting, escalation thresholds, and DQ conditions. Rules without notes aren't tappable.</p>
+        <p><b>Autonomous Win Point (SC8) — this event:</b> as a Signature Event, the Summit uses the v2.0 Worlds-qualifying AWP bar — <b>7+ Pins</b> Scored for your alliance, <b>3+ Goals</b> each holding <b>2+</b> of your alliance's Pins, and neither of your robots touching the Field Perimeter at the end of auton, with no auton violations. (Standard events stay at 6 Pins / 2 Goals.) Pins and Goals across the Autonomous Line from you don't count, and any auton violation voids the AWP.</p>
       </Section>
 
       <Section icon={Trophy} title="Judging">
@@ -3843,6 +3844,7 @@ function FeaturesGuide() {
 // Referee notes per rule (shown in a popup when a rule is tapped in the Rules tab).
 // Keyed by rule code. Fill these in as needed; rules without an entry show a default message.
 const RULE_NOTES = {
+  "SC8": "Autonomous Win Point. Signature Events (like this one) and other Worlds-qualifying events use the higher v2.0 bar: 7+ Pins Scored for your alliance, AND 3+ Goals that each hold 2+ of your alliance's Pins, AND neither of your robots touching the Field Perimeter when auton ends \u2014 with zero auton violations. (Standard events stay at 6 Pins / 2 Goals.)\nPins and Goals in Quadrants on the opposing side of the Autonomous Line don't count toward your total.\nAny auton violation, Major or Minor, voids the AWP.",
   "SG1": "Match won't start until every condition is met. If a robot can't get legal in time, it's removed from the field (R2d and GG2 then apply) \u2014 no DQ, but log a Minor and it can't play that match.",
   "SG2": "Incidental / insignificant in-match issues are Minor; escalate to Major only in extreme cases.\nTypical Minors: loose wires; broken zip ties or rubber bands; bent or broken parts not used for strategic gain.",
   "SG4": "Match-affecting impact is hard to judge, so most are Minor. Blatantly intentional or clearly match-affecting cases (especially in elims) can be escalated to Major at head-ref discretion.",
