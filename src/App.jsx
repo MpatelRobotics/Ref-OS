@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
-  ClipboardCheck, X, Search, BarChart3, Users, Download,
+  ClipboardCheck, X, Search, BarChart3, Users, Download, Save,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
   CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type,
 } from "lucide-react";
@@ -2721,21 +2721,18 @@ function AwpStep({ label, sub, val, set }) {
   );
 }
 
-function AwpAlliance({ color, th }) {
-  const [pins, setPins] = useState(0);
-  const [goals, setGoals] = useState(0);
-  const [perim, setPerim] = useState(true);
-  const [noViol, setNoViol] = useState(true);
+function AwpAlliance({ color, th, state, onChange }) {
+  const { pins, goals, perim, noViol } = state;
   const pinsOk = pins >= th.pins, goalsOk = goals >= th.goals;
   const pass = pinsOk && goalsOk && perim && noViol;
   const isRed = color === "red";
   return (
     <div className={`rounded-lg border p-3 space-y-2 ${isRed ? "border-red-200 dark:border-red-900 bg-red-50/40 dark:bg-red-950/20" : "border-blue-200 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/20"}`}>
       <div className={`text-xs font-bold uppercase tracking-wide ${isRed ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}>{color} alliance</div>
-      <AwpStep label="Pins Scored" sub={`Need ${th.pins}+`} val={pins} set={setPins} />
-      <AwpStep label="Goals with 2+ Pins" sub={`Need ${th.goals}+`} val={goals} set={setGoals} />
-      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"><input type="checkbox" checked={perim} onChange={(e) => setPerim(e.target.checked)} className="w-4 h-4 accent-emerald-600" /> Robots off the Field Perimeter</label>
-      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"><input type="checkbox" checked={noViol} onChange={(e) => setNoViol(e.target.checked)} className="w-4 h-4 accent-emerald-600" /> No auton violations</label>
+      <AwpStep label="Pins Scored" sub={`Need ${th.pins}+`} val={pins} set={(n) => onChange({ pins: n })} />
+      <AwpStep label="Goals with 2+ Pins" sub={`Need ${th.goals}+`} val={goals} set={(n) => onChange({ goals: n })} />
+      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"><input type="checkbox" checked={perim} onChange={(e) => onChange({ perim: e.target.checked })} className="w-4 h-4 accent-emerald-600" /> Robots off the Field Perimeter</label>
+      <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"><input type="checkbox" checked={noViol} onChange={(e) => onChange({ noViol: e.target.checked })} className="w-4 h-4 accent-emerald-600" /> No auton violations</label>
       <div className={`rounded-lg p-2.5 text-sm font-bold ${pass ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"}`}>
         {pass ? "\u2713 AWP can be awarded" : "AWP not met yet"}
         {!pass && (
@@ -2755,9 +2752,35 @@ function AwpAlliance({ color, th }) {
 // data exists in the app, so the ref enters what they saw at the end of auton for BOTH
 // alliances at once and this evaluates each against the v2.0 criteria.
 // Signature/Worlds-qualifying = 7 Pins / 3 Goals; standard events = 6 Pins / 2 Goals.
-function AwpChecker() {
+// "Save to match log" writes the result to the field log so the match can be referenced later.
+function AwpChecker({ onSave }) {
   const [sig, setSig] = useState(true);
+  const [red, setRed] = useState({ pins: 0, goals: 0, perim: true, noViol: true });
+  const [blue, setBlue] = useState({ pins: 0, goals: 0, perim: true, noViol: true });
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
   const th = sig ? { pins: 7, goals: 3 } : { pins: 6, goals: 2 };
+  const summarize = (label, s) => {
+    const ok = s.pins >= th.pins && s.goals >= th.goals && s.perim && s.noViol;
+    const gaps = [];
+    if (s.pins < th.pins) gaps.push(`pins ${s.pins}/${th.pins}`);
+    if (s.goals < th.goals) gaps.push(`goals ${s.goals}/${th.goals}`);
+    if (!s.perim) gaps.push("on perimeter");
+    if (!s.noViol) gaps.push("auton violation");
+    return `${label}: ${ok ? "MET" : "NOT met"} (${s.pins}P/${s.goals}G${!ok && gaps.length ? " — " + gaps.join(", ") : ""})`;
+  };
+  const doSave = async () => {
+    if (!onSave) return;
+    const note = `AWP ${sig ? "Sig 7/3" : "Std 6/2"} — ${summarize("Red", red)}; ${summarize("Blue", blue)}`;
+    setSaving(true);
+    try {
+      await onSave(note);
+      setSavedMsg("Saved to the match log ✓");
+      setTimeout(() => setSavedMsg(""), 3000);
+    } catch (e) {
+      alert(e.message || "Couldn't save the AWP result.");
+    } finally { setSaving(false); }
+  };
   return (
     <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-3">
       <div className="flex items-center justify-between">
@@ -2768,10 +2791,14 @@ function AwpChecker() {
         </div>
       </div>
       <div className="grid sm:grid-cols-2 gap-3">
-        <AwpAlliance color="red" th={th} />
-        <AwpAlliance color="blue" th={th} />
+        <AwpAlliance color="red" th={th} state={red} onChange={(patch) => setRed((s) => ({ ...s, ...patch }))} />
+        <AwpAlliance color="blue" th={th} state={blue} onChange={(patch) => setBlue((s) => ({ ...s, ...patch }))} />
       </div>
-      <p className="text-[11px] text-slate-400">Manual aid — enter what you saw at the end of auton. It changes no scores; Tournament Manager records the official AWP.</p>
+      {onSave && (
+        <button onClick={doSave} disabled={saving} className="w-full py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold flex items-center justify-center gap-2 disabled:bg-slate-300 hover:bg-[#171a45]"><Save size={16} /> {saving ? "Saving…" : "Save result to match log"}</button>
+      )}
+      {savedMsg && <p className="text-xs text-emerald-600 dark:text-emerald-400 text-center font-medium">{savedMsg}</p>}
+      <p className="text-[11px] text-slate-400">Manual aid — enter what you saw at the end of auton. It changes no scores; Tournament Manager records the official AWP. Saving keeps a copy in this match's log for later reference.</p>
     </div>
   );
 }
@@ -2913,7 +2940,7 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
           <button onClick={toggleReplay} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${replayEntry ? "bg-amber-500 text-white border-amber-500" : "bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"}`}><RefreshCw size={15} /> {replayEntry ? "For replay ✓" : "Replay"}</button>
         </div>
         {!isElim && <button onClick={() => { setAwpOpen((v) => !v); setToOpen(false); setFaultOpen(false); }} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${awpOpen ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"}`}><ClipboardCheck size={15} /> AWP check</button>}
-        {!isElim && awpOpen && <AwpChecker />}
+        {!isElim && awpOpen && <AwpChecker onSave={(note) => onAddField({ kind: "awp", matchId: m.id, matchRef: heading, note })} />}
         {isElim && toOpen && (
           <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2">
             <div className="flex gap-2">
@@ -3711,10 +3738,11 @@ function AddMatchModal({ teams, onSave, onClose }) {
 
 /* ============================ FIELD LOG (timeouts / faults / replays) ============================ */
 const FIELD_KINDS = [{ key: "timeout", label: "Timeout" }, { key: "field_fault", label: "Field fault" }, { key: "replay", label: "Match replay" }, { key: "other", label: "Other" }];
-const kindLabel = (k) => (FIELD_KINDS.find((x) => x.key === k) || {}).label || "Other";
+const kindLabel = (k) => k === "awp" ? "AWP" : (FIELD_KINDS.find((x) => x.key === k) || {}).label || "Other";
 const kindColor = (k) => k === "field_fault" ? "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-200 dark:border-red-700"
   : k === "replay" ? "bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700"
   : k === "timeout" ? "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700"
+  : k === "awp" ? "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-200 dark:border-emerald-700"
   : "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600";
 
 function FieldLogView({ entries, onAdd, onRemove, meName, canDelete }) {
