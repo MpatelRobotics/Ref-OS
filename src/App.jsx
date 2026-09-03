@@ -1740,7 +1740,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
               ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
               ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
               { k: "robots", label: "Robots", Icon: Camera },
-              { k: "awp", label: "AWP", Icon: ClipboardCheck },
               { k: "alliances", label: "Alliances", Icon: GitBranch },
               { k: "judging", label: "Judging", Icon: Trophy }
             ] : [
@@ -1748,7 +1747,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
               ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
               ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
               { k: "robots", label: "Robots", Icon: Camera },
-              { k: "awp", label: "AWP", Icon: ClipboardCheck },
               { k: "alliances", label: "Alliances", Icon: GitBranch },
               { k: "judging", label: "Judging", Icon: Trophy }]).map(({ k, label, Icon }) => (
               <button key={k} onClick={() => { setView(k); setQuery(""); }}
@@ -2671,6 +2669,10 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
               {f === "all" ? "All fields" : f}
             </button>
           ))}
+          <button onClick={() => setView("awp")}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border ${view === "awp" ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:border-slate-600"}`}>
+            AWP
+          </button>
         </div>
       )}
       <div className="relative mb-4">
