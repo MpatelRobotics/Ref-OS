@@ -1454,6 +1454,17 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     setFieldLog((prev) => [entry, ...prev.filter((e) => e.id !== entry.id)]);
   };
 
+  const deleteAnnouncementForAll = async (id) => {
+    await api.deleteFieldLog(id);
+    setFieldLog((prev) => prev.filter((e) => e.id !== id));
+  };
+
+  const clearAnnouncementsForAll = async () => {
+    const entries = fieldLog.filter((e) => e.kind === "announcement");
+    await Promise.all(entries.map((e) => api.deleteFieldLog(e.id)));
+    setFieldLog((prev) => prev.filter((e) => e.kind !== "announcement"));
+  };
+
   const saveSharedCountdown = async (value) => {
     const saved = await api.addFieldLog(eventId, {
       kind: "event_countdown",
@@ -2166,6 +2177,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onCountdown={() => { setShowCommandCenter(false); setShowCountdownSetup(true); }}
         onOfflineTest={() => { setShowCommandCenter(false); setShowOfflineTest(true); }}
         onAnnouncement={() => { setShowCommandCenter(false); setShowAnnouncement(true); }}
+        onDeleteAnnouncement={deleteAnnouncementForAll}
+        onClearAnnouncements={clearAnnouncementsForAll}
         onClose={() => setShowCommandCenter(false)} />}
       {showAnnouncement && adminUnlocked && <AnnouncementModal onClose={() => setShowAnnouncement(false)} onSend={sendAnnouncement} />}
       {showFeatures && (
@@ -3317,11 +3330,12 @@ function OfflineReadinessModal({ onClose }) {
   );
 }
 
-function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, countdownText, onCountdown, onOfflineTest, onAnnouncement, onClose }) {
+function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, countdownText, onCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onClose }) {
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
-  const announcements = fieldLog.filter(e=>e.kind==="announcement").length;
+  const announcementEntries = fieldLog.filter(e=>e.kind==="announcement").sort((a,b)=>b.createdAt-a.createdAt);
+  const announcements = announcementEntries.length;
   const awps = fieldLog.filter(e=>e.kind==="awp").length;
   const onlineNames = new Set((presence||[]).map(p=>p.name).filter(Boolean));
   return (
@@ -3339,6 +3353,40 @@ function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, 
           <div className="font-bold flex items-center gap-2"><Flag size={17}/> Event activity</div>
           <div className="grid grid-cols-2 gap-2 mt-2 text-sm"><div>AWP checks <b className="float-right">{awps}</b></div><div>Announcements <b className="float-right">{announcements}</b></div></div>
           <button onClick={onAnnouncement} className="mt-3 w-full py-2 rounded-lg border font-semibold text-sm">Send Key Volunteer Announcement</button>
+
+          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Announcement management</div>
+              {announcementEntries.length > 0 && (
+                <button onClick={() => {
+                  if (confirm("Delete all Key Volunteer Announcements for everyone?")) onClearAnnouncements();
+                }} className="ml-auto text-xs font-semibold text-red-600 hover:text-red-700">
+                  Delete all
+                </button>
+              )}
+            </div>
+            {announcementEntries.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-slate-400">No announcements have been sent.</p>
+            ) : (
+              <div className="space-y-2">
+                {announcementEntries.map((a) => (
+                  <div key={a.id} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+                    <div className="flex gap-2 items-start">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-slate-900 dark:text-slate-100 whitespace-pre-wrap">{a.note}</div>
+                        <div className="text-[11px] text-slate-400 mt-1">{a.by ? `From ${a.by} · ` : ""}{fmtTime(a.createdAt)}</div>
+                      </div>
+                      <button onClick={() => {
+                        if (confirm("Delete this Key Volunteer Announcement for everyone?")) onDeleteAnnouncement(a.id);
+                      }} className="shrink-0 p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30" title="Delete for everyone">
+                        <Trash2 size={16}/>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
           <div className="font-bold flex items-center gap-2"><Clock size={17}/> Countdown banner</div>
