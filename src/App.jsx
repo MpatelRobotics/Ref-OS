@@ -2098,7 +2098,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             </div>
           </div>
           <div className="mt-4 text-xs text-slate-400 leading-relaxed">
-            <div className="font-semibold text-slate-200 line-clamp-2">{event?.name || "Highlander Summit"}</div>
+            <h1 className="font-semibold text-slate-200 line-clamp-2">{event?.name || "Highlander Summit"}</h1>
             <div className="mt-1 flex items-center gap-1.5">
               <span className={`w-2 h-2 rounded-full ${online ? "bg-emerald-400" : "bg-amber-400"}`} />
               {online ? "Live" : "Offline · cached data"}

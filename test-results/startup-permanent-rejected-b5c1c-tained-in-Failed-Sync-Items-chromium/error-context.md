@@ -12,122 +12,76 @@
 # Error details
 
 ```
-Error: expect(locator).toBeVisible() failed
+Test timeout of 30000ms exceeded.
+```
 
-Locator: getByRole('heading', { name: 'Highlander Summit E2E' })
-Expected: visible
-Timeout: 5000ms
-Error: element(s) not found
-
+```
+Error: locator.click: Test timeout of 30000ms exceeded.
 Call log:
-  - Expect "toBeVisible" with timeout 5000ms
-  - waiting for getByRole('heading', { name: 'Highlander Summit E2E' })
+  - waiting for getByRole('button', { name: 'Event Command Center' })
 
 ```
 
+# Page snapshot
+
 ```yaml
-- complementary "Desktop navigation":
-  - img "Highlander Summit"
-  - text: Ref OS v1.2.0 Highlander Summit E2E Live
-  - navigation:
-    - button "Command Center":
-      - img
-      - text: Command Center
-    - button "Teams":
-      - img
-      - text: Teams
-    - button "Rules":
-      - img
-      - text: Rules
-    - button "Robots":
-      - img
-      - text: Robots
-    - button "Alliances":
-      - img
-      - text: Alliances
-    - button "Judging":
-      - img
-      - text: Judging
-  - button "Field Log":
-    - img
-    - text: Field Log
-  - button "Contacts":
-    - img
-    - text: Contacts
-  - button "Features & Help":
-    - img
-    - text: Features & Help
-  - button "Settings":
-    - img
-    - text: Settings
-- main:
-  - button "Highlander Summit E2E 10 quals · top 16":
-    - img
-    - text: Highlander Summit E2E 10 quals · top 16
-    - img
-  - img
-  - 'textbox "Search team #"'
-  - button "Scan":
-    - img
-    - text: Scan
-  - button "Team":
-    - img
-    - text: Team
-  - paragraph: No teams yet
-  - paragraph: Add a team, or just log a violation and the team is created for you.
-  - img "Highlander Summit"
-  - paragraph:
-    - text: Made by Maharshi Patel ·
-    - link "@mpatel_ref":
-      - /url: https://www.instagram.com/mpatel_ref/
-    - text: · v1.2.0
-- button "Log violation":
-  - img
-  - text: Log violation
+- generic [ref=e3]:
+  - complementary "Desktop navigation" [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img "Highlander Summit" [ref=e7]
+        - generic [ref=e8]:
+          - generic [ref=e9]: Ref OS
+          - generic [ref=e10]: v1.2.0
+      - generic [ref=e11]:
+        - heading "Highlander Summit E2E" [level=1] [ref=e12]
+        - generic [ref=e13]: Live
+    - navigation [ref=e15]:
+      - button "Command Center" [ref=e16] [cursor=pointer]
+      - button "Teams" [ref=e20] [cursor=pointer]
+      - button "Rules" [ref=e27] [cursor=pointer]
+      - button "Robots" [ref=e32] [cursor=pointer]
+      - button "Alliances" [ref=e37] [cursor=pointer]
+      - button "Judging" [ref=e43] [cursor=pointer]
+    - generic [ref=e51]:
+      - button "Field Log" [ref=e52] [cursor=pointer]
+      - button "Contacts" [ref=e56] [cursor=pointer]
+      - button "Features & Help" [ref=e62] [cursor=pointer]
+      - button "Settings" [active] [ref=e66] [cursor=pointer]
+  - generic [ref=e71]:
+    - generic [ref=e72]: Device settings
+    - button "Change name" [ref=e73] [cursor=pointer]
+    - button "Dark mode" [ref=e78] [cursor=pointer]
+    - 'button "Text size: Normal" [ref=e81] [cursor=pointer]'
+    - button "Guided tour" [ref=e84] [cursor=pointer]
+    - button "Lock device" [ref=e88] [cursor=pointer]
+  - generic [ref=e92]: 1 entry saved on this device — syncing now…
+  - main [ref=e100]:
+    - button "Highlander Summit E2E 10 quals · top 16" [ref=e101] [cursor=pointer]:
+      - generic [ref=e104]: Highlander Summit E2E
+      - generic [ref=e105]: 10 quals · top 16
+    - generic [ref=e108]:
+      - 'textbox "Search team #" [ref=e113]'
+      - button "Scan" [ref=e114] [cursor=pointer]
+      - button "Team" [ref=e118] [cursor=pointer]
+    - list [ref=e120]:
+      - listitem [ref=e121]:
+        - button "4610F 1" [ref=e122] [cursor=pointer]:
+          - generic [ref=e123]: 4610F
+          - generic [ref=e124]: "1"
+    - generic [ref=e129]:
+      - img "Highlander Summit" [ref=e130]
+      - paragraph [ref=e131]:
+        - text: Made by Maharshi Patel ·
+        - link "@mpatel_ref" [ref=e132] [cursor=pointer]:
+          - /url: https://www.instagram.com/mpatel_ref/
+        - text: · v1.2.0
+  - button "Log violation" [ref=e133] [cursor=pointer]
 ```
 
 # Test source
 
 ```ts
-  1   | import { test, expect } from "@playwright/test";
-  2   | 
-  3   | async function keypadLogin(page, code = "1A23") {
-  4   |   await page.goto("/");
-  5   |   await page.getByRole("button", { name: "Use event access code" }).click();
-  6   |   for (const key of code.split("")) {
-  7   |     await page.getByRole("button", { name: key, exact: true }).click();
-  8   |   }
-  9   | }
-  10  | 
-  11  | async function passwordLogin(page, credential) {
-  12  |   await page.goto("/");
-  13  |   await page.getByPlaceholder("Password").fill(credential);
-  14  |   await page.getByRole("button", { name: "Enter", exact: true }).click();
-  15  | }
-  16  | 
-  17  | async function finishName(page, first = "Alex", last = "Referee") {
-  18  |   await page.getByPlaceholder("e.g. Alex").fill(first);
-  19  |   await page.getByPlaceholder("e.g. Rodriguez").fill(last);
-  20  |   await page.getByRole("button", { name: "Start logging" }).click();
-> 21  |   await expect(page.getByRole("heading", { name: "Highlander Summit E2E" })).toBeVisible();
-      |                                                                              ^ Error: expect(locator).toBeVisible() failed
-  22  | }
-  23  | 
-  24  | async function loginAdmin(page) {
-  25  |   await keypadLogin(page);
-  26  |   await finishName(page, "Admin", "Tester");
-  27  | }
-  28  | 
-  29  | test("login screen renders instead of a blank page", async ({ page }) => {
-  30  |   await page.goto("/");
-  31  |   await expect(page.getByText("Highlander Summit — Violation Log")).toBeVisible();
-  32  |   await expect(page.getByRole("button", { name: "Use event access code" })).toBeVisible();
-  33  |   await expect(page.getByRole("button", { name: "Scan QR code" })).toBeVisible();
-  34  | });
-  35  | 
-  36  | test("wrong credential stays locked", async ({ page }) => {
-  37  |   await passwordLogin(page, "wrong-password");
-  38  |   await expect(page.getByText("Incorrect event credential.")).toBeVisible();
   39  |   await expect(page.getByPlaceholder("Password")).toBeVisible();
   40  | });
   41  | 
@@ -211,4 +165,56 @@ Call log:
   119 |   await context.setOffline(false);
   120 |   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   121 |   await page.waitForTimeout(500);
+  122 | 
+  123 |   await page.getByText("4610Q", { exact: true }).click();
+  124 |   await expect(page.getByRole("listitem").getByText("Offline queue rule", { exact: true })).toBeVisible();
+  125 | });
+  126 | 
+  127 | test("permanent rejected write is retained in Failed Sync Items", async ({ page }) => {
+  128 |   await loginAdmin(page);
+  129 |   await page.getByRole("button", { name: /Team$/ }).click();
+  130 |   await page.getByPlaceholder("e.g. 1234A").fill("4610F");
+  131 |   await page.getByRole("button", { name: "Add team", exact: true }).last().click();
+  132 | 
+  133 |   await page.getByRole("button", { name: /Log violation/i }).click();
+  134 |   await page.getByPlaceholder("What the rule covers").fill("PERMANENT_FAIL");
+  135 |   await page.getByRole("button", { name: "Save violation" }).click();
+  136 |   await page.waitForTimeout(300);
+  137 | 
+  138 |   await page.getByRole("button", { name: "Settings" }).click();
+> 139 |   await page.getByRole("button", { name: "Event Command Center" }).click();
+      |                                                                    ^ Error: locator.click: Test timeout of 30000ms exceeded.
+  140 |   await expect(page.getByText("Failed Sync Items")).toBeVisible();
+  141 |   await expect(page.getByText("E2E simulated RLS rejection")).toBeVisible();
+  142 | });
+  143 | 
+  144 | 
+  145 | test("generated volunteer QR is produced locally as a data URL", async ({ page }) => {
+  146 |   await loginAdmin(page);
+  147 |   await page.getByRole("button", { name: "Settings" }).click();
+  148 |   await page.getByRole("button", { name: "Event Command Center" }).click();
+  149 |   await page.getByRole("button", { name: "Volunteer Access Codes" }).click();
+  150 | 
+  151 |   await page.getByRole("button", { name: "Generate code", exact: true }).first().click();
+  152 |   await expect(page.getByText("Share this code")).toBeVisible();
+  153 | 
+  154 |   const popupPromise = page.waitForEvent("popup");
+  155 |   await page.getByRole("button", { name: "Show QR" }).first().click();
+  156 |   const popup = await popupPromise;
+  157 |   const src = await popup.locator("img").getAttribute("src");
+  158 |   expect(src).toMatch(/^data:image\/png;base64,/);
+  159 | });
+  160 | 
+  161 | test("service worker file is versioned for Ref OS 1.2", async ({ request }) => {
+  162 |   const response = await request.get("/sw.js");
+  163 |   expect(response.ok()).toBeTruthy();
+  164 |   const text = await response.text();
+  165 |   expect(text).toContain("refos-v7-1.2.0-desktop-ui");
+  166 | });
+  167 | 
+  168 | test("manifest remains available", async ({ request }) => {
+  169 |   const response = await request.get("/manifest.webmanifest");
+  170 |   expect(response.ok()).toBeTruthy();
+  171 | });
+  172 | 
 ```
