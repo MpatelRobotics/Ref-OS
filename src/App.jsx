@@ -4906,6 +4906,7 @@ function FeaturesGuide() {
         <ul className="space-y-1.5">
           <Li><b>Favorites</b> — star frequently used rules so they appear in a Favorites group when no search is active.</Li>
           <Li><b>Recently used</b> — recently selected rules are shown automatically for faster repeat access.</Li>
+          <Li><b>Offline rule index</b> — the event rule index is bundled with Ref-OS, so rule codes, descriptions, categories, favorites, recent rules, and referee notes remain available when Supabase or Wi-Fi is unavailable.</Li>
           <Li><b>Referee guidance</b> — rules with supplemental guidance can be opened for violation notes, escalation guidance, and event-specific interpretation.</Li>
         </ul>
         <p>Favorites and recently used rules are stored on the local browser or device.</p>

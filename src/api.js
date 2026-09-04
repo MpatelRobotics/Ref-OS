@@ -1,4 +1,5 @@
 import { supabase } from "./supabaseClient";
+import { OFFLINE_RULES } from "./offlineRules";
 
 const E2E_MOCK = import.meta.env.VITE_E2E_MOCK === "1";
 const e2eState = { teams: [], violations: [] };
@@ -370,9 +371,16 @@ export async function clearAlliances(eventId) {
 
 /* ================= rulebook ================= */
 export async function listRules(eventId) {
-  if (E2E_MOCK) return [];
-  const { data } = await supabase.from("rules").select("code,description,category,ord").eq("event_id", eventId).order("ord");
-  return (data || []).map((r) => ({ code: r.code, desc: r.description || "", category: r.category || "" }));
+  if (E2E_MOCK) return OFFLINE_RULES;
+  try {
+    const { data, error } = await supabase.from("rules").select("code,description,category,ord").eq("event_id", eventId).order("ord");
+    if (error) throw error;
+    const live = (data || []).map((r) => ({ code: r.code, desc: r.description || "", category: r.category || "", ord: r.ord ?? 0 }));
+    return live.length ? live : OFFLINE_RULES;
+  } catch (error) {
+    console.warn("Rules unavailable from Supabase; using bundled offline rule index.", error);
+    return OFFLINE_RULES;
+  }
 }
 
 /* ================= award nominations (Judging) ================= */
