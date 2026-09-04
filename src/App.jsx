@@ -3,12 +3,13 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download, Save,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, PlayCircle,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, PlayCircle, QrCode, ScanLine,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
 import * as outbox from "./outbox";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import QRCode from "qrcode";
 
 /* This build is locked to one event: The Highlander Summit Signature Event.
    EVENT_ID must match supabase/seed.sql. A shared site password gates entry. */
@@ -382,6 +383,9 @@ function PasswordScreen({ onUnlock }) {
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   const [checkingCode, setCheckingCode] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const scannerVideoRef = useRef(null);
+  const scannerStreamRef = useRef(null);
 
   const submit = () => {
     if (!SITE_PASSWORD && !JUDGE_PASSWORD) { setErr("Site password isn't set. Add VITE_SITE_PASSWORD to the environment."); return; }
@@ -405,6 +409,25 @@ function PasswordScreen({ onUnlock }) {
       return cur + key;
     });
   };
+
+  const stopLoginScanner = () => { scannerStreamRef.current?.getTracks?.().forEach((t)=>t.stop()); scannerStreamRef.current=null; setScanning(false); };
+  const handleLoginQrText = (raw) => {
+    let scannedCode="";
+    try { const payload=JSON.parse(raw); if(payload?.type==="refos-login"&&payload?.eventId===EVENT_ID) scannedCode=payload.code||""; } catch { scannedCode=String(raw||""); }
+    scannedCode=String(scannedCode).toUpperCase().trim();
+    if(!/^\d[A-D]\d\d$/.test(scannedCode)){setErr("That QR code is not a valid Ref OS event login.");return false;}
+    stopLoginScanner(); setCode(scannedCode); setMode("code"); return true;
+  };
+  const startLoginScanner = async () => {
+    setErr("");
+    if(!navigator.mediaDevices?.getUserMedia||!("BarcodeDetector" in globalThis)){setErr("QR scanning is not supported by this browser. Use the event code instead.");return;}
+    try {
+      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false}); scannerStreamRef.current=stream; setScanning(true);
+      setTimeout(async()=>{const video=scannerVideoRef.current;if(!video)return;video.srcObject=stream;await video.play().catch(()=>{});const detector=new BarcodeDetector({formats:["qr_code"]});
+        const scan=async()=>{if(!scannerStreamRef.current)return;try{const found=await detector.detect(video);if(found?.[0]?.rawValue&&handleLoginQrText(found[0].rawValue))return;}catch{}requestAnimationFrame(scan);};requestAnimationFrame(scan);},0);
+    } catch { stopLoginScanner(); setErr("Camera access was not available. Allow camera permission and try again."); }
+  };
+  useEffect(()=>()=>scannerStreamRef.current?.getTracks?.().forEach((t)=>t.stop()),[]);
 
   const submitCode = async (candidate = code) => {
     const clean = String(candidate || "").toUpperCase().replace(/[^0-9A-D]/g, "").slice(0, 4);
@@ -471,6 +494,7 @@ function PasswordScreen({ onUnlock }) {
               className="w-full mt-3 py-3 rounded-lg font-semibold border border-[#4a4f82] bg-[#171b45] hover:bg-[#202657]">
               Use event access code
             </button>
+            <button onClick={startLoginScanner} className="w-full mt-3 py-3 rounded-lg font-semibold border border-[#4a4f82] bg-[#171b45] hover:bg-[#202657] flex items-center justify-center gap-2"><ScanLine size={18}/> Scan QR code</button>
           </>
         ) : (
           <>
@@ -519,6 +543,7 @@ function PasswordScreen({ onUnlock }) {
           </>
         )}
 
+        {scanning && <div className="fixed inset-0 z-[100] bg-black flex flex-col"><div className="p-4 flex items-center"><div className="font-bold flex items-center gap-2"><ScanLine size={20}/> Scan Ref OS login QR</div><button onClick={stopLoginScanner} className="ml-auto p-2"><X size={24}/></button></div><div className="flex-1 relative overflow-hidden"><video ref={scannerVideoRef} playsInline muted className="w-full h-full object-cover"/><div className="absolute inset-0 grid place-items-center pointer-events-none"><div className="w-64 h-64 border-4 border-white rounded-3xl"/></div></div><div className="p-5 text-center text-sm text-slate-300">Point the camera at a Ref OS volunteer login QR code.</div></div>}
         <div className="flex flex-col items-center gap-2 mt-8">
           <img src="/logo.svg" alt="Highlander Summit" className="h-12 w-12 object-contain" />
           <p className="text-center text-xs text-slate-400">
@@ -594,6 +619,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [openMatch, setOpenMatch] = useState(null);
   const [openRobot, setOpenRobot] = useState(null);
   const [query, setQuery] = useState("");
+  const [showTeamScanner, setShowTeamScanner] = useState(false);
+  const teamScannerVideoRef = useRef(null);
+  const teamScannerStreamRef = useRef(null);
   const [lightbox, setLightbox] = useState(null);
   const [menu, setMenu] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -609,7 +637,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     reset();
     const evs = ["pointerdown", "pointermove", "touchstart", "wheel", "scroll", "keydown"];
     evs.forEach((ev) => el && el.addEventListener(ev, reset, { passive: true }));
-    return () => { clearTimeout(menuTimer.current); evs.forEach((ev) => el && el.removeEventListener(ev, reset)); };
+    const stopTeamScanner=()=>{teamScannerStreamRef.current?.getTracks?.().forEach(t=>t.stop());teamScannerStreamRef.current=null;setShowTeamScanner(false);};
+  const startTeamScanner=async()=>{if(!navigator.mediaDevices?.getUserMedia){alert("Camera access is not supported on this browser.");return;}try{const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});teamScannerStreamRef.current=stream;setShowTeamScanner(true);setTimeout(async()=>{const v=teamScannerVideoRef.current;if(v){v.srcObject=stream;await v.play().catch(()=>{});}},0);}catch{alert("Camera access was not available. Allow camera permission and try again.");}};
+  const captureTeamNumber=async()=>{const video=teamScannerVideoRef.current;if(!video?.videoWidth)return;const canvas=document.createElement("canvas");canvas.width=video.videoWidth;canvas.height=video.videoHeight;canvas.getContext("2d").drawImage(video,0,0);if(!("TextDetector" in globalThis)){alert("Automatic team number recognition is not supported by this browser. Use normal team search on this device.");return;}try{const found=await new TextDetector().detect(canvas);const raw=found.map(x=>x.rawValue||"").join(" ").toUpperCase().replace(/\s/g,"");const match=[...teams].sort((a,b)=>String(b.number).length-String(a.number).length).find(t=>raw.includes(String(t.number).toUpperCase()));if(!match){alert("No known team number was detected. Try again closer to the team number.");return;}stopTeamScanner();setOpenTeam(match.number);}catch{alert("Could not read a team number from that image. Try again.");}};
+
+  return () => { clearTimeout(menuTimer.current); evs.forEach((ev) => el && el.removeEventListener(ev, reset)); };
   }, [menu]);
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
@@ -2304,6 +2336,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search team #"
                   className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
               </div>
+              <button onClick={startTeamScanner} className="px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Camera size={17} /> Scan</button>
               {!isEmcee && <button onClick={() => setAddTeam(true)} className="px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Plus size={17} /> Team</button>}
             </div>
             {filteredTeams.length === 0 ? (
@@ -2351,6 +2384,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         </button>
       )}
 
+      {showTeamScanner && <div className="fixed inset-0 z-[100] bg-black flex flex-col text-white"><div className="p-4 flex items-center"><div className="font-bold flex items-center gap-2"><Camera size={20}/> Scan team number</div><button onClick={stopTeamScanner} className="ml-auto p-2"><X size={24}/></button></div><div className="flex-1 relative overflow-hidden"><video ref={teamScannerVideoRef} playsInline muted className="w-full h-full object-cover"/><div className="absolute inset-x-8 top-1/2 -translate-y-1/2 border-4 border-white rounded-2xl h-36 pointer-events-none"/></div><div className="p-4"><button onClick={captureTeamNumber} className="w-full py-3 rounded-xl bg-white text-black font-bold">Read team number</button><p className="text-xs text-slate-300 text-center mt-2">Center the robot team number in the box, then tap Read team number.</p></div></div>}
       {logFor !== null && (
         <LogModal teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules} onOpenPhoto={setLightbox} tourMode={showGuidedTour && tourStep === 4}
           onSetName={() => setShowIdentity(true)} onClose={() => { setLogFor(null); setLogMatch(null); }}
@@ -4191,6 +4225,10 @@ function RoleAccessCodeManager({ fieldLog, onSave, onClose }) {
     } catch {}
   };
 
+  const loginQrPayload=(role,code)=>JSON.stringify({type:"refos-login",eventId:EVENT_ID,role,code});
+  const showLoginQr=async(role)=>{const code=revealed[role];if(!code)return;const row=roleRows.find(r=>r.key===role);const dataUrl=await QRCode.toDataURL(loginQrPayload(role,code),{width:700,margin:2});const win=window.open("","_blank");if(!win){setError("Allow popups to open the QR code.");return;}win.document.write(`<title>Ref OS Login QR</title><body style="font-family:Arial;text-align:center;padding:32px"><h1>Ref OS</h1><h2>${row?.label||role}</h2><img src="${dataUrl}" style="width:min(80vw,500px)"><div style="font-size:38px;font-weight:800;letter-spacing:8px">${code}</div><p>Scan from the Ref OS login screen</p></body>`);win.document.close();};
+  const printLoginCards=async()=>{const available=roleRows.filter(r=>revealed[r.key]);if(!available.length){setError("Generate new role codes first. Ref OS does not store the readable code after generation.");return;}const cards=await Promise.all(available.map(async r=>({...r,code:revealed[r.key],qr:await QRCode.toDataURL(loginQrPayload(r.key,revealed[r.key]),{width:500,margin:2})})));const win=window.open("","_blank");if(!win){setError("Allow popups to print volunteer login cards.");return;}win.document.write(`<title>Ref OS Volunteer Login Cards</title><style>@page{size:letter;margin:.35in}body{font-family:Arial}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{border:2px solid #0D0F32;border-radius:18px;padding:22px;text-align:center;break-inside:avoid}.card img{width:210px;max-width:80%}.code{font-size:34px;font-weight:900;letter-spacing:7px}.role{font-size:22px;font-weight:800}.small{font-size:12px;color:#555}@media print{button{display:none}}</style><button onclick="window.print()">Print</button><div class="grid">${cards.map(c=>`<div class="card"><h2>Highlander Summit</h2><div class="role">${c.label}</div><img src="${c.qr}"><div class="code">${c.code}</div><p class="small">Open Ref OS and tap Scan QR code</p></div>`).join("")}</div>`);win.document.close();};
+
   const activeCount = roleRows.filter((r) => config?.codes?.[r.key]?.enabled).length;
 
   return (
@@ -4234,9 +4272,7 @@ function RoleAccessCodeManager({ fieldLog, onSave, onClose }) {
                   <div className="mt-4 rounded-xl bg-slate-100 dark:bg-slate-900 p-4 text-center">
                     <div className="text-xs uppercase tracking-wide text-slate-500">Share this code</div>
                     <div className="text-4xl font-black tracking-[0.3em] pl-[0.3em] mt-1">{visibleCode}</div>
-                    <button onClick={() => copyCode(role.key)} className="mt-3 px-3 py-2 rounded-lg border text-sm font-semibold inline-flex items-center gap-2">
-                      <Copy size={15}/> Copy code
-                    </button>
+                    <div className="mt-3 flex flex-wrap justify-center gap-2"><button onClick={() => copyCode(role.key)} className="px-3 py-2 rounded-lg border text-sm font-semibold inline-flex items-center gap-2"><Copy size={15}/> Copy code</button><button onClick={() => showLoginQr(role.key)} className="px-3 py-2 rounded-lg border text-sm font-semibold inline-flex items-center gap-2"><QrCode size={15}/> Show QR</button></div>
                   </div>
                 ) : active ? (
                   <div className="mt-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-dashed p-3 text-sm text-slate-500 dark:text-slate-400">
@@ -4259,6 +4295,8 @@ function RoleAccessCodeManager({ fieldLog, onSave, onClose }) {
           })}
 
           {error && <div className="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
+
+          <button onClick={printLoginCards} className="w-full rounded-xl bg-[#0D0F32] text-white py-3 font-semibold flex items-center justify-center gap-2"><QrCode size={17}/> Print volunteer login cards</button>
 
           <button disabled={!!busyRole || !activeCount} onClick={disableAll}
             className="w-full rounded-xl border border-red-300 text-red-700 dark:text-red-300 py-3 font-semibold disabled:opacity-40">
