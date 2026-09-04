@@ -9,7 +9,6 @@ import { configured } from "./supabaseClient";
 import * as api from "./api";
 import * as outbox from "./outbox";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import QRCode from "qrcode";
 
 /* This build is locked to one event: The Highlander Summit Signature Event.
    EVENT_ID must match supabase/seed.sql. A shared site password gates entry. */
@@ -18,6 +17,9 @@ const SITE_PASSWORD = import.meta.env.VITE_SITE_PASSWORD || "";
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || "";
 const JUDGE_PASSWORD = import.meta.env.VITE_JUDGE_PASSWORD || "";
 const EMCEE_PASSWORD = import.meta.env.VITE_EMCEE_PASSWORD || "";
+
+const qrImageUrl = (text, size = 500) =>
+  `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=12&data=${encodeURIComponent(text)}`;
 
 /* ---------- helpers ---------- */
 const normNum = (n) => (n || "").trim().toUpperCase();
@@ -4226,8 +4228,8 @@ function RoleAccessCodeManager({ fieldLog, onSave, onClose }) {
   };
 
   const loginQrPayload=(role,code)=>JSON.stringify({type:"refos-login",eventId:EVENT_ID,role,code});
-  const showLoginQr=async(role)=>{const code=revealed[role];if(!code)return;const row=roleRows.find(r=>r.key===role);const dataUrl=await QRCode.toDataURL(loginQrPayload(role,code),{width:700,margin:2});const win=window.open("","_blank");if(!win){setError("Allow popups to open the QR code.");return;}win.document.write(`<title>Ref OS Login QR</title><body style="font-family:Arial;text-align:center;padding:32px"><h1>Ref OS</h1><h2>${row?.label||role}</h2><img src="${dataUrl}" style="width:min(80vw,500px)"><div style="font-size:38px;font-weight:800;letter-spacing:8px">${code}</div><p>Scan from the Ref OS login screen</p></body>`);win.document.close();};
-  const printLoginCards=async()=>{const available=roleRows.filter(r=>revealed[r.key]);if(!available.length){setError("Generate new role codes first. Ref OS does not store the readable code after generation.");return;}const cards=await Promise.all(available.map(async r=>({...r,code:revealed[r.key],qr:await QRCode.toDataURL(loginQrPayload(r.key,revealed[r.key]),{width:500,margin:2})})));const win=window.open("","_blank");if(!win){setError("Allow popups to print volunteer login cards.");return;}win.document.write(`<title>Ref OS Volunteer Login Cards</title><style>@page{size:letter;margin:.35in}body{font-family:Arial}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{border:2px solid #0D0F32;border-radius:18px;padding:22px;text-align:center;break-inside:avoid}.card img{width:210px;max-width:80%}.code{font-size:34px;font-weight:900;letter-spacing:7px}.role{font-size:22px;font-weight:800}.small{font-size:12px;color:#555}@media print{button{display:none}}</style><button onclick="window.print()">Print</button><div class="grid">${cards.map(c=>`<div class="card"><h2>Highlander Summit</h2><div class="role">${c.label}</div><img src="${c.qr}"><div class="code">${c.code}</div><p class="small">Open Ref OS and tap Scan QR code</p></div>`).join("")}</div>`);win.document.close();};
+  const showLoginQr=async(role)=>{const code=revealed[role];if(!code)return;const row=roleRows.find(r=>r.key===role);const dataUrl=qrImageUrl(loginQrPayload(role,code),700);const win=window.open("","_blank");if(!win){setError("Allow popups to open the QR code.");return;}win.document.write(`<title>Ref OS Login QR</title><body style="font-family:Arial;text-align:center;padding:32px"><h1>Ref OS</h1><h2>${row?.label||role}</h2><img src="${dataUrl}" style="width:min(80vw,500px)"><div style="font-size:38px;font-weight:800;letter-spacing:8px">${code}</div><p>Scan from the Ref OS login screen</p></body>`);win.document.close();};
+  const printLoginCards=async()=>{const available=roleRows.filter(r=>revealed[r.key]);if(!available.length){setError("Generate new role codes first. Ref OS does not store the readable code after generation.");return;}const cards=available.map(r=>({...r,code:revealed[r.key],qr:qrImageUrl(loginQrPayload(r.key,revealed[r.key]),500)}));const win=window.open("","_blank");if(!win){setError("Allow popups to print volunteer login cards.");return;}win.document.write(`<title>Ref OS Volunteer Login Cards</title><style>@page{size:letter;margin:.35in}body{font-family:Arial}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{border:2px solid #0D0F32;border-radius:18px;padding:22px;text-align:center;break-inside:avoid}.card img{width:210px;max-width:80%}.code{font-size:34px;font-weight:900;letter-spacing:7px}.role{font-size:22px;font-weight:800}.small{font-size:12px;color:#555}@media print{button{display:none}}</style><button onclick="window.print()">Print</button><div class="grid">${cards.map(c=>`<div class="card"><h2>Highlander Summit</h2><div class="role">${c.label}</div><img src="${c.qr}"><div class="code">${c.code}</div><p class="small">Open Ref OS and tap Scan QR code</p></div>`).join("")}</div>`);win.document.close();};
 
   const activeCount = roleRows.filter((r) => config?.codes?.[r.key]?.enabled).length;
 
