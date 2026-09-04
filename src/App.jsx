@@ -1896,7 +1896,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         ) : view === "rulebook" ? (
           <RuleBook rules={rules} />
         ) : view === "awp" ? (
-          <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} />
+          <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} />
         ) : view === "alliances" ? (
           <AllianceSelection teams={teams} alliances={alliances} matches={matches} canEditAlliances={adminUnlocked && !isJudge} canEditBracket={!isJudge && !isEmcee} onSet={setAllianceTeam} onFinalize={finalizeAlliances} onSetWinner={setMatchWinner} onClear={() => requireAdmin(() => { if (confirm("Clear all alliance picks? (This does not delete any matches already generated.)")) clearAlliances(); })} />
         ) : (
@@ -3958,7 +3958,7 @@ function FieldComparison({ matches = {}, viols = [], fieldLog = [] }) {
   );
 }
 
-function AWPHistory({ fieldLog = [], matches = {}, viols = [] }) {
+function AWPHistory({ fieldLog = [], matches = {}, viols = [], canSeeFieldComparison = false }) {
   const entries = fieldLog
     .filter((e) => e.kind === "awp")
     .sort((a, b) => b.createdAt - a.createdAt);
@@ -4041,7 +4041,7 @@ function AWPHistory({ fieldLog = [], matches = {}, viols = [] }) {
       </div>
 
       <AWPAnalytics fieldLog={fieldLog} />
-      <FieldComparison matches={matches} viols={viols} fieldLog={fieldLog} />
+      {canSeeFieldComparison && <FieldComparison matches={matches} viols={viols} fieldLog={fieldLog} />}
       {entries.map((e) => {
         const red = parseAwpSide(e.note, "Red");
         const blue = parseAwpSide(e.note, "Blue");
@@ -4151,7 +4151,7 @@ function FeaturesGuide() {
       <Section icon={BarChart3} title="AWP analytics, field comparison & event report">
         <ul className="space-y-1.5">
           <Li><b>AWP analytics</b> — the AWP history view now shows overall, Red, and Blue AWP success rates plus success for Pins, Goals, Field Perimeter, and autonomous-violation criteria.</Li>
-          <Li><b>Field comparison</b> — compares each loaded field by matches, violations, replays, and field faults. It intentionally does not calculate average delay because Ref-OS is not receiving live Tournament Manager timing data.</Li>
+          <Li><b>Field comparison</b> — compares each loaded field by matches, violations, replays, and field faults.</Li>
           <Li><b>Event report</b> — admins can export a PDF event report containing event totals, AWP analytics, field comparison, violation summary, alliance selections, and judging totals.</Li>
         </ul>
       </Section>
