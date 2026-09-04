@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download, Save,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -510,6 +510,16 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showCountdownSetup, setShowCountdownSetup] = useState(false);
   const [showOfflineTest, setShowOfflineTest] = useState(false);
   const [showCommandCenter, setShowCommandCenter] = useState(false);
+  const [showContactDirectory, setShowContactDirectory] = useState(false);
+  const contactDirectoryEntries = fieldLog.filter((e) => e.kind === "contact_directory").sort((a, b) => b.createdAt - a.createdAt);
+  const contactDirectoryEntry = contactDirectoryEntries[0] || null;
+  const eventContacts = (() => {
+    if (!contactDirectoryEntry?.note) return [];
+    try {
+      const parsed = JSON.parse(contactDirectoryEntry.note);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  })();
   const [countdownNow, setCountdownNow] = useState(Date.now());
   const countdownEntries = fieldLog.filter((e) => e.kind === "event_countdown").sort((a, b) => b.createdAt - a.createdAt);
   const eventCountdownEntry = countdownEntries[0] || null;
@@ -787,6 +797,21 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const removeFieldLog = async (id) => {
     try { await api.deleteFieldLog(id); setFieldLog((cur) => cur.filter((x) => x.id !== id)); }
     catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to remove this."); return; } throw e; }
+  };
+  const saveEventContacts = async (contacts) => {
+    try {
+      const saved = await api.addFieldLog(eventId, {
+        kind: "contact_directory",
+        note: JSON.stringify(contacts),
+        by: meName,
+      });
+      const older = fieldLog.filter((e) => e.kind === "contact_directory" && e.id !== saved.id);
+      if (older.length) await Promise.all(older.map((e) => api.deleteFieldLog(e.id)));
+      setFieldLog((cur) => [saved, ...cur.filter((e) => e.kind !== "contact_directory")]);
+    } catch (e) {
+      if (outbox.isOffline(e)) { alert("You're offline — reconnect to update the contact directory."); return; }
+      alert("Could not save contact directory: " + (e.message || e));
+    }
   };
   const addElimMatch = async (m) => {
     try {
@@ -1876,6 +1901,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 ) : (
                 <>
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Key Volunteer Status</button>
+                <button onClick={() => { setMenu(false); setShowContactDirectory(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Contact size={16} /> Event Contact Directory</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
                 {adminUnlocked && <button onClick={() => { setMenu(false); setShowCommandCenter(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Event Command Center</button>}
 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
@@ -2200,6 +2226,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           </div></div>
         </div>
       )}
+      {showContactDirectory && <EventContactDirectory contacts={eventContacts} canEdit={adminUnlocked}
+        onSave={saveEventContacts} onClose={() => setShowContactDirectory(false)} />}
       {showCountdownSetup && adminUnlocked && <CountdownSetupModal current={eventCountdown}
         onSave={saveSharedCountdown}
         onClear={clearSharedCountdown}
@@ -2213,6 +2241,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onAnnouncement={() => { setShowCommandCenter(false); setShowAnnouncement(true); }}
         onDeleteAnnouncement={deleteAnnouncementForAll}
         onClearAnnouncements={clearAnnouncementsForAll}
+        onContactDirectory={() => { setShowCommandCenter(false); setShowContactDirectory(true); }}
         onEventSetup={() => { setShowCommandCenter(false); setShowEvent(true); }}
         onTMSync={() => { setShowCommandCenter(false); setShowTMSync(true); }}
         onExportViolations={exportCSV}
@@ -3373,7 +3402,91 @@ function OfflineReadinessModal({ onClose }) {
   );
 }
 
-function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
+function EventContactDirectory({ contacts, canEdit, onSave, onClose }) {
+  const blank = () => ({ role: "", name: "", phone: "", email: "", location: "", notes: "" });
+  const [draft, setDraft] = useState(() => (contacts || []).map((c) => ({ ...blank(), ...c })));
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!editing) setDraft((contacts || []).map((c) => ({ ...blank(), ...c })));
+  }, [contacts, editing]);
+
+  const update = (i, key, value) => setDraft((cur) => cur.map((c, n) => n === i ? { ...c, [key]: value } : c));
+  const save = async () => {
+    const cleaned = draft
+      .map((c) => Object.fromEntries(Object.entries(c).map(([k,v]) => [k, String(v || "").trim()])))
+      .filter((c) => c.role || c.name || c.phone || c.email || c.location || c.notes);
+    setBusy(true);
+    await onSave(cleaned);
+    setBusy(false);
+    setEditing(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-slate-50 dark:bg-slate-900 flex flex-col">
+      <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2">
+        <Contact size={20}/>
+        <div><h2 className="font-bold">Event Contact Directory</h2><p className="text-xs text-slate-400">Who to contact during the event</p></div>
+        <button onClick={onClose} className="ml-auto"><X size={22}/></button>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto p-4 space-y-3">
+          {canEdit && !editing && (
+            <button onClick={() => setEditing(true)} className="w-full rounded-xl bg-[#0D0F32] text-white px-4 py-3 font-semibold flex items-center justify-center gap-2">
+              <Pencil size={17}/> Edit directory
+            </button>
+          )}
+
+          {!editing ? (
+            (contacts || []).length ? (contacts || []).map((c, i) => (
+              <div key={i} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+                <div className="text-xs uppercase tracking-wide font-bold text-[#D7212B]">{c.role || "Event contact"}</div>
+                <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{c.name || "Name not set"}</div>
+                <div className="mt-2 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                  {c.location && <div><b>Location:</b> {c.location}</div>}
+                  {c.phone && <div><b>Phone:</b> <a className="underline" href={`tel:${c.phone}`}>{c.phone}</a></div>}
+                  {c.email && <div><b>Email:</b> <a className="underline" href={`mailto:${c.email}`}>{c.email}</a></div>}
+                  {c.notes && <div><b>Notes:</b> {c.notes}</div>}
+                </div>
+              </div>
+            )) : (
+              <div className="bg-white dark:bg-slate-800 border rounded-xl p-6 text-center text-slate-500">
+                No event contacts have been added yet.
+                {canEdit && <div className="text-xs mt-1">Use Edit directory to add event leadership and support contacts.</div>}
+              </div>
+            )
+          ) : (
+            <>
+              {draft.map((c, i) => (
+                <div key={i} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="font-semibold flex-1">Contact {i + 1}</div>
+                    <button onClick={() => setDraft((cur) => cur.filter((_, n) => n !== i))} className="p-2 text-red-600"><Trash2 size={17}/></button>
+                  </div>
+                  <input value={c.role} onChange={(e) => update(i,"role",e.target.value)} placeholder="Role, e.g. Head Referee" className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
+                  <input value={c.name} onChange={(e) => update(i,"name",e.target.value)} placeholder="Name" className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    <input value={c.phone} onChange={(e) => update(i,"phone",e.target.value)} placeholder="Phone" className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
+                    <input value={c.email} onChange={(e) => update(i,"email",e.target.value)} placeholder="Email" className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
+                  </div>
+                  <input value={c.location} onChange={(e) => update(i,"location",e.target.value)} placeholder="Event location, e.g. Field 1 / Scoring Table" className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
+                  <textarea value={c.notes} onChange={(e) => update(i,"notes",e.target.value)} placeholder="Notes or best reason to contact" rows={2} className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
+                </div>
+              ))}
+              <button onClick={() => setDraft((cur) => [...cur, blank()])} className="w-full rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 px-4 py-3 font-semibold flex items-center justify-center gap-2"><Plus size={17}/> Add contact</button>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={() => { setDraft((contacts || []).map((c) => ({ ...blank(), ...c }))); setEditing(false); }} className="rounded-xl border px-4 py-3 font-semibold">Cancel</button>
+                <button disabled={busy} onClick={save} className="rounded-xl bg-[#D7212B] text-white px-4 py-3 font-semibold disabled:opacity-50">{busy ? "Saving…" : "Save directory"}</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
@@ -3392,6 +3505,7 @@ function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, 
           <div className="font-bold flex items-center gap-2"><KeyRound size={17}/> Admin tools</div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">These controls are only available in Admin mode.</p>
           <div className="grid sm:grid-cols-2 gap-2 mt-3">
+            <button onClick={onContactDirectory} className="w-full text-left px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><Contact size={16}/> Event Contact Directory</button>
             <button onClick={onEventSetup} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><CalendarDays size={16}/> Event setup</button>
             <button onClick={onTMSync} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><RefreshCw size={16}/> TM Sync Center</button>
             <button onClick={onExportViolations} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Download size={16}/> Export violations</button>
