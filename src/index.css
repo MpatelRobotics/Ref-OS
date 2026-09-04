@@ -19,3 +19,213 @@ body { margin: 0; -webkit-tap-highlight-color: transparent; }
 .dark input::placeholder,
 .dark textarea::placeholder { color: #64748b; }  /* slate-500 */
 .dark option { background-color: #1e293b; color: #e2e8f0; }
+
+
+/* Ref OS desktop workspace.
+   Applied only at 1200px+ so phone and tablet layouts keep their existing UI. */
+.desktop-refos-sidebar,
+.desktop-settings-popover {
+  display: none;
+}
+
+@media (min-width: 1200px) {
+  .refos-desktop-shell {
+    padding-left: 240px;
+    min-height: 100vh;
+    background: #f3f6fb;
+  }
+
+  .dark .refos-desktop-shell {
+    background: #334155;
+  }
+
+  .refos-main-header {
+    display: none;
+  }
+
+  .desktop-refos-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 240px;
+    z-index: 45;
+    display: flex;
+    flex-direction: column;
+    padding: 22px 12px 16px;
+    background: linear-gradient(180deg, #0d1830 0%, #10223e 100%);
+    color: white;
+    border-right: 1px solid rgba(255,255,255,.07);
+  }
+
+  .desktop-sidebar-brand {
+    padding: 0 10px 18px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+
+  .desktop-sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding-top: 16px;
+  }
+
+  .desktop-sidebar-bottom {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,.08);
+  }
+
+  .desktop-sidebar-link {
+    width: 100%;
+    min-height: 46px;
+    border: 0;
+    border-radius: 9px;
+    padding: 0 13px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 600;
+    color: #d5deea;
+    background: transparent;
+    transition: background .15s ease, color .15s ease;
+  }
+
+  .desktop-sidebar-link:hover {
+    background: rgba(255,255,255,.08);
+    color: white;
+  }
+
+  .desktop-sidebar-link.is-active {
+    color: white;
+    background: linear-gradient(90deg, #1267df, #1983ff);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+  }
+
+  .desktop-settings-popover {
+    position: fixed;
+    left: 252px;
+    bottom: 18px;
+    width: 250px;
+    z-index: 60;
+    display: block;
+    padding: 12px;
+    border: 1px solid #dbe3ee;
+    border-radius: 14px;
+    background: white;
+    box-shadow: 0 18px 50px rgba(15,23,42,.18);
+  }
+
+  .dark .desktop-settings-popover {
+    background: #1e293b;
+    border-color: #475569;
+  }
+
+  .desktop-settings-popover button {
+    width: 100%;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 9px;
+    border-radius: 8px;
+    font-size: 13px;
+    text-align: left;
+  }
+
+  .desktop-settings-popover button:hover {
+    background: #f1f5f9;
+  }
+
+  .dark .desktop-settings-popover button:hover {
+    background: #334155;
+  }
+
+  .refos-wide-bar,
+  .refos-main-content {
+    max-width: none !important;
+    width: 100%;
+  }
+
+  .refos-wide-bar {
+    padding-left: 28px !important;
+    padding-right: 28px !important;
+  }
+
+  .refos-main-content {
+    padding: 24px 32px 80px !important;
+  }
+
+  .refos-main-content > * {
+    max-width: 1280px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .refos-main-content input,
+  .refos-main-content select {
+    min-height: 46px;
+  }
+
+  .desktop-team-list,
+  .desktop-match-list {
+    overflow: hidden;
+    border: 1px solid #dbe3ee;
+    border-radius: 14px;
+    background: white;
+  }
+
+  .dark .desktop-team-list,
+  .dark .desktop-match-list {
+    border-color: #475569;
+    background: #1e293b;
+  }
+
+  .desktop-team-list > li,
+  .desktop-match-list > li {
+    border-bottom: 1px solid #e5eaf1;
+  }
+
+  .dark .desktop-team-list > li,
+  .dark .desktop-match-list > li {
+    border-bottom-color: #475569;
+  }
+
+  .desktop-team-list > li:last-child,
+  .desktop-match-list > li:last-child {
+    border-bottom: 0;
+  }
+
+  .desktop-team-row,
+  .desktop-match-row {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    min-height: 58px;
+    padding-left: 18px !important;
+    padding-right: 18px !important;
+  }
+
+  .desktop-team-row:hover,
+  .desktop-match-row:hover {
+    background: #f8fafc;
+  }
+
+  .dark .desktop-team-row:hover,
+  .dark .desktop-match-row:hover {
+    background: #273449;
+  }
+
+  .refos-main-content > button:first-child {
+    border-radius: 14px;
+  }
+
+  /* Floating violation action stays inside the desktop workspace instead of
+     being centered across the sidebar and content together. */
+  .refos-desktop-shell > button.fixed.bottom-5 {
+    left: calc(50% + 120px);
+  }
+}

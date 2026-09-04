@@ -475,6 +475,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [lightbox, setLightbox] = useState(null);
   const [menu, setMenu] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [desktopSettingsOpen, setDesktopSettingsOpen] = useState(false);
   const [importPreview, setImportPreview] = useState(null); // { title, chips, warnings, resolve }
   const confirmImport = (p) => new Promise((resolve) => setImportPreview({ ...p, resolve }));
   const [importing, setImporting] = useState(null); // { label, done, total } | null while an import is writing
@@ -2066,9 +2067,88 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     .sort((a, b) => (countsByTeam[b.number]?.total || 0) - (countsByTeam[a.number]?.total || 0)
       || a.number.localeCompare(b.number, undefined, { numeric: true }));
 
+  const desktopNavItems = isJudge ? [
+    { k: "judging", label: "Judging", Icon: Trophy },
+    { k: "alliances", label: "Alliances", Icon: GitBranch },
+  ] : [
+    ...(adminUnlocked ? [{ k: "__command", label: "Command Center", Icon: BarChart3 }] : []),
+    ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
+    { k: "teams", label: "Teams", Icon: Users },
+    ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
+    { k: "robots", label: "Robots", Icon: Camera },
+    { k: "alliances", label: "Alliances", Icon: GitBranch },
+    { k: "judging", label: "Judging", Icon: Trophy },
+  ];
+
+  const desktopNavigate = (k) => {
+    setOpenTeam(null); setOpenMatch(null); setOpenRobot(null); setQuery("");
+    if (k === "__command") { setShowCommandCenter(true); return; }
+    setView(k);
+  };
+
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-700 font-sans text-slate-800 dark:text-slate-100 antialiased">
-      <header className="sticky top-0 z-20 bg-[#0D0F32] text-white shadow-lg">
+    <div className="refos-desktop-shell min-h-screen bg-slate-100 dark:bg-slate-700 font-sans text-slate-800 dark:text-slate-100 antialiased">
+      <aside className="desktop-refos-sidebar" aria-label="Desktop navigation">
+        <div className="desktop-sidebar-brand">
+          <div className="flex items-center gap-3">
+            <img src="/logo.svg" alt="Highlander Summit" className="h-10 w-10 object-contain" />
+            <div>
+              <div className="text-2xl font-bold tracking-tight text-white">Ref OS</div>
+              <div className="text-xs text-slate-400">v{APP_VERSION}</div>
+            </div>
+          </div>
+          <div className="mt-4 text-xs text-slate-400 leading-relaxed">
+            <div className="font-semibold text-slate-200 line-clamp-2">{event?.name || "Highlander Summit"}</div>
+            <div className="mt-1 flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${online ? "bg-emerald-400" : "bg-amber-400"}`} />
+              {online ? "Live" : "Offline · cached data"}
+            </div>
+          </div>
+        </div>
+
+        <nav className="desktop-sidebar-nav">
+          {desktopNavItems.map(({ k, label, Icon }) => {
+            const active = k === "__command" ? showCommandCenter : view === k;
+            return (
+              <button key={k} onClick={() => desktopNavigate(k)}
+                className={`desktop-sidebar-link ${active ? "is-active" : ""}`}>
+                <Icon size={18} />
+                <span>{label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="desktop-sidebar-bottom">
+          {!isEmcee && (
+            <button className="desktop-sidebar-link" onClick={() => setShowFieldLog(true)}>
+              <Flag size={18} /><span>Field Log</span>
+            </button>
+          )}
+          <button className="desktop-sidebar-link" onClick={() => setShowContactDirectory(true)}>
+            <Contact size={18} /><span>Contacts</span>
+          </button>
+          <button className="desktop-sidebar-link" onClick={() => setShowFeatures(true)}>
+            <Info size={18} /><span>Features &amp; Help</span>
+          </button>
+          <button className={`desktop-sidebar-link ${desktopSettingsOpen ? "is-active" : ""}`} onClick={() => setDesktopSettingsOpen((v) => !v)}>
+            <Settings size={18} /><span>Settings</span>
+          </button>
+        </div>
+      </aside>
+
+      {desktopSettingsOpen && (
+        <div className="desktop-settings-popover">
+          <div className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-2">Device settings</div>
+          <button onClick={() => { setDesktopSettingsOpen(false); setShowIdentity(true); }}><UserCircle2 size={16}/> Change name</button>
+          <button onClick={onToggleTheme}>{theme === "dark" ? <Sun size={16}/> : <Moon size={16}/>} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
+          <button onClick={onCycleTextSize}><Type size={16}/> Text size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
+          <button onClick={() => { setDesktopSettingsOpen(false); setTourStep(0); setShowGuidedTour(true); }}><PlayCircle size={16}/> Guided tour</button>
+          <button className="text-red-600 dark:text-red-300" onClick={() => { setDesktopSettingsOpen(false); onLock(); }}><LogOut size={16}/> Lock device</button>
+        </div>
+      )}
+
+      <header className="refos-main-header sticky top-0 z-20 bg-[#0D0F32] text-white shadow-lg">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           {(openTeam || openMatch || openRobot) ? (
             <button onClick={() => { setOpenTeam(null); setOpenMatch(null); setOpenRobot(null); }} className="p-1 -ml-1 rounded hover:bg-white/10"><ChevronLeft size={22} /></button>
@@ -2241,7 +2321,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 
       {(pendingCount > 0 || !online) && (
         <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-xs">
-          <div className="max-w-2xl mx-auto px-4 py-2 flex items-center gap-2">
+          <div className="refos-wide-bar max-w-2xl mx-auto px-4 py-2 flex items-center gap-2">
             {online ? <RefreshCw size={13} className="animate-spin shrink-0" /> : <CloudOff size={13} className="shrink-0" />}
             {pendingCount > 0
               ? <span>{pendingCount} {pendingCount === 1 ? "entry" : "entries"} saved on this device{online ? " — syncing now…" : " — will sync when you're back online."}</span>
@@ -2251,7 +2331,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       )}
 
       {eventCountdown && countdownRemaining > 0 && (
-        <div className="max-w-2xl mx-auto px-4 pt-3">
+        <div className="refos-wide-bar max-w-2xl mx-auto px-4 pt-3">
           <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-3 flex items-center gap-3">
             <Clock size={20} className="text-indigo-700 dark:text-indigo-300 shrink-0" />
             <div className="flex-1 min-w-0">
@@ -2263,7 +2343,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         </div>
       )}
       {activeAnnouncement && (
-        <div className="max-w-2xl mx-auto px-4 pt-3">
+        <div className="refos-wide-bar max-w-2xl mx-auto px-4 pt-3">
           <div className="rounded-xl border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-3 flex gap-3 items-start">
             <Flag size={20} className="text-amber-700 dark:text-amber-300 shrink-0 mt-0.5"/>
             <div className="flex-1 min-w-0">
@@ -2275,7 +2355,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           </div>
         </div>
       )}
-      <main className="max-w-2xl mx-auto px-4 pb-28 pt-4">
+      <main className="refos-main-content max-w-2xl mx-auto px-4 pb-28 pt-4">
         {openTeam ? (
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={teamRecords[openTeam]}
             onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
@@ -2329,12 +2409,12 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             {filteredTeams.length === 0 ? (
               <Empty title={teams.length ? "No matches" : "No teams yet"} sub={teams.length ? "Try a different team number." : "Add a team, or just log a violation and the team is created for you."} />
             ) : (
-              <ul className="space-y-2">
+              <ul className="desktop-team-list space-y-2">
                 {filteredTeams.map((t) => {
                   const c = countsByTeam[t.number] || { total: 0 };
                   return (
                     <li key={t.number}>
-                      <button onClick={() => setOpenTeam(t.number)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
+                      <button onClick={() => setOpenTeam(t.number)} className="desktop-team-row w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
                         <span className="font-mono font-bold text-lg text-slate-900 dark:text-slate-100">{t.number}</span>
                         {t.rank != null && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-200 dark:border-indigo-800 text-xs font-bold shrink-0">Rank {t.rank}</span>}
                         {!isEmcee && teamWatch[t.number]?.length > 0 && <span title={teamWatch[t.number].map((w) => `${w.by || "Ref"}: ${w.note}`).join("\n")} className="inline-flex items-center gap-1 text-amber-600 text-xs font-semibold shrink-0"><Star size={15} fill="currentColor" /> WATCH{teamWatch[t.number].length > 1 ? ` ${teamWatch[t.number].length}` : ""}</span>}
@@ -3109,10 +3189,10 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
       {filtered.length === 0 ? (
         <Empty title={tab === "elim" ? "No elimination matches" : "No matches"} sub={tab === "elim" ? (canAdd ? "Add an elimination match, or import the bracket from Tournament Manager." : "Elimination matches will appear here once loaded.") : "Try a different match number or team."} />
       ) : (
-        <ul className="space-y-2">
+        <ul className="desktop-match-list space-y-2">
           {filtered.map((m) => (
             <li key={m.id}>
-              <button onClick={() => onOpen(m.id)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
+              <button onClick={() => onOpen(m.id)} className="desktop-match-row w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-14 shrink-0">{rowLabel(m)}</span>
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
                   <span className="text-red-700 font-semibold">{m.red.join("  ")}</span>
