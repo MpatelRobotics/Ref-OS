@@ -2175,6 +2175,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       {showCommandCenter && adminUnlocked && <CommandCenter matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
         countdown={eventCountdown} countdownText={countdownText}
         onCountdown={() => { setShowCommandCenter(false); setShowCountdownSetup(true); }}
+        onClearCountdown={clearSharedCountdown}
         onOfflineTest={() => { setShowCommandCenter(false); setShowOfflineTest(true); }}
         onAnnouncement={() => { setShowCommandCenter(false); setShowAnnouncement(true); }}
         onDeleteAnnouncement={deleteAnnouncementForAll}
@@ -3330,7 +3331,7 @@ function OfflineReadinessModal({ onClose }) {
   );
 }
 
-function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, countdownText, onCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onClose }) {
+function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onClose }) {
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
@@ -3389,9 +3390,44 @@ function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, 
           </div>
         </div>
         <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
-          <div className="font-bold flex items-center gap-2"><Clock size={17}/> Countdown banner</div>
-          {countdown ? <div className="mt-2"><div className="text-sm font-semibold">{countdown.label}</div><div className="font-mono text-xl font-bold mt-1">{countdownText || "Complete"}</div></div> : <p className="text-sm text-slate-500 mt-2">No countdown is currently set.</p>}
-          <button onClick={onCountdown} className="mt-3 w-full py-2 rounded-lg border font-semibold text-sm">{countdown ? "Edit countdown" : "Set countdown"}</button>
+          <div className="flex items-center gap-2">
+            <div className="font-bold flex items-center gap-2"><Clock size={17}/> Countdown management</div>
+            {countdown && (
+              <button onClick={() => {
+                if (confirm("Remove the Event Countdown for everyone?")) onClearCountdown();
+              }} className="ml-auto text-xs font-semibold text-red-600 hover:text-red-700">
+                Remove countdown
+              </button>
+            )}
+          </div>
+
+          {countdown ? (
+            <div className="mt-3 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-3">
+              <div className="text-[11px] uppercase tracking-wide font-bold text-indigo-600 dark:text-indigo-300">Active countdown</div>
+              <div className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-1">{countdown.label}</div>
+              <div className="font-mono text-xl font-bold text-indigo-800 dark:text-indigo-200 mt-1">{countdownText || "Complete"}</div>
+              {countdown.target && (
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Target: {new Date(countdown.target).toLocaleString()}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">No countdown is currently set.</p>
+          )}
+
+          <div className="flex gap-2 mt-3">
+            <button onClick={onCountdown} className="flex-1 py-2 rounded-lg border font-semibold text-sm">
+              {countdown ? "Edit countdown" : "Set countdown"}
+            </button>
+            {countdown && (
+              <button onClick={() => {
+                if (confirm("Remove the Event Countdown for everyone?")) onClearCountdown();
+              }} className="px-4 py-2 rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-semibold text-sm">
+                Remove
+              </button>
+            )}
+          </div>
         </div>
         <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
           <div className="font-bold flex items-center gap-2"><CloudOff size={17}/> Offline readiness</div>
