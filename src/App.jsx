@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download, Save,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -3411,7 +3411,38 @@ function EventContactDirectory({ contacts, canEdit, onSave, onClose }) {
     if (!editing) setDraft((contacts || []).map((c) => ({ ...blank(), ...c })));
   }, [contacts, editing]);
 
+  const [dragIndex, setDragIndex] = useState(null);
+  const dragIndexRef = useRef(null);
   const update = (i, key, value) => setDraft((cur) => cur.map((c, n) => n === i ? { ...c, [key]: value } : c));
+  const moveContact = (from, to) => {
+    if (from == null || to == null || from === to) return;
+    setDraft((cur) => {
+      if (from < 0 || to < 0 || from >= cur.length || to >= cur.length) return cur;
+      const next = [...cur];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+    dragIndexRef.current = to;
+    setDragIndex(to);
+  };
+  const beginPointerDrag = (index, e) => {
+    dragIndexRef.current = index;
+    setDragIndex(index);
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const pointerDragMove = (e) => {
+    if (dragIndexRef.current == null) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest?.("[data-contact-index]");
+    if (!el) return;
+    const to = Number(el.dataset.contactIndex);
+    if (Number.isInteger(to) && to !== dragIndexRef.current) moveContact(dragIndexRef.current, to);
+  };
+  const endPointerDrag = (e) => {
+    try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch {}
+    dragIndexRef.current = null;
+    setDragIndex(null);
+  };
   const save = async () => {
     const cleaned = draft
       .map((c) => Object.fromEntries(Object.entries(c).map(([k,v]) => [k, String(v || "").trim()])))
@@ -3438,7 +3469,9 @@ function EventContactDirectory({ contacts, canEdit, onSave, onClose }) {
           )}
 
           {!editing ? (
-            (contacts || []).length ? (contacts || []).map((c, i) => (
+            (contacts || []).length ? (
+              <>
+                {(contacts || []).map((c, i) => (
               <div key={i} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
                 <div className="text-xs uppercase tracking-wide font-bold text-[#D7212B]">{c.role || "Event contact"}</div>
                 <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{c.name || "Name not set"}</div>
@@ -3449,7 +3482,9 @@ function EventContactDirectory({ contacts, canEdit, onSave, onClose }) {
                   {c.notes && <div><b>Notes:</b> {c.notes}</div>}
                 </div>
               </div>
-            )) : (
+                ))}
+              </>
+            ) : (
               <div className="bg-white dark:bg-slate-800 border rounded-xl p-6 text-center text-slate-500">
                 No event contacts have been added yet.
                 {canEdit && <div className="text-xs mt-1">Use Edit directory to add event leadership and support contacts.</div>}
@@ -3457,9 +3492,30 @@ function EventContactDirectory({ contacts, canEdit, onSave, onClose }) {
             )
           ) : (
             <>
+              {draft.length > 1 && (
+                <div className="rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                  <GripVertical size={17} className="shrink-0"/> Drag the handle to arrange contacts in the order everyone will see.
+                </div>
+              )}
               {draft.map((c, i) => (
-                <div key={i} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 space-y-2">
+                <div key={i} data-contact-index={i}
+                  className={`bg-white dark:bg-slate-800 border rounded-xl p-3 space-y-2 transition-all ${dragIndex === i ? "border-[#D7212B] shadow-lg scale-[1.01]" : "border-slate-200 dark:border-slate-700"}`}>
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      draggable
+                      onDragStart={(e) => { dragIndexRef.current = i; setDragIndex(i); e.dataTransfer.effectAllowed = "move"; }}
+                      onDragOver={(e) => { e.preventDefault(); const from = dragIndexRef.current; if (from != null && from !== i) moveContact(from, i); }}
+                      onDragEnd={() => { dragIndexRef.current = null; setDragIndex(null); }}
+                      onPointerDown={(e) => beginPointerDrag(i, e)}
+                      onPointerMove={pointerDragMove}
+                      onPointerUp={endPointerDrag}
+                      onPointerCancel={endPointerDrag}
+                      className="touch-none cursor-grab active:cursor-grabbing p-2 -ml-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+                      aria-label={`Drag contact ${i + 1} to reorder`}
+                      title="Drag to reorder">
+                      <GripVertical size={20}/>
+                    </button>
                     <div className="font-semibold flex-1">Contact {i + 1}</div>
                     <button onClick={() => setDraft((cur) => cur.filter((_, n) => n !== i))} className="p-2 text-red-600"><Trash2 size={17}/></button>
                   </div>
