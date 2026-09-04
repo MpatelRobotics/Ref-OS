@@ -436,15 +436,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [presence, setPresence] = useState([]); // [{ name, ... }] currently online
   const [refRoster, setRefRoster] = useState([]); // refs seen at this event, including offline
   const pendingCount = viols.filter((v) => v._pending).length;
-  const countdownRemaining = eventCountdown?.target ? Math.max(0, new Date(eventCountdown.target).getTime() - countdownNow) : 0;
-  const countdownText = countdownRemaining > 0 ? (() => {
-    const total = Math.floor(countdownRemaining / 1000);
-    const days = Math.floor(total / 86400);
-    const hours = Math.floor((total % 86400) / 3600);
-    const mins = Math.floor((total % 3600) / 60);
-    const secs = total % 60;
-    return days ? `${days}d ${hours}h ${mins}m` : hours ? `${hours}h ${mins}m ${secs}s` : `${mins}m ${secs}s`;
-  })() : "";
 
   const [lastMatch, setLastMatch] = useState(() => {
     try { return JSON.parse(localStorage.getItem("lastMatch")) || { phase: "qual", num: "" }; }
@@ -522,6 +513,15 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     try { return JSON.parse(localStorage.getItem(`refosCountdown:${eventId}`)) || null; } catch { return null; }
   });
   const [countdownNow, setCountdownNow] = useState(Date.now());
+  const countdownRemaining = eventCountdown?.target ? Math.max(0, new Date(eventCountdown.target).getTime() - countdownNow) : 0;
+  const countdownText = countdownRemaining > 0 ? (() => {
+    const total = Math.floor(countdownRemaining / 1000);
+    const days = Math.floor(total / 86400);
+    const hours = Math.floor((total % 86400) / 3600);
+    const mins = Math.floor((total % 3600) / 60);
+    const secs = total % 60;
+    return days ? `${days}d ${hours}h ${mins}m` : hours ? `${hours}h ${mins}m ${secs}s` : `${mins}m ${secs}s`;
+  })() : "";
   const [announcementAckTick, setAnnouncementAckTick] = useState(0);
   const [tmSyncStatus, setTmSyncStatus] = useState(() => {
     try { return JSON.parse(localStorage.getItem(`refosTmSync:${eventId}`)) || {}; }
