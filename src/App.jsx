@@ -1895,7 +1895,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           <div className="rounded-xl border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-3 flex gap-3 items-start">
             <Flag size={20} className="text-amber-700 dark:text-amber-300 shrink-0 mt-0.5"/>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold uppercase tracking-wide text-amber-800 dark:text-amber-200">Referee announcement</div>
+              <div className="text-xs font-bold uppercase tracking-wide text-amber-800 dark:text-amber-200">Key Volunteer Announcement</div>
               <div className="text-sm font-medium mt-1 whitespace-pre-wrap">{activeAnnouncement.note}</div>
               <div className="text-[11px] text-slate-500 mt-1">{activeAnnouncement.by ? `From ${activeAnnouncement.by} · ` : ""}{fmtTime(activeAnnouncement.createdAt)}</div>
             </div>
