@@ -479,6 +479,14 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [finalists, setFinalists] = useState(new Set()); // `${award}::${team}`
   const [watchNotes, setWatchNotes] = useState([]);
   const [fieldLog, setFieldLog] = useState([]);
+  const announcements = fieldLog.filter((e) => e.kind === "announcement").sort((a,b) => b.createdAt - a.createdAt);
+  const activeAnnouncement = announcements.find((e) => {
+    try { return localStorage.getItem(`refosAnnouncementAck:${e.id}`) !== "1"; } catch { return true; }
+  });
+  const acknowledgeAnnouncement = (id) => {
+    try { localStorage.setItem(`refosAnnouncementAck:${id}`, "1"); } catch {}
+    setAnnouncementAckTick((n) => n + 1);
+  };
   const [alliances, setAlliances] = useState({}); // seed -> [team1, team2]
   const [alliancesLoaded, setAlliancesLoaded] = useState(false);
   const [showFieldLog, setShowFieldLog] = useState(false);
@@ -497,6 +505,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showActivity, setShowActivity] = useState(false);
   const [showFeatures, setShowFeatures] = useState(false);
   const [showTMSync, setShowTMSync] = useState(false);
+  const [showAnnouncement, setShowAnnouncement] = useState(false);
+  const [announcementAckTick, setAnnouncementAckTick] = useState(0);
   const [tmSyncStatus, setTmSyncStatus] = useState(() => {
     try { return JSON.parse(localStorage.getItem(`refosTmSync:${eventId}`)) || {}; }
     catch { return {}; }
@@ -1412,6 +1422,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     a.click(); setMenu(false);
   };
 
+  const sendAnnouncement = async (message) => {
+    const entry = await api.addFieldLog(eventId, { kind: "announcement", note: message, by: meName });
+    setFieldLog((prev) => [entry, ...prev.filter((e) => e.id !== entry.id)]);
+  };
+
   const exportEventReport = async () => {
     try {
       const pdf = await PDFDocument.create();
@@ -1809,6 +1824,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export violations</button>
                 <button onClick={() => requireAdmin(exportNominations)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Trophy size={16} /> Export nominations</button>
                 <button onClick={() => requireAdmin(exportEventReport)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Export event report</button>
+                {adminUnlocked && <button onClick={() => { setMenu(false); setShowAnnouncement(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Send announcement</button>}
                 <button onClick={() => requireAdmin(backupAll)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Backup all (JSON) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowActivity(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><ListOrdered size={16} /> Activity feed {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowRankings(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Rankings {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
@@ -1874,6 +1890,19 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         </div>
       )}
 
+      {activeAnnouncement && (
+        <div className="max-w-2xl mx-auto px-4 pt-3">
+          <div className="rounded-xl border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-3 flex gap-3 items-start">
+            <Flag size={20} className="text-amber-700 dark:text-amber-300 shrink-0 mt-0.5"/>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold uppercase tracking-wide text-amber-800 dark:text-amber-200">Referee announcement</div>
+              <div className="text-sm font-medium mt-1 whitespace-pre-wrap">{activeAnnouncement.note}</div>
+              <div className="text-[11px] text-slate-500 mt-1">{activeAnnouncement.by ? `From ${activeAnnouncement.by} · ` : ""}{fmtTime(activeAnnouncement.createdAt)}</div>
+            </div>
+            <button onClick={() => acknowledgeAnnouncement(activeAnnouncement.id)} className="px-3 py-1.5 rounded-lg bg-amber-700 text-white text-xs font-bold shrink-0">Acknowledge</button>
+          </div>
+        </div>
+      )}
       <main className="max-w-2xl mx-auto px-4 pb-28 pt-4">
         {openTeam ? (
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={teamRecords[openTeam]}
@@ -2068,6 +2097,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           </div></div>
         </div>
       )}
+      {showAnnouncement && adminUnlocked && <AnnouncementModal onClose={() => setShowAnnouncement(false)} onSend={sendAnnouncement} />}
       {showFeatures && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
           <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
@@ -2494,16 +2524,36 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
 /* ============================ RULE PICKER ============================ */
 function RulePicker({ rules, knownRules, onPickRule, onPickCustom, onClose }) {
   const [q, setQ] = useState("");
+  const [favoriteCodes, setFavoriteCodes] = useState(() => { try { return JSON.parse(localStorage.getItem("refosRuleFavorites") || "[]"); } catch { return []; } });
+  const [recentCodes, setRecentCodes] = useState(() => { try { return JSON.parse(localStorage.getItem("refosRecentRules") || "[]"); } catch { return []; } });
   const query = q.trim();
   const uq = query.toUpperCase();
   const book = rules || [];
   const bookCodes = new Set(book.map((r) => r.code));
   const custom = Object.keys(knownRules || {}).filter((c) => !bookCodes.has(c)).map((c) => ({ code: c, desc: knownRules[c], category: "Previously used" }));
   const all = [...book, ...custom];
+  const byCode = new Map(all.map((r) => [r.code, r]));
+  const toggleFavorite = (code, e) => {
+    e?.stopPropagation();
+    const next = favoriteCodes.includes(code) ? favoriteCodes.filter((c) => c !== code) : [...favoriteCodes, code];
+    setFavoriteCodes(next); localStorage.setItem("refosRuleFavorites", JSON.stringify(next));
+  };
+  const rememberRule = (code) => {
+    const next = [code, ...recentCodes.filter((c) => c !== code)].slice(0, 8);
+    setRecentCodes(next); localStorage.setItem("refosRecentRules", JSON.stringify(next));
+  };
+  const chooseRule = (r) => { rememberRule(r.code); onPickRule(r.code, r.desc); };
   const filtered = query ? all.filter((r) => r.code.toUpperCase().includes(uq) || (r.desc || "").toUpperCase().includes(uq)) : all;
   const groups = [];
+  if (!query) {
+    const favorites = favoriteCodes.map((c) => byCode.get(c)).filter(Boolean);
+    const recent = recentCodes.filter((c) => !favoriteCodes.includes(c)).map((c) => byCode.get(c)).filter(Boolean);
+    if (favorites.length) groups.push({ cat: "Favorites", items: favorites });
+    if (recent.length) groups.push({ cat: "Recently used", items: recent });
+  }
   const idx = {};
   for (const r of filtered) {
+    if (!query && (favoriteCodes.includes(r.code) || recentCodes.includes(r.code))) continue;
     if (!(r.category in idx)) { idx[r.category] = groups.length; groups.push({ cat: r.category, items: [] }); }
     groups[idx[r.category]].items.push(r);
   }
@@ -2534,10 +2584,15 @@ function RulePicker({ rules, knownRules, onPickRule, onPickCustom, onClose }) {
           <div key={g.cat}>
             <div className="sticky top-0 bg-slate-100 dark:bg-slate-700 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{g.cat}</div>
             {g.items.map((r) => (
-              <button key={r.code} onClick={() => onPickRule(r.code, r.desc)} className="w-full text-left px-4 py-2.5 border-b border-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex gap-3 items-baseline">
-                <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
-                <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
-              </button>
+              <div key={`${g.cat}-${r.code}`} className="flex border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700">
+                <button onClick={() => chooseRule(r)} className="flex-1 min-w-0 text-left px-4 py-2.5 flex gap-3 items-baseline">
+                  <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
+                  <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
+                </button>
+                <button type="button" onClick={(e) => toggleFavorite(r.code, e)} className={`px-3 shrink-0 ${favoriteCodes.includes(r.code) ? "text-amber-500" : "text-slate-300 hover:text-amber-500"}`}>
+                  <Star size={17} fill={favoriteCodes.includes(r.code) ? "currentColor" : "none"} />
+                </button>
+              </div>
             ))}
           </div>
         ))}
@@ -3114,6 +3169,35 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
 }
 
 /* ============================ CLEAR MODAL ============================ */
+function AnnouncementModal({ onClose, onSend }) {
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const send = async () => {
+    if (!message.trim() || busy) return;
+    setBusy(true);
+    try { await onSend(message.trim()); onClose(); } finally { setBusy(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/45 flex items-end sm:items-center justify-center">
+      <div className="w-full sm:max-w-lg bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl shadow-xl">
+        <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
+          <Flag size={18} className="text-[#D7212B]" /><h2 className="font-bold">Send referee announcement</h2>
+          <button onClick={onClose} className="ml-auto p-1 text-slate-400"><X size={20}/></button>
+        </div>
+        <div className="p-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Everyone using this event will see this until they acknowledge it.</p>
+          <textarea autoFocus value={message} onChange={(e)=>setMessage(e.target.value)} rows={5} placeholder="Type announcement…"
+            className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm resize-none"/>
+        </div>
+        <div className="p-4 pt-0 flex gap-2">
+          <button onClick={onClose} className="px-4 py-2.5 rounded-lg border">Cancel</button>
+          <button onClick={send} disabled={!message.trim() || busy} className="flex-1 px-4 py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold disabled:bg-slate-300">{busy ? "Sending…" : "Send announcement"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ClearModal({ counts, onClear, onClose }) {
   const [sel, setSel] = useState({ violations: false, teams: false, schedule: false, replays: false, judging: false, alliances: false, watchlist: false });
   const opts = [
