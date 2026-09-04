@@ -18,10 +18,7 @@ async function finishName(page, first = "Alex", last = "Referee") {
   await page.getByPlaceholder("e.g. Alex").fill(first);
   await page.getByPlaceholder("e.g. Rodriguez").fill(last);
   await page.getByRole("button", { name: "Start logging" }).click();
-
-  await expect(
-    page.getByRole("heading", { name: "Highlander Summit E2E" })
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Highlander Summit E2E" })).toBeVisible();
 }
 
 async function loginAdmin(page) {
@@ -68,14 +65,8 @@ test("referee password enters normal referee workspace", async ({ page }) => {
 test("judge advisor password opens judging workflow", async ({ page }) => {
   await passwordLogin(page, "test-judge");
   await finishName(page, "Judge", "Tester");
-
-  await expect(
-    page.getByRole("button", { name: "Sportsmanship Award" })
-  ).toBeVisible();
-
-  await expect(
-    page.getByRole("button", { name: /Nominate a team/i })
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sportsmanship Award" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Nominate a team/i })).toBeVisible();
 });
 
 test("emcee password does not expose the floating violation button", async ({ page }) => {
@@ -89,7 +80,7 @@ test("admin can add a team and open its detail page", async ({ page }) => {
   await loginAdmin(page);
   await page.getByRole("button", { name: /Team$/ }).click();
   await page.getByPlaceholder("e.g. 1234A").fill("4610Z");
- const addTeamButton = page.getByRole("button", { name: "Add team", exact: true }).last();
+  const addTeamButton = page.getByRole("button", { name: "Add team", exact: true }).last();
   await expect(addTeamButton).toBeVisible();
   await addTeamButton.scrollIntoViewIfNeeded();
   await addTeamButton.click();
@@ -109,13 +100,9 @@ test("violation write appears on the team timeline", async ({ page }) => {
   await page.getByPlaceholder(/What happened/).fill("E2E violation note");
   await page.getByRole("button", { name: "Save violation" }).click();
 
-  await page.getByRole("button", { name: /^4610Z\b/ }).click();
-
-await expect(
-  page.getByRole("listitem").getByText("E2E rule description", { exact: true })
-).toBeVisible();
-
-await expect(page.getByText("E2E violation note")).toBeVisible();
+  await page.getByRole("button", { name: /^4610Z\\b/ }).click();
+  await expect(page.getByRole("listitem").getByText("E2E rule description", { exact: true })).toBeVisible();
+  await expect(page.getByText("E2E violation note")).toBeVisible();
 });
 
 test("offline violation is retained and syncs after reconnect", async ({ page, context }) => {
@@ -134,9 +121,7 @@ test("offline violation is retained and syncs after reconnect", async ({ page, c
   await page.waitForTimeout(500);
 
   await page.getByText("4610Q", { exact: true }).click();
- await expect(
-  page.getByRole("listitem").getByText("Offline queue rule", { exact: true })
-).toBeVisible();
+  await expect(page.getByRole("listitem").getByText("Offline queue rule", { exact: true })).toBeVisible();
 });
 
 test("permanent rejected write is retained in Failed Sync Items", async ({ page }) => {
