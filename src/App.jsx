@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download, Save,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -449,6 +449,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [query, setQuery] = useState("");
   const [lightbox, setLightbox] = useState(null);
   const [menu, setMenu] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [importPreview, setImportPreview] = useState(null); // { title, chips, warnings, resolve }
   const confirmImport = (p) => new Promise((resolve) => setImportPreview({ ...p, resolve }));
   const [importing, setImporting] = useState(null); // { label, done, total } | null while an import is writing
@@ -1898,33 +1899,76 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             )}
           </div>
         </div>
-        {!openTeam && !openMatch && !openRobot && (
-          <div className="max-w-2xl mx-auto px-4 flex gap-1 overflow-x-auto">
-            {(isJudge ? [
-              { k: "judging", label: "Judging", Icon: Trophy },
-              { k: "alliances", label: "Alliances", Icon: GitBranch }
-            ] : isEmcee ? [
-              { k: "teams", label: "Teams", Icon: Users },
-              ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
-              ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
-              { k: "robots", label: "Robots", Icon: Camera },
-              { k: "alliances", label: "Alliances", Icon: GitBranch },
-              { k: "judging", label: "Judging", Icon: Trophy }
-            ] : [
-              { k: "teams", label: "Teams", Icon: Users },
-              ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
-              ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
-              { k: "robots", label: "Robots", Icon: Camera },
-              { k: "alliances", label: "Alliances", Icon: GitBranch },
-              { k: "judging", label: "Judging", Icon: Trophy }]).map(({ k, label, Icon }) => (
-              <button key={k} onClick={() => { setView(k); setQuery(""); }}
-                className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
-                <Icon size={15} /> {label}
-              </button>
-            ))}
-          </div>
-        )}
+        {!openTeam && !openMatch && !openRobot && (() => {
+          const navItems = isJudge ? [
+            { k: "judging", label: "Judging", Icon: Trophy },
+            { k: "alliances", label: "Alliances", Icon: GitBranch }
+          ] : [
+            { k: "teams", label: "Teams", Icon: Users },
+            ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
+            ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
+            { k: "robots", label: "Robots", Icon: Camera },
+            { k: "alliances", label: "Alliances", Icon: GitBranch },
+            { k: "judging", label: "Judging", Icon: Trophy }
+          ];
+          const active = navItems.find((item) => item.k === view) || navItems[0];
+          const ActiveIcon = active?.Icon || Menu;
+          return (
+            <>
+              <div className="max-w-2xl mx-auto px-4 hidden sm:flex gap-1 overflow-x-auto">
+                {navItems.map(({ k, label, Icon }) => (
+                  <button key={k} onClick={() => { setView(k); setQuery(""); }}
+                    className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
+                    <Icon size={15} /> {label}
+                  </button>
+                ))}
+              </div>
+              <div className="sm:hidden max-w-2xl mx-auto px-4 pb-2">
+                <button onClick={() => setMobileNavOpen(true)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2.5 flex items-center gap-2 text-white">
+                  <ActiveIcon size={18} />
+                  <span className="font-semibold">{active?.label || "Navigation"}</span>
+                  <span className="ml-auto flex items-center gap-1 text-xs text-slate-400">Sections <Menu size={18}/></span>
+                </button>
+              </div>
+            </>
+          );
+        })()}
       </header>
+
+      {mobileNavOpen && !openTeam && !openMatch && !openRobot && (() => {
+        const navItems = isJudge ? [
+          { k: "judging", label: "Judging", Icon: Trophy },
+          { k: "alliances", label: "Alliances", Icon: GitBranch }
+        ] : [
+          { k: "teams", label: "Teams", Icon: Users },
+          ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
+          ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
+          { k: "robots", label: "Robots", Icon: Camera },
+          { k: "alliances", label: "Alliances", Icon: GitBranch },
+          { k: "judging", label: "Judging", Icon: Trophy }
+        ];
+        return (
+          <div className="fixed inset-0 z-[60] bg-black/50 sm:hidden" onClick={() => setMobileNavOpen(false)}>
+            <div className="absolute left-3 right-3 top-20 rounded-2xl bg-white dark:bg-slate-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center">
+                <div className="font-bold text-slate-900 dark:text-slate-100">Go to section</div>
+                <button onClick={() => setMobileNavOpen(false)} className="ml-auto p-1 text-slate-500"><X size={20}/></button>
+              </div>
+              <div className="p-2">
+                {navItems.map(({ k, label, Icon }) => (
+                  <button key={k} onClick={() => { setView(k); setQuery(""); setMobileNavOpen(false); }}
+                    className={`w-full px-3 py-3 rounded-xl flex items-center gap-3 text-left font-semibold ${view === k ? "bg-[#0D0F32] text-white" : "text-slate-800 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700"}`}>
+                    <Icon size={20}/>
+                    <span>{label}</span>
+                    {view === k && <Check size={18} className="ml-auto"/>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {(pendingCount > 0 || !online) && (
         <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-xs">
