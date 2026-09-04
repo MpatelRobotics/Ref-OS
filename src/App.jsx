@@ -511,6 +511,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showOfflineTest, setShowOfflineTest] = useState(false);
   const [showCommandCenter, setShowCommandCenter] = useState(false);
   const [showContactDirectory, setShowContactDirectory] = useState(false);
+  const [demoMode, setDemoMode] = useState(false);
+  const [showGuidedTour, setShowGuidedTour] = useState(false);
+
   const contactDirectoryEntries = fieldLog.filter((e) => e.kind === "contact_directory").sort((a, b) => b.createdAt - a.createdAt);
   const contactDirectoryEntry = contactDirectoryEntries[0] || null;
   const eventContacts = (() => {
@@ -547,6 +550,17 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showRankings, setShowRankings] = useState(false);
   const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
   const myRole = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
+  const demoTeams = [
+    { number: "4610A", name: "Highlander Robotics" },
+    { number: "4611B", name: "Demo Bot Beta" },
+    { number: "1234A", name: "Sample Robotics" },
+    { number: "8059X", name: "Practice Alliance" },
+  ];
+  const demoMatches = {
+    "DEMO-Q1": { id: "DEMO-Q1", phase: "qual", num: "1", field: "Field 1", red: ["4610A","4611B"], blue: ["1234A","8059X"] },
+    "DEMO-Q2": { id: "DEMO-Q2", phase: "qual", num: "2", field: "Field 2", red: ["1234A","4610A"], blue: ["8059X","4611B"] },
+  };
+
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const pendingAdminAction = useRef(null);
 
@@ -1885,7 +1899,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                     <div className="border-t border-slate-100 my-1" />
                     <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field log</button>
                 {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
-                <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
+                <button onClick={() => { setMenu(false); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided tour</button>
+                    <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
                   </>
                 ) : isEmcee ? (
@@ -1895,6 +1910,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                     <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
                     <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                     {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
+                    <button onClick={() => { setMenu(false); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided tour</button>
                     <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
                     <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
                   </>
@@ -1908,7 +1924,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                 <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field log</button>
                 {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
-                <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
+                <button onClick={() => { setMenu(false); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided tour</button>
+                    <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
                 <div className="border-t border-slate-100 my-1" />
                 {!adminUnlocked ? (
@@ -2226,6 +2243,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           </div></div>
         </div>
       )}
+      {showGuidedTour && <GuidedTour role={myRole} onClose={() => setShowGuidedTour(false)} />}
+      {demoMode && <DemoModePanel demoTeams={demoTeams} demoMatches={demoMatches} onClose={() => setDemoMode(false)} />}
       {showContactDirectory && <EventContactDirectory contacts={eventContacts} canEdit={adminUnlocked}
         onSave={saveEventContacts} onClose={() => setShowContactDirectory(false)} />}
       {showCountdownSetup && adminUnlocked && <CountdownSetupModal current={eventCountdown}
@@ -2242,6 +2261,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onDeleteAnnouncement={deleteAnnouncementForAll}
         onClearAnnouncements={clearAnnouncementsForAll}
         onContactDirectory={() => { setShowCommandCenter(false); setShowContactDirectory(true); }}
+        onDemoMode={() => { setShowCommandCenter(false); setDemoMode(true); }}
         onEventSetup={() => { setShowCommandCenter(false); setShowEvent(true); }}
         onTMSync={() => { setShowCommandCenter(false); setShowTMSync(true); }}
         onExportViolations={exportCSV}
@@ -3402,6 +3422,75 @@ function OfflineReadinessModal({ onClose }) {
   );
 }
 
+function GuidedTour({ role, onClose }) {
+  const steps = [
+    { title: "Welcome to Ref OS", text: `This quick tour covers the main tools available to ${role || "your role"}. Nothing in the tour changes event data.` },
+    { title: "Main sections", text: "Use the section navigation for Teams, Matches, Rules, Robots, Alliances, and Judging. The sections shown depend on your role." },
+    { title: "Teams and Matches", text: "Teams is the fastest way to start with a team number. Matches is the field workflow for alliance information, violations, and qualification AWP checks." },
+    { title: "Rules and field tools", text: "Search Rules for quick manual reference. Field Log keeps operational entries such as replays, field faults, and saved AWP information." },
+    { title: "Event communication", text: "The gear menu includes Key Volunteer Status and the Event Contact Directory. Shared announcements and the Event Countdown appear when Admin has set them." },
+    { title: "Admin tools", text: "When Admin mode is unlocked, the Event Command Center contains setup, TM Sync, exports, backups, announcements, countdown management, offline readiness, and Demo Mode." },
+    { title: "You're ready", text: "You can run this tour again any time from the gear menu." },
+  ];
+  const [step, setStep] = useState(0);
+  const cur = steps[step];
+  return (
+    <div className="fixed inset-0 z-[90] bg-black/45 flex items-end sm:items-center justify-center p-3">
+      <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2">
+          <PlayCircle size={19}/><div className="font-bold">Guided tour</div>
+          <button onClick={onClose} className="ml-auto"><X size={21}/></button>
+        </div>
+        <div className="p-5">
+          <div className="text-xs font-bold uppercase tracking-wide text-[#D7212B]">Step {step + 1} of {steps.length}</div>
+          <h3 className="text-xl font-bold mt-1 text-slate-900 dark:text-slate-100">{cur.title}</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{cur.text}</p>
+          <div className="flex gap-1.5 mt-5">{steps.map((_,i)=><div key={i} className={`h-1.5 flex-1 rounded-full ${i <= step ? "bg-[#D7212B]" : "bg-slate-200 dark:bg-slate-700"}`}/>)}</div>
+          <div className="grid grid-cols-2 gap-2 mt-5">
+            <button onClick={() => step ? setStep(step - 1) : onClose()} className="rounded-xl border px-4 py-3 font-semibold">{step ? "Back" : "Skip"}</button>
+            <button onClick={() => step < steps.length - 1 ? setStep(step + 1) : onClose()} className="rounded-xl bg-[#0D0F32] text-white px-4 py-3 font-semibold">{step < steps.length - 1 ? "Next" : "Finish"}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DemoModePanel({ demoTeams, demoMatches, onClose }) {
+  const [tab, setTab] = useState("teams");
+  const demoViolations = [
+    { team: "4610A", match: "Q1", rule: "SG6", severity: "Minor", note: "Training example only" },
+    { team: "1234A", match: "Q2", rule: "G1", severity: "Warning", note: "Training example only" },
+  ];
+  return (
+    <div className="fixed inset-0 z-[85] bg-slate-50 dark:bg-slate-900 flex flex-col">
+      <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2">
+        <PlayCircle size={20}/>
+        <div><h2 className="font-bold">Demo Mode</h2><p className="text-xs text-slate-400">Isolated training workspace</p></div>
+        <button onClick={onClose} className="ml-auto"><X size={22}/></button>
+      </div>
+      <div className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 px-4 py-3 text-sm text-amber-900 dark:text-amber-200">
+        <b>Training only.</b> Everything shown here is sample data. Demo Mode does not write to the live event.
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto p-4">
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            {[["teams","Teams"],["matches","Matches"],["violations","Violations"]].map(([k,l])=>
+              <button key={k} onClick={()=>setTab(k)} className={`rounded-xl px-3 py-2.5 text-sm font-semibold border ${tab===k ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"}`}>{l}</button>
+            )}
+          </div>
+          {tab==="teams" && <div className="space-y-2">{demoTeams.map(t=><div key={t.number} className="bg-white dark:bg-slate-800 border rounded-xl p-4"><div className="font-bold text-lg">{t.number}</div><div className="text-sm text-slate-500">{t.name}</div></div>)}</div>}
+          {tab==="matches" && <div className="space-y-2">{Object.values(demoMatches).map(m=><div key={m.id} className="bg-white dark:bg-slate-800 border rounded-xl p-4"><div className="font-bold">Qualification {m.num} · {m.field}</div><div className="grid grid-cols-2 gap-3 mt-3 text-sm"><div><b className="text-red-600">Red</b><div>{m.red.join(", ")}</div></div><div><b className="text-blue-600">Blue</b><div>{m.blue.join(", ")}</div></div></div></div>)}</div>}
+          {tab==="violations" && <div className="space-y-2">{demoViolations.map((v,i)=><div key={i} className="bg-white dark:bg-slate-800 border rounded-xl p-4"><div className="flex justify-between gap-3"><div className="font-bold">{v.team} · {v.match}</div><div className="text-xs font-bold text-[#D7212B]">{v.severity}</div></div><div className="text-sm mt-1"><b>{v.rule}</b> · {v.note}</div></div>)}</div>}
+          <div className="mt-5 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 p-4 text-sm text-slate-500 dark:text-slate-400">
+            Demo Mode is deliberately separated from the live event so volunteers can explore sample teams, matches, and violations without changing real records.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EventContactDirectory({ contacts, canEdit, onSave, onClose }) {
   const blank = () => ({ role: "", name: "", phone: "", email: "", location: "", notes: "" });
   const [draft, setDraft] = useState(() => (contacts || []).map((c) => ({ ...blank(), ...c })));
@@ -3542,7 +3631,7 @@ function EventContactDirectory({ contacts, canEdit, onSave, onClose }) {
   );
 }
 
-function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
+function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onDemoMode, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
@@ -3562,6 +3651,7 @@ function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, 
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">These controls are only available in Admin mode.</p>
           <div className="grid sm:grid-cols-2 gap-2 mt-3">
             <button onClick={onContactDirectory} className="w-full text-left px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><Contact size={16}/> Event Contact Directory</button>
+            <button onClick={onDemoMode} className="w-full text-left px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><PlayCircle size={16}/> Demo Mode</button>
             <button onClick={onEventSetup} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><CalendarDays size={16}/> Event setup</button>
             <button onClick={onTMSync} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><RefreshCw size={16}/> TM Sync Center</button>
             <button onClick={onExportViolations} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Download size={16}/> Export violations</button>
