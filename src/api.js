@@ -366,7 +366,7 @@ function dataURLtoBlob(dataURL) {
 /* ================= realtime ================= */
 export function subscribeEvent(eventId, onChange) {
   const ch = supabase
-    .channel(`event-${eventId}`)
+    .channel(`event-${eventId}-${Math.random().toString(36).slice(2)}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "violations", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "teams", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "events", filter: `id=eq.${eventId}` }, onChange)

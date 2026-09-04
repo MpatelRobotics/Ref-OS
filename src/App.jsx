@@ -512,6 +512,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showCommandCenter, setShowCommandCenter] = useState(false);
   const [showContactDirectory, setShowContactDirectory] = useState(false);
   const [showGuidedTour, setShowGuidedTour] = useState(false);
+  const [showPreEventTest, setShowPreEventTest] = useState(false);
+  const [showTwoDeviceSyncTest, setShowTwoDeviceSyncTest] = useState(false);
+  const [showDiagnosticReport, setShowDiagnosticReport] = useState(false);
+  const [lastSystemTest, setLastSystemTest] = useState(null);
   const [tourStep, setTourStep] = useState(0);
 
   const contactDirectoryEntries = fieldLog.filter((e) => e.kind === "contact_directory").sort((a, b) => b.createdAt - a.createdAt);
@@ -550,6 +554,18 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showRankings, setShowRankings] = useState(false);
   const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
   const myRole = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
+  const deviceId = useMemo(() => {
+    try {
+      let id = localStorage.getItem("refosDeviceId");
+      if (!id) {
+        id = (globalThis.crypto?.randomUUID?.() || `device-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        localStorage.setItem("refosDeviceId", id);
+      }
+      return id;
+    } catch {
+      return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+  }, []);
 
   useEffect(() => {
     if (!showGuidedTour) return;
@@ -828,6 +844,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     try {
       const saved = await api.addFieldLog(eventId, { ...entry, by: meName });
       setFieldLog((cur) => [saved, ...cur.filter((x) => x.id !== saved.id)]);
+      return saved;
     } catch (e) {
       if (outbox.isOffline(e)) throw new Error("You're offline — reconnect to log this.");
       throw e;
@@ -2264,12 +2281,20 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Flag size={18} /> Field log</h2>
           </div>
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4">
-            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
+            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
           </div></div>
         </div>
       )}
       {showGuidedTour && <GuidedTour role={myRole} step={tourStep} hasMatches={Object.keys(matches).length > 0} hasRules={rules.length > 0}
         onStep={setTourStep} onClose={() => { setShowGuidedTour(false); setShowFieldLog(false); setShowContactDirectory(false); setLogFor(null); setLogMatch(null); setOpenMatch(null); }} />}
+      {showPreEventTest && adminUnlocked && <PreEventSystemTest eventId={eventId} adminUnlocked={adminUnlocked}
+        onClose={() => setShowPreEventTest(false)} onComplete={setLastSystemTest} />}
+      {showTwoDeviceSyncTest && adminUnlocked && <TwoDeviceSyncTest fieldLog={fieldLog} deviceId={deviceId} meName={meName}
+        onAdd={addFieldLog} onRemove={removeFieldLog} onClose={() => setShowTwoDeviceSyncTest(false)} />}
+      {showDiagnosticReport && adminUnlocked && <EventDiagnosticReport event={event} eventId={eventId} teams={teams} matches={matches}
+        viols={viols} rules={rules} fieldLog={fieldLog} presence={presence} roster={refRoster} contacts={eventContacts}
+        countdown={eventCountdown} tmSyncStatus={tmSyncStatus} online={online} pendingCount={pendingCount}
+        lastSystemTest={lastSystemTest} onClose={() => setShowDiagnosticReport(false)} />}
       {showContactDirectory && <EventContactDirectory contacts={eventContacts} canEdit={adminUnlocked}
         onSave={saveEventContacts} onClose={() => setShowContactDirectory(false)} />}
       {showCountdownSetup && adminUnlocked && <CountdownSetupModal current={eventCountdown}
@@ -2286,6 +2311,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onDeleteAnnouncement={deleteAnnouncementForAll}
         onClearAnnouncements={clearAnnouncementsForAll}
         onContactDirectory={() => { setShowCommandCenter(false); setShowContactDirectory(true); }}
+        onPreEventTest={() => { setShowCommandCenter(false); setShowPreEventTest(true); }}
+        onTwoDeviceSyncTest={() => { setShowCommandCenter(false); setShowTwoDeviceSyncTest(true); }}
+        onDiagnosticReport={() => { setShowCommandCenter(false); setShowDiagnosticReport(true); }}
         onEventSetup={() => { setShowCommandCenter(false); setShowEvent(true); }}
         onTMSync={() => { setShowCommandCenter(false); setShowTMSync(true); }}
         onExportViolations={exportCSV}
@@ -3496,6 +3524,370 @@ function GuidedTour({ role, step, hasMatches, hasRules, onStep, onClose }) {
   );
 }
 
+
+function PreEventSystemTest({ eventId, adminUnlocked, onClose, onComplete }) {
+  const [running, setRunning] = useState(false);
+  const [results, setResults] = useState([]);
+  const addResult = (key, label, status, detail = "") => setResults((cur) => [...cur.filter((r) => r.key !== key), { key, label, status, detail }]);
+
+  const run = async () => {
+    setRunning(true);
+    setResults([]);
+
+    try {
+      const key = `refosSystemTest:${Date.now()}`;
+      localStorage.setItem(key, "ok");
+      const ok = localStorage.getItem(key) === "ok";
+      localStorage.removeItem(key);
+      addResult("storage", "Browser storage", ok ? "pass" : "fail", ok ? "Local storage read and write succeeded." : "Local storage did not return the test value.");
+    } catch (e) {
+      addResult("storage", "Browser storage", "fail", e.message || String(e));
+    }
+
+    addResult("admin", "Admin session", adminUnlocked ? "pass" : "fail", adminUnlocked ? "Admin mode is unlocked on this device." : "Admin mode is not unlocked.");
+
+    const swSupported = "serviceWorker" in navigator;
+    addResult("sw-support", "Service worker support", swSupported ? "pass" : "fail", swSupported ? "This browser supports service workers." : "Service workers are not supported.");
+    addResult("sw-control", "App controlled by service worker", navigator.serviceWorker?.controller ? "pass" : "check",
+      navigator.serviceWorker?.controller ? "The current Ref OS page is controlled by a service worker." : "The page is not currently controlled by a service worker. Refresh or reopen Ref OS after installation.");
+
+    try {
+      const cacheNames = "caches" in window ? await caches.keys() : [];
+      addResult("cache", "Offline cache", cacheNames.length ? "pass" : "check", cacheNames.length ? `${cacheNames.length} browser cache${cacheNames.length === 1 ? "" : "s"} detected.` : "No browser caches were found.");
+    } catch (e) {
+      addResult("cache", "Offline cache", "check", e.message || String(e));
+    }
+
+    try {
+      await api.listFieldLog(eventId);
+      addResult("db-read", "Database read", "pass", "Ref OS successfully read shared event data.");
+    } catch (e) {
+      addResult("db-read", "Database read", "fail", e.message || String(e));
+    }
+
+    let saved = null;
+    try {
+      let realtimeSeen = false;
+      let realtimeResolve;
+      const realtimePromise = new Promise((resolve) => { realtimeResolve = resolve; });
+      const unsub = api.subscribeEvent(eventId, () => {
+        realtimeSeen = true;
+        realtimeResolve(true);
+      });
+      saved = await api.addFieldLog(eventId, {
+        kind: "system_test",
+        note: JSON.stringify({ purpose: "pre_event_test", createdAt: Date.now() }),
+        by: "Ref OS System Test",
+      });
+      addResult("db-write", "Database write", "pass", "A temporary event test record was created successfully.");
+      await Promise.race([realtimePromise, new Promise((resolve) => setTimeout(resolve, 3500))]);
+      unsub?.();
+      addResult("realtime", "Realtime event sync", realtimeSeen ? "pass" : "check",
+        realtimeSeen ? "A realtime database change was received on this device." : "The database write worked, but no realtime callback arrived within 3.5 seconds. Use Two Device Sync Test for a full verification.");
+    } catch (e) {
+      addResult("db-write", "Database write", "fail", e.message || String(e));
+      addResult("realtime", "Realtime event sync", "check", "Realtime could not be verified because the temporary database write failed.");
+    } finally {
+      if (saved?.id) {
+        try { await api.deleteFieldLog(saved.id); }
+        catch {}
+      }
+    }
+
+    try {
+      const parsed = parseTeamsFile("Team Number,Team Name\n1234A,Ref OS System Test", "teams.csv");
+      const ok = parsed.rows?.some((r) => r.number === "1234A");
+      addResult("tm", "Tournament Manager parser", ok ? "pass" : "fail", ok ? "A sample TM style team CSV parsed successfully." : "The sample TM parser test did not return the expected team.");
+    } catch (e) {
+      addResult("tm", "Tournament Manager parser", "fail", e.message || String(e));
+    }
+
+    try {
+      const pdf = await PDFDocument.create();
+      pdf.addPage([200, 200]);
+      const bytes = await pdf.save();
+      addResult("pdf", "PDF generation", bytes?.length ? "pass" : "fail", bytes?.length ? "A test PDF was generated in memory." : "The PDF test did not produce output.");
+    } catch (e) {
+      addResult("pdf", "PDF generation", "fail", e.message || String(e));
+    }
+
+    setRunning(false);
+  };
+
+  useEffect(() => { run(); }, []);
+
+  useEffect(() => {
+    if (!running && results.length) {
+      onComplete?.({ ranAt: Date.now(), results });
+    }
+  }, [running, results]);
+
+  const pass = results.filter((r) => r.status === "pass").length;
+  const fail = results.filter((r) => r.status === "fail").length;
+  const check = results.filter((r) => r.status === "check").length;
+  const badge = (status) => status === "pass"
+    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+    : status === "fail"
+      ? "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300"
+      : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-slate-50 dark:bg-slate-900 flex flex-col">
+      <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2">
+        <ClipboardCheck size={20}/>
+        <div><h2 className="font-bold">Pre Event System Test</h2><p className="text-xs text-slate-400">Run before volunteers begin using Ref OS</p></div>
+        <button onClick={onClose} className="ml-auto"><X size={22}/></button>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto p-4 space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-xl border bg-white dark:bg-slate-800 p-3"><div className="text-xs text-slate-400">PASS</div><div className="text-2xl font-bold text-emerald-600">{pass}</div></div>
+            <div className="rounded-xl border bg-white dark:bg-slate-800 p-3"><div className="text-xs text-slate-400">CHECK</div><div className="text-2xl font-bold text-amber-600">{check}</div></div>
+            <div className="rounded-xl border bg-white dark:bg-slate-800 p-3"><div className="text-xs text-slate-400">FAIL</div><div className="text-2xl font-bold text-red-600">{fail}</div></div>
+          </div>
+          {results.map((r) => (
+            <div key={r.key} className="rounded-xl border bg-white dark:bg-slate-800 p-4">
+              <div className="flex items-center gap-3">
+                <div className="font-semibold flex-1">{r.label}</div>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${badge(r.status)}`}>{r.status}</span>
+              </div>
+              {r.detail && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{r.detail}</div>}
+            </div>
+          ))}
+          {running && <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 flex items-center gap-2"><RefreshCw size={17} className="animate-spin"/> Running system checks…</div>}
+          <button disabled={running} onClick={run} className="w-full rounded-xl bg-[#0D0F32] text-white py-3 font-semibold disabled:opacity-50 flex items-center justify-center gap-2"><RefreshCw size={17}/> Run again</button>
+          <div className="text-xs text-slate-500 dark:text-slate-400">The temporary database record created by this test is deleted automatically. For full cross device realtime verification, use Two Device Sync Test.</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TwoDeviceSyncTest({ fieldLog, deviceId, meName, onAdd, onRemove, onClose }) {
+  const parse = (e) => {
+    try { return JSON.parse(e.note || "{}"); } catch { return {}; }
+  };
+  const probes = (fieldLog || []).filter((e) => e.kind === "sync_probe").sort((a,b) => b.createdAt - a.createdAt);
+  const latestProbe = probes[0] || null;
+  const probeData = latestProbe ? parse(latestProbe) : null;
+  const acks = latestProbe ? (fieldLog || []).filter((e) => e.kind === "sync_ack" && parse(e).token === probeData?.token) : [];
+  const remoteAcks = acks.filter((e) => parse(e).deviceId && parse(e).deviceId !== probeData?.deviceId);
+  const isStarter = probeData?.deviceId === deviceId;
+  const alreadyAckedHere = acks.some((e) => parse(e).deviceId === deviceId);
+  const [busy, setBusy] = useState(false);
+
+  const start = async () => {
+    setBusy(true);
+    const token = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    try {
+      await onAdd({
+        kind: "sync_probe",
+        note: JSON.stringify({ token, deviceId, startedBy: meName || "Admin", startedAt: Date.now() }),
+      });
+    } catch (e) {
+      alert("Could not start sync test: " + (e.message || e));
+    }
+    setBusy(false);
+  };
+
+  const acknowledge = async () => {
+    if (!latestProbe || !probeData?.token || alreadyAckedHere) return;
+    setBusy(true);
+    try {
+      await onAdd({
+        kind: "sync_ack",
+        note: JSON.stringify({ token: probeData.token, deviceId, by: meName || "Admin", at: Date.now() }),
+      });
+    } catch (e) {
+      alert("Could not confirm sync test: " + (e.message || e));
+    }
+    setBusy(false);
+  };
+
+  const clear = async () => {
+    setBusy(true);
+    const ids = [...probes, ...(fieldLog || []).filter((e) => e.kind === "sync_ack")].map((e) => e.id);
+    for (const id of ids) {
+      try { await onRemove(id); } catch {}
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-slate-50 dark:bg-slate-900 flex flex-col">
+      <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2">
+        <Wifi size={20}/>
+        <div><h2 className="font-bold">Two Device Sync Test</h2><p className="text-xs text-slate-400">Verify shared realtime data between two devices</p></div>
+        <button onClick={onClose} className="ml-auto"><X size={22}/></button>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto p-4 space-y-3">
+          {!latestProbe ? (
+            <div className="rounded-xl border bg-white dark:bg-slate-800 p-5">
+              <h3 className="font-bold">Device 1</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Start the test here. Then open Ref OS on a second device, unlock Admin mode, open this same test, and confirm the probe.</p>
+              <button disabled={busy} onClick={start} className="mt-4 w-full rounded-xl bg-[#0D0F32] text-white py-3 font-semibold">Start sync test</button>
+            </div>
+          ) : (
+            <>
+              <div className="rounded-xl border bg-white dark:bg-slate-800 p-4">
+                <div className="text-xs uppercase font-bold text-slate-400">Active test</div>
+                <div className="font-bold mt-1">Started by {probeData?.startedBy || "Admin"}</div>
+                <div className="text-sm text-slate-500 mt-1">Waiting for a different device to receive and acknowledge this shared probe.</div>
+              </div>
+
+              {isStarter ? (
+                <div className={`rounded-xl border p-5 ${remoteAcks.length ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800" : "bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800"}`}>
+                  <div className="font-bold">{remoteAcks.length ? "PASS · second device confirmed" : "Waiting for Device 2"}</div>
+                  <div className="text-sm mt-1 text-slate-600 dark:text-slate-300">
+                    {remoteAcks.length
+                      ? `Realtime sync was confirmed by ${parse(remoteAcks[0]).by || "another Admin device"}.`
+                      : "On Device 2, open Command Center → Two Device Sync Test and tap Confirm on this device."}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800 p-5">
+                  <div className="font-bold">Device 2 detected the shared test</div>
+                  <div className="text-sm text-slate-600 dark:text-slate-300 mt-1">This proves the probe reached this device. Confirm it to send an acknowledgement back to Device 1.</div>
+                  <button disabled={busy || alreadyAckedHere} onClick={acknowledge} className="mt-4 w-full rounded-xl bg-[#0D0F32] text-white py-3 font-semibold disabled:opacity-50">{alreadyAckedHere ? "Confirmed on this device" : "Confirm on this device"}</button>
+                </div>
+              )}
+            </>
+          )}
+          {(latestProbe || acks.length) && <button disabled={busy} onClick={clear} className="w-full rounded-xl border border-red-200 text-red-700 dark:text-red-300 py-3 font-semibold">Clear sync test data</button>}
+          <div className="text-xs text-slate-500 dark:text-slate-400">The test uses temporary hidden system records. They do not appear in Field Log.</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, fieldLog, presence, roster, contacts, countdown, tmSyncStatus, online, pendingCount, lastSystemTest, onClose }) {
+  const [runtime, setRuntime] = useState({ cacheCount: null, swControlled: false, swSupported: false });
+  useEffect(() => {
+    (async () => {
+      let cacheCount = null;
+      try { cacheCount = "caches" in window ? (await caches.keys()).length : null; } catch {}
+      setRuntime({
+        cacheCount,
+        swControlled: !!navigator.serviceWorker?.controller,
+        swSupported: "serviceWorker" in navigator,
+      });
+    })();
+  }, []);
+
+  const internalKinds = new Set(["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack"]);
+  const operationalFieldLog = (fieldLog || []).filter((e) => !internalKinds.has(e.kind));
+  const report = {
+    generatedAt: new Date().toISOString(),
+    app: {
+      version: import.meta.env.VITE_APP_VERSION || "not configured",
+      mode: import.meta.env.MODE || "unknown",
+      url: typeof location !== "undefined" ? location.href : "",
+    },
+    event: {
+      id: eventId,
+      name: event?.name || "",
+      qualificationMatchesConfigured: event?.quals ?? null,
+    },
+    device: {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform || "",
+      language: navigator.language || "",
+      online: !!online,
+      serviceWorkerSupported: runtime.swSupported,
+      serviceWorkerControlled: runtime.swControlled,
+      cacheCount: runtime.cacheCount,
+      pendingOfflineChanges: pendingCount,
+    },
+    data: {
+      teams: (teams || []).length,
+      matches: Object.keys(matches || {}).length,
+      violations: (viols || []).length,
+      rules: (rules || []).length,
+      operationalFieldLogEntries: operationalFieldLog.length,
+      eventContacts: (contacts || []).length,
+      volunteersSeen: (roster || []).length,
+      volunteersOnline: (presence || []).length,
+      activeCountdown: !!countdown,
+    },
+    tournamentManager: tmSyncStatus || {},
+    lastPreEventSystemTest: lastSystemTest || null,
+  };
+
+  const text = JSON.stringify(report, null, 2);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert("Diagnostic report copied.");
+    } catch {
+      alert("Could not copy automatically. Use Download report instead.");
+    }
+  };
+  const download = () => {
+    const blob = new Blob([text], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `ref-os-diagnostic-${new Date().toISOString().replace(/[:.]/g,"-")}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-slate-50 dark:bg-slate-900 flex flex-col">
+      <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2">
+        <ShieldCheck size={20}/>
+        <div><h2 className="font-bold">Event Diagnostic Report</h2><p className="text-xs text-slate-400">Technical event and device snapshot</p></div>
+        <button onClick={onClose} className="ml-auto"><X size={22}/></button>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto p-4 space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[["Teams",report.data.teams],["Matches",report.data.matches],["Violations",report.data.violations],["Online",report.data.volunteersOnline]].map(([l,v]) =>
+              <div key={l} className="rounded-xl border bg-white dark:bg-slate-800 p-3"><div className="text-xs text-slate-400">{l}</div><div className="text-2xl font-bold">{v}</div></div>
+            )}
+          </div>
+
+          <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 space-y-2 text-sm">
+            <div className="font-bold">Device status</div>
+            <div className="flex justify-between"><span>Online</span><b>{report.device.online ? "Yes" : "No"}</b></div>
+            <div className="flex justify-between"><span>Service worker</span><b>{report.device.serviceWorkerControlled ? "Controlling app" : report.device.serviceWorkerSupported ? "Supported, not controlling" : "Unsupported"}</b></div>
+            <div className="flex justify-between"><span>Offline caches</span><b>{runtime.cacheCount == null ? "Unknown" : runtime.cacheCount}</b></div>
+            <div className="flex justify-between"><span>Pending offline changes</span><b>{pendingCount}</b></div>
+          </div>
+
+          <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 space-y-2 text-sm">
+            <div className="font-bold">Shared event data</div>
+            <div className="flex justify-between"><span>Rules</span><b>{report.data.rules}</b></div>
+            <div className="flex justify-between"><span>Field Log entries</span><b>{report.data.operationalFieldLogEntries}</b></div>
+            <div className="flex justify-between"><span>Event contacts</span><b>{report.data.eventContacts}</b></div>
+            <div className="flex justify-between"><span>Volunteers seen</span><b>{report.data.volunteersSeen}</b></div>
+            <div className="flex justify-between"><span>Event countdown</span><b>{report.data.activeCountdown ? "Active" : "None"}</b></div>
+          </div>
+
+          {lastSystemTest && (
+            <div className="rounded-xl border bg-white dark:bg-slate-800 p-4">
+              <div className="font-bold">Latest Pre Event System Test</div>
+              <div className="text-sm text-slate-500 mt-1">{new Date(lastSystemTest.ranAt).toLocaleString()}</div>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {lastSystemTest.results?.map((r) => <span key={r.key} className={`px-2 py-1 rounded-full text-xs font-bold ${r.status === "pass" ? "bg-emerald-100 text-emerald-700" : r.status === "fail" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>{r.label}: {r.status.toUpperCase()}</span>)}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={copy} className="rounded-xl border py-3 font-semibold flex items-center justify-center gap-2"><Copy size={17}/> Copy report</button>
+            <button onClick={download} className="rounded-xl bg-[#0D0F32] text-white py-3 font-semibold flex items-center justify-center gap-2"><Download size={17}/> Download report</button>
+          </div>
+          <pre className="rounded-xl bg-slate-950 text-slate-200 p-4 text-xs overflow-x-auto whitespace-pre-wrap break-words">{text}</pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EventContactDirectory({ contacts, canEdit, onSave, onClose }) {
   const blank = () => ({ role: "", name: "", phone: "", email: "", location: "", notes: "" });
   const [draft, setDraft] = useState(() => (contacts || []).map((c) => ({ ...blank(), ...c })));
@@ -3636,7 +4028,7 @@ function EventContactDirectory({ contacts, canEdit, onSave, onClose }) {
   );
 }
 
-function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
+function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
@@ -3656,6 +4048,9 @@ function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, 
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">These controls are only available in Admin mode.</p>
           <div className="grid sm:grid-cols-2 gap-2 mt-3">
             <button onClick={onContactDirectory} className="w-full text-left px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><Contact size={16}/> Event Contact Directory</button>
+            <button onClick={onPreEventTest} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ClipboardCheck size={16}/> Pre Event System Test</button>
+            <button onClick={onTwoDeviceSyncTest} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Wifi size={16}/> Two Device Sync Test</button>
+            <button onClick={onDiagnosticReport} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ShieldCheck size={16}/> Event Diagnostic Report</button>
             <button onClick={onEventSetup} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><CalendarDays size={16}/> Event setup</button>
             <button onClick={onTMSync} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><RefreshCw size={16}/> TM Sync Center</button>
             <button onClick={onExportViolations} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Download size={16}/> Export violations</button>
