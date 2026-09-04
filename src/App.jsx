@@ -392,15 +392,26 @@ function PasswordScreen({ onUnlock }) {
     setErr("Incorrect password.");
   };
 
-  const enterDigit = (digit) => {
+  const enterCodeKey = (value) => {
     if (checkingCode) return;
+    const key = String(value || "").toUpperCase();
     setErr("");
-    setCode((cur) => cur.length < 4 ? cur + digit : cur);
+    setCode((cur) => {
+      if (cur.length >= 4) return cur;
+      const position = cur.length;
+      const expectsLetter = position === 1;
+      if (expectsLetter && !["A","B","C","D"].includes(key)) return cur;
+      if (!expectsLetter && !/^\d$/.test(key)) return cur;
+      return cur + key;
+    });
   };
 
   const submitCode = async (candidate = code) => {
-    const clean = String(candidate || "").replace(/\D/g, "").slice(0, 4);
-    if (clean.length !== 4) return;
+    const clean = String(candidate || "").toUpperCase().replace(/[^0-9A-D]/g, "").slice(0, 4);
+    if (!/^\d[A-D]\d\d$/.test(clean)) {
+      setErr("Code format must be number, letter, number, number.");
+      return;
+    }
     if (!globalThis.crypto?.subtle) {
       setErr("Secure code login is not supported in this browser.");
       return;
@@ -454,30 +465,47 @@ function PasswordScreen({ onUnlock }) {
               className="w-full mt-3 py-3 rounded-lg font-semibold bg-[#D7212B] text-white hover:bg-[#B42024] disabled:bg-[#2c3168] disabled:text-slate-400">Enter</button>
             <button onClick={() => { setMode("code"); setErr(""); setPw(""); }}
               className="w-full mt-3 py-3 rounded-lg font-semibold border border-[#4a4f82] bg-[#171b45] hover:bg-[#202657]">
-              Use 4 digit event code
+              Use event access code
             </button>
           </>
         ) : (
           <>
-            <p className="text-sm text-slate-300 text-center">Enter the 4 digit access code provided by event leadership.</p>
+            <p className="text-sm text-slate-300 text-center">Enter the 4 character access code provided by event leadership.</p>
             <div className="flex justify-center gap-3 my-5">
               {[0,1,2,3].map((i) => (
-                <div key={i} className={`w-14 h-14 rounded-xl border grid place-items-center text-2xl font-bold ${code.length > i ? "bg-white text-[#0D0F32] border-white" : "bg-[#171b45] border-[#4a4f82]"}`}>
-                  {code.length > i ? "•" : ""}
+                <div key={i} className={`w-14 h-14 rounded-xl border grid place-items-center text-2xl font-bold ${code.length > i ? "bg-white text-[#0D0F32] border-white" : "bg-[#171b45] border-[#4a4f82] text-slate-500"}`}>
+                  {code.length > i ? code[i] : (i === 1 ? "A" : "0")}
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-3 gap-3">
-              {["1","2","3","4","5","6","7","8","9"].map((d) => (
-                <button key={d} disabled={checkingCode} onClick={() => enterDigit(d)}
-                  className="h-14 rounded-xl bg-[#1b1f4d] border border-[#353a73] text-xl font-bold hover:bg-[#262c62] active:scale-[0.98]">{d}</button>
-              ))}
-              <button disabled={checkingCode || !code.length} onClick={() => { setCode((cur) => cur.slice(0,-1)); setErr(""); }}
-                className="h-14 rounded-xl bg-[#171b45] border border-[#353a73] font-semibold disabled:opacity-40">Delete</button>
-              <button disabled={checkingCode} onClick={() => enterDigit("0")}
-                className="h-14 rounded-xl bg-[#1b1f4d] border border-[#353a73] text-xl font-bold hover:bg-[#262c62] active:scale-[0.98]">0</button>
-              <button disabled={checkingCode || code.length !== 4} onClick={() => submitCode()}
-                className="h-14 rounded-xl bg-[#D7212B] font-semibold disabled:bg-[#2c3168] disabled:text-slate-400">{checkingCode ? "…" : "Enter"}</button>
+            <div className="text-xs text-slate-400 text-center mb-3">Format: number · A/B/C/D · number · number</div>
+            <div className="grid grid-cols-4 gap-3">
+              {["1","2","3","A","4","5","6","B","7","8","9","C","Delete","0","Enter","D"].map((key) => {
+                const expectsLetter = code.length === 1;
+                const isLetter = ["A","B","C","D"].includes(key);
+                const isDigit = /^\d$/.test(key);
+                const disabled = checkingCode
+                  || (isLetter && !expectsLetter)
+                  || (isDigit && expectsLetter)
+                  || (key === "Delete" && !code.length)
+                  || (key === "Enter" && code.length !== 4);
+                const action = () => {
+                  if (key === "Delete") { setCode((cur) => cur.slice(0,-1)); setErr(""); return; }
+                  if (key === "Enter") { submitCode(); return; }
+                  enterCodeKey(key);
+                };
+                return (
+                  <button key={key} disabled={disabled} onClick={action}
+                    className={`h-14 rounded-xl border font-bold active:scale-[0.98] disabled:opacity-30 ${
+                      key === "Enter" ? "bg-[#D7212B] border-[#D7212B] text-white"
+                      : isLetter ? "bg-[#252b63] border-[#4a51a0] text-xl"
+                      : key === "Delete" ? "bg-[#171b45] border-[#353a73] text-sm"
+                      : "bg-[#1b1f4d] border-[#353a73] text-xl"
+                    }`}>
+                    {key === "Enter" && checkingCode ? "…" : key}
+                  </button>
+                );
+              })}
             </div>
             {err && <p className="text-sm text-red-400 mt-3 text-center">{err}</p>}
             <button onClick={() => { setMode("password"); setCode(""); setErr(""); }}
@@ -4031,9 +4059,10 @@ function RoleAccessCodeManager({ fieldLog, onSave, onClose }) {
   ];
 
   const generateCandidate = () => {
-    const array = new Uint32Array(1);
+    const array = new Uint32Array(4);
     globalThis.crypto.getRandomValues(array);
-    return String(1000 + (array[0] % 9000));
+    const letters = ["A", "B", "C", "D"];
+    return `${array[0] % 10}${letters[array[1] % letters.length]}${array[2] % 10}${array[3] % 10}`;
   };
 
   const generate = async (role) => {
@@ -4060,6 +4089,7 @@ function RoleAccessCodeManager({ fieldLog, onSave, onClose }) {
           ...(config?.codes || {}),
           [role]: {
             hash,
+            format: "N-L-N-N",
             enabled: true,
             updatedAt: Date.now(),
           },
@@ -4142,7 +4172,7 @@ function RoleAccessCodeManager({ fieldLog, onSave, onClose }) {
         <KeyRound size={20}/>
         <div>
           <h2 className="font-bold">Volunteer Access Codes</h2>
-          <p className="text-xs text-slate-400">4 digit event day login codes</p>
+          <p className="text-xs text-slate-400">4 character event day login codes</p>
         </div>
         <button onClick={onClose} className="ml-auto"><X size={22}/></button>
       </div>
@@ -4152,7 +4182,7 @@ function RoleAccessCodeManager({ fieldLog, onSave, onClose }) {
           <div className="rounded-xl border bg-white dark:bg-slate-800 p-4">
             <div className="font-bold">Event day access</div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Generate a different 4 digit code for each volunteer role. Admins continue using the normal Admin password.
+              Generate a different code for each volunteer role. Every code follows number, letter, number, number using A, B, C, or D. Admins continue using the normal Admin password.
             </p>
             <div className="mt-3 text-sm"><b>{activeCount}</b> of {roleRows.length} role codes active</div>
           </div>
