@@ -359,9 +359,30 @@ const ConfigError = () => (
 );
 
 /* ---------------------- PASSWORD GATE ---------------------- */
+async function hashAccessCode(code) {
+  const data = new TextEncoder().encode(String(code));
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function latestRoleAccessConfig(entries) {
+  const rows = (entries || []).filter((e) => e.kind === "role_access_codes").sort((a,b) => b.createdAt - a.createdAt);
+  if (!rows[0]?.note) return { entry: rows[0] || null, config: { version: 1, codes: {} } };
+  try {
+    const parsed = JSON.parse(rows[0].note);
+    return { entry: rows[0], config: parsed && typeof parsed === "object" ? parsed : { version: 1, codes: {} } };
+  } catch {
+    return { entry: rows[0], config: { version: 1, codes: {} } };
+  }
+}
+
 function PasswordScreen({ onUnlock }) {
+  const [mode, setMode] = useState("password");
   const [pw, setPw] = useState("");
+  const [code, setCode] = useState("");
   const [err, setErr] = useState("");
+  const [checkingCode, setCheckingCode] = useState(false);
+
   const submit = () => {
     if (!SITE_PASSWORD && !JUDGE_PASSWORD) { setErr("Site password isn't set. Add VITE_SITE_PASSWORD to the environment."); return; }
     if (SITE_PASSWORD && pw === SITE_PASSWORD) { onUnlock("ref"); return; }
@@ -370,20 +391,102 @@ function PasswordScreen({ onUnlock }) {
     if (ADMIN_PASSWORD && pw === ADMIN_PASSWORD) { onUnlock("ref", true); return; }
     setErr("Incorrect password.");
   };
+
+  const enterDigit = (digit) => {
+    if (checkingCode) return;
+    setErr("");
+    setCode((cur) => cur.length < 4 ? cur + digit : cur);
+  };
+
+  const submitCode = async (candidate = code) => {
+    const clean = String(candidate || "").replace(/\D/g, "").slice(0, 4);
+    if (clean.length !== 4) return;
+    if (!globalThis.crypto?.subtle) {
+      setErr("Secure code login is not supported in this browser.");
+      return;
+    }
+    setCheckingCode(true);
+    setErr("");
+    try {
+      const entries = await api.listFieldLog(EVENT_ID);
+      const { config } = latestRoleAccessConfig(entries);
+      const digest = await hashAccessCode(clean);
+      const roles = [
+        ["ref", "Referee"],
+        ["judge", "Judge Advisor"],
+        ["emcee", "Emcee"],
+      ];
+      const found = roles.find(([role]) => config?.codes?.[role]?.enabled && config.codes[role].hash === digest);
+      if (!found) {
+        setCode("");
+        setErr("That event access code is not valid.");
+        return;
+      }
+      onUnlock(found[0]);
+    } catch (e) {
+      setCode("");
+      setErr("Could not verify the event code. Check your connection and try again.");
+    } finally {
+      setCheckingCode(false);
+    }
+  };
+
+  useEffect(() => {
+    if (mode === "code" && code.length === 4) submitCode(code);
+  }, [code, mode]);
+
   return (
     <div className="min-h-screen bg-[#0D0F32] text-white grid place-items-center p-6 font-sans">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center text-center mb-6">
-          <img src="/logo.svg" alt="Highlander Summit" className="h-72 w-72 object-contain mb-3" />
+          <img src="/logo.svg" alt="Highlander Summit" className="h-52 sm:h-64 w-52 sm:w-64 object-contain mb-3" />
           <span className="font-bold text-lg">Highlander Summit — Violation Log</span>
         </div>
-        <p className="text-sm text-slate-300 mb-4 text-center">Enter the referee, judge advisor, emcee, or admin password to open the log.</p>
-        <input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} placeholder="Password" autoFocus
-          onKeyDown={(e) => e.key === "Enter" && submit()}
-          className="w-full px-3 py-3 rounded-lg bg-[#1b1f4d] border border-[#2c3168] text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#D7212B]" />
-        {err && <p className="text-sm text-red-400 mt-2">{err}</p>}
-        <button onClick={submit} disabled={!pw}
-          className="w-full mt-3 py-3 rounded-lg font-semibold bg-[#D7212B] text-white hover:bg-[#B42024] disabled:bg-[#2c3168] disabled:text-slate-400">Enter</button>
+
+        {mode === "password" ? (
+          <>
+            <p className="text-sm text-slate-300 mb-4 text-center">Enter the referee, judge advisor, emcee, or admin password to open the log.</p>
+            <input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} placeholder="Password" autoFocus
+              onKeyDown={(e) => e.key === "Enter" && submit()}
+              className="w-full px-3 py-3 rounded-lg bg-[#1b1f4d] border border-[#2c3168] text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#D7212B]" />
+            {err && <p className="text-sm text-red-400 mt-2 text-center">{err}</p>}
+            <button onClick={submit} disabled={!pw}
+              className="w-full mt-3 py-3 rounded-lg font-semibold bg-[#D7212B] text-white hover:bg-[#B42024] disabled:bg-[#2c3168] disabled:text-slate-400">Enter</button>
+            <button onClick={() => { setMode("code"); setErr(""); setPw(""); }}
+              className="w-full mt-3 py-3 rounded-lg font-semibold border border-[#4a4f82] bg-[#171b45] hover:bg-[#202657]">
+              Use 4 digit event code
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-slate-300 text-center">Enter the 4 digit access code provided by event leadership.</p>
+            <div className="flex justify-center gap-3 my-5">
+              {[0,1,2,3].map((i) => (
+                <div key={i} className={`w-14 h-14 rounded-xl border grid place-items-center text-2xl font-bold ${code.length > i ? "bg-white text-[#0D0F32] border-white" : "bg-[#171b45] border-[#4a4f82]"}`}>
+                  {code.length > i ? "•" : ""}
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {["1","2","3","4","5","6","7","8","9"].map((d) => (
+                <button key={d} disabled={checkingCode} onClick={() => enterDigit(d)}
+                  className="h-14 rounded-xl bg-[#1b1f4d] border border-[#353a73] text-xl font-bold hover:bg-[#262c62] active:scale-[0.98]">{d}</button>
+              ))}
+              <button disabled={checkingCode || !code.length} onClick={() => { setCode((cur) => cur.slice(0,-1)); setErr(""); }}
+                className="h-14 rounded-xl bg-[#171b45] border border-[#353a73] font-semibold disabled:opacity-40">Delete</button>
+              <button disabled={checkingCode} onClick={() => enterDigit("0")}
+                className="h-14 rounded-xl bg-[#1b1f4d] border border-[#353a73] text-xl font-bold hover:bg-[#262c62] active:scale-[0.98]">0</button>
+              <button disabled={checkingCode || code.length !== 4} onClick={() => submitCode()}
+                className="h-14 rounded-xl bg-[#D7212B] font-semibold disabled:bg-[#2c3168] disabled:text-slate-400">{checkingCode ? "…" : "Enter"}</button>
+            </div>
+            {err && <p className="text-sm text-red-400 mt-3 text-center">{err}</p>}
+            <button onClick={() => { setMode("password"); setCode(""); setErr(""); }}
+              className="w-full mt-4 py-3 rounded-lg font-semibold border border-[#4a4f82] bg-[#171b45] hover:bg-[#202657]">
+              Use password instead
+            </button>
+          </>
+        )}
+
         <div className="flex flex-col items-center gap-2 mt-8">
           <img src="/logo.svg" alt="Highlander Summit" className="h-12 w-12 object-contain" />
           <p className="text-center text-xs text-slate-400">
@@ -515,6 +618,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showPreEventTest, setShowPreEventTest] = useState(false);
   const [showTwoDeviceSyncTest, setShowTwoDeviceSyncTest] = useState(false);
   const [showDiagnosticReport, setShowDiagnosticReport] = useState(false);
+  const [showRoleCodeManager, setShowRoleCodeManager] = useState(false);
   const [lastSystemTest, setLastSystemTest] = useState(null);
   const [tourStep, setTourStep] = useState(0);
 
@@ -869,6 +973,23 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       alert("Could not save contact directory: " + (e.message || e));
     }
   };
+  const saveRoleAccessConfig = async (config) => {
+    try {
+      const saved = await api.addFieldLog(eventId, {
+        kind: "role_access_codes",
+        note: JSON.stringify(config),
+        by: meName,
+      });
+      const older = fieldLog.filter((e) => e.kind === "role_access_codes" && e.id !== saved.id);
+      if (older.length) await Promise.all(older.map((e) => api.deleteFieldLog(e.id)));
+      setFieldLog((cur) => [saved, ...cur.filter((e) => e.kind !== "role_access_codes")]);
+      return saved;
+    } catch (e) {
+      if (outbox.isOffline(e)) throw new Error("Reconnect before changing event access codes.");
+      throw e;
+    }
+  };
+
   const addElimMatch = async (m) => {
     try {
       await api.addMatch(eventId, m);
@@ -2281,7 +2402,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Flag size={18} /> Field log</h2>
           </div>
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4">
-            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
+            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
           </div></div>
         </div>
       )}
@@ -2295,6 +2416,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         viols={viols} rules={rules} fieldLog={fieldLog} presence={presence} roster={refRoster} contacts={eventContacts}
         countdown={eventCountdown} tmSyncStatus={tmSyncStatus} online={online} pendingCount={pendingCount}
         lastSystemTest={lastSystemTest} onClose={() => setShowDiagnosticReport(false)} />}
+      {showRoleCodeManager && adminUnlocked && <RoleAccessCodeManager fieldLog={fieldLog}
+        onSave={saveRoleAccessConfig} onClose={() => setShowRoleCodeManager(false)} />}
       {showContactDirectory && <EventContactDirectory contacts={eventContacts} canEdit={adminUnlocked}
         onSave={saveEventContacts} onClose={() => setShowContactDirectory(false)} />}
       {showCountdownSetup && adminUnlocked && <CountdownSetupModal current={eventCountdown}
@@ -2311,6 +2434,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onDeleteAnnouncement={deleteAnnouncementForAll}
         onClearAnnouncements={clearAnnouncementsForAll}
         onContactDirectory={() => { setShowCommandCenter(false); setShowContactDirectory(true); }}
+        onRoleCodes={() => { setShowCommandCenter(false); setShowRoleCodeManager(true); }}
         onPreEventTest={() => { setShowCommandCenter(false); setShowPreEventTest(true); }}
         onTwoDeviceSyncTest={() => { setShowCommandCenter(false); setShowTwoDeviceSyncTest(true); }}
         onDiagnosticReport={() => { setShowCommandCenter(false); setShowDiagnosticReport(true); }}
@@ -3776,7 +3900,7 @@ function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, f
     })();
   }, []);
 
-  const internalKinds = new Set(["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack"]);
+  const internalKinds = new Set(["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes"]);
   const operationalFieldLog = (fieldLog || []).filter((e) => !internalKinds.has(e.kind));
   const report = {
     generatedAt: new Date().toISOString(),
@@ -3882,6 +4006,211 @@ function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, f
             <button onClick={download} className="rounded-xl bg-[#0D0F32] text-white py-3 font-semibold flex items-center justify-center gap-2"><Download size={17}/> Download report</button>
           </div>
           <pre className="rounded-xl bg-slate-950 text-slate-200 p-4 text-xs overflow-x-auto whitespace-pre-wrap break-words">{text}</pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function RoleAccessCodeManager({ fieldLog, onSave, onClose }) {
+  const { config: sharedConfig } = latestRoleAccessConfig(fieldLog);
+  const [config, setConfig] = useState(() => sharedConfig || { version: 1, codes: {} });
+  const [revealed, setRevealed] = useState({});
+  const [busyRole, setBusyRole] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setConfig(sharedConfig || { version: 1, codes: {} });
+  }, [sharedConfig?.updatedAt, JSON.stringify(sharedConfig?.codes || {})]);
+
+  const roleRows = [
+    { key: "ref", label: "Referee", description: "Standard referee access" },
+    { key: "judge", label: "Judge Advisor", description: "Judging and alliance access" },
+    { key: "emcee", label: "Emcee", description: "Emcee event access" },
+  ];
+
+  const generateCandidate = () => {
+    const array = new Uint32Array(1);
+    globalThis.crypto.getRandomValues(array);
+    return String(1000 + (array[0] % 9000));
+  };
+
+  const generate = async (role) => {
+    if (!globalThis.crypto?.subtle || !globalThis.crypto?.getRandomValues) {
+      setError("Secure code generation is not supported in this browser.");
+      return;
+    }
+    setBusyRole(role);
+    setError("");
+    try {
+      const existingHashes = new Set(Object.values(config?.codes || {}).map((v) => v?.hash).filter(Boolean));
+      let code = "";
+      let hash = "";
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        code = generateCandidate();
+        hash = await hashAccessCode(code);
+        if (!existingHashes.has(hash) || config?.codes?.[role]?.hash === hash) break;
+      }
+      const next = {
+        ...config,
+        version: 1,
+        updatedAt: Date.now(),
+        codes: {
+          ...(config?.codes || {}),
+          [role]: {
+            hash,
+            enabled: true,
+            updatedAt: Date.now(),
+          },
+        },
+      };
+      await onSave(next);
+      setConfig(next);
+      setRevealed((cur) => ({ ...cur, [role]: code }));
+    } catch (e) {
+      setError(e.message || String(e));
+    } finally {
+      setBusyRole("");
+    }
+  };
+
+  const disable = async (role) => {
+    if (!config?.codes?.[role]) return;
+    setBusyRole(role);
+    setError("");
+    try {
+      const next = {
+        ...config,
+        version: 1,
+        updatedAt: Date.now(),
+        codes: {
+          ...(config?.codes || {}),
+          [role]: {
+            ...config.codes[role],
+            enabled: false,
+            updatedAt: Date.now(),
+          },
+        },
+      };
+      await onSave(next);
+      setConfig(next);
+      setRevealed((cur) => {
+        const copy = { ...cur };
+        delete copy[role];
+        return copy;
+      });
+    } catch (e) {
+      setError(e.message || String(e));
+    } finally {
+      setBusyRole("");
+    }
+  };
+
+  const disableAll = async () => {
+    setBusyRole("all");
+    setError("");
+    try {
+      const codes = {};
+      for (const [key, value] of Object.entries(config?.codes || {})) {
+        codes[key] = { ...value, enabled: false, updatedAt: Date.now() };
+      }
+      const next = { ...config, version: 1, updatedAt: Date.now(), codes };
+      await onSave(next);
+      setConfig(next);
+      setRevealed({});
+    } catch (e) {
+      setError(e.message || String(e));
+    } finally {
+      setBusyRole("");
+    }
+  };
+
+  const copyCode = async (role) => {
+    const code = revealed[role];
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+    } catch {}
+  };
+
+  const activeCount = roleRows.filter((r) => config?.codes?.[r.key]?.enabled).length;
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-slate-50 dark:bg-slate-900 flex flex-col">
+      <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2">
+        <KeyRound size={20}/>
+        <div>
+          <h2 className="font-bold">Volunteer Access Codes</h2>
+          <p className="text-xs text-slate-400">4 digit event day login codes</p>
+        </div>
+        <button onClick={onClose} className="ml-auto"><X size={22}/></button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto p-4 space-y-3">
+          <div className="rounded-xl border bg-white dark:bg-slate-800 p-4">
+            <div className="font-bold">Event day access</div>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+              Generate a different 4 digit code for each volunteer role. Admins continue using the normal Admin password.
+            </p>
+            <div className="mt-3 text-sm"><b>{activeCount}</b> of {roleRows.length} role codes active</div>
+          </div>
+
+          {roleRows.map((role) => {
+            const saved = config?.codes?.[role.key];
+            const active = !!saved?.enabled;
+            const visibleCode = revealed[role.key];
+            return (
+              <div key={role.key} className="rounded-xl border bg-white dark:bg-slate-800 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold">{role.label}</div>
+                    <div className="text-sm text-slate-500 dark:text-slate-400">{role.description}</div>
+                  </div>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"}`}>
+                    {active ? "ACTIVE" : "OFF"}
+                  </span>
+                </div>
+
+                {visibleCode ? (
+                  <div className="mt-4 rounded-xl bg-slate-100 dark:bg-slate-900 p-4 text-center">
+                    <div className="text-xs uppercase tracking-wide text-slate-500">Share this code</div>
+                    <div className="text-4xl font-black tracking-[0.3em] pl-[0.3em] mt-1">{visibleCode}</div>
+                    <button onClick={() => copyCode(role.key)} className="mt-3 px-3 py-2 rounded-lg border text-sm font-semibold inline-flex items-center gap-2">
+                      <Copy size={15}/> Copy code
+                    </button>
+                  </div>
+                ) : active ? (
+                  <div className="mt-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-dashed p-3 text-sm text-slate-500 dark:text-slate-400">
+                    A code is active. For security, the existing code cannot be revealed after generation. Generate a new one if it needs to be shared again.
+                  </div>
+                ) : null}
+
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  <button disabled={!!busyRole} onClick={() => generate(role.key)}
+                    className="rounded-xl bg-[#0D0F32] text-white py-2.5 px-3 font-semibold disabled:opacity-50">
+                    {busyRole === role.key ? "Generating…" : active ? "Generate new code" : "Generate code"}
+                  </button>
+                  <button disabled={!!busyRole || !active} onClick={() => disable(role.key)}
+                    className="rounded-xl border border-red-200 text-red-700 dark:text-red-300 py-2.5 px-3 font-semibold disabled:opacity-40">
+                    Disable
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {error && <div className="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
+
+          <button disabled={!!busyRole || !activeCount} onClick={disableAll}
+            className="w-full rounded-xl border border-red-300 text-red-700 dark:text-red-300 py-3 font-semibold disabled:opacity-40">
+            Disable all volunteer codes
+          </button>
+
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            Codes are shared for this event and work across devices. Ref OS stores only a one way hash of each code in shared event data.
+          </div>
         </div>
       </div>
     </div>
@@ -4028,7 +4357,7 @@ function EventContactDirectory({ contacts, canEdit, onSave, onClose }) {
   );
 }
 
-function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
+function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
@@ -4048,6 +4377,7 @@ function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, 
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">These controls are only available in Admin mode.</p>
           <div className="grid sm:grid-cols-2 gap-2 mt-3">
             <button onClick={onContactDirectory} className="w-full text-left px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><Contact size={16}/> Event Contact Directory</button>
+            <button onClick={onRoleCodes} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><KeyRound size={16}/> Volunteer Access Codes</button>
             <button onClick={onPreEventTest} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ClipboardCheck size={16}/> Pre Event System Test</button>
             <button onClick={onTwoDeviceSyncTest} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Wifi size={16}/> Two Device Sync Test</button>
             <button onClick={onDiagnosticReport} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ShieldCheck size={16}/> Event Diagnostic Report</button>
