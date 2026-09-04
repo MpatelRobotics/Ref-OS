@@ -436,6 +436,15 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [presence, setPresence] = useState([]); // [{ name, ... }] currently online
   const [refRoster, setRefRoster] = useState([]); // refs seen at this event, including offline
   const pendingCount = viols.filter((v) => v._pending).length;
+  const countdownRemaining = eventCountdown?.target ? Math.max(0, new Date(eventCountdown.target).getTime() - countdownNow) : 0;
+  const countdownText = countdownRemaining > 0 ? (() => {
+    const total = Math.floor(countdownRemaining / 1000);
+    const days = Math.floor(total / 86400);
+    const hours = Math.floor((total % 86400) / 3600);
+    const mins = Math.floor((total % 3600) / 60);
+    const secs = total % 60;
+    return days ? `${days}d ${hours}h ${mins}m` : hours ? `${hours}h ${mins}m ${secs}s` : `${mins}m ${secs}s`;
+  })() : "";
 
   const [lastMatch, setLastMatch] = useState(() => {
     try { return JSON.parse(localStorage.getItem("lastMatch")) || { phase: "qual", num: "" }; }
@@ -506,6 +515,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showFeatures, setShowFeatures] = useState(false);
   const [showTMSync, setShowTMSync] = useState(false);
   const [showAnnouncement, setShowAnnouncement] = useState(false);
+  const [showCountdownSetup, setShowCountdownSetup] = useState(false);
+  const [showOfflineTest, setShowOfflineTest] = useState(false);
+  const [showCommandCenter, setShowCommandCenter] = useState(false);
+  const [eventCountdown, setEventCountdown] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`refosCountdown:${eventId}`)) || null; } catch { return null; }
+  });
+  const [countdownNow, setCountdownNow] = useState(Date.now());
   const [announcementAckTick, setAnnouncementAckTick] = useState(0);
   const [tmSyncStatus, setTmSyncStatus] = useState(() => {
     try { return JSON.parse(localStorage.getItem(`refosTmSync:${eventId}`)) || {}; }
@@ -516,6 +532,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const myRole = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const pendingAdminAction = useRef(null);
+
+  useEffect(() => {
+    const id = setInterval(() => setCountdownNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const captureInstallPrompt = (e) => { e.preventDefault(); setInstallPrompt(e); };
@@ -1825,6 +1846,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 <button onClick={() => requireAdmin(exportNominations)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Trophy size={16} /> Export nominations</button>
                 <button onClick={() => requireAdmin(exportEventReport)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Export event report</button>
                 {adminUnlocked && <button onClick={() => { setMenu(false); setShowAnnouncement(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Send announcement</button>}
+                {adminUnlocked && <button onClick={() => { setMenu(false); setShowCountdownSetup(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Clock size={16} /> Countdown banner</button>}
+                {adminUnlocked && <button onClick={() => { setMenu(false); setShowOfflineTest(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><CloudOff size={16} /> Offline readiness test</button>}
+                {adminUnlocked && <button onClick={() => { setMenu(false); setShowCommandCenter(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Event Command Center</button>}
                 <button onClick={() => requireAdmin(backupAll)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Backup all (JSON) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowActivity(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><ListOrdered size={16} /> Activity feed {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowRankings(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Rankings {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
@@ -1890,6 +1914,18 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         </div>
       )}
 
+      {eventCountdown && countdownRemaining > 0 && (
+        <div className="max-w-2xl mx-auto px-4 pt-3">
+          <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-3 flex items-center gap-3">
+            <Clock size={20} className="text-indigo-700 dark:text-indigo-300 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] uppercase tracking-wide font-bold text-indigo-600 dark:text-indigo-300">Event countdown</div>
+              <div className="font-bold text-slate-900 dark:text-slate-100">{eventCountdown.label || "Next event milestone"}</div>
+            </div>
+            <div className="font-mono text-lg font-bold text-indigo-800 dark:text-indigo-200 whitespace-nowrap">{countdownText}</div>
+          </div>
+        </div>
+      )}
       {activeAnnouncement && (
         <div className="max-w-2xl mx-auto px-4 pt-3">
           <div className="rounded-xl border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-3 flex gap-3 items-start">
@@ -2097,6 +2133,17 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           </div></div>
         </div>
       )}
+      {showCountdownSetup && adminUnlocked && <CountdownSetupModal current={eventCountdown}
+        onSave={(v) => { setEventCountdown(v); localStorage.setItem(`refosCountdown:${eventId}`, JSON.stringify(v)); setShowCountdownSetup(false); }}
+        onClear={() => { setEventCountdown(null); localStorage.removeItem(`refosCountdown:${eventId}`); setShowCountdownSetup(false); }}
+        onClose={() => setShowCountdownSetup(false)} />}
+      {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => setShowOfflineTest(false)} />}
+      {showCommandCenter && adminUnlocked && <CommandCenter matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
+        countdown={eventCountdown} countdownText={countdownText}
+        onCountdown={() => { setShowCommandCenter(false); setShowCountdownSetup(true); }}
+        onOfflineTest={() => { setShowCommandCenter(false); setShowOfflineTest(true); }}
+        onAnnouncement={() => { setShowCommandCenter(false); setShowAnnouncement(true); }}
+        onClose={() => setShowCommandCenter(false)} />}
       {showAnnouncement && adminUnlocked && <AnnouncementModal onClose={() => setShowAnnouncement(false)} onSend={sendAnnouncement} />}
       {showFeatures && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
@@ -3194,6 +3241,93 @@ function AnnouncementModal({ onClose, onSend }) {
           <button onClick={send} disabled={!message.trim() || busy} className="flex-1 px-4 py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold disabled:bg-slate-300">{busy ? "Sending…" : "Send announcement"}</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function CountdownSetupModal({ current, onSave, onClear, onClose }) {
+  const [label, setLabel] = useState(current?.label || "");
+  const [target, setTarget] = useState(current?.target ? new Date(current.target).toISOString().slice(0,16) : "");
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/45 flex items-end sm:items-center justify-center">
+      <div className="w-full sm:max-w-md bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl p-4">
+        <div className="flex items-center gap-2 mb-4"><Clock size={19}/><h2 className="font-bold text-lg">Countdown banner</h2><button onClick={onClose} className="ml-auto text-slate-400"><X size={21}/></button></div>
+        <Label>Milestone</Label>
+        <input value={label} onChange={(e)=>setLabel(e.target.value)} placeholder="Alliance Selection" className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 mb-3"/>
+        <Label>Date and time</Label>
+        <input type="datetime-local" value={target} onChange={(e)=>setTarget(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600"/>
+        <div className="flex gap-2 mt-4">
+          {current && <button onClick={onClear} className="px-4 py-2.5 rounded-lg border border-red-200 text-red-600">Remove</button>}
+          <button onClick={onClose} className="ml-auto px-4 py-2.5 rounded-lg border">Cancel</button>
+          <button disabled={!label.trim() || !target} onClick={()=>onSave({label:label.trim(),target:new Date(target).toISOString()})} className="px-4 py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold disabled:bg-slate-300">Set countdown</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OfflineReadinessModal({ onClose }) {
+  const [result, setResult] = useState(null);
+  const run = async () => {
+    const checks = [];
+    checks.push({ label: "Browser storage", ok: (()=>{ try { localStorage.setItem("refosOfflineTest","1"); localStorage.removeItem("refosOfflineTest"); return true; } catch { return false; } })() });
+    checks.push({ label: "Service worker support", ok: "serviceWorker" in navigator });
+    let controller = false;
+    try { controller = !!navigator.serviceWorker?.controller; } catch {}
+    checks.push({ label: "App controlled by service worker", ok: controller });
+    let cacheOk = false;
+    try { cacheOk = "caches" in window && (await caches.keys()).length > 0; } catch {}
+    checks.push({ label: "Offline cache present", ok: cacheOk });
+    setResult(checks);
+  };
+  useEffect(()=>{ run(); },[]);
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/45 flex items-end sm:items-center justify-center">
+      <div className="w-full sm:max-w-md bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl p-4">
+        <div className="flex items-center gap-2"><CloudOff size={19}/><h2 className="font-bold text-lg">Offline readiness test</h2><button onClick={onClose} className="ml-auto text-slate-400"><X size={21}/></button></div>
+        <p className="text-xs text-slate-500 mt-1 mb-4">Checks whether this device has the browser capabilities and cached app resources needed for offline use.</p>
+        <div className="space-y-2">{(result||[]).map((r)=><div key={r.label} className="flex items-center gap-2 rounded-lg border p-3">{r.ok?<Check size={17} className="text-emerald-600"/>:<X size={17} className="text-red-600"/>}<span className="text-sm font-medium">{r.label}</span><span className={`ml-auto text-xs font-bold ${r.ok?"text-emerald-600":"text-red-600"}`}>{r.ok?"PASS":"CHECK"}</span></div>)}</div>
+        {result && <div className={`mt-4 rounded-lg p-3 text-sm font-bold ${result.every(r=>r.ok)?"bg-emerald-50 text-emerald-700":"bg-amber-50 text-amber-800"}`}>{result.every(r=>r.ok) ? "This device is ready for Ref OS offline mode." : "One or more offline readiness checks need attention."}</div>}
+        <div className="flex gap-2 mt-4"><button onClick={run} className="flex-1 py-2.5 rounded-lg border font-semibold">Run again</button><button onClick={onClose} className="flex-1 py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold">Done</button></div>
+      </div>
+    </div>
+  );
+}
+
+function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, countdownText, onCountdown, onOfflineTest, onAnnouncement, onClose }) {
+  const all = Object.values(matches);
+  const replays = fieldLog.filter(e=>e.kind==="replay").length;
+  const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
+  const announcements = fieldLog.filter(e=>e.kind==="announcement").length;
+  const awps = fieldLog.filter(e=>e.kind==="awp").length;
+  const onlineNames = new Set((presence||[]).map(p=>p.name).filter(Boolean));
+  return (
+    <div className="fixed inset-0 z-[65] bg-slate-50 dark:bg-slate-900 flex flex-col">
+      <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2"><BarChart3 size={20}/><div><h2 className="font-bold">Event Command Center</h2><p className="text-xs text-slate-400">Admin operations overview</p></div><button onClick={onClose} className="ml-auto"><X size={22}/></button></div>
+      <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto p-4 space-y-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[["Matches",all.length],["Violations",viols.length],["Replays",replays],["Field faults",faults]].map(([l,v])=><div key={l} className="bg-white dark:bg-slate-800 border rounded-xl p-3"><div className="text-[11px] uppercase text-slate-400 font-semibold">{l}</div><div className="text-2xl font-bold">{v}</div></div>)}
+        </div>
+        <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
+          <div className="font-bold flex items-center gap-2"><Users size={17}/> Key Volunteer Status</div>
+          <div className="mt-2 text-sm">{onlineNames.size} currently online · {(roster||[]).length} known volunteers</div>
+        </div>
+        <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
+          <div className="font-bold flex items-center gap-2"><Flag size={17}/> Event activity</div>
+          <div className="grid grid-cols-2 gap-2 mt-2 text-sm"><div>AWP checks <b className="float-right">{awps}</b></div><div>Announcements <b className="float-right">{announcements}</b></div></div>
+          <button onClick={onAnnouncement} className="mt-3 w-full py-2 rounded-lg border font-semibold text-sm">Send Key Volunteer Announcement</button>
+        </div>
+        <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
+          <div className="font-bold flex items-center gap-2"><Clock size={17}/> Countdown banner</div>
+          {countdown ? <div className="mt-2"><div className="text-sm font-semibold">{countdown.label}</div><div className="font-mono text-xl font-bold mt-1">{countdownText || "Complete"}</div></div> : <p className="text-sm text-slate-500 mt-2">No countdown is currently set.</p>}
+          <button onClick={onCountdown} className="mt-3 w-full py-2 rounded-lg border font-semibold text-sm">{countdown ? "Edit countdown" : "Set countdown"}</button>
+        </div>
+        <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
+          <div className="font-bold flex items-center gap-2"><CloudOff size={17}/> Offline readiness</div>
+          <p className="text-sm text-slate-500 mt-2">Test this admin device before competition begins.</p>
+          <button onClick={onOfflineTest} className="mt-3 w-full py-2 rounded-lg border font-semibold text-sm">Run offline readiness test</button>
+        </div>
+      </div></div>
     </div>
   );
 }
