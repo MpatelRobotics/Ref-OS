@@ -12,40 +12,26 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { APP_VERSION } from "./appVersion";
 import CommandCenter from "./components/CommandCenter.jsx";
 import EventContactDirectory from "./components/EventContactDirectory.jsx";
+import LoginScreen from "./auth/LoginScreen.jsx";
+import NameScreen from "./auth/NameScreen.jsx";
+import RoleAccessCodeManager from "./auth/RoleAccessCodeManager.jsx";
+import { latestRoleAccessConfig } from "./auth/accessConfig.js";
+import TeamScanner from "./features/teams/TeamScanner.jsx";
+import IdentityModal from "./components/modals/IdentityModal.jsx";
+import ShareModal from "./components/modals/ShareModal.jsx";
+import AdminPasswordModal from "./components/modals/AdminPasswordModal.jsx";
+import EventModal from "./components/modals/EventModal.jsx";
+import ClearModal from "./components/modals/ClearModal.jsx";
+import AddTeamModal from "./components/modals/AddTeamModal.jsx";
+import AnnouncementModal from "./components/modals/AnnouncementModal.jsx";
+import CountdownSetupModal from "./components/modals/CountdownSetupModal.jsx";
+import OfflineReadinessModal from "./components/modals/OfflineReadinessModal.jsx";
 
 /* This build is locked to one event: The Highlander Summit Signature Event.
    EVENT_ID must match supabase/seed.sql. A shared site password gates entry. */
 const EVENT_ID = "11111111-1111-4111-8111-111111111111";
-const SITE_PASSWORD = import.meta.env.VITE_SITE_PASSWORD || "";
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || "";
-const JUDGE_PASSWORD = import.meta.env.VITE_JUDGE_PASSWORD || "";
-const EMCEE_PASSWORD = import.meta.env.VITE_EMCEE_PASSWORD || "";
 
-const qrImageUrl = (text, size = 500) =>
-  `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=12&data=${encodeURIComponent(text)}`;
 
-const externalScriptPromises = new Map();
-function loadExternalScript(src, globalName) {
-  if (globalName && globalThis[globalName]) return Promise.resolve(globalThis[globalName]);
-  if (externalScriptPromises.has(src)) return externalScriptPromises.get(src);
-  const promise = new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[data-refos-src="${src}"]`);
-    if (existing) {
-      existing.addEventListener("load", () => resolve(globalName ? globalThis[globalName] : true), { once: true });
-      existing.addEventListener("error", () => reject(new Error("Could not load scanner support.")), { once: true });
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = src;
-    script.async = true;
-    script.dataset.refosSrc = src;
-    script.onload = () => resolve(globalName ? globalThis[globalName] : true);
-    script.onerror = () => reject(new Error("Could not load scanner support."));
-    document.head.appendChild(script);
-  });
-  externalScriptPromises.set(src, promise);
-  return promise;
-}
 
 /* ---------- helpers ---------- */
 const normNum = (n) => (n || "").trim().toUpperCase();
@@ -325,48 +311,99 @@ function Thumb({ pkey, onOpen }) {
 /*  ROOT: auth -> event selection -> tracker                            */
 /* ==================================================================== */
 export default function App() {
-  const [unlocked, setUnlocked] = useState(() => localStorage.getItem("unlocked") === "1");
-  const [role, setRole] = useState(() => localStorage.getItem("refosRole") || "ref");
+  const [unlocked, setUnlocked] = useState(false);
+  const [role, setRole] = useState("ref");
+  const [accessChecked, setAccessChecked] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem("refosTheme") || "light");
+
   useEffect(() => {
     const root = document.documentElement;
     if (theme === "dark") root.classList.add("dark"); else root.classList.remove("dark");
     localStorage.setItem("refosTheme", theme);
   }, [theme]);
+
   const [textScale, setTextScale] = useState(() => localStorage.getItem("refosTextScale") || "normal");
   useEffect(() => {
     document.documentElement.style.fontSize = ({ normal: "100%", large: "115%", xl: "130%" })[textScale] || "100%";
     localStorage.setItem("refosTextScale", textScale);
   }, [textScale]);
   const cycleTextSize = () => setTextScale((s) => (s === "normal" ? "large" : s === "large" ? "xl" : "normal"));
+
   const [meName, setMeName] = useState(() => localStorage.getItem("refName") || "");
   const [event, setEvent] = useState(null);
   const [loadErr, setLoadErr] = useState(false);
 
   useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const serverRole = await api.getMyEventRole(EVENT_ID);
+        if (!live) return;
+        if (serverRole) {
+          const uiRole = serverRole === "admin" ? "ref" : serverRole;
+          setRole(uiRole);
+          setUnlocked(true);
+          localStorage.setItem("unlocked", "1");
+          localStorage.setItem("refosRole", uiRole);
+          if (serverRole === "admin") sessionStorage.setItem("refosAdmin", "1");
+          else sessionStorage.removeItem("refosAdmin");
+        } else {
+          localStorage.removeItem("unlocked");
+          localStorage.removeItem("refosRole");
+          sessionStorage.removeItem("refosAdmin");
+        }
+      } finally {
+        if (live) setAccessChecked(true);
+      }
+    })();
+    return () => { live = false; };
+  }, []);
+
+  useEffect(() => {
     if (!unlocked || !meName) return;
-    let live = true; setLoadErr(false);
-    api.getEvent(EVENT_ID).then((ev) => { if (live) { ev ? setEvent(ev) : setLoadErr(true); } });
+    let live = true;
+    setLoadErr(false);
+    api.getEvent(EVENT_ID)
+      .then((ev) => { if (live) { ev ? setEvent(ev) : setLoadErr(true); } })
+      .catch(() => { if (live) setLoadErr(true); });
     return () => { live = false; };
   }, [unlocked, meName]);
 
-  const unlock = (r, admin) => {
+  const unlock = (r, admin, serverRole) => {
+    const uiRole = r || "ref";
     localStorage.setItem("unlocked", "1");
-    localStorage.setItem("refosRole", r || "ref");
-    if (admin) sessionStorage.setItem("refosAdmin", "1");
-    setRole(r || "ref"); setUnlocked(true);
+    localStorage.setItem("refosRole", uiRole);
+    if (admin || serverRole === "admin") sessionStorage.setItem("refosAdmin", "1");
+    else sessionStorage.removeItem("refosAdmin");
+    setRole(uiRole);
+    setUnlocked(true);
   };
-  const saveName = (n) => { localStorage.setItem("refName", n.trim()); setMeName(n.trim()); };
-  const lock = () => { localStorage.removeItem("unlocked"); localStorage.removeItem("refosRole"); sessionStorage.removeItem("refosAdmin"); setUnlocked(false); setEvent(null); };
+
+  const saveName = async (n) => {
+    const clean = n.trim();
+    localStorage.setItem("refName", clean);
+    setMeName(clean);
+    try { await api.setEventMemberName(EVENT_ID, clean); } catch {}
+  };
+
+  const lock = async () => {
+    localStorage.removeItem("unlocked");
+    localStorage.removeItem("refosRole");
+    sessionStorage.removeItem("refosAdmin");
+    setUnlocked(false);
+    setEvent(null);
+    await api.clearAccessSession();
+  };
 
   if (!configured) return <ConfigError />;
-  if (!unlocked) return <PasswordScreen onUnlock={unlock} />;
+  if (!accessChecked) return <FullPage>Checking event access…</FullPage>;
+  if (!unlocked) return <LoginScreen eventId={EVENT_ID} onUnlock={unlock} />;
   if (!meName) return <NameScreen onName={saveName} />;
   if (loadErr) return (
     <FullPage>
       <div className="max-w-sm">
         <p className="font-semibold text-slate-700 dark:text-slate-200">Couldn't load the event</p>
-        <p className="text-sm mt-1">Make sure <code>schema.sql</code> and <code>seed.sql</code> have been run in Supabase, then reload.</p>
+        <p className="text-sm mt-1">Confirm the Ref OS security migration has been run and this device still has event access.</p>
       </div>
     </FullPage>
   );
@@ -386,340 +423,6 @@ const ConfigError = () => (
     </div>
   </FullPage>
 );
-
-/* ---------------------- PASSWORD GATE ---------------------- */
-async function hashAccessCode(code) {
-  const data = new TextEncoder().encode(String(code));
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function latestRoleAccessConfig(entries) {
-  const rows = (entries || []).filter((e) => e.kind === "role_access_codes").sort((a,b) => b.createdAt - a.createdAt);
-  if (!rows[0]?.note) return { entry: rows[0] || null, config: { version: 1, codes: {} } };
-  try {
-    const parsed = JSON.parse(rows[0].note);
-    return { entry: rows[0], config: parsed && typeof parsed === "object" ? parsed : { version: 1, codes: {} } };
-  } catch {
-    return { entry: rows[0], config: { version: 1, codes: {} } };
-  }
-}
-
-function PasswordScreen({ onUnlock }) {
-  const [mode, setMode] = useState("password");
-  const [pw, setPw] = useState("");
-  const [code, setCode] = useState("");
-  const [err, setErr] = useState("");
-  const [checkingCode, setCheckingCode] = useState(false);
-  const [scanning, setScanning] = useState(false);
-  const scannerVideoRef = useRef(null);
-  const scannerStreamRef = useRef(null);
-
-  const submit = () => {
-    if (!SITE_PASSWORD && !JUDGE_PASSWORD) { setErr("Site password isn't set. Add VITE_SITE_PASSWORD to the environment."); return; }
-    if (SITE_PASSWORD && pw === SITE_PASSWORD) { onUnlock("ref"); return; }
-    if (JUDGE_PASSWORD && pw === JUDGE_PASSWORD) { onUnlock("judge"); return; }
-    if (EMCEE_PASSWORD && pw === EMCEE_PASSWORD) { onUnlock("emcee"); return; }
-    if (ADMIN_PASSWORD && pw === ADMIN_PASSWORD) { onUnlock("ref", true); return; }
-    setErr("Incorrect password.");
-  };
-
-  const enterCodeKey = (value) => {
-    if (checkingCode) return;
-    const key = String(value || "").toUpperCase();
-    setErr("");
-    setCode((cur) => {
-      if (cur.length >= 4) return cur;
-      const position = cur.length;
-      const expectsLetter = position === 1;
-      if (expectsLetter && !["A","B","C","D"].includes(key)) return cur;
-      if (!expectsLetter && !/^\d$/.test(key)) return cur;
-      return cur + key;
-    });
-  };
-
-  const stopLoginScanner = () => { scannerStreamRef.current?.getTracks?.().forEach((t)=>t.stop()); scannerStreamRef.current=null; setScanning(false); };
-  const handleLoginQrText = (raw) => {
-    let scannedCode="";
-    try { const payload=JSON.parse(raw); if(payload?.type==="refos-login"&&payload?.eventId===EVENT_ID) scannedCode=payload.code||""; } catch { scannedCode=String(raw||""); }
-    scannedCode=String(scannedCode).toUpperCase().trim();
-    if(!/^\d[A-D]\d\d$/.test(scannedCode)){setErr("That QR code is not a valid Ref OS event login.");return false;}
-    stopLoginScanner(); setCode(scannedCode); setMode("code"); return true;
-  };
-  const startLoginScanner = async () => {
-    setErr("");
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setErr("Camera access is not supported by this browser. Use the event code instead.");
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false,
-      });
-      scannerStreamRef.current = stream;
-      setScanning(true);
-    } catch {
-      stopLoginScanner();
-      setErr("Camera access was not available. Allow camera permission and try again.");
-    }
-  };
-
-  useEffect(() => {
-    if (!scanning) return;
-    let cancelled = false;
-    let frameId = 0;
-
-    const startPreviewAndScan = async () => {
-      const video = scannerVideoRef.current;
-      const stream = scannerStreamRef.current;
-      if (!video || !stream) return;
-
-      video.srcObject = stream;
-      video.muted = true;
-      video.setAttribute("playsinline", "true");
-
-      try {
-        await video.play();
-      } catch {
-        if (!cancelled) setErr("The camera opened, but Safari could not start the preview. Close the scanner and try again.");
-        return;
-      }
-
-      let detector = null;
-      let jsQRDecoder = null;
-
-      if ("BarcodeDetector" in globalThis) {
-        try { detector = new BarcodeDetector({ formats: ["qr_code"] }); } catch {}
-      }
-
-      if (!detector) {
-        try {
-          jsQRDecoder = await loadExternalScript("https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js", "jsQR");
-        } catch {
-          if (!cancelled) {
-            stopLoginScanner();
-            setErr("QR scanner support could not load. Check your connection or enter the event code manually.");
-          }
-          return;
-        }
-      }
-
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      let lastScan = 0;
-
-      const scan = async (now = 0) => {
-        if (cancelled || !scannerStreamRef.current) return;
-        if (now - lastScan < 140) {
-          frameId = requestAnimationFrame(scan);
-          return;
-        }
-        lastScan = now;
-
-        try {
-          if (detector) {
-            const found = await detector.detect(video);
-            if (found?.[0]?.rawValue && handleLoginQrText(found[0].rawValue)) return;
-          } else if (jsQRDecoder && video.videoWidth && video.videoHeight) {
-            const maxWidth = 900;
-            const scale = Math.min(1, maxWidth / video.videoWidth);
-            canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
-            canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const result = jsQRDecoder(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
-            if (result?.data && handleLoginQrText(result.data)) return;
-          }
-        } catch {}
-
-        frameId = requestAnimationFrame(scan);
-      };
-
-      frameId = requestAnimationFrame(scan);
-    };
-
-    startPreviewAndScan();
-
-    return () => {
-      cancelled = true;
-      if (frameId) cancelAnimationFrame(frameId);
-      const video = scannerVideoRef.current;
-      if (video) video.srcObject = null;
-    };
-  }, [scanning]);
-
-  useEffect(() => () => {
-    scannerStreamRef.current?.getTracks?.().forEach((track) => track.stop());
-  }, []);
-
-
-  const submitCode = async (candidate = code) => {
-    const clean = String(candidate || "").toUpperCase().replace(/[^0-9A-D]/g, "").slice(0, 4);
-    if (!/^\d[A-D]\d\d$/.test(clean)) {
-      setErr("Code format must be number, letter, number, number.");
-      return;
-    }
-    if (!globalThis.crypto?.subtle) {
-      setErr("Secure code login is not supported in this browser.");
-      return;
-    }
-    setCheckingCode(true);
-    setErr("");
-    try {
-      if (clean === "1A23") {
-        onUnlock("ref", true);
-        return;
-      }
-      let config = null;
-      try {
-        const setting = await api.getEventSetting(EVENT_ID, "role_access_codes");
-        config = setting?.value || null;
-      } catch {}
-      if (!config) {
-        const entries = await api.listFieldLog(EVENT_ID);
-        config = latestRoleAccessConfig(entries).config;
-      }
-      const digest = await hashAccessCode(clean);
-      const roles = [
-        ["ref", "Referee"],
-        ["judge", "Judge Advisor"],
-        ["emcee", "Emcee"],
-      ];
-      const found = roles.find(([role]) => config?.codes?.[role]?.enabled && config.codes[role].hash === digest);
-      if (!found) {
-        setCode("");
-        setErr("That event access code is not valid.");
-        return;
-      }
-      onUnlock(found[0]);
-    } catch (e) {
-      setCode("");
-      setErr("Could not verify the event code. Check your connection and try again.");
-    } finally {
-      setCheckingCode(false);
-    }
-  };
-
-  useEffect(() => {
-    if (mode === "code" && code.length === 4) submitCode(code);
-  }, [code, mode]);
-
-  return (
-    <div className="min-h-screen bg-[#0D0F32] text-white grid place-items-center p-6 font-sans">
-      <div className="w-full max-w-sm">
-        <div className="flex flex-col items-center text-center mb-6">
-          <img src="/logo.svg" alt="Highlander Summit" className="h-52 sm:h-64 w-52 sm:w-64 object-contain mb-3" />
-          <span className="font-bold text-lg">Highlander Summit — Violation Log</span>
-        </div>
-
-        {mode === "password" ? (
-          <>
-            <p className="text-sm text-slate-300 mb-4 text-center">Enter the referee, judge advisor, emcee, or admin password to open the log.</p>
-            <input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} placeholder="Password" autoFocus
-              onKeyDown={(e) => e.key === "Enter" && submit()}
-              className="w-full px-3 py-3 rounded-lg bg-[#1b1f4d] border border-[#2c3168] text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#D7212B]" />
-            {err && <p className="text-sm text-red-400 mt-2 text-center">{err}</p>}
-            <button onClick={submit} disabled={!pw}
-              className="w-full mt-3 py-3 rounded-lg font-semibold bg-[#D7212B] text-white hover:bg-[#B42024] disabled:bg-[#2c3168] disabled:text-slate-400">Enter</button>
-            <button onClick={() => { setMode("code"); setErr(""); setPw(""); }}
-              className="w-full mt-3 py-3 rounded-lg font-semibold border border-[#4a4f82] bg-[#171b45] hover:bg-[#202657]">
-              Use event access code
-            </button>
-            <button onClick={startLoginScanner} className="w-full mt-3 py-3 rounded-lg font-semibold border border-[#4a4f82] bg-[#171b45] hover:bg-[#202657] flex items-center justify-center gap-2"><ScanLine size={18}/> Scan QR code</button>
-          </>
-        ) : (
-          <>
-            <p className="text-sm text-slate-300 text-center">Enter the 4 character access code provided by event leadership.</p>
-            <div className="flex justify-center gap-3 my-5">
-              {[0,1,2,3].map((i) => (
-                <div key={i} className={`w-14 h-14 rounded-xl border grid place-items-center text-2xl font-bold ${code.length > i ? "bg-white text-[#0D0F32] border-white" : "bg-[#171b45] border-[#4a4f82] text-slate-500"}`}>
-                  {code.length > i ? code[i] : (i === 1 ? "A" : "0")}
-                </div>
-              ))}
-            </div>
-            <div className="text-xs text-slate-400 text-center mb-3">Format: number · A/B/C/D · number · number</div>
-            <div className="grid grid-cols-4 gap-3">
-              {["1","2","3","A","4","5","6","B","7","8","9","C","Delete","0","Enter","D"].map((key) => {
-                const expectsLetter = code.length === 1;
-                const isLetter = ["A","B","C","D"].includes(key);
-                const isDigit = /^\d$/.test(key);
-                const disabled = checkingCode
-                  || (isLetter && !expectsLetter)
-                  || (isDigit && expectsLetter)
-                  || (key === "Delete" && !code.length)
-                  || (key === "Enter" && code.length !== 4);
-                const action = () => {
-                  if (key === "Delete") { setCode((cur) => cur.slice(0,-1)); setErr(""); return; }
-                  if (key === "Enter") { submitCode(); return; }
-                  enterCodeKey(key);
-                };
-                return (
-                  <button key={key} disabled={disabled} onClick={action}
-                    className={`h-14 rounded-xl border font-bold active:scale-[0.98] disabled:opacity-30 ${
-                      key === "Enter" ? "bg-[#D7212B] border-[#D7212B] text-white"
-                      : isLetter ? "bg-[#252b63] border-[#4a51a0] text-xl"
-                      : key === "Delete" ? "bg-[#171b45] border-[#353a73] text-sm"
-                      : "bg-[#1b1f4d] border-[#353a73] text-xl"
-                    }`}>
-                    {key === "Enter" && checkingCode ? "…" : key}
-                  </button>
-                );
-              })}
-            </div>
-            {err && <p className="text-sm text-red-400 mt-3 text-center">{err}</p>}
-            <button onClick={() => { setMode("password"); setCode(""); setErr(""); }}
-              className="w-full mt-4 py-3 rounded-lg font-semibold border border-[#4a4f82] bg-[#171b45] hover:bg-[#202657]">
-              Use password instead
-            </button>
-          </>
-        )}
-
-        {scanning && <div className="fixed inset-0 z-[100] bg-black flex flex-col"><div className="p-4 flex items-center"><div className="font-bold flex items-center gap-2"><ScanLine size={20}/> Scan Ref OS login QR</div><button onClick={stopLoginScanner} className="ml-auto p-2"><X size={24}/></button></div><div className="flex-1 relative overflow-hidden"><video ref={scannerVideoRef} autoPlay playsInline muted className="w-full h-full object-cover"/><div className="absolute inset-0 grid place-items-center pointer-events-none"><div className="w-64 h-64 border-4 border-white rounded-3xl"/></div></div><div className="p-5 text-center text-sm text-slate-300">Point the camera at a Ref OS volunteer login QR code.</div></div>}
-        <div className="flex flex-col items-center gap-2 mt-8">
-          <img src="/logo.svg" alt="Highlander Summit" className="h-12 w-12 object-contain" />
-          <p className="text-center text-xs text-slate-400">
-            Made by Maharshi Patel ·{" "}
-            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-white underline">@mpatel_ref</a>{" · "}v{APP_VERSION}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---------------------- NAME (ref identity) ---------------------- */
-function NameScreen({ onName }) {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-  const valid = !!firstName.trim() && !!lastName.trim();
-  const submit = () => valid && onName(fullName);
-  return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-700 grid place-items-center p-6 font-sans">
-      <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5">
-        <div className="flex items-center gap-2 mb-1"><img src="/logo.svg" alt="" className="h-6 w-6 object-contain" /><span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Highlander Summit Signature</span></div>
-        <h1 className="font-bold text-slate-900 dark:text-slate-100 text-lg">Welcome, ref</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">Your name is shown on everything you log, so the crew knows exactly who made each call.</p>
-        <div className="space-y-3">
-          <div>
-            <Label>First name</Label>
-            <input autoFocus value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="e.g. Alex"
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
-          </div>
-          <div>
-            <Label>Last name</Label>
-            <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="e.g. Rodriguez"
-              onKeyDown={(e) => e.key === "Enter" && submit()}
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
-          </div>
-        </div>
-        <button onClick={submit} disabled={!valid}
-          className={`w-full mt-4 py-2.5 rounded-lg font-semibold text-white ${valid ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Start logging</button>
-      </div>
-    </div>
-  );
-}
 
 /* ==================================================================== */
 /*  TRACKER (the main app, scoped to one event)                        */
@@ -752,9 +455,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [openRobot, setOpenRobot] = useState(null);
   const [query, setQuery] = useState("");
   const [showTeamScanner, setShowTeamScanner] = useState(false);
-  const [teamScannerBusy, setTeamScannerBusy] = useState(false);
-  const teamScannerVideoRef = useRef(null);
-  const teamScannerStreamRef = useRef(null);
   const [lightbox, setLightbox] = useState(null);
   const [menu, setMenu] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -772,105 +472,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     evs.forEach((ev) => el && el.addEventListener(ev, reset, { passive: true }));
   return () => { clearTimeout(menuTimer.current); evs.forEach((ev) => el && el.removeEventListener(ev, reset)); };
   }, [menu]);
-
-  const stopTeamScanner = () => {
-    teamScannerStreamRef.current?.getTracks?.().forEach((track) => track.stop());
-    teamScannerStreamRef.current = null;
-    setShowTeamScanner(false);
-  };
-
-  const startTeamScanner = async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      alert("Camera access is not supported on this browser.");
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
-        audio: false,
-      });
-      teamScannerStreamRef.current = stream;
-      setShowTeamScanner(true);
-    } catch {
-      alert("Camera access was not available. Allow camera permission and try again.");
-    }
-  };
-
-  useEffect(() => {
-    if (!showTeamScanner) return;
-    const video = teamScannerVideoRef.current;
-    const stream = teamScannerStreamRef.current;
-    if (!video || !stream) return;
-
-    video.srcObject = stream;
-    video.muted = true;
-    video.setAttribute("playsinline", "true");
-    video.play().catch(() => {
-      alert("The camera opened, but Safari could not start the preview. Close the scanner and try again.");
-    });
-
-    return () => {
-      if (video) video.srcObject = null;
-    };
-  }, [showTeamScanner]);
-
-
-  const captureTeamNumber = async () => {
-    const video = teamScannerVideoRef.current;
-    if (!video?.videoWidth || teamScannerBusy) return;
-    setTeamScannerBusy(true);
-    const canvas = document.createElement("canvas");
-    const maxWidth = 1400;
-    const scale = Math.min(1, maxWidth / video.videoWidth);
-    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
-    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    try {
-      let rawText = "";
-      if ("TextDetector" in globalThis) {
-        try {
-          const found = await new TextDetector().detect(canvas);
-          rawText = found.map((x) => x.rawValue || "").join(" ");
-        } catch {}
-      }
-
-      if (!rawText.trim()) {
-        let Tesseract;
-        try {
-          Tesseract = await loadExternalScript("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js", "Tesseract");
-        } catch {
-          alert("Team number OCR support could not load. Check your connection or use normal team search.");
-          return;
-        }
-        const result = await Tesseract.recognize(canvas, "eng", {
-          logger: () => {},
-        });
-        rawText = result?.data?.text || "";
-      }
-
-      const normalized = String(rawText).toUpperCase().replace(/[^0-9A-Z]/g, "");
-      const match = [...teams]
-        .sort((a, b) => String(b.number).length - String(a.number).length)
-        .find((team) => normalized.includes(String(team.number).toUpperCase().replace(/[^0-9A-Z]/g, "")));
-
-      if (!match) {
-        alert("No known team number was detected. Move closer to the team number and try again.");
-        return;
-      }
-      stopTeamScanner();
-      setOpenTeam(match.number);
-    } catch {
-      alert("Could not read a team number from that image. Try again closer to the number.");
-    } finally {
-      setTeamScannerBusy(false);
-    }
-  };
-
-  useEffect(() => () => {
-    teamScannerStreamRef.current?.getTracks?.().forEach((track) => track.stop());
-  }, []);
 
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
@@ -1049,19 +650,24 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     setShowAdminPassword(true);
   }, [adminUnlocked]);
 
-  const unlockAdmin = (password) => {
-    if (!ADMIN_PASSWORD) return { ok: false, message: "Admin password isn't configured. Add VITE_ADMIN_PASSWORD to the environment." };
-    if (password !== ADMIN_PASSWORD) return { ok: false, message: "Incorrect admin password." };
-    sessionStorage.setItem("refosAdmin", "1");
-    setAdminUnlocked(true);
-    setShowAdminPassword(false);
-    const action = pendingAdminAction.current;
-    pendingAdminAction.current = null;
-    if (action) setTimeout(action, 0);
-    return { ok: true };
+  const unlockAdmin = async (password) => {
+    try {
+      const result = await api.claimEventAccess(eventId, password);
+      if (!result.isAdmin) return { ok: false, message: "That credential does not have Admin access." };
+      sessionStorage.setItem("refosAdmin", "1");
+      setAdminUnlocked(true);
+      setShowAdminPassword(false);
+      const action = pendingAdminAction.current;
+      pendingAdminAction.current = null;
+      if (action) setTimeout(action, 0);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, message: e?.message?.includes("Invalid event credential") ? "Incorrect admin credential." : (e.message || "Could not verify Admin access.") };
+    }
   };
 
-  const lockAdmin = () => {
+  const lockAdmin = async () => {
+    try { await api.downgradeMyEventRole(eventId, role === "judge" ? "judge" : role === "emcee" ? "emcee" : "ref"); } catch {}
     sessionStorage.removeItem("refosAdmin");
     setAdminUnlocked(false);
     setMenu(false);
@@ -1316,6 +922,16 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const saveRoleAccessConfig = async (config) => {
     try {
       const saved = await api.upsertEventSetting(eventId, "role_access_codes", config, meName);
+      const roleMap = { ref: "ref", judge: "judge", emcee: "emcee" };
+      await Promise.all(Object.entries(roleMap).map(async ([key, serverRole]) => {
+        const entry = config?.codes?.[key];
+        const credentialName = `${key}_code`;
+        if (entry?.hash) {
+          await api.setEventAccessCredentialHash(eventId, credentialName, serverRole, entry.hash, !!entry.enabled);
+        } else {
+          await api.disableEventAccessCredential(eventId, credentialName).catch(() => {});
+        }
+      }));
       setEventSettings((cur) => ({ ...cur, role_access_codes: saved }));
       return saved;
     } catch (e) {
@@ -2385,7 +2001,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             <span className="text-xs font-medium max-w-[70px] truncate">{meName || "Set name"}</span>
           </button>
           <div className="relative">
-            <button onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
+            <button aria-label="Settings" onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
               <div ref={menuRef} className="absolute right-0 mt-2 w-56 max-h-[75vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
                 {isJudge ? (
@@ -2596,7 +2212,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search team #"
                   className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
               </div>
-              <button onClick={startTeamScanner} className="px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Camera size={17} /> Scan</button>
+              <button onClick={() => setShowTeamScanner(true)} className="px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Camera size={17} /> Scan</button>
               {!isEmcee && <button onClick={() => setAddTeam(true)} className="px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Plus size={17} /> Team</button>}
             </div>
             {filteredTeams.length === 0 ? (
@@ -2644,7 +2260,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         </button>
       )}
 
-      {showTeamScanner && <div className="fixed inset-0 z-[100] bg-black flex flex-col text-white"><div className="p-4 flex items-center"><div className="font-bold flex items-center gap-2"><Camera size={20}/> Scan team number</div><button onClick={stopTeamScanner} className="ml-auto p-2"><X size={24}/></button></div><div className="flex-1 relative overflow-hidden"><video ref={teamScannerVideoRef} autoPlay playsInline muted className="w-full h-full object-cover"/><div className="absolute inset-x-8 top-1/2 -translate-y-1/2 border-4 border-white rounded-2xl h-36 pointer-events-none"/></div><div className="p-4"><button disabled={teamScannerBusy} onClick={captureTeamNumber} className="w-full py-3 rounded-xl bg-white text-black font-bold disabled:opacity-60">{teamScannerBusy ? "Reading team number…" : "Read team number"}</button><p className="text-xs text-slate-300 text-center mt-2">Center the robot team number in the box, then tap Read team number. iPhone uses OCR when native text detection is unavailable.</p></div></div>}
+      {showTeamScanner && <TeamScanner
+        teams={teams}
+        onDetected={(number) => { setShowTeamScanner(false); setOpenTeam(number); }}
+        onClose={() => setShowTeamScanner(false)}
+      />}
       {logFor !== null && (
         <LogModal teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules} onOpenPhoto={setLightbox} tourMode={showGuidedTour && tourStep === 4}
           onSetName={() => setShowIdentity(true)} onClose={() => { setLogFor(null); setLogMatch(null); }}
@@ -2754,7 +2374,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         viols={viols} rules={rules} fieldLog={fieldLog} presence={presence} roster={refRoster} contacts={eventContacts}
         countdown={eventCountdown} tmSyncStatus={tmSyncStatus} online={online} pendingCount={pendingCount}
         lastSystemTest={lastSystemTest} onClose={() => setShowDiagnosticReport(false)} />}
-      {showRoleCodeManager && adminUnlocked && <RoleAccessCodeManager config={eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config}
+      {showRoleCodeManager && adminUnlocked && <RoleAccessCodeManager eventId={eventId} config={eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config}
         onSave={saveRoleAccessConfig} onClose={() => setShowRoleCodeManager(false)} />}
       {showContactDirectory && <EventContactDirectory contacts={eventContacts} canEdit={adminUnlocked}
         onSave={saveEventContacts} onClose={() => setShowContactDirectory(false)} />}
@@ -3294,178 +2914,7 @@ function RulePicker({ rules, knownRules, onPickRule, onPickCustom, onClose }) {
 }
 
 /* ============================ ADD TEAM MODAL ============================ */
-function AddTeamModal({ onClose, onSave }) {
-  const [num, setNum] = useState(""); const [name, setName] = useState("");
-  return (
-    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-white dark:bg-slate-800 w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
-        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700"><h2 className="font-bold text-slate-900 dark:text-slate-100">Add team</h2><button onClick={onClose} className="text-slate-400"><X size={22} /></button></div>
-        <div className="p-4 space-y-3">
-          <div><Label>Team number</Label><input autoFocus value={num} onChange={(e) => setNum(e.target.value)} placeholder="e.g. 1234A" className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-mono focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
-          <div><Label>Team name (optional)</Label><input value={name} onChange={(e) => setName(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
-        </div>
-        <div className="p-4 pt-0 flex gap-2">
-          <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
-          <button onClick={() => num.trim() && onSave(num, name)} disabled={!num.trim()} className={`flex-1 py-2.5 rounded-lg font-semibold text-white ${num.trim() ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Add team</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-/* ============================ IDENTITY MODAL ============================ */
-function IdentityModal({ me, onSave, onClose }) {
-  const existingParts = String(me?.name || "").trim().split(/\s+/).filter(Boolean);
-  const [firstName, setFirstName] = useState(existingParts[0] || "");
-  const [lastName, setLastName] = useState(existingParts.slice(1).join(" ") || "");
-  const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-  const valid = !!firstName.trim() && !!lastName.trim();
-  const submit = () => valid && onSave(fullName);
-  return (
-    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-white dark:bg-slate-800 w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
-        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
-          <h2 className="font-bold text-slate-900 dark:text-slate-100">Your name</h2>
-          <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
-        </div>
-        <div className="p-4 space-y-3">
-          <div>
-            <Label>First name</Label>
-            <input autoFocus value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="e.g. Alex"
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
-          </div>
-          <div>
-            <Label>Last name</Label>
-            <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="e.g. Rodriguez"
-              onKeyDown={(e) => e.key === "Enter" && submit()}
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
-          </div>
-        </div>
-        <div className="p-4 pt-0"><button onClick={submit} disabled={!valid} className={`w-full py-2.5 rounded-lg font-semibold text-white ${valid ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Save</button></div>
-      </div>
-    </div>
-  );
-}
-
-/* ============================ SHARE / INVITE MODAL ============================ */
-function ShareModal({ event, onClose }) {
-  const [copied, setCopied] = useState("");
-  const url = window.location.origin;
-  const copy = (text, which) => { navigator.clipboard?.writeText(text); setCopied(which); setTimeout(() => setCopied(""), 1500); };
-  return (
-    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-white dark:bg-slate-800 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
-        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
-          <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Share2 size={18} /> Invite other refs</h2>
-          <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
-        </div>
-        <div className="p-4 space-y-4 text-sm text-slate-600 dark:text-slate-300">
-          <p>Everyone works from the same live Highlander Summit log and sees each other's entries within seconds.</p>
-          <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4 space-y-3">
-            <div>
-              <Label>Send your crew the site</Label>
-              <div className="flex gap-2">
-                <input readOnly value={url} className="flex-1 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm" />
-                <button onClick={() => copy(url, "url")} className="px-3 rounded-lg bg-slate-900 text-white flex items-center gap-1 text-sm">{copied === "url" ? <Check size={15} /> : <Copy size={15} />}</button>
-              </div>
-            </div>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400">They open the link, enter the crew password, set a ref name, and they're in.</p>
-          </div>
-          <div className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 bg-amber-50 border border-amber-200 rounded-lg p-3">
-            <AlertTriangle size={15} className="text-amber-500 shrink-0 mt-0.5" />
-            <span>Share the password only with your officiating crew — anyone who has it can view, add, and delete entries.</span>
-          </div>
-        </div>
-        <div className="p-4 pt-0"><button onClick={onClose} className="w-full py-2.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 flex items-center justify-center gap-2"><Check size={16} /> Done</button></div>
-      </div>
-    </div>
-  );
-}
-
-/* ============================ EVENT MODAL ============================ */
-function AdminPasswordModal({ onUnlock, onClose }) {
-  const [pw, setPw] = useState("");
-  const [err, setErr] = useState("");
-  const submit = (e) => {
-    e?.preventDefault();
-    const result = onUnlock(pw);
-    if (!result?.ok) setErr(result?.message || "Incorrect admin password.");
-  };
-  return (
-    <div className="fixed inset-0 z-[70] bg-slate-950/60 grid place-items-center p-4" onMouseDown={onClose}>
-      <form onSubmit={submit} onMouseDown={(e) => e.stopPropagation()} className="w-full max-w-sm bg-white dark:bg-slate-800 rounded-2xl shadow-2xl p-5">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="w-10 h-10 rounded-full bg-[#0D0F32] text-white grid place-items-center"><KeyRound size={19} /></span>
-          <div><h2 className="font-bold text-slate-900 dark:text-slate-100">Admin access required</h2><p className="text-xs text-slate-500 dark:text-slate-400">Event editing and CSV export are admin only.</p></div>
-        </div>
-        <input autoFocus type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} placeholder="Admin password"
-          className="w-full mt-4 px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
-        {err && <p className="text-xs text-red-600 mt-2">{err}</p>}
-        <div className="flex gap-2 mt-4">
-          <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-medium">Cancel</button>
-          <button type="submit" className="flex-1 px-4 py-2.5 rounded-xl bg-[#0D0F32] text-white font-semibold">Unlock admin</button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function EventModal({ event, onSave, onClose }) {
-  const [name, setName] = useState(event?.name || "");
-  const [quals, setQuals] = useState(event?.quals ? String(event.quals) : "");
-  const [practice, setPractice] = useState(event?.practice ? String(event.practice) : "");
-  const [bracket, setBracket] = useState(event?.bracket ? String(event.bracket) : "16");
-  const [finalsBestOf, setFinalsBestOf] = useState(event?.finalsBestOf ? String(event.finalsBestOf) : "3");
-  const creating = !event;
-  return (
-    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-white dark:bg-slate-800 w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white dark:bg-slate-800 px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
-          <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><CalendarDays size={18} /> {creating ? "New event" : "Event setup"}</h2>
-          <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
-        </div>
-        <div className="p-4 space-y-3">
-          <div><Label>Event name</Label>
-            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Highlander Summit Signature"
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
-          <div><Label>Number of qualification matches</Label>
-            <div className="relative">
-              <ListOrdered size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input value={quals} onChange={(e) => setQuals(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="e.g. 60"
-                className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
-            </div>
-            <p className="text-[11px] text-slate-400 mt-1">Logging will offer Q1–Q{quals || "n"} as a dropdown.</p>
-          </div>
-          <div><Label>Practice matches (optional)</Label>
-            <input value={practice} onChange={(e) => setPractice(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="leave blank if none"
-              className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
-          <div className="grid grid-cols-2 gap-2">
-            <div><Label>Elimination bracket</Label>
-              <select value={bracket} onChange={(e) => setBracket(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
-                <option value="0">None</option><option value="4">Top 4</option><option value="8">Top 8</option><option value="16">Top 16</option>
-              </select>
-            </div>
-            <div><Label>Finals</Label>
-              <select value={finalsBestOf} onChange={(e) => setFinalsBestOf(e.target.value)} disabled={bracket === "0"} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 disabled:bg-slate-100 dark:bg-slate-700 disabled:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300">
-                <option value="1">Single</option><option value="3">Best of 3</option>
-              </select>
-            </div>
-          </div>
-          {bracket !== "0" && (
-            <p className="text-[11px] text-slate-400">Generates {(() => { const ec = elimCounts(bracket); const parts = []; if (ec.r16) parts.push("R16-1…8"); if (ec.qf) parts.push("QF1…4"); if (ec.sf) parts.push("SF1…2"); parts.push(finalsBestOf === "3" ? "F1…3" : "F1"); return parts.join(", "); })()} as dropdowns.</p>
-          )}
-        </div>
-        <div className="p-4 pt-0 flex gap-2">
-          <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
-          <button onClick={() => onSave({ name, quals, practice, bracket, finalsBestOf })} className="flex-1 py-2.5 rounded-lg font-semibold text-white bg-slate-900 hover:bg-slate-800">{creating ? "Create event" : "Save event"}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-/* ============================ MATCHES ============================ */
 function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee, onOpenAwp }) {
   const [field, setField] = useState("all");
   const all = Object.values(matches);
@@ -3872,83 +3321,8 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
 }
 
 /* ============================ CLEAR MODAL ============================ */
-function AnnouncementModal({ onClose, onSend }) {
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-  const send = async () => {
-    if (!message.trim() || busy) return;
-    setBusy(true);
-    try { await onSend(message.trim()); onClose(); } finally { setBusy(false); }
-  };
-  return (
-    <div className="fixed inset-0 z-[70] bg-black/45 flex items-end sm:items-center justify-center">
-      <div className="w-full sm:max-w-lg bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl shadow-xl">
-        <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
-          <Flag size={18} className="text-[#D7212B]" /><h2 className="font-bold">Send referee announcement</h2>
-          <button onClick={onClose} className="ml-auto p-1 text-slate-400"><X size={20}/></button>
-        </div>
-        <div className="p-4">
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Everyone using this event will see this until they acknowledge it.</p>
-          <textarea autoFocus value={message} onChange={(e)=>setMessage(e.target.value)} rows={5} placeholder="Type announcement…"
-            className="w-full px-3 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm resize-none"/>
-        </div>
-        <div className="p-4 pt-0 flex gap-2">
-          <button onClick={onClose} className="px-4 py-2.5 rounded-lg border">Cancel</button>
-          <button onClick={send} disabled={!message.trim() || busy} className="flex-1 px-4 py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold disabled:bg-slate-300">{busy ? "Sending…" : "Send announcement"}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function CountdownSetupModal({ current, onSave, onClear, onClose }) {
-  const [label, setLabel] = useState(current?.label || "");
-  const [target, setTarget] = useState(current?.target ? new Date(current.target).toISOString().slice(0,16) : "");
-  return (
-    <div className="fixed inset-0 z-[70] bg-black/45 flex items-end sm:items-center justify-center">
-      <div className="w-full sm:max-w-md bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl p-4">
-        <div className="flex items-center gap-2 mb-4"><Clock size={19}/><h2 className="font-bold text-lg">Countdown banner</h2><button onClick={onClose} className="ml-auto text-slate-400"><X size={21}/></button></div>
-        <Label>Milestone</Label>
-        <input value={label} onChange={(e)=>setLabel(e.target.value)} placeholder="Alliance Selection" className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 mb-3"/>
-        <Label>Date and time</Label>
-        <input type="datetime-local" value={target} onChange={(e)=>setTarget(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600"/>
-        <div className="flex gap-2 mt-4">
-          {current && <button onClick={onClear} className="px-4 py-2.5 rounded-lg border border-red-200 text-red-600">Remove</button>}
-          <button onClick={onClose} className="ml-auto px-4 py-2.5 rounded-lg border">Cancel</button>
-          <button disabled={!label.trim() || !target} onClick={()=>onSave({label:label.trim(),target:new Date(target).toISOString()})} className="px-4 py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold disabled:bg-slate-300">Set countdown</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function OfflineReadinessModal({ onClose }) {
-  const [result, setResult] = useState(null);
-  const run = async () => {
-    const checks = [];
-    checks.push({ label: "Browser storage", ok: (()=>{ try { localStorage.setItem("refosOfflineTest","1"); localStorage.removeItem("refosOfflineTest"); return true; } catch { return false; } })() });
-    checks.push({ label: "Service worker support", ok: "serviceWorker" in navigator });
-    let controller = false;
-    try { controller = !!navigator.serviceWorker?.controller; } catch {}
-    checks.push({ label: "App controlled by service worker", ok: controller });
-    let cacheOk = false;
-    try { cacheOk = "caches" in window && (await caches.keys()).length > 0; } catch {}
-    checks.push({ label: "Offline cache present", ok: cacheOk });
-    setResult(checks);
-  };
-  useEffect(()=>{ run(); },[]);
-  return (
-    <div className="fixed inset-0 z-[70] bg-black/45 flex items-end sm:items-center justify-center">
-      <div className="w-full sm:max-w-md bg-white dark:bg-slate-800 rounded-t-2xl sm:rounded-2xl p-4">
-        <div className="flex items-center gap-2"><CloudOff size={19}/><h2 className="font-bold text-lg">Offline readiness test</h2><button onClick={onClose} className="ml-auto text-slate-400"><X size={21}/></button></div>
-        <p className="text-xs text-slate-500 mt-1 mb-4">Checks whether this device has the browser capabilities and cached app resources needed for offline use.</p>
-        <div className="space-y-2">{(result||[]).map((r)=><div key={r.label} className="flex items-center gap-2 rounded-lg border p-3">{r.ok?<Check size={17} className="text-emerald-600"/>:<X size={17} className="text-red-600"/>}<span className="text-sm font-medium">{r.label}</span><span className={`ml-auto text-xs font-bold ${r.ok?"text-emerald-600":"text-red-600"}`}>{r.ok?"PASS":"CHECK"}</span></div>)}</div>
-        {result && <div className={`mt-4 rounded-lg p-3 text-sm font-bold ${result.every(r=>r.ok)?"bg-emerald-50 text-emerald-700":"bg-amber-50 text-amber-800"}`}>{result.every(r=>r.ok) ? "This device is ready for Ref OS offline mode." : "One or more offline readiness checks need attention."}</div>}
-        <div className="flex gap-2 mt-4"><button onClick={run} className="flex-1 py-2.5 rounded-lg border font-semibold">Run again</button><button onClick={onClose} className="flex-1 py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold">Done</button></div>
-      </div>
-    </div>
-  );
-}
 
 function GuidedTour({ role, step, hasMatches, hasRules, onStep, onClose }) {
   const judge = role === "Judge Advisor";
@@ -4363,267 +3737,8 @@ function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, f
 }
 
 
-function RoleAccessCodeManager({ config: sharedConfig, onSave, onClose }) {
-  const [config, setConfig] = useState(() => sharedConfig || { version: 1, codes: {} });
-  const [revealed, setRevealed] = useState({});
-  const [busyRole, setBusyRole] = useState("");
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    setConfig(sharedConfig || { version: 1, codes: {} });
-  }, [sharedConfig?.updatedAt, JSON.stringify(sharedConfig?.codes || {})]);
-
-  const roleRows = [
-    { key: "ref", label: "Referee", description: "Standard referee access" },
-    { key: "judge", label: "Judge Advisor", description: "Judging and alliance access" },
-    { key: "emcee", label: "Emcee", description: "Emcee event access" },
-  ];
-
-  const generateCandidate = () => {
-    const array = new Uint32Array(4);
-    globalThis.crypto.getRandomValues(array);
-    const letters = ["A", "B", "C", "D"];
-    return `${array[0] % 10}${letters[array[1] % letters.length]}${array[2] % 10}${array[3] % 10}`;
-  };
-
-  const generate = async (role) => {
-    if (!globalThis.crypto?.subtle || !globalThis.crypto?.getRandomValues) {
-      setError("Secure code generation is not supported in this browser.");
-      return;
-    }
-    setBusyRole(role);
-    setError("");
-    try {
-      const existingHashes = new Set(Object.values(config?.codes || {}).map((v) => v?.hash).filter(Boolean));
-      let code = "";
-      let hash = "";
-      for (let attempt = 0; attempt < 50; attempt += 1) {
-        code = generateCandidate();
-        hash = await hashAccessCode(code);
-        if (!existingHashes.has(hash) || config?.codes?.[role]?.hash === hash) break;
-      }
-      const next = {
-        ...config,
-        version: 1,
-        updatedAt: Date.now(),
-        codes: {
-          ...(config?.codes || {}),
-          [role]: {
-            hash,
-            format: "N-L-N-N",
-            enabled: true,
-            updatedAt: Date.now(),
-          },
-        },
-      };
-      await onSave(next);
-      setConfig(next);
-      setRevealed((cur) => ({ ...cur, [role]: code }));
-    } catch (e) {
-      setError(e.message || String(e));
-    } finally {
-      setBusyRole("");
-    }
-  };
-
-  const disable = async (role) => {
-    if (!config?.codes?.[role]) return;
-    setBusyRole(role);
-    setError("");
-    try {
-      const next = {
-        ...config,
-        version: 1,
-        updatedAt: Date.now(),
-        codes: {
-          ...(config?.codes || {}),
-          [role]: {
-            ...config.codes[role],
-            enabled: false,
-            updatedAt: Date.now(),
-          },
-        },
-      };
-      await onSave(next);
-      setConfig(next);
-      setRevealed((cur) => {
-        const copy = { ...cur };
-        delete copy[role];
-        return copy;
-      });
-    } catch (e) {
-      setError(e.message || String(e));
-    } finally {
-      setBusyRole("");
-    }
-  };
-
-  const disableAll = async () => {
-    setBusyRole("all");
-    setError("");
-    try {
-      const codes = {};
-      for (const [key, value] of Object.entries(config?.codes || {})) {
-        codes[key] = { ...value, enabled: false, updatedAt: Date.now() };
-      }
-      const next = { ...config, version: 1, updatedAt: Date.now(), codes };
-      await onSave(next);
-      setConfig(next);
-      setRevealed({});
-    } catch (e) {
-      setError(e.message || String(e));
-    } finally {
-      setBusyRole("");
-    }
-  };
-
-  const copyCode = async (role) => {
-    const code = revealed[role];
-    if (!code) return;
-    try {
-      await navigator.clipboard.writeText(code);
-    } catch {}
-  };
-
-  const loginQrPayload=(role,code)=>JSON.stringify({type:"refos-login",eventId:EVENT_ID,role,code});
-  const showLoginQr=async(role)=>{const code=revealed[role];if(!code)return;const row=roleRows.find(r=>r.key===role);const dataUrl=qrImageUrl(loginQrPayload(role,code),700);const win=window.open("","_blank");if(!win){setError("Allow popups to open the QR code.");return;}win.document.write(`<title>Ref OS Login QR</title><body style="font-family:Arial;text-align:center;padding:32px"><h1>Ref OS</h1><h2>${row?.label||role}</h2><img src="${dataUrl}" style="width:min(80vw,500px)"><div style="font-size:38px;font-weight:800;letter-spacing:8px">${code}</div><p>Scan from the Ref OS login screen</p></body>`);win.document.close();};
-  const printLoginCards=async()=>{const available=roleRows.filter(r=>revealed[r.key]);if(!available.length){setError("Generate new role codes first. Ref OS does not store the readable code after generation.");return;}const cards=available.map(r=>({...r,code:revealed[r.key],qr:qrImageUrl(loginQrPayload(r.key,revealed[r.key]),500)}));const win=window.open("","_blank");if(!win){setError("Allow popups to print volunteer login cards.");return;}win.document.write(`<title>Ref OS Volunteer Login Cards</title><style>@page{size:letter;margin:.35in}body{font-family:Arial}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{border:2px solid #0D0F32;border-radius:18px;padding:22px;text-align:center;break-inside:avoid}.card img{width:210px;max-width:80%}.code{font-size:34px;font-weight:900;letter-spacing:7px}.role{font-size:22px;font-weight:800}.small{font-size:12px;color:#555}@media print{button{display:none}}</style><button onclick="window.print()">Print</button><div class="grid">${cards.map(c=>`<div class="card"><h2>Highlander Summit</h2><div class="role">${c.label}</div><img src="${c.qr}"><div class="code">${c.code}</div><p class="small">Open Ref OS and tap Scan QR code</p></div>`).join("")}</div>`);win.document.close();};
-
-  const activeCount = roleRows.filter((r) => config?.codes?.[r.key]?.enabled).length;
-
-  return (
-    <div className="fixed inset-0 z-[80] bg-slate-50 dark:bg-slate-900 flex flex-col">
-      <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2">
-        <KeyRound size={20}/>
-        <div>
-          <h2 className="font-bold">Volunteer Access Codes</h2>
-          <p className="text-xs text-slate-400">4 character event day login codes</p>
-        </div>
-        <button onClick={onClose} className="ml-auto"><X size={22}/></button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto p-4 space-y-3">
-          <div className="rounded-xl border bg-white dark:bg-slate-800 p-4">
-            <div className="font-bold">Event day access</div>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Generate a different code for each volunteer role. Every code follows number, letter, number, number using A, B, C, or D. Admins continue using the normal Admin password.
-            </p>
-            <div className="mt-3 text-sm"><b>{activeCount}</b> of {roleRows.length} role codes active</div>
-          </div>
-
-          {roleRows.map((role) => {
-            const saved = config?.codes?.[role.key];
-            const active = !!saved?.enabled;
-            const visibleCode = revealed[role.key];
-            return (
-              <div key={role.key} className="rounded-xl border bg-white dark:bg-slate-800 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold">{role.label}</div>
-                    <div className="text-sm text-slate-500 dark:text-slate-400">{role.description}</div>
-                  </div>
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"}`}>
-                    {active ? "ACTIVE" : "OFF"}
-                  </span>
-                </div>
-
-                {visibleCode ? (
-                  <div className="mt-4 rounded-xl bg-slate-100 dark:bg-slate-900 p-4 text-center">
-                    <div className="text-xs uppercase tracking-wide text-slate-500">Share this code</div>
-                    <div className="text-4xl font-black tracking-[0.3em] pl-[0.3em] mt-1">{visibleCode}</div>
-                    <div className="mt-3 flex flex-wrap justify-center gap-2"><button onClick={() => copyCode(role.key)} className="px-3 py-2 rounded-lg border text-sm font-semibold inline-flex items-center gap-2"><Copy size={15}/> Copy code</button><button onClick={() => showLoginQr(role.key)} className="px-3 py-2 rounded-lg border text-sm font-semibold inline-flex items-center gap-2"><QrCode size={15}/> Show QR</button></div>
-                  </div>
-                ) : active ? (
-                  <div className="mt-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-dashed p-3 text-sm text-slate-500 dark:text-slate-400">
-                    A code is active. For security, the existing code cannot be revealed after generation. Generate a new one if it needs to be shared again.
-                  </div>
-                ) : null}
-
-                <div className="grid grid-cols-2 gap-2 mt-4">
-                  <button disabled={!!busyRole} onClick={() => generate(role.key)}
-                    className="rounded-xl bg-[#0D0F32] text-white py-2.5 px-3 font-semibold disabled:opacity-50">
-                    {busyRole === role.key ? "Generating…" : active ? "Generate new code" : "Generate code"}
-                  </button>
-                  <button disabled={!!busyRole || !active} onClick={() => disable(role.key)}
-                    className="rounded-xl border border-red-200 text-red-700 dark:text-red-300 py-2.5 px-3 font-semibold disabled:opacity-40">
-                    Disable
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-
-          {error && <div className="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/30 p-3 text-sm text-red-700 dark:text-red-300">{error}</div>}
-
-          <button onClick={printLoginCards} className="w-full rounded-xl bg-[#0D0F32] text-white py-3 font-semibold flex items-center justify-center gap-2"><QrCode size={17}/> Print volunteer login cards</button>
-
-          <button disabled={!!busyRole || !activeCount} onClick={disableAll}
-            className="w-full rounded-xl border border-red-300 text-red-700 dark:text-red-300 py-3 font-semibold disabled:opacity-40">
-            Disable all volunteer codes
-          </button>
-
-          <div className="text-xs text-slate-500 dark:text-slate-400">
-            Codes are shared for this event and work across devices. Ref OS stores only a one way hash of each code in shared event data.
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 
-function ClearModal({ counts, onClear, onClose }) {
-  const [sel, setSel] = useState({ violations: false, teams: false, schedule: false, replays: false, judging: false, alliances: false, watchlist: false });
-  const opts = [
-    { key: "violations", label: "Violations", desc: `${counts.violations} logged`, note: "Clears every violation and its photos." },
-    { key: "replays", label: "Match replays", desc: `${counts.replays} flagged`, note: "Clears all matches marked to re-run (does not delete the matches)." },
-    { key: "teams", label: "Teams", desc: `${counts.teams} teams`, note: "Removes the team roster." },
-    { key: "schedule", label: "Match schedule", desc: `${counts.schedule} matches`, note: "Removes the imported matches. Also clears team rankings and W-L-T (both come from the schedule)." },
-    { key: "judging", label: "Judging", desc: `${counts.judging} nominations`, note: "Clears all award nominations and finalist selections." },
-    { key: "alliances", label: "Alliances", desc: `${counts.alliances} alliances`, note: "Clears all alliance captain and first-pick assignments." },
-    { key: "watchlist", label: "Watchlist", desc: `${counts.watchlist} entries`, note: "Removes all teams and notes from the watchlist." },
-  ];
-  const any = opts.some((o) => sel[o.key]);
-  const toggle = (k) => setSel((s) => ({ ...s, [k]: !s[k] }));
-  const doClear = () => {
-    const names = opts.filter((o) => sel[o.key]).map((o) => o.label.toLowerCase()).join(", ");
-    if (confirm(`Permanently delete: ${names}?\nThis cannot be undone.`)) onClear(sel);
-  };
-  return (
-    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-white dark:bg-slate-800 w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
-        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
-          <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Trash2 size={18} /> Clear data</h2>
-          <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
-        </div>
-        <div className="p-4 space-y-2">
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Choose what to delete. Anything you leave unchecked is kept.</p>
-          {opts.map((o) => {
-            const on = sel[o.key];
-            return (
-              <button key={o.key} onClick={() => toggle(o.key)}
-                className={`w-full flex items-start gap-3 text-left rounded-xl border-2 p-3 transition ${on ? "border-red-400 bg-red-50" : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:border-slate-600"}`}>
-                <span className={`mt-0.5 w-5 h-5 rounded-md grid place-items-center shrink-0 border-2 ${on ? "bg-red-600 border-red-600 text-white" : "border-slate-300 dark:border-slate-600"}`}>{on && <Check size={13} />}</span>
-                <span className="flex-1">
-                  <span className="flex items-center gap-2"><b className="text-slate-800 dark:text-slate-100">{o.label}</b><span className="text-xs text-slate-400">{o.desc}</span></span>
-                  <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">{o.note}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="p-4 pt-0 flex gap-2">
-          <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
-          <button onClick={doClear} disabled={!any}
-            className={`flex-1 py-2.5 rounded-lg font-semibold text-white ${any ? "bg-red-600 hover:bg-red-700" : "bg-slate-300"}`}>Clear selected</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ============================ ONLINE (presence) ============================ */
 function OnlineCluster({ presence, onClick }) {
   const names = [...new Set(presence.map((p) => p.name || "Ref"))];
   const shown = names.slice(0, 3);

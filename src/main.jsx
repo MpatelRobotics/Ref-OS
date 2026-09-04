@@ -14,7 +14,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   </React.StrictMode>,
 );
 
-if ("serviceWorker" in navigator) {
+if ("serviceWorker" in navigator && import.meta.env.VITE_E2E_MOCK !== "1") {
   window.addEventListener("load", async () => {
     try {
       const registration = await navigator.serviceWorker.register("/sw.js");

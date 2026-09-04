@@ -22,6 +22,19 @@ on conflict (id) do update set
   finals_best_of = excluded.finals_best_of,
   join_code = excluded.join_code;
 
+
+-- Permanent Ref OS keypad Admin credential. Stored as a SHA-256 hash server side.
+insert into public.event_access_credentials(event_id,credential_name,role,credential_hash,enabled)
+values(
+  '11111111-1111-4111-8111-111111111111',
+  'admin_keypad',
+  'admin',
+  encode(digest('1A23','sha256'),'hex'),
+  true
+)
+on conflict(event_id,credential_name)
+do update set role=excluded.role,credential_hash=excluded.credential_hash,enabled=true,updated_at=now();
+
 -- ------------------------------------------------------------------
 -- TEAMS (101 registered as of registration close)
 -- ------------------------------------------------------------------

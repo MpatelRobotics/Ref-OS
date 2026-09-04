@@ -1,8 +1,105 @@
 import { supabase } from "./supabaseClient";
 
+const E2E_MOCK = import.meta.env.VITE_E2E_MOCK === "1";
+const e2eState = { teams: [], violations: [] };
+
 export const uid = () =>
   (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) ||
   Date.now().toString(36) + Math.random().toString(36).slice(2);
+
+/* ================= server enforced event access ================= */
+export async function ensureAnonymousSession() {
+  if (E2E_MOCK) return { user: { id: "e2e-user" } };
+  const { data: existing } = await supabase.auth.getSession();
+  if (existing?.session?.user) return existing.session;
+  const { data, error } = await supabase.auth.signInAnonymously();
+  if (error) throw new Error(
+    error.message?.includes("Anonymous") ?
+      "Anonymous Sign-Ins are not enabled in Supabase Auth. Enable them before using Ref OS 1.2." :
+      error.message
+  );
+  return data.session;
+}
+
+export async function claimEventAccess(eventId, credential) {
+  if (E2E_MOCK) {
+    const value = String(credential || "");
+    if (value === "1A23" || value === "test-admin") return { role: "ref", serverRole: "admin", isAdmin: true };
+    if (value === "test-ref") return { role: "ref", serverRole: "ref", isAdmin: false };
+    if (value === "test-judge") return { role: "judge", serverRole: "judge", isAdmin: false };
+    if (value === "test-emcee") return { role: "emcee", serverRole: "emcee", isAdmin: false };
+    throw new Error("Invalid event credential");
+  }
+  await ensureAnonymousSession();
+  const { data, error } = await supabase.rpc("claim_event_access", {
+    p_event: eventId,
+    p_credential: String(credential || ""),
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row?.role) throw new Error("Invalid event credential.");
+  return { role: row.role === "admin" ? "ref" : row.role, serverRole: row.role, isAdmin: !!row.is_admin };
+}
+
+export async function getMyEventRole(eventId) {
+  if (E2E_MOCK) return null;
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData?.session?.user) return null;
+  const { data, error } = await supabase
+    .from("event_members")
+    .select("role")
+    .eq("event_id", eventId)
+    .eq("user_id", sessionData.session.user.id)
+    .maybeSingle();
+  if (error) return null;
+  return data?.role || null;
+}
+
+export async function setEventMemberName(eventId, name) {
+  if (E2E_MOCK) return;
+  const { error } = await supabase.rpc("set_my_event_member_name", {
+    p_event: eventId,
+    p_name: String(name || "").trim(),
+  });
+  if (error) throw error;
+}
+
+export async function setEventAccessCredentialHash(eventId, credentialName, role, hash, enabled = true) {
+  if (E2E_MOCK) return;
+  const { error } = await supabase.rpc("set_event_access_credential", {
+    p_event: eventId,
+    p_name: credentialName,
+    p_role: role,
+    p_hash: hash,
+    p_enabled: enabled,
+  });
+  if (error) throw error;
+}
+
+export async function disableEventAccessCredential(eventId, credentialName) {
+  if (E2E_MOCK) return;
+  const { error } = await supabase.rpc("disable_event_access_credential", {
+    p_event: eventId,
+    p_name: credentialName,
+  });
+  if (error) throw error;
+}
+
+export async function clearAccessSession() {
+  if (E2E_MOCK) return;
+  try { await supabase.auth.signOut({ scope: "local" }); }
+  catch { await supabase.auth.signOut(); }
+}
+
+export async function downgradeMyEventRole(eventId, role = "ref") {
+  if (E2E_MOCK) return;
+  const { error } = await supabase.rpc("downgrade_my_event_role", {
+    p_event: eventId,
+    p_role: role,
+  });
+  if (error) throw error;
+}
+
 
 /* ================= auth ================= */
 export const signIn = (email) =>
@@ -34,6 +131,7 @@ export async function listMyEvents() {
   return (data || []).map(mapEvent);
 }
 export async function getEvent(id) {
+  if (E2E_MOCK) return { id, name: "Highlander Summit E2E", quals: 10, practice: 0, bracket: 16, finalsBestOf: 1, joinCode: "TEST" };
   const { data } = await supabase.from("events").select("*").eq("id", id).maybeSingle();
   return mapEvent(data);
 }
@@ -69,11 +167,22 @@ export async function listMembers(eventId) {
 /* ================= teams ================= */
 const mapTeam = (r) => ({ number: r.number, name: r.name || "", rank: r.rank == null ? null : Number(r.rank), photoKeys: r.photo_paths || [], createdAt: new Date(r.created_at).getTime() });
 export async function listTeams(eventId) {
+  if (E2E_MOCK) return e2eState.teams.map((t) => ({ ...t }));
   const { data } = await supabase.from("teams").select("*").eq("event_id", eventId);
   return (data || []).map(mapTeam);
 }
 export async function upsertTeam(eventId, number, name) {
   const num = (number || "").trim().toUpperCase();
+  if (E2E_MOCK) {
+    if (!num) return num;
+    const existing = e2eState.teams.find((t) => t.number === num);
+    if (existing) {
+      if (name && name.trim()) existing.name = name.trim();
+    } else {
+      e2eState.teams.push({ number: num, name: (name || "").trim(), rank: null, photoKeys: [], createdAt: Date.now() });
+    }
+    return num;
+  }
   if (!num) return num;
   const hasName = !!(name && name.trim());
   const payload = { event_id: eventId, number: num };
@@ -86,6 +195,7 @@ export async function upsertTeam(eventId, number, name) {
 /* ---- team watchlist notes (multiple refs per team) ---- */
 const mapWatch = (r) => ({ id: r.id, team: r.team, by: r.ref_name || "", note: r.note || "", createdAt: new Date(r.created_at).getTime() });
 export async function listWatchNotes(eventId) {
+  if (E2E_MOCK) return [];
   const { data } = await supabase.from("watch_notes").select("*").eq("event_id", eventId).order("created_at");
   return (data || []).map(mapWatch);
 }
@@ -158,6 +268,7 @@ export async function removeTeamPhoto(eventId, number, path) {
 
 /* ================= matches (qualification schedule) ================= */
 export async function listMatches(eventId) {
+  if (E2E_MOCK) return [];
   const { data } = await supabase.from("matches").select("num,red,blue,field,phase,label,winner,red_score,blue_score").eq("event_id", eventId).order("num");
   return (data || []).map((m) => {
     const phase = m.phase || "qual";
@@ -198,6 +309,7 @@ export async function deleteMatch(eventId, phase, num) {
 /* ================= event settings (shared configuration) ================= */
 const mapEventSetting = (r) => ({ key: r.key, value: r.value, updatedBy: r.updated_by || "", updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : 0 });
 export async function listEventSettings(eventId) {
+  if (E2E_MOCK) return {};
   const { data, error } = await supabase.from("event_settings").select("*").eq("event_id", eventId);
   if (error) throw error;
   return Object.fromEntries((data || []).map((r) => [r.key, mapEventSetting(r)]));
@@ -208,12 +320,14 @@ export async function getEventSetting(eventId, key) {
   return data ? mapEventSetting(data) : null;
 }
 export async function upsertEventSetting(eventId, key, value, by = "") {
+  if (E2E_MOCK) return { key, value, updatedBy: by || "", updatedAt: Date.now() };
   const row = { event_id: eventId, key, value, updated_by: by || "", updated_at: new Date().toISOString() };
   const { data, error } = await supabase.from("event_settings").upsert(row, { onConflict: "event_id,key" }).select().single();
   if (error) throw error;
   return mapEventSetting(data);
 }
 export async function deleteEventSetting(eventId, key) {
+  if (E2E_MOCK) return;
   const { error } = await supabase.from("event_settings").delete().eq("event_id", eventId).eq("key", key);
   if (error) throw error;
 }
@@ -221,6 +335,7 @@ export async function deleteEventSetting(eventId, key) {
 /* ================= field log (timeouts / faults / replays) ================= */
 const mapFieldLog = (r) => ({ id: r.id, kind: r.kind, field: r.field || "", matchRef: r.match_ref || "", matchId: r.match_id || "", alliance: r.alliance || "", team: r.team || "", teams: r.teams || [], note: r.note || "", by: r.logged_by || "", createdAt: new Date(r.created_at).getTime() });
 export async function listFieldLog(eventId) {
+  if (E2E_MOCK) return [];
   const { data } = await supabase.from("field_log").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
   return (data || []).map(mapFieldLog);
 }
@@ -239,6 +354,7 @@ export async function deleteFieldLog(id) {
 /* ================= elimination alliances ================= */
 const mapAlliance = (r) => ({ seed: r.seed, teams: r.teams || [] });
 export async function listAlliances(eventId) {
+  if (E2E_MOCK) return [];
   const { data } = await supabase.from("alliances").select("seed,teams").eq("event_id", eventId).order("seed");
   return (data || []).map(mapAlliance);
 }
@@ -254,6 +370,7 @@ export async function clearAlliances(eventId) {
 
 /* ================= rulebook ================= */
 export async function listRules(eventId) {
+  if (E2E_MOCK) return [];
   const { data } = await supabase.from("rules").select("code,description,category,ord").eq("event_id", eventId).order("ord");
   return (data || []).map((r) => ({ code: r.code, desc: r.description || "", category: r.category || "" }));
 }
@@ -261,6 +378,7 @@ export async function listRules(eventId) {
 /* ================= award nominations (Judging) ================= */
 const mapNom = (r) => ({ id: r.id, award: r.award, team: r.team, match: r.match_info || null, reason: r.reason || "", criteria: r.criteria || [], whereWhen: r.where_when || "", by: r.nominated_by || "", byRole: r.nominated_role || "", createdAt: new Date(r.created_at).getTime() });
 export async function listNominations(eventId) {
+  if (E2E_MOCK) return [];
   const { data } = await supabase.from("nominations").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
   return (data || []).map(mapNom);
 }
@@ -285,6 +403,7 @@ export async function clearJudging(eventId) {
 
 /* ---- award shortlist / finalists ---- */
 export async function listShortlist(eventId) {
+  if (E2E_MOCK) return [];
   const { data } = await supabase.from("shortlist").select("award,team").eq("event_id", eventId);
   return (data || []).map((r) => ({ award: r.award, team: r.team }));
 }
@@ -305,6 +424,7 @@ const mapViol = (r) => ({
   photoKeys: r.photo_paths || [], createdAt: new Date(r.created_at).getTime(),
 });
 export async function listViolations(eventId) {
+  if (E2E_MOCK) return e2eState.violations.map((v) => ({ ...v }));
   const { data } = await supabase.from("violations").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
   return (data || []).map(mapViol);
 }
@@ -319,6 +439,26 @@ export function buildViolationRow(eventId, v) {
 // Upload photos then upsert the row. Safe to call more than once for the same
 // row (same id) — a retry after a lost ack just overwrites identically.
 export async function addViolationRow(eventId, row, photoDataUrls = []) {
+  if (E2E_MOCK) {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) throw new TypeError("Failed to fetch");
+    if (String(row.rule_desc || "").includes("PERMANENT_FAIL")) throw new Error("E2E simulated RLS rejection");
+    const saved = {
+      id: row.id,
+      team: row.team,
+      type: row.type,
+      code: row.code,
+      desc: row.rule_desc || "",
+      notes: row.notes || "",
+      match: row.match_info || null,
+      by: row.logged_by || "",
+      photoKeys: [],
+      createdAt: Date.now(),
+    };
+    const idx = e2eState.violations.findIndex((v) => v.id === saved.id);
+    if (idx >= 0) e2eState.violations[idx] = saved;
+    else e2eState.violations.unshift(saved);
+    return saved;
+  }
   const paths = [];
   for (let i = 0; i < photoDataUrls.length; i++) {
     const path = `${eventId}/${row.id}/${i}.jpg`;
@@ -353,16 +493,22 @@ export async function updateViolation(eventId, row, keepKeys = [], newPhotoDataU
   return mapViol(data);
 }
 export async function deleteViolation(v) {
+  if (E2E_MOCK) {
+    e2eState.violations = e2eState.violations.filter((x) => x.id !== v.id);
+    return;
+  }
   if (v.photoKeys?.length) await supabase.storage.from("robot-photos").remove(v.photoKeys);
   await supabase.from("violations").delete().eq("id", v.id);
 }
 export async function clearViolations(eventId) {
+  if (E2E_MOCK) { e2eState.violations = []; return; }
   const { data: vs } = await supabase.from("violations").select("photo_paths").eq("event_id", eventId);
   const paths = (vs || []).flatMap((v) => v.photo_paths || []);
   if (paths.length) await supabase.storage.from("robot-photos").remove(paths);
   await supabase.from("violations").delete().eq("event_id", eventId);
 }
 export async function clearTeams(eventId) {
+  if (E2E_MOCK) { e2eState.teams = []; return; }
   await supabase.from("teams").delete().eq("event_id", eventId);
 }
 export async function clearMatches(eventId) {
@@ -375,8 +521,10 @@ export async function clearRankings(eventId) {
 
 /* ================= photos ================= */
 export async function photoUrl(path) {
-  const { data } = supabase.storage.from("robot-photos").getPublicUrl(path);
-  return data?.publicUrl || null;
+  if (E2E_MOCK) return null;
+  const { data, error } = await supabase.storage.from("robot-photos").createSignedUrl(path, 3600);
+  if (error) return null;
+  return data?.signedUrl || null;
 }
 function dataURLtoBlob(dataURL) {
   const [meta, b64] = dataURL.split(",");
@@ -388,6 +536,7 @@ function dataURLtoBlob(dataURL) {
 
 /* ================= realtime ================= */
 export function subscribeEvent(eventId, onChange) {
+  if (E2E_MOCK) return () => {};
   const ch = supabase
     .channel(`event-${eventId}-${Math.random().toString(36).slice(2)}`)
     .on("postgres_changes", { event: "*", schema: "public", table: "violations", filter: `event_id=eq.${eventId}` }, onChange)
@@ -406,12 +555,14 @@ export function subscribeEvent(eventId, onChange) {
 
 /* live presence — who's currently on the log. onChange gets an array of {name, ...} */
 export async function listRefRoster(eventId) {
+  if (E2E_MOCK) return [];
   const { data, error } = await supabase.from("ref_roster").select("name,last_seen,role").eq("event_id", eventId).order("name");
   if (error) { console.warn("Could not load ref roster", error); return []; }
   return (data || []).map((r) => ({ name: r.name, lastSeen: r.last_seen ? new Date(r.last_seen).getTime() : 0, role: r.role || "" }));
 }
 
 export async function touchRefRoster(eventId, name, role) {
+  if (E2E_MOCK) return undefined;
   const clean = (name || "Ref").trim();
   if (!clean) return;
   const row = { event_id: eventId, name: clean, last_seen: new Date().toISOString() };
@@ -429,6 +580,7 @@ export async function deleteRefRoster(eventId, name) {
 }
 
 export function joinPresence(eventId, meta, onChange) {
+  if (E2E_MOCK) { onChange?.([]); return () => {}; }
   const key = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
   const ch = supabase.channel(`presence-${eventId}`, { config: { presence: { key } } });
   ch.on("presence", { event: "sync" }, () => onChange(Object.values(ch.presenceState()).flat()));

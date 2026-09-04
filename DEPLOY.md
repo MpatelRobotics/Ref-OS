@@ -197,3 +197,18 @@ If all seven pass, you're production-ready.
 ## One-time vs. every-event
 - **One-time:** Phases 0–6. After that the site just stays up.
 - **Before each event:** open the Supabase dashboard once to make sure the project is awake; confirm custom SMTP is set if many refs will sign in; create the event and share the join code.
+
+
+## Ref OS 1.2 security migration
+
+Before deploying Ref OS 1.2:
+
+1. Enable Anonymous Sign-Ins in Supabase Authentication settings.
+2. Run `supabase/security-hardening.sql` once in Supabase SQL Editor.
+3. If you want the existing normal Referee, Judge Advisor, Emcee, and Admin passwords to continue working, put them in `.env` as `REFOS_SITE_PASSWORD`, `REFOS_JUDGE_PASSWORD`, `REFOS_EMCEE_PASSWORD`, and `REFOS_ADMIN_PASSWORD`.
+4. Run `npm run security:access-sql`.
+5. Run the generated `supabase/access-passwords-generated.sql` once in Supabase SQL Editor.
+6. Run `npm install` so the bundled QR packages and Playwright dependency are installed.
+7. Run `npm run build`.
+
+The permanent keypad Admin code `1A23` is seeded by the migration, so Admin access remains available while normal password hashes are being migrated.
