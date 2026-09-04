@@ -167,10 +167,45 @@ export async function listMembers(eventId) {
 
 /* ================= teams ================= */
 const mapTeam = (r) => ({ number: r.number, name: r.name || "", rank: r.rank == null ? null : Number(r.rank), photoKeys: r.photo_paths || [], createdAt: new Date(r.created_at).getTime() });
+/* ================= offline read cache =================
+   Last successful Teams and Matches reads are kept per event so field refs
+   can continue working through a temporary network/Supabase outage. */
+const readCacheKey = (eventId, kind) => `refosReadCache:${eventId}:${kind}`;
+function loadReadCache(eventId, kind) {
+  try {
+    const raw = localStorage.getItem(readCacheKey(eventId, kind));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.data) ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+function saveReadCache(eventId, kind, data) {
+  try {
+    localStorage.setItem(readCacheKey(eventId, kind), JSON.stringify({
+      savedAt: Date.now(),
+      data: Array.isArray(data) ? data : [],
+    }));
+  } catch {}
+}
+
 export async function listTeams(eventId) {
   if (E2E_MOCK) return e2eState.teams.map((t) => ({ ...t }));
-  const { data } = await supabase.from("teams").select("*").eq("event_id", eventId);
-  return (data || []).map(mapTeam);
+  try {
+    const { data, error } = await supabase.from("teams").select("*").eq("event_id", eventId);
+    if (error) throw error;
+    const teams = (data || []).map(mapTeam);
+    saveReadCache(eventId, "teams", teams);
+    return teams;
+  } catch (error) {
+    const cached = loadReadCache(eventId, "teams");
+    if (cached) {
+      console.warn("Teams unavailable from Supabase; using last synced local cache.", error);
+      return cached;
+    }
+    throw error;
+  }
 }
 export async function upsertTeam(eventId, number, name) {
   const num = (number || "").trim().toUpperCase();
@@ -270,11 +305,23 @@ export async function removeTeamPhoto(eventId, number, path) {
 /* ================= matches (qualification schedule) ================= */
 export async function listMatches(eventId) {
   if (E2E_MOCK) return [];
-  const { data } = await supabase.from("matches").select("num,red,blue,field,phase,label,winner,red_score,blue_score").eq("event_id", eventId).order("num");
-  return (data || []).map((m) => {
-    const phase = m.phase || "qual";
-    return { id: phase === "qual" ? String(m.num) : `${phase}-${m.num}`, phase, num: m.num, label: m.label || "", winner: m.winner || "", redScore: m.red_score, blueScore: m.blue_score, red: m.red || [], blue: m.blue || [], field: m.field || "" };
-  });
+  try {
+    const { data, error } = await supabase.from("matches").select("num,red,blue,field,phase,label,winner,red_score,blue_score").eq("event_id", eventId).order("num");
+    if (error) throw error;
+    const matches = (data || []).map((m) => {
+      const phase = m.phase || "qual";
+      return { id: phase === "qual" ? String(m.num) : `${phase}-${m.num}`, phase, num: m.num, label: m.label || "", winner: m.winner || "", redScore: m.red_score, blueScore: m.blue_score, red: m.red || [], blue: m.blue || [], field: m.field || "" };
+    });
+    saveReadCache(eventId, "matches", matches);
+    return matches;
+  } catch (error) {
+    const cached = loadReadCache(eventId, "matches");
+    if (cached) {
+      console.warn("Matches unavailable from Supabase; using last synced local cache.", error);
+      return cached;
+    }
+    throw error;
+  }
 }
 export async function addMatch(eventId, m) {
   const row = { event_id: eventId, phase: m.phase || "qual", num: Number(m.num), red: m.red || [], blue: m.blue || [], field: m.field || null, label: m.label || null };

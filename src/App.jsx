@@ -744,6 +744,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       await refresh();
       api.listMatches(eventId).then((list) => {
         const map = {}; for (const m of list) map[m.id] = m; setMatches(map);
+      }).catch((error) => {
+        console.warn("Matches unavailable and no local match cache exists yet.", error);
       });
       api.listRules(eventId).then(setRules);
       // restore violations still waiting in the queue (e.g. after a reload while offline)
@@ -4868,6 +4870,8 @@ function FeaturesGuide() {
         <p>If Wi-Fi drops, supported entries are queued on the device and automatically retried when connectivity returns. Pending items show their saving state so volunteers do not need to enter them twice.</p>
         <ul className="space-y-1.5">
           <Li><b>Offline queue</b> — temporary failures remain queued locally until they can sync.</Li>
+          <Li><b>Cached teams</b> — every successful team roster sync is saved on the device. If the network drops, Ref-OS keeps the last synced roster visible and searchable instead of replacing it with an empty list.</Li>
+          <Li><b>Cached matches</b> — every successful match schedule sync is saved on the device. Previously loaded qualification and elimination matches remain available while offline.</Li>
           <Li><b>Permanent failures</b> — rejected writes are moved into Failed Sync Items for Admin review.</Li>
           <Li><b>Realtime updates</b> — shared event data and event settings update across connected devices through Supabase realtime.</Li>
         </ul>
