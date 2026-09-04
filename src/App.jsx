@@ -450,62 +450,106 @@ function PasswordScreen({ onUnlock }) {
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
       scannerStreamRef.current = stream;
       setScanning(true);
-      setTimeout(async () => {
-        const video = scannerVideoRef.current;
-        if (!video) return;
-        video.srcObject = stream;
-        await video.play().catch(() => {});
-
-        let detector = null;
-        let jsQRDecoder = null;
-        if ("BarcodeDetector" in globalThis) {
-          try { detector = new BarcodeDetector({ formats: ["qr_code"] }); } catch {}
-        }
-        if (!detector) {
-          try {
-            jsQRDecoder = await loadExternalScript("https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js", "jsQR");
-          } catch {
-            stopLoginScanner();
-            setErr("QR scanner support could not load. Check your connection or enter the event code manually.");
-            return;
-          }
-        }
-
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        let lastScan = 0;
-        const scan = async (now = 0) => {
-          if (!scannerStreamRef.current) return;
-          if (now - lastScan < 140) { requestAnimationFrame(scan); return; }
-          lastScan = now;
-          try {
-            if (detector) {
-              const found = await detector.detect(video);
-              if (found?.[0]?.rawValue && handleLoginQrText(found[0].rawValue)) return;
-            } else if (jsQRDecoder && video.videoWidth && video.videoHeight) {
-              const maxWidth = 900;
-              const scale = Math.min(1, maxWidth / video.videoWidth);
-              canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
-              canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-              const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
-              const result = jsQRDecoder(image.data, image.width, image.height, { inversionAttempts: "attemptBoth" });
-              if (result?.data && handleLoginQrText(result.data)) return;
-            }
-          } catch {}
-          requestAnimationFrame(scan);
-        };
-        requestAnimationFrame(scan);
-      }, 0);
     } catch {
       stopLoginScanner();
       setErr("Camera access was not available. Allow camera permission and try again.");
     }
   };
-  useEffect(() => () => scannerStreamRef.current?.getTracks?.().forEach((track) => track.stop()), []);
+
+  useEffect(() => {
+    if (!scanning) return;
+    let cancelled = false;
+    let frameId = 0;
+
+    const startPreviewAndScan = async () => {
+      const video = scannerVideoRef.current;
+      const stream = scannerStreamRef.current;
+      if (!video || !stream) return;
+
+      video.srcObject = stream;
+      video.muted = true;
+      video.setAttribute("playsinline", "true");
+
+      try {
+        await video.play();
+      } catch {
+        if (!cancelled) setErr("The camera opened, but Safari could not start the preview. Close the scanner and try again.");
+        return;
+      }
+
+      let detector = null;
+      let jsQRDecoder = null;
+
+      if ("BarcodeDetector" in globalThis) {
+        try { detector = new BarcodeDetector({ formats: ["qr_code"] }); } catch {}
+      }
+
+      if (!detector) {
+        try {
+          jsQRDecoder = await loadExternalScript("https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js", "jsQR");
+        } catch {
+          if (!cancelled) {
+            stopLoginScanner();
+            setErr("QR scanner support could not load. Check your connection or enter the event code manually.");
+          }
+          return;
+        }
+      }
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      let lastScan = 0;
+
+      const scan = async (now = 0) => {
+        if (cancelled || !scannerStreamRef.current) return;
+        if (now - lastScan < 140) {
+          frameId = requestAnimationFrame(scan);
+          return;
+        }
+        lastScan = now;
+
+        try {
+          if (detector) {
+            const found = await detector.detect(video);
+            if (found?.[0]?.rawValue && handleLoginQrText(found[0].rawValue)) return;
+          } else if (jsQRDecoder && video.videoWidth && video.videoHeight) {
+            const maxWidth = 900;
+            const scale = Math.min(1, maxWidth / video.videoWidth);
+            canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+            canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const result = jsQRDecoder(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
+            if (result?.data && handleLoginQrText(result.data)) return;
+          }
+        } catch {}
+
+        frameId = requestAnimationFrame(scan);
+      };
+
+      frameId = requestAnimationFrame(scan);
+    };
+
+    startPreviewAndScan();
+
+    return () => {
+      cancelled = true;
+      if (frameId) cancelAnimationFrame(frameId);
+      const video = scannerVideoRef.current;
+      if (video) video.srcObject = null;
+    };
+  }, [scanning]);
+
+  useEffect(() => () => {
+    scannerStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+  }, []);
+
 
   const submitCode = async (candidate = code) => {
     const clean = String(candidate || "").toUpperCase().replace(/[^0-9A-D]/g, "").slice(0, 4);
@@ -621,7 +665,7 @@ function PasswordScreen({ onUnlock }) {
           </>
         )}
 
-        {scanning && <div className="fixed inset-0 z-[100] bg-black flex flex-col"><div className="p-4 flex items-center"><div className="font-bold flex items-center gap-2"><ScanLine size={20}/> Scan Ref OS login QR</div><button onClick={stopLoginScanner} className="ml-auto p-2"><X size={24}/></button></div><div className="flex-1 relative overflow-hidden"><video ref={scannerVideoRef} playsInline muted className="w-full h-full object-cover"/><div className="absolute inset-0 grid place-items-center pointer-events-none"><div className="w-64 h-64 border-4 border-white rounded-3xl"/></div></div><div className="p-5 text-center text-sm text-slate-300">Point the camera at a Ref OS volunteer login QR code.</div></div>}
+        {scanning && <div className="fixed inset-0 z-[100] bg-black flex flex-col"><div className="p-4 flex items-center"><div className="font-bold flex items-center gap-2"><ScanLine size={20}/> Scan Ref OS login QR</div><button onClick={stopLoginScanner} className="ml-auto p-2"><X size={24}/></button></div><div className="flex-1 relative overflow-hidden"><video ref={scannerVideoRef} autoPlay playsInline muted className="w-full h-full object-cover"/><div className="absolute inset-0 grid place-items-center pointer-events-none"><div className="w-64 h-64 border-4 border-white rounded-3xl"/></div></div><div className="p-5 text-center text-sm text-slate-300">Point the camera at a Ref OS volunteer login QR code.</div></div>}
         <div className="flex flex-col items-center gap-2 mt-8">
           <img src="/logo.svg" alt="Highlander Summit" className="h-12 w-12 object-contain" />
           <p className="text-center text-xs text-slate-400">
@@ -737,16 +781,29 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       });
       teamScannerStreamRef.current = stream;
       setShowTeamScanner(true);
-      setTimeout(async () => {
-        const video = teamScannerVideoRef.current;
-        if (!video) return;
-        video.srcObject = stream;
-        await video.play().catch(() => {});
-      }, 0);
     } catch {
       alert("Camera access was not available. Allow camera permission and try again.");
     }
   };
+
+  useEffect(() => {
+    if (!showTeamScanner) return;
+    const video = teamScannerVideoRef.current;
+    const stream = teamScannerStreamRef.current;
+    if (!video || !stream) return;
+
+    video.srcObject = stream;
+    video.muted = true;
+    video.setAttribute("playsinline", "true");
+    video.play().catch(() => {
+      alert("The camera opened, but Safari could not start the preview. Close the scanner and try again.");
+    });
+
+    return () => {
+      if (video) video.srcObject = null;
+    };
+  }, [showTeamScanner]);
+
 
   const captureTeamNumber = async () => {
     const video = teamScannerVideoRef.current;
@@ -2546,7 +2603,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         </button>
       )}
 
-      {showTeamScanner && <div className="fixed inset-0 z-[100] bg-black flex flex-col text-white"><div className="p-4 flex items-center"><div className="font-bold flex items-center gap-2"><Camera size={20}/> Scan team number</div><button onClick={stopTeamScanner} className="ml-auto p-2"><X size={24}/></button></div><div className="flex-1 relative overflow-hidden"><video ref={teamScannerVideoRef} playsInline muted className="w-full h-full object-cover"/><div className="absolute inset-x-8 top-1/2 -translate-y-1/2 border-4 border-white rounded-2xl h-36 pointer-events-none"/></div><div className="p-4"><button disabled={teamScannerBusy} onClick={captureTeamNumber} className="w-full py-3 rounded-xl bg-white text-black font-bold disabled:opacity-60">{teamScannerBusy ? "Reading team number…" : "Read team number"}</button><p className="text-xs text-slate-300 text-center mt-2">Center the robot team number in the box, then tap Read team number. iPhone uses OCR when native text detection is unavailable.</p></div></div>}
+      {showTeamScanner && <div className="fixed inset-0 z-[100] bg-black flex flex-col text-white"><div className="p-4 flex items-center"><div className="font-bold flex items-center gap-2"><Camera size={20}/> Scan team number</div><button onClick={stopTeamScanner} className="ml-auto p-2"><X size={24}/></button></div><div className="flex-1 relative overflow-hidden"><video ref={teamScannerVideoRef} autoPlay playsInline muted className="w-full h-full object-cover"/><div className="absolute inset-x-8 top-1/2 -translate-y-1/2 border-4 border-white rounded-2xl h-36 pointer-events-none"/></div><div className="p-4"><button disabled={teamScannerBusy} onClick={captureTeamNumber} className="w-full py-3 rounded-xl bg-white text-black font-bold disabled:opacity-60">{teamScannerBusy ? "Reading team number…" : "Read team number"}</button><p className="text-xs text-slate-300 text-center mt-2">Center the robot team number in the box, then tap Read team number. iPhone uses OCR when native text detection is unavailable.</p></div></div>}
       {logFor !== null && (
         <LogModal teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules} onOpenPhoto={setLightbox} tourMode={showGuidedTour && tourStep === 4}
           onSetName={() => setShowIdentity(true)} onClose={() => { setLogFor(null); setLogMatch(null); }}
