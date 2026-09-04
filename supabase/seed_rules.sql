@@ -66,7 +66,7 @@ insert into public.rules (event_id, code, description, category, ord) values
   ('11111111-1111-4111-8111-111111111111', 'R5', 'Let go of Scoring Objects after the Match', 'Robot', 59),
   ('11111111-1111-4111-8111-111111111111', 'R6', 'Robots have one Brain', 'Robot', 60),
   ('11111111-1111-4111-8111-111111111111', 'R7', 'Keep the power button or battery connection accessible', 'Robot', 61),
-  ('11111111-1111-4111-8111-111111111111', 'R8', 'Firmware up to date', 'Robot', 62),
+  ('11111111-1111-4111-8111-111111111111', 'R8', 'Firmware 1.1.5', 'Robot', 62),
   ('11111111-1111-4111-8111-111111111111', 'R9', 'Use a "Competition Template" for programming', 'Robot', 63),
   ('11111111-1111-4111-8111-111111111111', 'R10', 'Motors are limited', 'Robot', 64),
   ('11111111-1111-4111-8111-111111111111', 'R11', 'Subsystems 1 & 2 have a combined motor limit', 'Robot', 65),

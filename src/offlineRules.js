@@ -369,7 +369,7 @@ export const OFFLINE_RULES = [
   },
   {
     "code": "R8",
-    "desc": "Firmware up to date",
+    "desc": "Firmware 1.1.5",
     "category": "Robot",
     "ord": 62
   },
