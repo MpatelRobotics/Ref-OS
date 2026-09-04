@@ -639,12 +639,72 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     reset();
     const evs = ["pointerdown", "pointermove", "touchstart", "wheel", "scroll", "keydown"];
     evs.forEach((ev) => el && el.addEventListener(ev, reset, { passive: true }));
-    const stopTeamScanner=()=>{teamScannerStreamRef.current?.getTracks?.().forEach(t=>t.stop());teamScannerStreamRef.current=null;setShowTeamScanner(false);};
-  const startTeamScanner=async()=>{if(!navigator.mediaDevices?.getUserMedia){alert("Camera access is not supported on this browser.");return;}try{const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});teamScannerStreamRef.current=stream;setShowTeamScanner(true);setTimeout(async()=>{const v=teamScannerVideoRef.current;if(v){v.srcObject=stream;await v.play().catch(()=>{});}},0);}catch{alert("Camera access was not available. Allow camera permission and try again.");}};
-  const captureTeamNumber=async()=>{const video=teamScannerVideoRef.current;if(!video?.videoWidth)return;const canvas=document.createElement("canvas");canvas.width=video.videoWidth;canvas.height=video.videoHeight;canvas.getContext("2d").drawImage(video,0,0);if(!("TextDetector" in globalThis)){alert("Automatic team number recognition is not supported by this browser. Use normal team search on this device.");return;}try{const found=await new TextDetector().detect(canvas);const raw=found.map(x=>x.rawValue||"").join(" ").toUpperCase().replace(/\s/g,"");const match=[...teams].sort((a,b)=>String(b.number).length-String(a.number).length).find(t=>raw.includes(String(t.number).toUpperCase()));if(!match){alert("No known team number was detected. Try again closer to the team number.");return;}stopTeamScanner();setOpenTeam(match.number);}catch{alert("Could not read a team number from that image. Try again.");}};
-
   return () => { clearTimeout(menuTimer.current); evs.forEach((ev) => el && el.removeEventListener(ev, reset)); };
   }, [menu]);
+
+  const stopTeamScanner = () => {
+    teamScannerStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+    teamScannerStreamRef.current = null;
+    setShowTeamScanner(false);
+  };
+
+  const startTeamScanner = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      alert("Camera access is not supported on this browser.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false,
+      });
+      teamScannerStreamRef.current = stream;
+      setShowTeamScanner(true);
+      setTimeout(async () => {
+        const video = teamScannerVideoRef.current;
+        if (!video) return;
+        video.srcObject = stream;
+        await video.play().catch(() => {});
+      }, 0);
+    } catch {
+      alert("Camera access was not available. Allow camera permission and try again.");
+    }
+  };
+
+  const captureTeamNumber = async () => {
+    const video = teamScannerVideoRef.current;
+    if (!video?.videoWidth) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+
+    if (!("TextDetector" in globalThis)) {
+      alert("Automatic team number recognition is not supported by this browser. Use normal team search on this device.");
+      return;
+    }
+
+    try {
+      const found = await new TextDetector().detect(canvas);
+      const raw = found.map((x) => x.rawValue || "").join(" ").toUpperCase().replace(/\s/g, "");
+      const match = [...teams]
+        .sort((a, b) => String(b.number).length - String(a.number).length)
+        .find((team) => raw.includes(String(team.number).toUpperCase()));
+      if (!match) {
+        alert("No known team number was detected. Try again closer to the team number.");
+        return;
+      }
+      stopTeamScanner();
+      setOpenTeam(match.number);
+    } catch {
+      alert("Could not read a team number from that image. Try again.");
+    }
+  };
+
+  useEffect(() => () => {
+    teamScannerStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+  }, []);
+
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
   const [isInstalled, setIsInstalled] = useState(() =>
