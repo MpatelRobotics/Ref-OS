@@ -509,10 +509,16 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showCountdownSetup, setShowCountdownSetup] = useState(false);
   const [showOfflineTest, setShowOfflineTest] = useState(false);
   const [showCommandCenter, setShowCommandCenter] = useState(false);
-  const [eventCountdown, setEventCountdown] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(`refosCountdown:${eventId}`)) || null; } catch { return null; }
-  });
   const [countdownNow, setCountdownNow] = useState(Date.now());
+  const countdownEntries = fieldLog.filter((e) => e.kind === "event_countdown").sort((a, b) => b.createdAt - a.createdAt);
+  const eventCountdownEntry = countdownEntries[0] || null;
+  const eventCountdown = (() => {
+    if (!eventCountdownEntry?.note) return null;
+    try {
+      const parsed = JSON.parse(eventCountdownEntry.note);
+      return parsed?.target ? parsed : null;
+    } catch { return null; }
+  })();
   const countdownRemaining = eventCountdown?.target ? Math.max(0, new Date(eventCountdown.target).getTime() - countdownNow) : 0;
   const countdownText = countdownRemaining > 0 ? (() => {
     const total = Math.floor(countdownRemaining / 1000);
@@ -1448,6 +1454,25 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     setFieldLog((prev) => [entry, ...prev.filter((e) => e.id !== entry.id)]);
   };
 
+  const saveSharedCountdown = async (value) => {
+    const saved = await api.addFieldLog(eventId, {
+      kind: "event_countdown",
+      note: JSON.stringify(value),
+      by: meName,
+    });
+    const older = fieldLog.filter((e) => e.kind === "event_countdown" && e.id !== saved.id);
+    await Promise.all(older.map((e) => api.deleteFieldLog(e.id).catch(() => {})));
+    setFieldLog((prev) => [saved, ...prev.filter((e) => e.kind !== "event_countdown")]);
+    setShowCountdownSetup(false);
+  };
+
+  const clearSharedCountdown = async () => {
+    const entries = fieldLog.filter((e) => e.kind === "event_countdown");
+    await Promise.all(entries.map((e) => api.deleteFieldLog(e.id)));
+    setFieldLog((prev) => prev.filter((e) => e.kind !== "event_countdown"));
+    setShowCountdownSetup(false);
+  };
+
   const exportEventReport = async () => {
     try {
       const pdf = await PDFDocument.create();
@@ -2132,8 +2157,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         </div>
       )}
       {showCountdownSetup && adminUnlocked && <CountdownSetupModal current={eventCountdown}
-        onSave={(v) => { setEventCountdown(v); localStorage.setItem(`refosCountdown:${eventId}`, JSON.stringify(v)); setShowCountdownSetup(false); }}
-        onClear={() => { setEventCountdown(null); localStorage.removeItem(`refosCountdown:${eventId}`); setShowCountdownSetup(false); }}
+        onSave={saveSharedCountdown}
+        onClear={clearSharedCountdown}
         onClose={() => setShowCountdownSetup(false)} />}
       {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => setShowOfflineTest(false)} />}
       {showCommandCenter && adminUnlocked && <CommandCenter matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
