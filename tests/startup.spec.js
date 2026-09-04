@@ -100,9 +100,9 @@ test("violation write appears on the team timeline", async ({ page }) => {
   await page.getByPlaceholder(/What happened/).fill("E2E violation note");
   await page.getByRole("button", { name: "Save violation" }).click();
 
-  await page.getByRole("button", { name: /^4610Z\\b/ }).click();
+  await page.getByRole("button", { name: /^4610Z\b/ }).click();
   await expect(page.getByRole("listitem").getByText("E2E rule description", { exact: true })).toBeVisible();
-  await expect(page.getByText("E2E violation note")).toBeVisible();
+  await expect(page.getByRole("listitem").getByText("E2E violation note", { exact: true })).toBeVisible();
 });
 
 test("offline violation is retained and syncs after reconnect", async ({ page, context }) => {
@@ -162,7 +162,7 @@ test("service worker file is versioned for Ref OS 1.2", async ({ request }) => {
   const response = await request.get("/sw.js");
   expect(response.ok()).toBeTruthy();
   const text = await response.text();
-  expect(text).toContain("refos-v4-1.2.0");
+  expect(text).toContain("refos-v5-1.2.0-offline-rules");
 });
 
 test("manifest remains available", async ({ request }) => {
