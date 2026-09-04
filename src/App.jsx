@@ -1412,6 +1412,110 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     a.click(); setMenu(false);
   };
 
+  const exportEventReport = async () => {
+    try {
+      const pdf = await PDFDocument.create();
+      const font = await pdf.embedFont(StandardFonts.Helvetica);
+      const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+      const pageSize = [612, 792];
+      let page = pdf.addPage(pageSize);
+      let y = 744;
+
+      const newPage = () => { page = pdf.addPage(pageSize); y = 744; };
+      const ensure = (need = 28) => { if (y < 48 + need) newPage(); };
+      const line = (text, size = 10, isBold = false, indent = 0) => {
+        ensure(size + 8);
+        const clean = String(text ?? "").replace(/\s+/g, " ").trim();
+        const maxWidth = 530 - indent;
+        const f = isBold ? bold : font;
+        let s = size;
+        while (s > 7 && f.widthOfTextAtSize(clean, s) > maxWidth) s -= 0.5;
+        let shown = clean;
+        while (shown.length > 1 && f.widthOfTextAtSize(shown, s) > maxWidth) shown = shown.slice(0, -1);
+        if (shown !== clean) shown = shown.slice(0, -3) + "...";
+        page.drawText(shown, { x: 41 + indent, y, size: s, font: f, color: rgb(0,0,0) });
+        y -= size + 7;
+      };
+      const section = (title) => { ensure(36); y -= 5; line(title, 14, true); };
+
+      line(event.name || "Ref OS Event Report", 20, true);
+      line(`Generated ${new Date().toLocaleString()}`, 9);
+      y -= 8;
+
+      const matchList = Object.values(matches);
+      const quals = matchList.filter((m) => (m.phase || "qual") === "qual");
+      const elims = matchList.filter((m) => m.phase && m.phase !== "qual");
+      const majors = viols.filter((v) => v.type === "major").length;
+      const minors = viols.filter((v) => v.type === "minor").length;
+      const inspections = viols.filter((v) => v.type === "inspection").length;
+      const replays = fieldLog.filter((e) => e.kind === "replay").length;
+      const faults = fieldLog.filter((e) => e.kind === "field_fault").length;
+      const awpEntries = fieldLog.filter((e) => e.kind === "awp");
+      const awpSides = awpEntries.flatMap((e) => [parseAwpSide(e.note, "Red"), parseAwpSide(e.note, "Blue")]).filter(Boolean);
+      const awpMet = awpSides.filter((a) => a.met).length;
+      const awpRate = awpSides.length ? Math.round(awpMet / awpSides.length * 100) : 0;
+
+      section("Event overview");
+      line(`Teams: ${teams.length}`);
+      line(`Matches loaded: ${matchList.length} (${quals.length} qualifications, ${elims.length} eliminations)`);
+      line(`Violations logged: ${viols.length} (${majors} major, ${minors} minor, ${inspections} inspection)`);
+      line(`AWP checks saved: ${awpEntries.length} (${awpRate}% alliance success)`);
+      line(`Replays: ${replays}   Field faults: ${faults}`);
+      line(`Judging nominations: ${noms.length}   Finalists: ${finalists.size}`);
+      line(`Alliance selections entered: ${Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length}`);
+
+      section("AWP analytics");
+      line(`Overall alliance AWP success: ${awpMet}/${awpSides.length} (${awpRate}%)`);
+      for (const [label, key] of [["Pins","pinsMet"],["Goals","goalsMet"],["Off perimeter","perimeterMet"],["No auton violations","noViolationsMet"]]) {
+        const met = awpSides.filter((a) => a[key]).length;
+        line(`${label}: ${met}/${awpSides.length} met (${awpSides.length ? Math.round(met/awpSides.length*100) : 0}%)`, 10, false, 10);
+      }
+
+      section("Field comparison");
+      const fields = [...new Set(matchList.map((m) => m.field).filter(Boolean))].sort();
+      if (!fields.length) line("No field assignments are loaded.");
+      for (const field of fields) {
+        const fm = matchList.filter((m) => m.field === field);
+        const ids = new Set(fm.map((m) => m.id));
+        const refs = new Set(fm.map((m) => m.phase === "qual" ? `Q${m.num}` : fmtMatch({phase:m.phase,num:m.num})));
+        const vc = viols.filter((v) => v.match && v.match.num != null && refs.has(v.match.phase === "qual" ? `Q${v.match.num}` : fmtMatch(v.match))).length;
+        const rp = fieldLog.filter((e) => e.kind === "replay" && ((e.matchId && ids.has(e.matchId)) || (e.matchRef && refs.has(e.matchRef)))).length;
+        const ff = fieldLog.filter((e) => e.kind === "field_fault" && ((e.matchId && ids.has(e.matchId)) || (e.matchRef && refs.has(e.matchRef)))).length;
+        line(`${field}: ${fm.length} matches, ${vc} violations, ${rp} replays, ${ff} field faults`);
+      }
+
+      section("Violation summary");
+      const ruleCounts = {};
+      viols.forEach((v) => { const k = v.code ? fmtRule(v.code) : "No rule"; ruleCounts[k] = (ruleCounts[k] || 0) + 1; });
+      const rulesTop = Object.entries(ruleCounts).sort((a,b) => b[1]-a[1]);
+      if (!rulesTop.length) line("No violations logged.");
+      rulesTop.forEach(([rule,count]) => line(`${rule}: ${count}`, 10, false, 10));
+
+      section("Alliance selections");
+      const allianceRows = Object.entries(alliances).sort((a,b) => Number(a[0])-Number(b[0]));
+      if (!allianceRows.length) line("No alliances entered.");
+      allianceRows.forEach(([seed, arr]) => line(`A${seed}: ${(arr || []).filter(Boolean).join(" + ") || "Not set"}`, 10, false, 10));
+
+      section("Judging");
+      line(`Nominations recorded: ${noms.length}`);
+      line(`Finalist selections: ${finalists.size}`);
+      const awardCounts = {};
+      noms.forEach((n) => { const k = n.award || "Unspecified"; awardCounts[k] = (awardCounts[k] || 0) + 1; });
+      Object.entries(awardCounts).sort((a,b)=>b[1]-a[1]).forEach(([award,count]) => line(`${award}: ${count} nominations`, 10, false, 10));
+
+      const bytes = await pdf.save();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      a.download = `${(event.name || "ref-os").replace(/\W+/g, "-").toLowerCase()}-event-report.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      setMenu(false);
+    } catch (e) {
+      console.error(e);
+      alert("Could not generate event report: " + (e.message || e));
+    }
+  };
+
   const exportCSV = async () => {
     if (!viols.length) {
       alert("There are no violations to export.");
@@ -1704,6 +1808,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite other refs</button>
                 <button onClick={() => requireAdmin(exportCSV)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export violations</button>
                 <button onClick={() => requireAdmin(exportNominations)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Trophy size={16} /> Export nominations</button>
+                <button onClick={() => requireAdmin(exportEventReport)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Export event report</button>
                 <button onClick={() => requireAdmin(backupAll)} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Backup all (JSON) {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowActivity(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><ListOrdered size={16} /> Activity feed {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
                 <button onClick={() => { setMenu(false); requireAdmin(() => setShowRankings(true)); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Rankings {!adminUnlocked && <span className="ml-auto text-[10px] text-slate-400 font-semibold">ADMIN</span>}</button>
@@ -1791,7 +1896,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         ) : view === "rulebook" ? (
           <RuleBook rules={rules} />
         ) : view === "awp" ? (
-          <AWPHistory fieldLog={fieldLog} matches={matches} />
+          <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} />
         ) : view === "alliances" ? (
           <AllianceSelection teams={teams} alliances={alliances} matches={matches} canEditAlliances={adminUnlocked && !isJudge} canEditBracket={!isJudge && !isEmcee} onSet={setAllianceTeam} onFinalize={finalizeAlliances} onSetWinner={setMatchWinner} onClear={() => requireAdmin(() => { if (confirm("Clear all alliance picks? (This does not delete any matches already generated.)")) clearAlliances(); })} />
         ) : (
@@ -3744,7 +3849,116 @@ function AddMatchModal({ teams, onSave, onClose }) {
 
 
 /* ============================ AWP HISTORY ============================ */
-function AWPHistory({ fieldLog = [], matches = {} }) {
+function parseAwpSide(note, side) {
+  const mode = /AWP\s+(Sig|Std)\s+(\d+)\/(\d+)/i.exec(note || "");
+  const pinsNeed = mode ? Number(mode[2]) : 0;
+  const goalsNeed = mode ? Number(mode[3]) : 0;
+  const re = new RegExp(`${side}:\\s*(MET|NOT met)\\s*\\((\\d+)P\\/(\\d+)G([^)]*)\\)`, "i");
+  const m = re.exec(note || "");
+  if (!m) return null;
+  const pins = Number(m[2]);
+  const goals = Number(m[3]);
+  const extra = String(m[4] || "").toLowerCase();
+  return {
+    met: m[1].toUpperCase() === "MET",
+    pins, goals, pinsNeed, goalsNeed,
+    pinsMet: pinsNeed ? pins >= pinsNeed : true,
+    goalsMet: goalsNeed ? goals >= goalsNeed : true,
+    perimeterMet: !extra.includes("on perimeter"),
+    noViolationsMet: !extra.includes("auton violation"),
+    mode: mode ? (mode[1].toLowerCase() === "sig" ? "Signature" : "Standard") : "",
+  };
+}
+
+function AWPAnalytics({ fieldLog = [] }) {
+  const checks = fieldLog.filter((e) => e.kind === "awp");
+  const sides = checks.flatMap((e) => [
+    { side: "Red", data: parseAwpSide(e.note, "Red") },
+    { side: "Blue", data: parseAwpSide(e.note, "Blue") },
+  ]).filter((x) => x.data);
+
+  const pct = (n, d) => d ? Math.round((n / d) * 100) : 0;
+  const totalMet = sides.filter((x) => x.data.met).length;
+  const red = sides.filter((x) => x.side === "Red");
+  const blue = sides.filter((x) => x.side === "Blue");
+  const criteria = [
+    ["Pins", "pinsMet"],
+    ["Goals", "goalsMet"],
+    ["Off perimeter", "perimeterMet"],
+    ["No auton violations", "noViolationsMet"],
+  ].map(([label, key]) => ({
+    label, met: sides.filter((x) => x.data[key]).length,
+    failed: sides.filter((x) => !x.data[key]).length,
+  }));
+  const mostFailed = [...criteria].sort((a, b) => b.failed - a.failed)[0];
+
+  if (!sides.length) return null;
+  const Stat = ({ label, value, sub }) => (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
+      <div className="text-[11px] uppercase tracking-wide font-semibold text-slate-400">{label}</div>
+      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-0.5">{value}</div>
+      {sub && <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{sub}</div>}
+    </div>
+  );
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <Stat label="AWP success" value={`${pct(totalMet, sides.length)}%`} sub={`${totalMet} of ${sides.length} alliance checks`} />
+        <Stat label="Red success" value={`${pct(red.filter((x) => x.data.met).length, red.length)}%`} sub={`${red.length} checks`} />
+        <Stat label="Blue success" value={`${pct(blue.filter((x) => x.data.met).length, blue.length)}%`} sub={`${blue.length} checks`} />
+        <Stat label="Most failed" value={mostFailed?.failed ? mostFailed.label : "None"} sub={mostFailed?.failed ? `${mostFailed.failed} failures` : "All recorded criteria met"} />
+      </div>
+      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
+        <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">Criteria success</div>
+        <div className="space-y-2">
+          {criteria.map((c) => {
+            const rate = pct(c.met, sides.length);
+            return <div key={c.label}>
+              <div className="flex justify-between text-xs mb-1"><span className="font-medium text-slate-700 dark:text-slate-200">{c.label}</span><span className="text-slate-500">{rate}% · {c.met}/{sides.length}</span></div>
+              <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: `${rate}%` }} /></div>
+            </div>;
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FieldComparison({ matches = {}, viols = [], fieldLog = [] }) {
+  const all = Object.values(matches);
+  const fields = [...new Set(all.map((m) => m.field).filter(Boolean))].sort();
+  if (!fields.length) return null;
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
+      <div className="flex items-center gap-2 mb-3"><BarChart3 size={18} className="text-[#D7212B]" /><h3 className="font-bold text-slate-900 dark:text-slate-100">Field comparison</h3></div>
+      <div className="grid sm:grid-cols-3 gap-2">
+        {fields.map((field) => {
+          const fm = all.filter((m) => m.field === field);
+          const ids = new Set(fm.map((m) => m.id));
+          const refs = new Set(fm.map((m) => m.phase === "qual" ? `Q${m.num}` : fmtMatch({ phase: m.phase, num: m.num })));
+          const violations = viols.filter((v) => {
+            if (!v.match || v.match.num == null) return false;
+            const ref = v.match.phase === "qual" ? `Q${v.match.num}` : fmtMatch(v.match);
+            return refs.has(ref);
+          }).length;
+          const replays = fieldLog.filter((e) => e.kind === "replay" && ((e.matchId && ids.has(e.matchId)) || (e.matchRef && refs.has(e.matchRef)))).length;
+          const faults = fieldLog.filter((e) => e.kind === "field_fault" && ((e.matchId && ids.has(e.matchId)) || (e.matchRef && refs.has(e.matchRef)))).length;
+          return <div key={field} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+            <div className="font-bold text-slate-900 dark:text-slate-100">{field}</div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2 text-xs">
+              <span className="text-slate-500">Matches</span><span className="font-bold text-right">{fm.length}</span>
+              <span className="text-slate-500">Violations</span><span className="font-bold text-right">{violations}</span>
+              <span className="text-slate-500">Replays</span><span className="font-bold text-right">{replays}</span>
+              <span className="text-slate-500">Field faults</span><span className="font-bold text-right">{faults}</span>
+            </div>
+          </div>;
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AWPHistory({ fieldLog = [], matches = {}, viols = [] }) {
   const entries = fieldLog
     .filter((e) => e.kind === "awp")
     .sort((a, b) => b.createdAt - a.createdAt);
@@ -3826,9 +4040,11 @@ function AWPHistory({ fieldLog = [], matches = {} }) {
         </div>
       </div>
 
+      <AWPAnalytics fieldLog={fieldLog} />
+      <FieldComparison matches={matches} viols={viols} fieldLog={fieldLog} />
       {entries.map((e) => {
-        const red = parseSide(e.note, "Red");
-        const blue = parseSide(e.note, "Blue");
+        const red = parseAwpSide(e.note, "Red");
+        const blue = parseAwpSide(e.note, "Blue");
         const match = e.matchId ? matches[e.matchId] : null;
         const matchLabel = e.matchRef || (match ? fmtMatch({ phase: match.phase, num: match.num }) : "Match not recorded");
         const mode = red?.mode || blue?.mode || "";
@@ -3930,6 +4146,14 @@ function FeaturesGuide() {
           <Li><b>Admin</b> — unlocks event setup, CSV exports, clearing data, marking finalists, deleting teams, removing offline refs, and the Activity feed & Rankings. Entering the admin password at login signs you in as a ref with admin already on.</Li>
         </ul>
         <p>Set your <b>ref name</b> (tap your avatar, top right) so everything you log is attributed to you.</p>
+      </Section>
+
+      <Section icon={BarChart3} title="AWP analytics, field comparison & event report">
+        <ul className="space-y-1.5">
+          <Li><b>AWP analytics</b> — the AWP history view now shows overall, Red, and Blue AWP success rates plus success for Pins, Goals, Field Perimeter, and autonomous-violation criteria.</Li>
+          <Li><b>Field comparison</b> — compares each loaded field by matches, violations, replays, and field faults. It intentionally does not calculate average delay because Ref-OS is not receiving live Tournament Manager timing data.</Li>
+          <Li><b>Event report</b> — admins can export a PDF event report containing event totals, AWP analytics, field comparison, violation summary, alliance selections, and judging totals.</Li>
+        </ul>
       </Section>
 
       <Section icon={Trophy} title="Emcee / announcer view">
