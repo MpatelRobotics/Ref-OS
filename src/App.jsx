@@ -21,6 +21,29 @@ const EMCEE_PASSWORD = import.meta.env.VITE_EMCEE_PASSWORD || "";
 const qrImageUrl = (text, size = 500) =>
   `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&margin=12&data=${encodeURIComponent(text)}`;
 
+const externalScriptPromises = new Map();
+function loadExternalScript(src, globalName) {
+  if (globalName && globalThis[globalName]) return Promise.resolve(globalThis[globalName]);
+  if (externalScriptPromises.has(src)) return externalScriptPromises.get(src);
+  const promise = new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[data-refos-src="${src}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve(globalName ? globalThis[globalName] : true), { once: true });
+      existing.addEventListener("error", () => reject(new Error("Could not load scanner support.")), { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.dataset.refosSrc = src;
+    script.onload = () => resolve(globalName ? globalThis[globalName] : true);
+    script.onerror = () => reject(new Error("Could not load scanner support."));
+    document.head.appendChild(script);
+  });
+  externalScriptPromises.set(src, promise);
+  return promise;
+}
+
 /* ---------- helpers ---------- */
 const normNum = (n) => (n || "").trim().toUpperCase();
 const initials = (name) =>
@@ -422,14 +445,67 @@ function PasswordScreen({ onUnlock }) {
   };
   const startLoginScanner = async () => {
     setErr("");
-    if(!navigator.mediaDevices?.getUserMedia||!("BarcodeDetector" in globalThis)){setErr("QR scanning is not supported by this browser. Use the event code instead.");return;}
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setErr("Camera access is not supported by this browser. Use the event code instead.");
+      return;
+    }
     try {
-      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false}); scannerStreamRef.current=stream; setScanning(true);
-      setTimeout(async()=>{const video=scannerVideoRef.current;if(!video)return;video.srcObject=stream;await video.play().catch(()=>{});const detector=new BarcodeDetector({formats:["qr_code"]});
-        const scan=async()=>{if(!scannerStreamRef.current)return;try{const found=await detector.detect(video);if(found?.[0]?.rawValue&&handleLoginQrText(found[0].rawValue))return;}catch{}requestAnimationFrame(scan);};requestAnimationFrame(scan);},0);
-    } catch { stopLoginScanner(); setErr("Camera access was not available. Allow camera permission and try again."); }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+      scannerStreamRef.current = stream;
+      setScanning(true);
+      setTimeout(async () => {
+        const video = scannerVideoRef.current;
+        if (!video) return;
+        video.srcObject = stream;
+        await video.play().catch(() => {});
+
+        let detector = null;
+        let jsQRDecoder = null;
+        if ("BarcodeDetector" in globalThis) {
+          try { detector = new BarcodeDetector({ formats: ["qr_code"] }); } catch {}
+        }
+        if (!detector) {
+          try {
+            jsQRDecoder = await loadExternalScript("https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js", "jsQR");
+          } catch {
+            stopLoginScanner();
+            setErr("QR scanner support could not load. Check your connection or enter the event code manually.");
+            return;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        let lastScan = 0;
+        const scan = async (now = 0) => {
+          if (!scannerStreamRef.current) return;
+          if (now - lastScan < 140) { requestAnimationFrame(scan); return; }
+          lastScan = now;
+          try {
+            if (detector) {
+              const found = await detector.detect(video);
+              if (found?.[0]?.rawValue && handleLoginQrText(found[0].rawValue)) return;
+            } else if (jsQRDecoder && video.videoWidth && video.videoHeight) {
+              const maxWidth = 900;
+              const scale = Math.min(1, maxWidth / video.videoWidth);
+              canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+              canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const result = jsQRDecoder(image.data, image.width, image.height, { inversionAttempts: "attemptBoth" });
+              if (result?.data && handleLoginQrText(result.data)) return;
+            }
+          } catch {}
+          requestAnimationFrame(scan);
+        };
+        requestAnimationFrame(scan);
+      }, 0);
+    } catch {
+      stopLoginScanner();
+      setErr("Camera access was not available. Allow camera permission and try again.");
+    }
   };
-  useEffect(()=>()=>scannerStreamRef.current?.getTracks?.().forEach((t)=>t.stop()),[]);
+  useEffect(() => () => scannerStreamRef.current?.getTracks?.().forEach((track) => track.stop()), []);
 
   const submitCode = async (candidate = code) => {
     const clean = String(candidate || "").toUpperCase().replace(/[^0-9A-D]/g, "").slice(0, 4);
@@ -622,6 +698,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [openRobot, setOpenRobot] = useState(null);
   const [query, setQuery] = useState("");
   const [showTeamScanner, setShowTeamScanner] = useState(false);
+  const [teamScannerBusy, setTeamScannerBusy] = useState(false);
   const teamScannerVideoRef = useRef(null);
   const teamScannerStreamRef = useRef(null);
   const [lightbox, setLightbox] = useState(null);
@@ -673,31 +750,54 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 
   const captureTeamNumber = async () => {
     const video = teamScannerVideoRef.current;
-    if (!video?.videoWidth) return;
+    if (!video?.videoWidth || teamScannerBusy) return;
+    setTeamScannerBusy(true);
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d").drawImage(video, 0, 0);
-
-    if (!("TextDetector" in globalThis)) {
-      alert("Automatic team number recognition is not supported by this browser. Use normal team search on this device.");
-      return;
-    }
+    const maxWidth = 1400;
+    const scale = Math.min(1, maxWidth / video.videoWidth);
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     try {
-      const found = await new TextDetector().detect(canvas);
-      const raw = found.map((x) => x.rawValue || "").join(" ").toUpperCase().replace(/\s/g, "");
+      let rawText = "";
+      if ("TextDetector" in globalThis) {
+        try {
+          const found = await new TextDetector().detect(canvas);
+          rawText = found.map((x) => x.rawValue || "").join(" ");
+        } catch {}
+      }
+
+      if (!rawText.trim()) {
+        let Tesseract;
+        try {
+          Tesseract = await loadExternalScript("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js", "Tesseract");
+        } catch {
+          alert("Team number OCR support could not load. Check your connection or use normal team search.");
+          return;
+        }
+        const result = await Tesseract.recognize(canvas, "eng", {
+          logger: () => {},
+        });
+        rawText = result?.data?.text || "";
+      }
+
+      const normalized = String(rawText).toUpperCase().replace(/[^0-9A-Z]/g, "");
       const match = [...teams]
         .sort((a, b) => String(b.number).length - String(a.number).length)
-        .find((team) => raw.includes(String(team.number).toUpperCase()));
+        .find((team) => normalized.includes(String(team.number).toUpperCase().replace(/[^0-9A-Z]/g, "")));
+
       if (!match) {
-        alert("No known team number was detected. Try again closer to the team number.");
+        alert("No known team number was detected. Move closer to the team number and try again.");
         return;
       }
       stopTeamScanner();
       setOpenTeam(match.number);
     } catch {
-      alert("Could not read a team number from that image. Try again.");
+      alert("Could not read a team number from that image. Try again closer to the number.");
+    } finally {
+      setTeamScannerBusy(false);
     }
   };
 
@@ -2446,7 +2546,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         </button>
       )}
 
-      {showTeamScanner && <div className="fixed inset-0 z-[100] bg-black flex flex-col text-white"><div className="p-4 flex items-center"><div className="font-bold flex items-center gap-2"><Camera size={20}/> Scan team number</div><button onClick={stopTeamScanner} className="ml-auto p-2"><X size={24}/></button></div><div className="flex-1 relative overflow-hidden"><video ref={teamScannerVideoRef} playsInline muted className="w-full h-full object-cover"/><div className="absolute inset-x-8 top-1/2 -translate-y-1/2 border-4 border-white rounded-2xl h-36 pointer-events-none"/></div><div className="p-4"><button onClick={captureTeamNumber} className="w-full py-3 rounded-xl bg-white text-black font-bold">Read team number</button><p className="text-xs text-slate-300 text-center mt-2">Center the robot team number in the box, then tap Read team number.</p></div></div>}
+      {showTeamScanner && <div className="fixed inset-0 z-[100] bg-black flex flex-col text-white"><div className="p-4 flex items-center"><div className="font-bold flex items-center gap-2"><Camera size={20}/> Scan team number</div><button onClick={stopTeamScanner} className="ml-auto p-2"><X size={24}/></button></div><div className="flex-1 relative overflow-hidden"><video ref={teamScannerVideoRef} playsInline muted className="w-full h-full object-cover"/><div className="absolute inset-x-8 top-1/2 -translate-y-1/2 border-4 border-white rounded-2xl h-36 pointer-events-none"/></div><div className="p-4"><button disabled={teamScannerBusy} onClick={captureTeamNumber} className="w-full py-3 rounded-xl bg-white text-black font-bold disabled:opacity-60">{teamScannerBusy ? "Reading team number…" : "Read team number"}</button><p className="text-xs text-slate-300 text-center mt-2">Center the robot team number in the box, then tap Read team number. iPhone uses OCR when native text detection is unavailable.</p></div></div>}
       {logFor !== null && (
         <LogModal teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules} onOpenPhoto={setLightbox} tourMode={showGuidedTour && tourStep === 4}
           onSetName={() => setShowIdentity(true)} onClose={() => { setLogFor(null); setLogMatch(null); }}
