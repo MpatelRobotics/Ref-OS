@@ -4707,147 +4707,160 @@ function FeaturesGuide() {
     </div>
   );
   const Li = ({ children }) => <li className="flex gap-2"><span className="text-[#D7212B] mt-0.5">•</span><span>{children}</span></li>;
+
   return (
     <>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Ref-OS is the referee & judging system for the Highlander Summit. Here's what every part does.</p>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+        Ref-OS is the shared referee, event operations, alliance, and judging workspace for the Highlander Summit. This guide reflects Ref-OS v{APP_VERSION}.
+      </p>
 
-      <Section icon={KeyRound} title="Logins & roles">
-        <p>There are four passwords, all entered on the login screen (admin can also be entered later from this menu → “Admin login”):</p>
+      <Section icon={KeyRound} title="Login, access codes & roles">
+        <p>Ref-OS supports the normal role passwords plus event access codes and QR login. Role access is enforced by Supabase on the server, not only by hiding buttons in the interface.</p>
         <ul className="space-y-1.5">
-          <Li><b>Referee / crew</b> — full access: log violations, matches, robots, rules, judging.</Li>
-          <Li><b>Judge Advisor</b> — sees only the Judging tab and can export nominations. Nothing on the violation side.</Li>
-          <Li><b>Emcee / announcer</b> — a read-only announcer view (see the section below). Sees teams, scores, winners, and records, but nothing on the violation side.</Li>
-          <Li><b>Admin</b> — unlocks event setup, CSV exports, clearing data, marking finalists, deleting teams, removing offline refs, and the Activity feed & Rankings. Entering the admin password at login signs you in as a ref with admin already on.</Li>
+          <Li><b>Referee / crew</b> — teams, matches, violations, robot photos, rules, watchlist, field operations, judging nominations, and bracket advancement.</Li>
+          <Li><b>Judge Advisor</b> — Judging plus view access to Alliances and the elimination bracket. Judge Advisors do not get referee violation tools or bracket editing.</Li>
+          <Li><b>Emcee / announcer</b> — teams, matches, scores, rules, alliances, bracket information, and judging nominations without exposing referee disciplinary information.</Li>
+          <Li><b>Admin</b> — all normal event access plus the Event Command Center, setup, imports, exports, role access code management, diagnostics, data clearing, and alliance selection controls.</Li>
+          <Li><b>Permanent Admin keypad code</b> — the fixed event Admin code can be entered directly on the keypad. Generated volunteer codes use the pattern number, letter A-D, number, number.</Li>
+          <Li><b>QR login</b> — admins can generate a QR login card for a role access code. QR creation and QR decoding are local to Ref-OS; the actual login still verifies access with Supabase.</Li>
         </ul>
-        <p>Set your <b>ref name</b> (tap your avatar, top right) so everything you log is attributed to you.</p>
+        <p>After login, enter your <b>first and last name</b>. Your name is used to identify entries and volunteer presence across the event.</p>
       </Section>
 
-      <Section icon={BarChart3} title="AWP analytics, field comparison & event report">
+      <Section icon={ShieldAlert} title="Security & permissions">
         <ul className="space-y-1.5">
-          <Li><b>AWP analytics</b> — the AWP history view now shows overall, Red, and Blue AWP success rates plus success for Pins, Goals, Field Perimeter, and autonomous-violation criteria.</Li>
-          <Li><b>Field comparison</b> — compares each loaded field by matches, violations, replays, and field faults.</Li>
-          <Li><b>Event report</b> — admins can export a PDF event report containing event totals, AWP analytics, field comparison, violation summary, alliance selections, and judging totals.</Li>
-        </ul>
-      </Section>
-
-      <Section icon={Trophy} title="Emcee / announcer view">
-        <p>The <b>Emcee</b> password opens a read-only view built for whoever is running the mic — enough to hype the crowd, without exposing any disciplinary information.</p>
-        <ul className="space-y-1.5">
-          <Li><b>Can see:</b> Teams (with W-L-T records), Matches (scores and who won), Robots, Rules, the elimination Alliances bracket, and Judging.</Li>
-          <Li><b>Judging:</b> the emcee can add and view award nominations, so a great moment on the field gets captured — but can't mark finalists, export, or delete.</Li>
-          <Li><b>Rules & Alliances are view-only</b> — the emcee can read the rulebook and watch the bracket fill in, but can't advance winners, edit picks, or change anything.</Li>
-          <Li><b>Hidden entirely:</b> all violations, the watchlist, the field log, replay/timeout/fault flags, per-match violation counts, and the “conduct” flags on nominations. None of it reaches the announcer's screen.</Li>
-        </ul>
-        <p>This is a screen-level view for keeping referee calls off the announcer's display — it isn't a hard security wall, so only hand the emcee password to someone you'd trust with the tablet.</p>
-      </Section>
-
-      <Section icon={ListOrdered} title="Logging a violation">
-        <p>The fastest path is the <b>Matches</b> tab: tap a match → tap the offending team → the log opens pre-filled with that team and match.</p>
-        <ul className="space-y-1.5">
-          <Li>Pick a <b>type</b>: <b>Minor</b>, <b>Major</b>, or <b>Inspection</b>.</Li>
-          <Li>Tap the <b>rule box</b> to open the searchable rulebook; picking a rule fills in the code and description automatically (you can edit the description).</Li>
-          <Li>Add <b>robot photos</b> (rear camera) and <b>notes</b> if useful.</Li>
-          <Li>If the team already has a robot photo on file, it shows at the top for quick identification.</Li>
+          <Li><b>Database enforced permissions</b> — Supabase Row Level Security restricts event data reads and writes by the signed-in role.</Li>
+          <Li><b>Server validated credentials</b> — role passwords and access codes are verified by server-side RPCs instead of being compared in the browser.</Li>
+          <Li><b>Private robot photos</b> — robot images are stored privately and opened with signed URLs for authorized event members.</Li>
+          <Li><b>Disabled access codes</b> — disabling a generated code blocks future logins with that code. It does not automatically kick out volunteers who are already signed in.</Li>
         </ul>
       </Section>
 
-      <Section icon={ShieldAlert} title="Guards while logging">
+      <Section icon={BarChart3} title="Event Command Center (Admin)">
+        <p>The Event Command Center is the main Admin operations screen. Most event management tools that used to live directly in the gear menu are now organized here.</p>
         <ul className="space-y-1.5">
-          <Li><b>Duplicate check</b> — if the same team + rule + match was already logged, you'll get a confirm before adding it again (stops two refs double-logging one call).</Li>
-        </ul>
-        <p>There is no automatic escalation in Ref-OS — there's no general "three strikes" rule. Referees warn rather than punish, and any escalation to a Major is always Head Referee discretion.</p>
-      </Section>
-
-      <Section icon={CloudOff} title="Works offline">
-        <p>If Wi-Fi drops, entries save on your device and show a “Saving” tag, then sync automatically when the connection returns. Don't re-enter a “Saving” item — it'll upload on its own.</p>
-      </Section>
-
-      <Section icon={ListOrdered} title="Matches tab">
-        <ul className="space-y-1.5">
-          <Li><b>Field filter</b> — narrow the list to your field (Field 1/2/3).</Li>
-          <Li><b>Qualifications / Eliminations toggle</b> — appears once elimination matches exist. Elim matches (QF, SF, Final) use the same tap-to-log flow as quals.</Li>
-          <Li>Each team shows its <b>prior record</b> (severity + per-rule counts) so you have context before a call.</Li>
-          <Li><b>Jump to Q…</b> dropdown and <b>Next</b> button to move through the schedule.</Li>
-          <Li>Row badges flag matches with a <b>REPLAY</b>, a <b>TO</b> (timeout), or a <b>FAULT</b>, plus the violation count.</Li>
-          <Li>A <b>Watchlist</b> panel and the full list of violations for that match appear below the alliances.</Li>
+          <Li><b>Event overview</b> — quick counts for matches, violations, replays, field faults, volunteer presence, and event activity.</Li>
+          <Li><b>Key Volunteer Status</b> — see volunteers online now and the known volunteer roster with role and online or offline status.</Li>
+          <Li><b>Announcements</b> — send a shared Key Volunteer Announcement to connected Ref-OS devices. Each device can acknowledge it.</Li>
+          <Li><b>Shared countdown</b> — create or clear an event countdown that syncs across devices.</Li>
+          <Li><b>Event Contact Directory</b> — shared names, roles, phone numbers, email, locations, and notes for event contacts. Admins can edit and reorder it.</Li>
+          <Li><b>Role access codes</b> — generate, display, print, QR encode, or disable event role codes.</Li>
+          <Li><b>Pre Event System Test</b> — checks browser storage, service worker readiness, database read/write, realtime sync, Tournament Manager parsing, PDF generation, and other event-critical functions.</Li>
+          <Li><b>Two Device Sync Test</b> — verifies that two Ref-OS devices can exchange a live probe and acknowledgement through the event backend.</Li>
+          <Li><b>Event Diagnostic Report</b> — displays the app, device, event, storage, network, and sync snapshot and can copy or download the report as JSON.</Li>
+          <Li><b>Failed Sync Items</b> — permanent offline write failures are retained so an Admin can retry or discard them instead of silently losing the entry.</Li>
+          <Li><b>Event setup, TM Sync Center, exports, backup, Activity feed, Rankings, and Clear event data</b> are also accessed from the Command Center.</Li>
         </ul>
       </Section>
 
-      <Section icon={Clock} title="Timeouts, field faults & replays (in a match)">
-        <p>Open any match to find quick actions under the alliances (Timeout appears in elimination matches only):</p>
+      <Section icon={CloudOff} title="Offline & live sync">
+        <p>If Wi-Fi drops, supported entries are queued on the device and automatically retried when connectivity returns. Pending items show their saving state so volunteers do not need to enter them twice.</p>
         <ul className="space-y-1.5">
-          <Li><b>Timeout</b> (elimination matches only) — pick the <b>Red</b> or <b>Blue</b> alliance and optionally tie it to a team. Each alliance gets <b>one timeout for the whole elimination bracket</b>, so if that alliance already used theirs you'll be warned before logging another.</Li>
-          <Li><b>Field fault</b> — log a field problem with an optional note.</Li>
-          <Li><b>Replay</b> — mark the match to be re-run; tap again to unmark.</Li>
+          <Li><b>Offline queue</b> — temporary failures remain queued locally until they can sync.</Li>
+          <Li><b>Permanent failures</b> — rejected writes are moved into Failed Sync Items for Admin review.</Li>
+          <Li><b>Realtime updates</b> — shared event data and event settings update across connected devices through Supabase realtime.</Li>
         </ul>
-        <p>Everything you log shows in that match's log, and (for replays) in the <b>“Matches to re-run”</b> banner at the top of the Matches tab so nothing is missed at the end of the day.</p>
+      </Section>
+
+      <Section icon={ListOrdered} title="Matches & logging violations">
+        <p>The fastest referee workflow is <b>Matches</b>: open a match, tap the team involved, then complete the violation form.</p>
+        <ul className="space-y-1.5">
+          <Li>Choose <b>Minor</b>, <b>Major</b>, or <b>Inspection</b>, select the applicable rule, add notes, and attach robot photos when useful.</Li>
+          <Li><b>Duplicate protection</b> warns before adding the same team, rule, and match combination twice.</Li>
+          <Li><b>Field filters</b>, match jumping, replay flags, field faults, timeouts, watchlist information, and match violation history are available from the match workflow.</Li>
+          <Li><b>Elimination priority</b> — when elimination matches exist, the Matches view prioritizes them while qualifications remain available.</Li>
+          <Li><b>Timeouts</b> are available for elimination matches and are tracked by alliance across the elimination bracket.</Li>
+        </ul>
+      </Section>
+
+      <Section icon={Clock} title="AWP checks & analytics">
+        <ul className="space-y-1.5">
+          <Li><b>Qualification AWP check</b> — record what was observed for Red and Blue at the end of autonomous. Ref-OS evaluates the event checklist but does not change the official Tournament Manager score.</Li>
+          <Li><b>AWP history</b> — open AWP history from the Matches area next to the field filters instead of from the main navigation.</Li>
+          <Li><b>AWP analytics</b> — review overall, Red, and Blue success rates and the success rate for Pins, Goals, Field Perimeter, and autonomous violation criteria.</Li>
+        </ul>
+      </Section>
+
+      <Section icon={Users} title="Teams, watchlist & robot scanner">
+        <ul className="space-y-1.5">
+          <Li><b>Teams</b> — search teams, open their full history, add teams, review Tournament Manager rank, and start a new log from the team record.</Li>
+          <Li><b>Team scanner</b> — use the camera OCR scanner to recognize a team number and jump to the team record.</Li>
+          <Li><b>Watchlist</b> — add shared watch notes to teams. Watched teams are flagged and their notes appear during relevant matches.</Li>
+          <Li><b>Robot photos</b> — store inspection photos for teams so referees can identify and review robots later.</Li>
+        </ul>
+      </Section>
+
+      <Section icon={BookOpen} title="Rules, favorites & recent rules">
+        <p>The Rules tab and violation rule picker use the same searchable rule reference.</p>
+        <ul className="space-y-1.5">
+          <Li><b>Favorites</b> — star frequently used rules so they appear in a Favorites group when no search is active.</Li>
+          <Li><b>Recently used</b> — recently selected rules are shown automatically for faster repeat access.</Li>
+          <Li><b>Referee guidance</b> — rules with supplemental guidance can be opened for violation notes, escalation guidance, and event-specific interpretation.</Li>
+        </ul>
+        <p>Favorites and recently used rules are stored on the local browser or device.</p>
       </Section>
 
       <Section icon={Flag} title="Field log">
-        <p>The gear-menu <b>Field log</b> is the running list of every timeout, field fault, match replay, and other note across the event — newest first, each attributed to the ref who logged it. You can add standalone entries here too, and remove your own (admins can remove any).</p>
-      </Section>
-
-      <Section icon={Users} title="Teams tab">
-        <p>Search any team, see its full history, add a team (“+ Team”), or open a team to log against it, add robot photos, or add watchlist notes. New teams are added here only — not from the log form.</p>
-      </Section>
-
-      <Section icon={Star} title="Watchlist">
-        <p>Open a team and add a <b>watch note</b> — multiple refs can each add their own, shown as <b>“Your name: note”</b>. Watched teams show a gold <b>WATCH</b> badge in the Teams list, and their notes appear in a Watchlist panel on the match screen so the whole crew is aware. You can remove your own notes; admins can remove any.</p>
-      </Section>
-
-      <Section icon={Camera} title="Robots tab">
-        <p>A photo grid of every team. Tap a team to add <b>inspection photos</b> (multiple angles, rear camera). These are stored on the team and can be pulled up any time — handy for R-rule checks during matches.</p>
-      </Section>
-
-      <Section icon={BookOpen} title="Rules tab">
-        <p>The full rulebook, searchable by code or description. It also powers the rule picker in the log form.</p>
-        <p>Rules that have referee guidance show a red <b>“Notes ›”</b> tag — tap one to open a popup with <b>violation notes</b> for that rule: when it's Minor vs. Major, when it's match-affecting, escalation thresholds, and DQ conditions. Rules without notes aren't tappable.</p>
-        <p><b>Autonomous Win Point (SC8) — this event:</b> as a Signature Event, the Summit uses the v2.0 Worlds-qualifying AWP bar — <b>7+ Pins</b> Scored for your alliance, <b>3+ Goals</b> each holding <b>2+</b> of your alliance's Pins, and neither of your robots touching the Field Perimeter at the end of auton, with no auton violations. (Standard events stay at 6 Pins / 2 Goals.) Pins and Goals across the Autonomous Line from you don't count, and any auton violation voids the AWP. On qualification matches, the match view has an <b>AWP check</b> button that runs this checklist for you — enter what you saw at the end of auton and it tells you pass/fail (it changes no scores; TM records the official AWP).</p>
+        <p>The Field Log is the referee-facing running list for operational entries such as timeouts, field faults, replays, and other field notes. Internal Ref-OS sync, announcement, access-code, diagnostic, and settings records are intentionally hidden from this view.</p>
       </Section>
 
       <Section icon={Trophy} title="Judging">
-        <p>Nominate teams for the <b>Sportsmanship</b> and <b>Energy</b> awards. The nomination form mirrors the official award forms: pick the team and match, <b>check the observed criteria</b> that apply (they change per award), give a <b>specific example</b>, and optionally note <b>where/when</b> you saw it.</p>
         <ul className="space-y-1.5">
-          <Li>Teams are <b>ranked by nomination count</b> per award; tap a team to read every nomination with its checked criteria.</Li>
-          <Li>Teams with <b>G1–G5 conduct violations</b> are flagged red so judges are aware.</Li>
-          <Li>Admins/judge advisor tap the <b>star</b> to mark <b>finalists</b>.</Li>
-          <Li><b>Export nominations</b> — creates one combined PDF using the official Energy and Sportsmanship nomination forms, with one completed form per nomination.</Li>
+          <Li><b>Sportsmanship and Energy nominations</b> — record the team, match, observed criteria, specific example, and supporting details.</Li>
+          <Li><b>Judge Advisor workflow</b> — Judge Advisors can manage judging information without receiving referee disciplinary views.</Li>
+          <Li><b>Official form export</b> — Ref-OS can generate a combined PDF using the supplied official nomination forms.</Li>
+          <Li><b>Alliance visibility</b> — Judge Advisors can view the Alliances section and bracket but cannot edit alliance selection or advance the bracket.</Li>
         </ul>
       </Section>
 
-      <Section icon={BarChart3} title="Oversight (admin)">
+      <Section icon={Trophy} title="Alliance selection & elimination bracket">
         <ul className="space-y-1.5">
-          <Li><b>By Rule</b> (header chart icon) — violations broken down by rule and team.</Li>
-          <Li><b>Activity feed</b> — every violation across the event, newest first.</Li>
-          <Li><b>Rankings</b> — teams ranked by violations, Majors weighted highest.</Li>
-          <Li><b>Key Volunteer Status</b> — who's online / last seen, each tagged with the role they logged in as (Referee, Emcee, Judge Advisor, or Admin); after 24 hours, last seen is displayed in days instead of hours. Admins can remove offline volunteers.</Li>
-          <Li><b>Tournament Manager Sync Center</b> (admin) — one place for all Tournament Manager imports: teams, match schedule, rankings, alliances, and scores. Each section shows the current data count and when it was last updated.</Li>
-          <Li><b>Import matches (file)</b> — load the whole schedule at once: export the match list from Tournament Manager (CSV) and pick it here. It reads quals and elims, matched by number so re-importing updates in place. No API or bridge needed.</Li>
-          <Li><b>Import teams (file)</b> — load the team roster the same way: export the team list from Tournament Manager (CSV) and pick it here. Team numbers and names are added/updated; nothing is deleted.</Li>
-          <Li><b>Import scores (file)</b> — export match <b>results</b> from Tournament Manager. If scored Round of 16 rows are present, Ref-OS uses <b>Round 6 + Instance</b> to update only each existing R16 match's score and winner. Alliance teams are never replaced by a score upload. If no R16 scores are present, qualification scores import normally and team <b>W-L-T records</b> update automatically.</Li>
-          <Li><b>Upload rankings</b> — import the Tournament Manager qualification rankings CSV. Ref-OS matches <b>TeamNum</b> to each team and stores its <b>Rank</b>. Rankings appear on the Teams tab and inside individual match cards.</Li>
-          <Li><b>Upload alliances</b> — import a Tournament Manager elimination CSV. Ref-OS reads the Tournament Manager elimination CSV directly: <b>Round 6</b> identifies the Round of 16 and <b>Instance 1 through 8</b> becomes R16 1 through R16 8. Red1 + Red2 and Blue1 + Blue2 are used exactly as the alliance pairs in the exported bracket.</Li>
-          <Li><b>Exports</b> — violations CSV and nominations CSV. <b>Backup all (JSON)</b> downloads a complete snapshot of the event (teams, matches, violations, nominations, finalists, watchlist, field log) — grab one periodically as insurance. <b>Clear data</b> wipes selected data (admin only).</Li>
+          <Li><b>Ranking seeded captains</b> — uploaded Tournament Manager rankings automatically seed alliance captains before the official elimination bracket is imported.</Li>
+          <Li><b>Captain shifting</b> — if a higher seed selects a team that would have been a later captain, that team drops from the captain list and the remaining ranked teams move up.</Li>
+          <Li><b>Admin selection controls</b> — alliance captain and pick editing is Admin only.</Li>
+          <Li><b>Bracket permissions</b> — regular Referee and Emcee access can use their permitted bracket workflow; Judge Advisor access is view only.</Li>
+          <Li><b>Tournament Manager source of truth</b> — after a Round of 16 bracket is imported, Ref-OS preserves the imported alliances instead of overwriting them from rankings.</Li>
         </ul>
       </Section>
 
-      <Section icon={Pencil} title="Editing & fixing">
-        <p>Every synced violation has a <b>pencil</b> (edit) and <b>trash</b> (delete) icon. Editing reopens the same form with everything pre-filled, including photos, and updates the record in place.</p>
-      </Section>
-
-      <Section icon={Info} title="Extras">
+      <Section icon={BarChart3} title="Tournament Manager Sync Center">
         <ul className="space-y-1.5">
-          <Li><b>Dark / Light mode</b> — toggle in this menu, saved per device.</Li>
-          <Li><b>Text size</b> — cycle Normal → Large → Extra large in this menu to enlarge text and buttons across the whole app (saved per device), without changing your phone's zoom.</Li>
-          <Li><b>Install</b> — add Ref-OS to your home screen to launch it full-screen like an app (Add to Home Screen / the install prompt on the deployed site).</Li>
-          <Li><b>Live sync</b> — everything updates across all devices within seconds.</Li>
-          <Li><b>Elimination priority view</b> — once elimination matches exist, the Matches tab opens directly to <b>Eliminations</b>. Qualifications remain available with one tap.</Li>
-          <Li><b>Alliance selection</b> — the Alliances tab is visible to everyone, including Judge Advisors. Captains, picks, finalize, and clear controls remain admin only. The elimination bracket can be advanced by all regular refs, while Judge Advisors have read only bracket access.</Li>
-          <Li><b>Eliminations</b> — elimination matches use the same tap-to-log flow as quals, with timeouts enabled.</Li>
+          <Li><b>Teams</b> — import or update the event roster from Tournament Manager CSV.</Li>
+          <Li><b>Matches</b> — import the qualification and elimination schedule and update existing matches in place.</Li>
+          <Li><b>Rankings</b> — import qualification rankings using TeamNum and store the rank on each team.</Li>
+          <Li><b>Alliances</b> — import the official elimination bracket. Round 6 is treated as Round of 16 and its Instance value determines the R16 matchup.</Li>
+          <Li><b>Scores</b> — when elimination scores are present, Ref-OS prioritizes elimination score updates and leaves qualification score importing alone. Qualification records update when qualification results are imported without elimination results.</Li>
         </ul>
       </Section>
 
-      <p className="text-center text-xs text-slate-400 mt-4 mb-2">Made by Maharshi Patel · <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="underline">@mpatel_ref</a> · v{APP_VERSION}</p>
+      <Section icon={BarChart3} title="Exports, analytics & backup">
+        <ul className="space-y-1.5">
+          <Li><b>Event Report PDF</b> — includes event overview, AWP analytics, field comparison, violation summary, alliance selections, and judging totals.</Li>
+          <Li><b>Violation export</b> — violation data can be exported and the official Match Anomaly Log PDF can be filled from Ref-OS data.</Li>
+          <Li><b>Judging export</b> — create the combined official Energy and Sportsmanship nomination PDF.</Li>
+          <Li><b>Field comparison</b> — Admin view comparing matches, violations, replays, and field faults by field.</Li>
+          <Li><b>Backup all JSON</b> — download a snapshot of the event data for event-day insurance.</Li>
+          <Li><b>Clear event data</b> — Admins can selectively clear supported event data, including judging, alliances, and watchlist data.</Li>
+        </ul>
+      </Section>
+
+      <Section icon={Info} title="Guided tour, install & device settings">
+        <ul className="space-y-1.5">
+          <Li><b>Interactive Guided Tour</b> — walks through the live role-specific Ref-OS interface and opens real sections such as Teams, Matches, a match, violation logging, Rules, Field Log, Alliances, and contacts.</Li>
+          <Li><b>Install Ref-OS</b> — add the deployed HTTPS site to the device home screen for an app-like PWA experience.</Li>
+          <Li><b>Dark / Light mode</b> and <b>Text size</b> are saved per device.</Li>
+          <Li><b>Mobile navigation</b> — phones use the compact Go to section menu instead of forcing the full desktop navigation across the screen.</Li>
+          <Li><b>Device readiness</b> — event staff can approve modern devices by running the Pre Event System Test before use.</Li>
+        </ul>
+      </Section>
+
+      <Section icon={Pencil} title="Editing & correcting records">
+        <p>Synced violations can be reopened, edited, and deleted according to the signed-in role. Editing keeps the existing record and reopens the form with its current information so corrections can be made without creating a second violation.</p>
+      </Section>
+
+      <p className="text-center text-xs text-slate-400 mt-4 mb-2">
+        Made by Maharshi Patel · <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="underline">@mpatel_ref</a> · v{APP_VERSION}
+      </p>
     </>
   );
 }
