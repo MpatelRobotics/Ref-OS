@@ -168,6 +168,7 @@ export default function LoginScreen({ eventId, onUnlock }) {
         <div className="flex flex-col items-center text-center mb-6">
           <img src="/logo.svg" alt="Highlander Summit" className="h-52 sm:h-64 w-52 sm:w-64 object-contain mb-3" />
           <span className="font-bold text-lg">Highlander Summit — Violation Log</span>
+          <span className="mt-2 rounded-full border border-amber-300/50 bg-amber-400/15 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-200">Private Beta</span>
         </div>
 
         {mode === "password" ? (
@@ -237,7 +238,7 @@ export default function LoginScreen({ eventId, onUnlock }) {
           <img src="/logo.svg" alt="Highlander Summit" className="h-12 w-12 object-contain" />
           <p className="text-center text-xs text-slate-400">
             Made by Maharshi Patel ·{" "}
-            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-white underline">@mpatel_ref</a>{" · "}v{APP_VERSION}
+            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-white underline">@mpatel_ref</a>{" · "}v{APP_VERSION} · Private Beta
           </p>
         </div>
       </div>

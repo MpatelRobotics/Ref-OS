@@ -2076,7 +2076,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             <div className="flex items-center gap-2 shrink-0">
               <img src="/logo.svg" alt="Highlander Summit" className="h-9 w-9 object-contain" />
               <div className="leading-tight hidden sm:block">
-                <div className="font-bold text-[13px] text-white">Ref-OS</div>
+                <div className="flex items-center gap-1.5">
+                  <div className="font-bold text-[13px] text-white">Ref-OS</div>
+                  <span className="rounded-full border border-amber-300/50 bg-amber-400/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-200">Private Beta</span>
+                </div>
                 <div className="text-[9px] text-slate-400">Referee Operating System</div>
               </div>
             </div>
@@ -2360,7 +2363,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           <img src="/logo.svg" alt="Highlander Summit" className="h-10 w-10 object-contain opacity-90" />
           <p className="text-center text-xs text-slate-400">
             Made by Maharshi Patel ·{" "}
-            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 underline">@mpatel_ref</a>{" · "}v{APP_VERSION}
+            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 underline">@mpatel_ref</a>{" · "}v{APP_VERSION} · Private Beta
           </p>
         </div>
       </main>
