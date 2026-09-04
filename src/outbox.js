@@ -39,8 +39,35 @@ async function kvSet(key, val) {
 }
 
 const qKey = (eventId) => `outbox:${eventId}`;
+const failedKey = (eventId) => `failed:${eventId}`;
 export async function loadQueue(eventId) { return (await kvGet(qKey(eventId))) || []; }
 async function saveQueue(eventId, q) { await kvSet(qKey(eventId), q); return q; }
+export async function loadFailed(eventId) { return (await kvGet(failedKey(eventId))) || []; }
+async function saveFailed(eventId, items) { await kvSet(failedKey(eventId), items); return items; }
+export async function discardFailed(eventId, failedId) {
+  const items = (await loadFailed(eventId)).filter((item) => item.failedId !== failedId);
+  return saveFailed(eventId, items);
+}
+export async function retryFailed(eventId, failedId) {
+  const items = await loadFailed(eventId);
+  const failed = items.find((item) => item.failedId === failedId);
+  if (!failed) return false;
+  await enqueue(eventId, failed.op);
+  await saveFailed(eventId, items.filter((item) => item.failedId !== failedId));
+  return true;
+}
+async function keepFailed(eventId, op, error) {
+  const items = await loadFailed(eventId);
+  const failedId = `${op.id}:failed:${Date.now()}`;
+  items.unshift({
+    failedId,
+    op,
+    message: error?.message || String(error || "Unknown sync error"),
+    failedAt: Date.now(),
+  });
+  await saveFailed(eventId, items.slice(0, 100));
+  return failedId;
+}
 
 export async function enqueue(eventId, op) {
   const q = await loadQueue(eventId);
@@ -73,6 +100,7 @@ export async function flush(eventId, handlers = {}) {
       try {
         if (op.kind === "team") {
           await api.upsertTeam(op.eventId, op.number, op.name);
+          handlers.onTeamSynced && handlers.onTeamSynced(op.number);
         } else if (op.kind === "violation") {
           const saved = await api.addViolationRow(op.eventId, op.row, op.photos || []);
           handlers.onSynced && handlers.onSynced(saved);
@@ -80,8 +108,9 @@ export async function flush(eventId, handlers = {}) {
         q = await removeOp(eventId, op.id);           // success -> drop it
       } catch (e) {
         if (isOffline(e)) break;                       // keep queued, retry later
-        q = await removeOp(eventId, op.id);            // permanent -> drop so queue moves on
-        handlers.onDropped && handlers.onDropped(op, e);
+        await keepFailed(eventId, op, e);              // permanent -> retain for recovery
+        q = await removeOp(eventId, op.id);             // move queue forward
+        handlers.onFailed && handlers.onFailed(op, e);
       }
     }
   } finally {

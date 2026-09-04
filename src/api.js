@@ -195,6 +195,29 @@ export async function deleteMatch(eventId, phase, num) {
   if (error) throw error;
 }
 
+/* ================= event settings (shared configuration) ================= */
+const mapEventSetting = (r) => ({ key: r.key, value: r.value, updatedBy: r.updated_by || "", updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : 0 });
+export async function listEventSettings(eventId) {
+  const { data, error } = await supabase.from("event_settings").select("*").eq("event_id", eventId);
+  if (error) throw error;
+  return Object.fromEntries((data || []).map((r) => [r.key, mapEventSetting(r)]));
+}
+export async function getEventSetting(eventId, key) {
+  const { data, error } = await supabase.from("event_settings").select("*").eq("event_id", eventId).eq("key", key).maybeSingle();
+  if (error) throw error;
+  return data ? mapEventSetting(data) : null;
+}
+export async function upsertEventSetting(eventId, key, value, by = "") {
+  const row = { event_id: eventId, key, value, updated_by: by || "", updated_at: new Date().toISOString() };
+  const { data, error } = await supabase.from("event_settings").upsert(row, { onConflict: "event_id,key" }).select().single();
+  if (error) throw error;
+  return mapEventSetting(data);
+}
+export async function deleteEventSetting(eventId, key) {
+  const { error } = await supabase.from("event_settings").delete().eq("event_id", eventId).eq("key", key);
+  if (error) throw error;
+}
+
 /* ================= field log (timeouts / faults / replays) ================= */
 const mapFieldLog = (r) => ({ id: r.id, kind: r.kind, field: r.field || "", matchRef: r.match_ref || "", matchId: r.match_id || "", alliance: r.alliance || "", team: r.team || "", teams: r.teams || [], note: r.note || "", by: r.logged_by || "", createdAt: new Date(r.created_at).getTime() });
 export async function listFieldLog(eventId) {
@@ -375,6 +398,7 @@ export function subscribeEvent(eventId, onChange) {
     .on("postgres_changes", { event: "*", schema: "public", table: "watch_notes", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "field_log", filter: `event_id=eq.${eventId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "event_settings", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "alliances", filter: `event_id=eq.${eventId}` }, onChange)
     .subscribe();
   return () => supabase.removeChannel(ch);

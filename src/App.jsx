@@ -9,6 +9,9 @@ import { configured } from "./supabaseClient";
 import * as api from "./api";
 import * as outbox from "./outbox";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { APP_VERSION } from "./appVersion";
+import CommandCenter from "./components/CommandCenter.jsx";
+import EventContactDirectory from "./components/EventContactDirectory.jsx";
 
 /* This build is locked to one event: The Highlander Summit Signature Event.
    EVENT_ID must match supabase/seed.sql. A shared site password gates entry. */
@@ -568,8 +571,15 @@ function PasswordScreen({ onUnlock }) {
         onUnlock("ref", true);
         return;
       }
-      const entries = await api.listFieldLog(EVENT_ID);
-      const { config } = latestRoleAccessConfig(entries);
+      let config = null;
+      try {
+        const setting = await api.getEventSetting(EVENT_ID, "role_access_codes");
+        config = setting?.value || null;
+      } catch {}
+      if (!config) {
+        const entries = await api.listFieldLog(EVENT_ID);
+        config = latestRoleAccessConfig(entries).config;
+      }
       const digest = await hashAccessCode(clean);
       const roles = [
         ["ref", "Referee"],
@@ -670,7 +680,7 @@ function PasswordScreen({ onUnlock }) {
           <img src="/logo.svg" alt="Highlander Summit" className="h-12 w-12 object-contain" />
           <p className="text-center text-xs text-slate-400">
             Made by Maharshi Patel ·{" "}
-            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-white underline">@mpatel_ref</a>
+            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-white underline">@mpatel_ref</a>{" · "}v{APP_VERSION}
           </p>
         </div>
       </div>
@@ -878,6 +888,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [finalists, setFinalists] = useState(new Set()); // `${award}::${team}`
   const [watchNotes, setWatchNotes] = useState([]);
   const [fieldLog, setFieldLog] = useState([]);
+  const [eventSettings, setEventSettings] = useState({});
+  const [failedSyncItems, setFailedSyncItems] = useState([]);
   const announcements = fieldLog.filter((e) => e.kind === "announcement").sort((a,b) => b.createdAt - a.createdAt);
   const activeAnnouncement = announcements.find((e) => {
     try { return localStorage.getItem(`refosAnnouncementAck:${e.id}`) !== "1"; } catch { return true; }
@@ -919,23 +931,26 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 
   const contactDirectoryEntries = fieldLog.filter((e) => e.kind === "contact_directory").sort((a, b) => b.createdAt - a.createdAt);
   const contactDirectoryEntry = contactDirectoryEntries[0] || null;
-  const eventContacts = (() => {
+  const legacyContacts = (() => {
     if (!contactDirectoryEntry?.note) return [];
-    try {
-      const parsed = JSON.parse(contactDirectoryEntry.note);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch { return []; }
+    try { const parsed = JSON.parse(contactDirectoryEntry.note); return Array.isArray(parsed) ? parsed : []; }
+    catch { return []; }
   })();
+  const eventContacts = Array.isArray(eventSettings?.contact_directory?.value)
+    ? eventSettings.contact_directory.value
+    : legacyContacts;
+
   const [countdownNow, setCountdownNow] = useState(Date.now());
   const countdownEntries = fieldLog.filter((e) => e.kind === "event_countdown").sort((a, b) => b.createdAt - a.createdAt);
   const eventCountdownEntry = countdownEntries[0] || null;
-  const eventCountdown = (() => {
+  const legacyCountdown = (() => {
     if (!eventCountdownEntry?.note) return null;
-    try {
-      const parsed = JSON.parse(eventCountdownEntry.note);
-      return parsed?.target ? parsed : null;
-    } catch { return null; }
+    try { const parsed = JSON.parse(eventCountdownEntry.note); return parsed?.target ? parsed : null; }
+    catch { return null; }
   })();
+  const eventCountdown = eventSettings?.event_countdown?.value?.target
+    ? eventSettings.event_countdown.value
+    : legacyCountdown;
   const countdownRemaining = eventCountdown?.target ? Math.max(0, new Date(eventCountdown.target).getTime() - countdownNow) : 0;
   const countdownText = countdownRemaining > 0 ? (() => {
     const total = Math.floor(countdownRemaining / 1000);
@@ -1064,12 +1079,17 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     const [ev, t, v, nm, sl, wn] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), api.listViolations(eventId), api.listNominations(eventId), api.listShortlist(eventId), api.listWatchNotes(eventId)]);
     if (ev) setEvent(ev);
     // keep optimistic items the server hasn't caught up on yet (unsynced writes)
-    setTeams((cur) => { const extra = cur.filter((x) => !t.some((s) => s.number === x.number)); return [...t, ...extra]; });
+    setTeams((cur) => {
+      const pending = cur.filter((x) => x._pending && !t.some((s) => s.number === x.number));
+      return [...t, ...pending];
+    });
     setViols((cur) => { const pend = cur.filter((x) => x._pending && !v.some((s) => s.id === x.id)); return [...pend, ...v]; });
     setNoms(nm);
     setFinalists(new Set(sl.map((s) => `${s.award}::${s.team}`)));
     setWatchNotes(wn);
     api.listFieldLog(eventId).then(setFieldLog).catch(() => {});
+    api.listEventSettings(eventId).then(setEventSettings).catch(() => {});
+    outbox.loadFailed(eventId).then(setFailedSyncItems).catch(() => {});
     api.listAlliances(eventId).then((rows) => { const m = {}; for (const a of rows) m[a.seed] = a.teams; setAlliances(m); setAlliancesLoaded(true); }).catch(() => { setAlliancesLoaded(true); });
     setSyncedAt(Date.now()); setSyncing(false);
   }, [eventId]);
@@ -1077,9 +1097,24 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const doFlush = useCallback(async () => {
     await outbox.flush(eventId, {
       onSynced: (saved) => setViols((cur) => cur.map((x) => (x.id === saved.id ? saved : x))),
-      onDropped: (op, e) => console.error("outbox op dropped", op, e),
+      onTeamSynced: (number) => setTeams((cur) => cur.map((x) => x.number === number ? { ...x, _pending: false } : x)),
+      onFailed: (op, e) => {
+        console.error("outbox op retained as failed", op, e);
+        outbox.loadFailed(eventId).then(setFailedSyncItems).catch(() => {});
+      },
+      onIdle: () => outbox.loadFailed(eventId).then(setFailedSyncItems).catch(() => {}),
     });
   }, [eventId]);
+
+  const retryFailedSync = async (failedId) => {
+    await outbox.retryFailed(eventId, failedId);
+    setFailedSyncItems(await outbox.loadFailed(eventId));
+    doFlush();
+  };
+  const discardFailedSync = async (failedId) => {
+    if (!confirm("Discard this failed sync item permanently?")) return;
+    setFailedSyncItems(await outbox.discardFailed(eventId, failedId));
+  };
 
   useEffect(() => {
     (async () => {
@@ -1090,6 +1125,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       api.listRules(eventId).then(setRules);
       // restore violations still waiting in the queue (e.g. after a reload while offline)
       const q = await outbox.loadQueue(eventId);
+      const pendingTeams = q.filter((o) => o.kind === "team").map((o) => ({
+        number: normNum(o.number), name: (o.name || "").trim(), createdAt: o.createdAt || Date.now(), _pending: true,
+      }));
+      if (pendingTeams.length) setTeams((cur) => {
+        const have = new Set(cur.map((t) => t.number));
+        return [...cur, ...pendingTeams.filter((t) => !have.has(t.number))];
+      });
       const pend = q.filter((o) => o.kind === "violation").map((o) => ({
         id: o.row.id, team: o.row.team, type: o.row.type, code: o.row.code, desc: o.row.rule_desc || "",
         notes: o.row.notes || "", match: o.row.match_info || null, by: o.row.logged_by || "",
@@ -1137,12 +1179,21 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     const num = normNum(number);
     setTeams((cur) => {
       const ex = cur.find((t) => t.number === num);
-      if (!ex) return [...cur, { number: num, name: (name || "").trim(), createdAt: Date.now() }];
-      if (name && !ex.name) return cur.map((t) => (t.number === num ? { ...t, name: name.trim() } : t));
-      return cur;
+      if (!ex) return [...cur, { number: num, name: (name || "").trim(), createdAt: Date.now(), _pending: true }];
+      if (name && !ex.name) return cur.map((t) => (t.number === num ? { ...t, name: name.trim(), _pending: true } : t));
+      return cur.map((t) => t.number === num ? { ...t, _pending: true } : t);
     });
-    try { await api.upsertTeam(eventId, num, name); }
-    catch (e) { if (outbox.isOffline(e)) await outbox.enqueue(eventId, { id: `team:${num}:${Date.now()}`, kind: "team", eventId, number: num, name }); else throw e; }
+    try {
+      await api.upsertTeam(eventId, num, name);
+      setTeams((cur) => cur.map((t) => t.number === num ? { ...t, _pending: false } : t));
+    } catch (e) {
+      if (outbox.isOffline(e)) {
+        await outbox.enqueue(eventId, { id: `team:${num}:${Date.now()}`, kind: "team", eventId, number: num, name, createdAt: Date.now() });
+      } else {
+        setTeams((cur) => cur.filter((t) => !(t.number === num && t._pending)));
+        throw e;
+      }
+    }
     return num;
   };
 
@@ -1255,14 +1306,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   };
   const saveEventContacts = async (contacts) => {
     try {
-      const saved = await api.addFieldLog(eventId, {
-        kind: "contact_directory",
-        note: JSON.stringify(contacts),
-        by: meName,
-      });
-      const older = fieldLog.filter((e) => e.kind === "contact_directory" && e.id !== saved.id);
-      if (older.length) await Promise.all(older.map((e) => api.deleteFieldLog(e.id)));
-      setFieldLog((cur) => [saved, ...cur.filter((e) => e.kind !== "contact_directory")]);
+      const saved = await api.upsertEventSetting(eventId, "contact_directory", contacts, meName);
+      setEventSettings((cur) => ({ ...cur, contact_directory: saved }));
     } catch (e) {
       if (outbox.isOffline(e)) { alert("You're offline — reconnect to update the contact directory."); return; }
       alert("Could not save contact directory: " + (e.message || e));
@@ -1270,14 +1315,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   };
   const saveRoleAccessConfig = async (config) => {
     try {
-      const saved = await api.addFieldLog(eventId, {
-        kind: "role_access_codes",
-        note: JSON.stringify(config),
-        by: meName,
-      });
-      const older = fieldLog.filter((e) => e.kind === "role_access_codes" && e.id !== saved.id);
-      if (older.length) await Promise.all(older.map((e) => api.deleteFieldLog(e.id)));
-      setFieldLog((cur) => [saved, ...cur.filter((e) => e.kind !== "role_access_codes")]);
+      const saved = await api.upsertEventSetting(eventId, "role_access_codes", config, meName);
+      setEventSettings((cur) => ({ ...cur, role_access_codes: saved }));
       return saved;
     } catch (e) {
       if (outbox.isOffline(e)) throw new Error("Reconnect before changing event access codes.");
@@ -1309,7 +1348,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       setImporting({ label: "Importing teams…", done: 0, total: 0 });
       await api.bulkUpsertTeams(eventId, rows);
       const t = await api.listTeams(eventId);
-      setTeams((cur) => { const extra = cur.filter((x) => !t.some((s) => s.number === x.number)); return [...t, ...extra]; });
+      setTeams((cur) => {
+      const pending = cur.filter((x) => x._pending && !t.some((s) => s.number === x.number));
+      return [...t, ...pending];
+    });
       markTMSync("teams");
       alert(`Imported ${rows.length} teams.` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
     } catch (e) {
@@ -1486,7 +1528,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       setImporting({ label: "Importing rankings…", done: 0, total: 0 });
       await api.bulkUpsertRankings(eventId, rows);
       const t = await api.listTeams(eventId);
-      setTeams((cur) => { const extra = cur.filter((x) => !t.some((serverTeam) => serverTeam.number === x.number)); return [...t, ...extra]; });
+      setTeams((cur) => { const pending = cur.filter((x) => x._pending && !t.some((serverTeam) => serverTeam.number === x.number)); return [...t, ...pending]; });
       markTMSync("rankings");
       alert(`Uploaded rankings for ${rows.length} teams.` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
     } catch (e) {
@@ -1598,7 +1640,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 
       await reloadMatches();
       const newFromScores = [...inFileS].filter((x) => !rosterS.has(x)).map((number) => ({ number, name: "" }));
-      if (newFromScores.length) { await api.bulkUpsertTeams(eventId, newFromScores); const t = await api.listTeams(eventId); setTeams((cur) => { const extra = cur.filter((x) => !t.some((s) => s.number === x.number)); return [...t, ...extra]; }); }
+      if (newFromScores.length) { await api.bulkUpsertTeams(eventId, newFromScores); const t = await api.listTeams(eventId); setTeams((cur) => { const pending = cur.filter((x) => x._pending && !t.some((s) => s.number === x.number)); return [...t, ...pending]; }); }
       markTMSync("scores");
       alert(`Updated scores for ${scored.length} qualification matches. Team records refreshed.`);
     } catch (e) {
@@ -1626,7 +1668,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         await api.addMatch(eventId, { phase: r.phase, num: r.num, red: r.red, blue: r.blue, field: r.field });
       }
       const newTeams = [...inFile].filter((x) => !roster.has(x)).map((number) => ({ number, name: "" }));
-      if (newTeams.length) { await api.bulkUpsertTeams(eventId, newTeams); const t = await api.listTeams(eventId); setTeams((cur) => { const extra = cur.filter((x) => !t.some((s) => s.number === x.number)); return [...t, ...extra]; }); }
+      if (newTeams.length) { await api.bulkUpsertTeams(eventId, newTeams); const t = await api.listTeams(eventId); setTeams((cur) => { const pending = cur.filter((x) => x._pending && !t.some((s) => s.number === x.number)); return [...t, ...pending]; }); }
       await reloadMatches();
       markTMSync("matches");
       alert(`Imported ${rows.length} matches (${summary}).` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
@@ -1939,6 +1981,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       finalists: Array.from(finalists),
       watchNotes,
       fieldLog,
+      eventSettings,
+      failedSyncItems,
     };
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" }));
@@ -1964,21 +2008,18 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   };
 
   const saveSharedCountdown = async (value) => {
-    const saved = await api.addFieldLog(eventId, {
-      kind: "event_countdown",
-      note: JSON.stringify(value),
-      by: meName,
-    });
-    const older = fieldLog.filter((e) => e.kind === "event_countdown" && e.id !== saved.id);
-    await Promise.all(older.map((e) => api.deleteFieldLog(e.id).catch(() => {})));
-    setFieldLog((prev) => [saved, ...prev.filter((e) => e.kind !== "event_countdown")]);
+    const saved = await api.upsertEventSetting(eventId, "event_countdown", value, meName);
+    setEventSettings((cur) => ({ ...cur, event_countdown: saved }));
     setShowCountdownSetup(false);
   };
 
   const clearSharedCountdown = async () => {
-    const entries = fieldLog.filter((e) => e.kind === "event_countdown");
-    await Promise.all(entries.map((e) => api.deleteFieldLog(e.id)));
-    setFieldLog((prev) => prev.filter((e) => e.kind !== "event_countdown"));
+    await api.deleteEventSetting(eventId, "event_countdown");
+    setEventSettings((cur) => {
+      const next = { ...cur };
+      delete next.event_countdown;
+      return next;
+    });
     setShowCountdownSetup(false);
   };
 
@@ -2592,7 +2633,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           <img src="/logo.svg" alt="Highlander Summit" className="h-10 w-10 object-contain opacity-90" />
           <p className="text-center text-xs text-slate-400">
             Made by Maharshi Patel ·{" "}
-            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 underline">@mpatel_ref</a>
+            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 underline">@mpatel_ref</a>{" · "}v{APP_VERSION}
           </p>
         </div>
       </main>
@@ -2713,7 +2754,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         viols={viols} rules={rules} fieldLog={fieldLog} presence={presence} roster={refRoster} contacts={eventContacts}
         countdown={eventCountdown} tmSyncStatus={tmSyncStatus} online={online} pendingCount={pendingCount}
         lastSystemTest={lastSystemTest} onClose={() => setShowDiagnosticReport(false)} />}
-      {showRoleCodeManager && adminUnlocked && <RoleAccessCodeManager fieldLog={fieldLog}
+      {showRoleCodeManager && adminUnlocked && <RoleAccessCodeManager config={eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config}
         onSave={saveRoleAccessConfig} onClose={() => setShowRoleCodeManager(false)} />}
       {showContactDirectory && <EventContactDirectory contacts={eventContacts} canEdit={adminUnlocked}
         onSave={saveEventContacts} onClose={() => setShowContactDirectory(false)} />}
@@ -2723,6 +2764,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onClose={() => setShowCountdownSetup(false)} />}
       {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => setShowOfflineTest(false)} />}
       {showCommandCenter && adminUnlocked && <CommandCenter matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
+        failedSyncItems={failedSyncItems} onRetryFailedSync={retryFailedSync} onDiscardFailedSync={discardFailedSync}
         countdown={eventCountdown} countdownText={countdownText}
         onCountdown={() => { setShowCommandCenter(false); setShowCountdownSetup(true); }}
         onClearCountdown={clearSharedCountdown}
@@ -4213,7 +4255,7 @@ function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, f
   const report = {
     generatedAt: new Date().toISOString(),
     app: {
-      version: import.meta.env.VITE_APP_VERSION || "not configured",
+      version: APP_VERSION,
       mode: import.meta.env.MODE || "unknown",
       url: typeof location !== "undefined" ? location.href : "",
     },
@@ -4321,8 +4363,7 @@ function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, f
 }
 
 
-function RoleAccessCodeManager({ fieldLog, onSave, onClose }) {
-  const { config: sharedConfig } = latestRoleAccessConfig(fieldLog);
+function RoleAccessCodeManager({ config: sharedConfig, onSave, onClose }) {
   const [config, setConfig] = useState(() => sharedConfig || { version: 1, codes: {} });
   const [revealed, setRevealed] = useState({});
   const [busyRole, setBusyRole] = useState("");
@@ -4531,319 +4572,6 @@ function RoleAccessCodeManager({ fieldLog, onSave, onClose }) {
   );
 }
 
-function EventContactDirectory({ contacts, canEdit, onSave, onClose }) {
-  const blank = () => ({ role: "", name: "", phone: "", email: "", location: "", notes: "" });
-  const [draft, setDraft] = useState(() => (contacts || []).map((c) => ({ ...blank(), ...c })));
-  const [editing, setEditing] = useState(false);
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    if (!editing) setDraft((contacts || []).map((c) => ({ ...blank(), ...c })));
-  }, [contacts, editing]);
-
-  const [dragIndex, setDragIndex] = useState(null);
-  const dragIndexRef = useRef(null);
-  const update = (i, key, value) => setDraft((cur) => cur.map((c, n) => n === i ? { ...c, [key]: value } : c));
-  const moveContact = (from, to) => {
-    if (from == null || to == null || from === to) return;
-    setDraft((cur) => {
-      if (from < 0 || to < 0 || from >= cur.length || to >= cur.length) return cur;
-      const next = [...cur];
-      const [item] = next.splice(from, 1);
-      next.splice(to, 0, item);
-      return next;
-    });
-    dragIndexRef.current = to;
-    setDragIndex(to);
-  };
-  const beginPointerDrag = (index, e) => {
-    dragIndexRef.current = index;
-    setDragIndex(index);
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-  };
-  const pointerDragMove = (e) => {
-    if (dragIndexRef.current == null) return;
-    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest?.("[data-contact-index]");
-    if (!el) return;
-    const to = Number(el.dataset.contactIndex);
-    if (Number.isInteger(to) && to !== dragIndexRef.current) moveContact(dragIndexRef.current, to);
-  };
-  const endPointerDrag = (e) => {
-    try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch {}
-    dragIndexRef.current = null;
-    setDragIndex(null);
-  };
-  const save = async () => {
-    const cleaned = draft
-      .map((c) => Object.fromEntries(Object.entries(c).map(([k,v]) => [k, String(v || "").trim()])))
-      .filter((c) => c.role || c.name || c.phone || c.email || c.location || c.notes);
-    setBusy(true);
-    await onSave(cleaned);
-    setBusy(false);
-    setEditing(false);
-  };
-
-  return (
-    <div className="fixed inset-0 z-[70] bg-slate-50 dark:bg-slate-900 flex flex-col">
-      <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2">
-        <Contact size={20}/>
-        <div><h2 className="font-bold">Event Contact Directory</h2><p className="text-xs text-slate-400">Who to contact during the event</p></div>
-        <button onClick={onClose} className="ml-auto"><X size={22}/></button>
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto p-4 space-y-3">
-          {canEdit && !editing && (
-            <button onClick={() => setEditing(true)} className="w-full rounded-xl bg-[#0D0F32] text-white px-4 py-3 font-semibold flex items-center justify-center gap-2">
-              <Pencil size={17}/> Edit directory
-            </button>
-          )}
-
-          {!editing ? (
-            (contacts || []).length ? (
-              <>
-                {(contacts || []).map((c, i) => (
-              <div key={i} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
-                <div className="text-xs uppercase tracking-wide font-bold text-[#D7212B]">{c.role || "Event contact"}</div>
-                <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{c.name || "Name not set"}</div>
-                <div className="mt-2 space-y-1 text-sm text-slate-600 dark:text-slate-300">
-                  {c.location && <div><b>Location:</b> {c.location}</div>}
-                  {c.phone && <div><b>Phone:</b> <a className="underline" href={`tel:${c.phone}`}>{c.phone}</a></div>}
-                  {c.email && <div><b>Email:</b> <a className="underline" href={`mailto:${c.email}`}>{c.email}</a></div>}
-                  {c.notes && <div><b>Notes:</b> {c.notes}</div>}
-                </div>
-              </div>
-                ))}
-              </>
-            ) : (
-              <div className="bg-white dark:bg-slate-800 border rounded-xl p-6 text-center text-slate-500">
-                No event contacts have been added yet.
-                {canEdit && <div className="text-xs mt-1">Use Edit directory to add event leadership and support contacts.</div>}
-              </div>
-            )
-          ) : (
-            <>
-              {draft.length > 1 && (
-                <div className="rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
-                  <GripVertical size={17} className="shrink-0"/> Drag the handle to arrange contacts in the order everyone will see.
-                </div>
-              )}
-              {draft.map((c, i) => (
-                <div key={i} data-contact-index={i}
-                  className={`bg-white dark:bg-slate-800 border rounded-xl p-3 space-y-2 transition-all ${dragIndex === i ? "border-[#D7212B] shadow-lg scale-[1.01]" : "border-slate-200 dark:border-slate-700"}`}>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      draggable
-                      onDragStart={(e) => { dragIndexRef.current = i; setDragIndex(i); e.dataTransfer.effectAllowed = "move"; }}
-                      onDragOver={(e) => { e.preventDefault(); const from = dragIndexRef.current; if (from != null && from !== i) moveContact(from, i); }}
-                      onDragEnd={() => { dragIndexRef.current = null; setDragIndex(null); }}
-                      onPointerDown={(e) => beginPointerDrag(i, e)}
-                      onPointerMove={pointerDragMove}
-                      onPointerUp={endPointerDrag}
-                      onPointerCancel={endPointerDrag}
-                      className="touch-none cursor-grab active:cursor-grabbing p-2 -ml-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
-                      aria-label={`Drag contact ${i + 1} to reorder`}
-                      title="Drag to reorder">
-                      <GripVertical size={20}/>
-                    </button>
-                    <div className="font-semibold flex-1">Contact {i + 1}</div>
-                    <button onClick={() => setDraft((cur) => cur.filter((_, n) => n !== i))} className="p-2 text-red-600"><Trash2 size={17}/></button>
-                  </div>
-                  <input value={c.role} onChange={(e) => update(i,"role",e.target.value)} placeholder="Role, e.g. Head Referee" className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
-                  <input value={c.name} onChange={(e) => update(i,"name",e.target.value)} placeholder="Name" className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
-                  <div className="grid sm:grid-cols-2 gap-2">
-                    <input value={c.phone} onChange={(e) => update(i,"phone",e.target.value)} placeholder="Phone" className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
-                    <input value={c.email} onChange={(e) => update(i,"email",e.target.value)} placeholder="Email" className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
-                  </div>
-                  <input value={c.location} onChange={(e) => update(i,"location",e.target.value)} placeholder="Event location, e.g. Field 1 / Scoring Table" className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
-                  <textarea value={c.notes} onChange={(e) => update(i,"notes",e.target.value)} placeholder="Notes or best reason to contact" rows={2} className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
-                </div>
-              ))}
-              <button onClick={() => setDraft((cur) => [...cur, blank()])} className="w-full rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 px-4 py-3 font-semibold flex items-center justify-center gap-2"><Plus size={17}/> Add contact</button>
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => { setDraft((contacts || []).map((c) => ({ ...blank(), ...c }))); setEditing(false); }} className="rounded-xl border px-4 py-3 font-semibold">Cancel</button>
-                <button disabled={busy} onClick={save} className="rounded-xl bg-[#D7212B] text-white px-4 py-3 font-semibold disabled:opacity-50">{busy ? "Saving…" : "Save directory"}</button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
-  const all = Object.values(matches);
-  const replays = fieldLog.filter(e=>e.kind==="replay").length;
-  const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
-  const announcementEntries = fieldLog.filter(e=>e.kind==="announcement").sort((a,b)=>b.createdAt-a.createdAt);
-  const announcements = announcementEntries.length;
-  const awps = fieldLog.filter(e=>e.kind==="awp").length;
-  const onlinePeople = Array.from(
-    new Map((presence || []).filter((p) => p?.name).map((p) => [p.name, p])).values()
-  ).sort((a, b) => String(a.name).localeCompare(String(b.name)));
-  const onlineNames = new Set(onlinePeople.map((p) => p.name));
-  return (
-    <div className="fixed inset-0 z-[65] bg-slate-50 dark:bg-slate-900 flex flex-col">
-      <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2"><BarChart3 size={20}/><div><h2 className="font-bold">Event Command Center</h2><p className="text-xs text-slate-400">Admin operations overview</p></div><button onClick={onClose} className="ml-auto"><X size={22}/></button></div>
-      <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto p-4 space-y-3">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[["Matches",all.length],["Violations",viols.length],["Replays",replays],["Field faults",faults]].map(([l,v])=><div key={l} className="bg-white dark:bg-slate-800 border rounded-xl p-3"><div className="text-[11px] uppercase text-slate-400 font-semibold">{l}</div><div className="text-2xl font-bold">{v}</div></div>)}
-        </div>
-        <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
-          <div className="font-bold flex items-center gap-2"><KeyRound size={17}/> Admin tools</div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">These controls are only available in Admin mode.</p>
-          <div className="grid sm:grid-cols-2 gap-2 mt-3">
-            <button onClick={onContactDirectory} className="w-full text-left px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><Contact size={16}/> Event Contact Directory</button>
-            <button onClick={onRoleCodes} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><KeyRound size={16}/> Volunteer Access Codes</button>
-            <button onClick={onPreEventTest} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ClipboardCheck size={16}/> Pre Event System Test</button>
-            <button onClick={onTwoDeviceSyncTest} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Wifi size={16}/> Two Device Sync Test</button>
-            <button onClick={onDiagnosticReport} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ShieldCheck size={16}/> Event Diagnostic Report</button>
-            <button onClick={onEventSetup} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><CalendarDays size={16}/> Event setup</button>
-            <button onClick={onTMSync} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><RefreshCw size={16}/> TM Sync Center</button>
-            <button onClick={onExportViolations} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Download size={16}/> Export violations</button>
-            <button onClick={onExportNominations} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Trophy size={16}/> Export nominations</button>
-            <button onClick={onExportEventReport} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><BarChart3 size={16}/> Export event report</button>
-            <button onClick={onBackupAll} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Download size={16}/> Backup all JSON</button>
-            <button onClick={onActivityFeed} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ListOrdered size={16}/> Activity feed</button>
-            <button onClick={onRankings} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><BarChart3 size={16}/> Rankings</button>
-          </div>
-          <button onClick={onClearData} className="mt-2 w-full py-2.5 px-3 rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-semibold text-sm text-left flex items-center gap-2"><Trash2 size={16}/> Clear event data</button>
-        </div>
-        <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
-          <div className="font-bold flex items-center gap-2"><Users size={17}/> Key Volunteer Status</div>
-          <div className="mt-2 text-sm">{onlineNames.size} currently online · {(roster||[]).length} known volunteers</div>
-          <div className="mt-4">
-            <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">Online now</div>
-            {onlinePeople.length > 0 ? (
-              <div className="space-y-2">
-                {onlinePeople.map((person) => (
-                  <div key={person.name} className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                    <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{person.name}</span>
-                    {person.role && (
-                      <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">{person.role}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-sm text-slate-500 dark:text-slate-400">No volunteers are currently online.</div>
-            )}
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-            <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">Known volunteers</div>
-            {(roster || []).length > 0 ? (
-              <div className="space-y-2">
-                {[...(roster || [])].sort((a,b) => String(a.name || "").localeCompare(String(b.name || ""))).map((person) => {
-                  const isOnline = onlineNames.has(person.name);
-                  return (
-                    <div key={person.id || person.name} className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2">
-                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isOnline ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`} />
-                      <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{person.name || "Unknown volunteer"}</span>
-                      <div className="ml-auto flex items-center gap-2">
-                        {person.role && <span className="text-xs text-slate-500 dark:text-slate-400">{person.role}</span>}
-                        <span className={`text-[11px] font-semibold ${isOnline ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
-                          {isOnline ? "ONLINE" : "OFFLINE"}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-sm text-slate-500 dark:text-slate-400">No known volunteers yet.</div>
-            )}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
-          <div className="font-bold flex items-center gap-2"><Flag size={17}/> Event activity</div>
-          <div className="grid grid-cols-2 gap-2 mt-2 text-sm"><div>AWP checks <b className="float-right">{awps}</b></div><div>Announcements <b className="float-right">{announcements}</b></div></div>
-          <button onClick={onAnnouncement} className="mt-3 w-full py-2 rounded-lg border font-semibold text-sm">Send Key Volunteer Announcement</button>
-
-          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Announcement management</div>
-              {announcementEntries.length > 0 && (
-                <button onClick={() => {
-                  if (confirm("Delete all Key Volunteer Announcements for everyone?")) onClearAnnouncements();
-                }} className="ml-auto text-xs font-semibold text-red-600 hover:text-red-700">
-                  Delete all
-                </button>
-              )}
-            </div>
-            {announcementEntries.length === 0 ? (
-              <p className="text-sm text-slate-500 dark:text-slate-400">No announcements have been sent.</p>
-            ) : (
-              <div className="space-y-2">
-                {announcementEntries.map((a) => (
-                  <div key={a.id} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-                    <div className="flex gap-2 items-start">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium text-slate-900 dark:text-slate-100 whitespace-pre-wrap">{a.note}</div>
-                        <div className="text-[11px] text-slate-400 mt-1">{a.by ? `From ${a.by} · ` : ""}{fmtTime(a.createdAt)}</div>
-                      </div>
-                      <button onClick={() => {
-                        if (confirm("Delete this Key Volunteer Announcement for everyone?")) onDeleteAnnouncement(a.id);
-                      }} className="shrink-0 p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30" title="Delete for everyone">
-                        <Trash2 size={16}/>
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
-          <div className="flex items-center gap-2">
-            <div className="font-bold flex items-center gap-2"><Clock size={17}/> Countdown management</div>
-            {countdown && (
-              <button onClick={() => {
-                if (confirm("Remove the Event Countdown for everyone?")) onClearCountdown();
-              }} className="ml-auto text-xs font-semibold text-red-600 hover:text-red-700">
-                Remove countdown
-              </button>
-            )}
-          </div>
-
-          {countdown ? (
-            <div className="mt-3 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 p-3">
-              <div className="text-[11px] uppercase tracking-wide font-bold text-indigo-600 dark:text-indigo-300">Active countdown</div>
-              <div className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-1">{countdown.label}</div>
-              <div className="font-mono text-xl font-bold text-indigo-800 dark:text-indigo-200 mt-1">{countdownText || "Complete"}</div>
-              {countdown.target && (
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                  Target: {new Date(countdown.target).toLocaleString()}
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">No countdown is currently set.</p>
-          )}
-
-          <div className="flex gap-2 mt-3">
-            <button onClick={onCountdown} className="flex-1 py-2 rounded-lg border font-semibold text-sm">
-              {countdown ? "Edit countdown" : "Set countdown"}
-            </button>
-            {countdown && (
-              <button onClick={() => {
-                if (confirm("Remove the Event Countdown for everyone?")) onClearCountdown();
-              }} className="px-4 py-2 rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-semibold text-sm">
-                Remove
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
-          <div className="font-bold flex items-center gap-2"><CloudOff size={17}/> Offline readiness</div>
-          <p className="text-sm text-slate-500 mt-2">Test this admin device before competition begins.</p>
-          <button onClick={onOfflineTest} className="mt-3 w-full py-2 rounded-lg border font-semibold text-sm">Run offline readiness test</button>
-        </div>
-      </div></div>
-    </div>
-  );
-}
 
 function ClearModal({ counts, onClear, onClose }) {
   const [sel, setSel] = useState({ violations: false, teams: false, schedule: false, replays: false, judging: false, alliances: false, watchlist: false });
@@ -6004,7 +5732,7 @@ function FeaturesGuide() {
         </ul>
       </Section>
 
-      <p className="text-center text-xs text-slate-400 mt-4 mb-2">Made by Maharshi Patel · <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="underline">@mpatel_ref</a></p>
+      <p className="text-center text-xs text-slate-400 mt-4 mb-2">Made by Maharshi Patel · <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="underline">@mpatel_ref</a> · v{APP_VERSION}</p>
     </>
   );
 }
