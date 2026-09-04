@@ -235,6 +235,23 @@ function parseMatchesFile(text, filename = "") {
   return { rows, warnings };
 }
 
+const tmClean = (v) => String(v == null ? "" : v).trim();
+const tmSameTeams = (a, b) => {
+  const aa = (a || []).map((x) => tmClean(x).toUpperCase());
+  const bb = (b || []).map((x) => tmClean(x).toUpperCase());
+  return aa.length === bb.length && aa.every((x, i) => x === bb[i]);
+};
+const tmMatchKey = (phase, num) => (phase === "qual" ? String(num) : `${phase}-${num}`);
+const tmScheduleChanged = (existing, incoming) => !existing ||
+  !tmSameTeams(existing.red, incoming.red) ||
+  !tmSameTeams(existing.blue, incoming.blue) ||
+  tmClean(existing.field) !== tmClean(incoming.field);
+const tmScoreWinner = (redScore, blueScore) => redScore > blueScore ? "red" : blueScore > redScore ? "blue" : "tie";
+const tmScoreChanged = (existing, redScore, blueScore, winner) => !existing ||
+  Number(existing.redScore) !== Number(redScore) ||
+  Number(existing.blueScore) !== Number(blueScore) ||
+  tmClean(existing.winner).toLowerCase() !== tmClean(winner).toLowerCase();
+
 const MATCH_PHASES = [
   { key: "qual", label: "Qualification", abbrev: "Q" },
   { key: "practice", label: "Practice", abbrev: "P" },
@@ -957,10 +974,21 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       const text = await file.text();
       const { rows, warnings } = parseTeamsFile(text, file.name);
       if (!rows.length) { alert("No teams found in that file.\n" + warnings.join("\n")); return; }
-      const rosterT = new Set(teams.map((t) => t.number));
-      const newCount = rows.filter((r) => !rosterT.has(r.number)).length;
-      const chipsT = [{ label: `${rows.length} teams in file` }, { label: `${newCount} new` }, { label: `${rows.length - newCount} already in roster` }];
-      if (!(await confirmImport({ title: "Team list", chips: chipsT, warnings }))) return;
+      const existingTeamsT = new Map(teams.map((t) => [t.number, t]));
+      let newCount = 0, renamedCount = 0, unchangedCount = 0;
+      for (const r of rows) {
+        const current = existingTeamsT.get(r.number);
+        if (!current) newCount++;
+        else if (tmClean(current.name) !== tmClean(r.name)) renamedCount++;
+        else unchangedCount++;
+      }
+      const chipsT = [
+        { label: `${newCount} team${newCount === 1 ? "" : "s"} added` },
+        { label: `${renamedCount} name${renamedCount === 1 ? "" : "s"} changed` },
+        { label: `${unchangedCount} unchanged` },
+        { label: `${Math.max(0, teams.length - rows.filter((r) => existingTeamsT.has(r.number)).length)} existing teams not in file remain untouched` },
+      ];
+      if (!(await confirmImport({ title: "Team list — change preview", chips: chipsT, warnings, noChanges: newCount === 0 && renamedCount === 0 }))) return;
       setImporting({ label: "Importing teams…", done: 0, total: 0 });
       await api.bulkUpsertTeams(eventId, rows);
       const t = await api.listTeams(eventId);
@@ -1068,18 +1096,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         return;
       }
 
-      if (!confirm("Replace the current R16 and Alliances with the 8 Round 6 matches from this Tournament Manager CSV?")) return;
-
-      // Remove all previous R16 matches and alliance assignments first.
-      for (let n = 1; n <= 64; n++) {
-        try {
-          await api.deleteMatch(eventId, "r16", n);
-        } catch (e) {
-          if (!outbox.isOffline(e)) throw e;
-        }
-      }
-      await api.clearAlliances(eventId);
-
       // Tournament Manager R16 instance to alliance seed mapping.
       const seedPairs = {
         1: [1,16],
@@ -1091,6 +1107,47 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         7: [3,14],
         8: [6,11],
       };
+
+      const candidateAlliances = {};
+      for (const m of r16) {
+        const [redSeed, blueSeed] = seedPairs[m.instance];
+        candidateAlliances[redSeed] = [...m.red];
+        candidateAlliances[blueSeed] = [...m.blue];
+      }
+      let allianceChanged = 0, allianceUnchanged = 0, r16Added = 0, r16Changed = 0, r16Unchanged = 0;
+      for (let seed = 1; seed <= 16; seed++) {
+        if (tmSameTeams(alliances[seed] || [], candidateAlliances[seed] || [])) allianceUnchanged++;
+        else allianceChanged++;
+      }
+      for (const m of r16) {
+        const existing = matches[tmMatchKey("r16", m.instance)];
+        if (!existing) r16Added++;
+        else if (tmScheduleChanged(existing, m)) r16Changed++;
+        else r16Unchanged++;
+      }
+      const allianceChips = [
+        { label: `${allianceChanged} alliance${allianceChanged === 1 ? "" : "s"} changed` },
+        { label: `${allianceUnchanged} alliances unchanged` },
+        { label: `${r16Added} R16 match${r16Added === 1 ? "" : "es"} added` },
+        { label: `${r16Changed} R16 match${r16Changed === 1 ? "" : "es"} changed` },
+        { label: `${r16Unchanged} R16 unchanged` },
+      ];
+      if (!(await confirmImport({
+        title: "Alliances & R16 — change preview",
+        chips: allianceChips,
+        warnings: ["Applying this import replaces the current R16 and all 16 alliance assignments with the Tournament Manager file."],
+        noChanges: allianceChanged === 0 && r16Added === 0 && r16Changed === 0,
+      }))) return;
+
+      // Remove all previous R16 matches and alliance assignments first.
+      for (let n = 1; n <= 64; n++) {
+        try {
+          await api.deleteMatch(eventId, "r16", n);
+        } catch (e) {
+          if (!outbox.isOffline(e)) throw e;
+        }
+      }
+      await api.clearAlliances(eventId);
 
       const nextAlliances = {};
 
@@ -1137,10 +1194,22 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       const text = await file.text();
       const { rows, warnings } = parseRankingsFile(text, file.name);
       if (!rows.length) { alert("No rankings found in that file.\n" + warnings.join("\n")); return; }
-      const rosterR = new Set(teams.map((t) => t.number));
-      const unknownR = rows.filter((r) => !rosterR.has(r.number)).length;
-      const chipsR = [{ label: `${rows.length} ranked teams` }, { label: `${rows.length - unknownR} recognized` }, { label: `${unknownR} unknown teams`, warn: unknownR > 0 }];
-      if (!(await confirmImport({ title: "Qualification rankings", chips: chipsR, warnings }))) return;
+      const teamMapR = new Map(teams.map((t) => [t.number, t]));
+      let changedR = 0, unchangedR = 0, newRankR = 0, unknownR = 0;
+      for (const r of rows) {
+        const current = teamMapR.get(r.number);
+        if (!current) { unknownR++; continue; }
+        if (current.rank == null) newRankR++;
+        else if (Number(current.rank) !== Number(r.rank)) changedR++;
+        else unchangedR++;
+      }
+      const chipsR = [
+        { label: `${newRankR} new ranking${newRankR === 1 ? "" : "s"}` },
+        { label: `${changedR} ranking${changedR === 1 ? "" : "s"} changed` },
+        { label: `${unchangedR} unchanged` },
+        { label: `${unknownR} unknown team${unknownR === 1 ? "" : "s"}`, warn: unknownR > 0 },
+      ];
+      if (!(await confirmImport({ title: "Qualification rankings — change preview", chips: chipsR, warnings, noChanges: newRankR === 0 && changedR === 0 && unknownR === 0 }))) return;
       setImporting({ label: "Importing rankings…", done: 0, total: 0 });
       await api.bulkUpsertRankings(eventId, rows);
       const t = await api.listTeams(eventId);
@@ -1203,7 +1272,21 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       }
 
       if (elimScoreRows.length) {
-        if (!(await confirmImport({ title: "Match results — eliminations", chips: [{ label: `${elimScoreRows.length} R16 results` }, { label: "alliance teams unchanged" }], warnings: [] }))) return;
+        let scoreChangesE = 0, scoreUnchangedE = 0, scoreMissingE = 0;
+        for (const r of elimScoreRows) {
+          const current = matches[tmMatchKey("r16", r.instance)];
+          const winner = tmScoreWinner(r.redScore, r.blueScore);
+          if (!current) scoreMissingE++;
+          else if (tmScoreChanged(current, r.redScore, r.blueScore, winner)) scoreChangesE++;
+          else scoreUnchangedE++;
+        }
+        const scoreChipsE = [
+          { label: `${scoreChangesE} score${scoreChangesE === 1 ? "" : "s"} updated` },
+          { label: `${scoreUnchangedE} unchanged` },
+          { label: `${scoreMissingE} missing R16 match${scoreMissingE === 1 ? "" : "es"}`, warn: scoreMissingE > 0 },
+          { label: "alliance teams unchanged" },
+        ];
+        if (!(await confirmImport({ title: "Match results — change preview", chips: scoreChipsE, warnings: [], noChanges: scoreChangesE === 0 && scoreMissingE === 0 }))) return;
 
         for (let i = 0; i < elimScoreRows.length; i++) {
           const r = elimScoreRows[i];
@@ -1235,8 +1318,21 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       const rosterS = new Set(teams.map((t) => t.number));
       const inFileS = new Set(); scored.forEach((r) => { (r.red || []).forEach((x) => inFileS.add(x)); (r.blue || []).forEach((x) => inFileS.add(x)); });
       let unknownS = 0; inFileS.forEach((x) => { if (!rosterS.has(x)) unknownS++; });
-      const chipsS = [{ label: `${scored.length} scored matches` }, { label: `${inFileS.size - unknownS} teams recognized` }, { label: `${unknownS} unknown teams`, warn: unknownS > 0 }];
-      if (!(await confirmImport({ title: "Match results", chips: chipsS, warnings: [] }))) return;
+      let scoreChangesS = 0, scoreUnchangedS = 0, scoreNewMatchS = 0;
+      for (const r of scored) {
+        const current = matches[tmMatchKey(r.phase, r.num)];
+        const winner = tmScoreWinner(r.redScore, r.blueScore);
+        if (!current) scoreNewMatchS++;
+        else if (tmScoreChanged(current, r.redScore, r.blueScore, winner)) scoreChangesS++;
+        else scoreUnchangedS++;
+      }
+      const chipsS = [
+        { label: `${scoreChangesS} score${scoreChangesS === 1 ? "" : "s"} updated` },
+        { label: `${scoreNewMatchS} scored match${scoreNewMatchS === 1 ? "" : "es"} added` },
+        { label: `${scoreUnchangedS} unchanged` },
+        { label: `${unknownS} unknown team${unknownS === 1 ? "" : "s"}`, warn: unknownS > 0 },
+      ];
+      if (!(await confirmImport({ title: "Match results — change preview", chips: chipsS, warnings: [], noChanges: scoreChangesS === 0 && scoreNewMatchS === 0 && unknownS === 0 }))) return;
 
       for (let i = 0; i < scored.length; i++) {
         const r = scored[i];
@@ -1274,10 +1370,23 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       const roster = new Set(teams.map((t) => t.number));
       const inFile = new Set(); for (const r of rows) { (r.red || []).forEach((x) => inFile.add(x)); (r.blue || []).forEach((x) => inFile.add(x)); }
       let unknown = 0; inFile.forEach((x) => { if (!roster.has(x)) unknown++; });
-      const pl = { qual: "qualification", r16: "R16", qf: "QF", sf: "SF", final: "final", practice: "practice" };
-      const chips = Object.entries(counts).map(([p, n]) => ({ label: `${n} ${pl[p] || p} matches` }));
-      chips.push({ label: `${inFile.size - unknown} teams recognized` }, { label: `${unknown} unknown teams`, warn: unknown > 0 });
-      if (!(await confirmImport({ title: "Match schedule", chips, warnings }))) return;
+      let addedMatches = 0, changedMatches = 0, unchangedMatches = 0;
+      for (const r of rows) {
+        const current = matches[tmMatchKey(r.phase, r.num)];
+        if (!current) addedMatches++;
+        else if (tmScheduleChanged(current, r)) changedMatches++;
+        else unchangedMatches++;
+      }
+      const inFileKeys = new Set(rows.map((r) => tmMatchKey(r.phase, r.num)));
+      const existingNotInFile = Object.values(matches).filter((m) => !inFileKeys.has(tmMatchKey(m.phase || "qual", m.num))).length;
+      const chips = [
+        { label: `${addedMatches} match${addedMatches === 1 ? "" : "es"} added` },
+        { label: `${changedMatches} match${changedMatches === 1 ? "" : "es"} changed` },
+        { label: `${unchangedMatches} unchanged` },
+        { label: `${existingNotInFile} existing match${existingNotInFile === 1 ? "" : "es"} not in file remain untouched` },
+        { label: `${unknown} unknown team${unknown === 1 ? "" : "s"}`, warn: unknown > 0 },
+      ];
+      if (!(await confirmImport({ title: "Match schedule — change preview", chips, warnings, noChanges: addedMatches === 0 && changedMatches === 0 && unknown === 0 }))) return;
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i];
         setImporting({ label: "Importing matches…", done: i + 1, total: rows.length });
@@ -4175,8 +4284,9 @@ function ImportPreviewModal({ preview, onImport, onCancel }) {
   return (
     <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={onCancel}>
       <div className="bg-white dark:bg-slate-800 w-full max-w-sm rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
-        <h2 className="font-bold text-slate-900 dark:text-slate-100 text-lg flex items-center gap-2"><Upload size={18} /> Confirm import</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">File detected: <b className="text-slate-700 dark:text-slate-200">{preview.title}</b></p>
+        <h2 className="font-bold text-slate-900 dark:text-slate-100 text-lg flex items-center gap-2"><Upload size={18} /> Review Tournament Manager changes</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5"><b className="text-slate-700 dark:text-slate-200">{preview.title}</b></p>
+        <p className="text-xs text-slate-400 mt-1">Nothing is written until you choose Apply changes.</p>
         <div className="flex flex-wrap gap-1.5 mt-3">
           {preview.chips.map((c, i) => (
             <span key={i} className={`text-xs font-mono px-2 py-1 rounded-md ${c.warn ? "bg-red-100 text-red-700 border border-red-300 dark:bg-red-900/40 dark:text-red-200 dark:border-red-700 font-bold" : "bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200"}`}>{c.label || c}</span>
@@ -4188,9 +4298,10 @@ function ImportPreviewModal({ preview, onImport, onCancel }) {
           </div>
         )}
         {preview.chips.some((c) => c.warn) && <p className="mt-3 text-[11px] text-red-600 dark:text-red-300">Unknown teams aren\'t in your roster — check you picked the right file, or import teams first.</p>}
+        {preview.noChanges && <div className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">Ref-OS found no data changes to apply.</div>}
         <div className="flex gap-2 mt-5">
-          <button onClick={onCancel} className="flex-1 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
-          <button onClick={onImport} className="flex-1 py-2.5 rounded-lg bg-[#D7212B] text-white font-semibold hover:bg-[#B42024]">Import</button>
+          <button onClick={onCancel} className="flex-1 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">{preview.noChanges ? "Close" : "Cancel"}</button>
+          {!preview.noChanges && <button onClick={onImport} className="flex-1 py-2.5 rounded-lg bg-[#D7212B] text-white font-semibold hover:bg-[#B42024]">Apply changes</button>}
         </div>
       </div>
     </div>
@@ -4829,6 +4940,7 @@ function FeaturesGuide() {
           <Li><b>Matches</b> — import the qualification and elimination schedule and update existing matches in place.</Li>
           <Li><b>Rankings</b> — import qualification rankings using TeamNum and store the rank on each team.</Li>
           <Li><b>Alliances</b> — import the official elimination bracket. Round 6 is treated as Round of 16 and its Instance value determines the R16 matchup.</Li>
+          <Li><b>Change preview</b> — before a Tournament Manager import writes anything, Ref-OS compares the file with the current event and shows what will be added, changed, or left untouched. If no differences are found, the import is blocked as unnecessary.</Li>
           <Li><b>Scores</b> — when elimination scores are present, Ref-OS prioritizes elimination score updates and leaves qualification score importing alone. Qualification records update when qualification results are imported without elimination results.</Li>
         </ul>
       </Section>
