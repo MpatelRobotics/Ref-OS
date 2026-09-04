@@ -4398,7 +4398,10 @@ function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, 
   const announcementEntries = fieldLog.filter(e=>e.kind==="announcement").sort((a,b)=>b.createdAt-a.createdAt);
   const announcements = announcementEntries.length;
   const awps = fieldLog.filter(e=>e.kind==="awp").length;
-  const onlineNames = new Set((presence||[]).map(p=>p.name).filter(Boolean));
+  const onlinePeople = Array.from(
+    new Map((presence || []).filter((p) => p?.name).map((p) => [p.name, p])).values()
+  ).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  const onlineNames = new Set(onlinePeople.map((p) => p.name));
   return (
     <div className="fixed inset-0 z-[65] bg-slate-50 dark:bg-slate-900 flex flex-col">
       <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2"><BarChart3 size={20}/><div><h2 className="font-bold">Event Command Center</h2><p className="text-xs text-slate-400">Admin operations overview</p></div><button onClick={onClose} className="ml-auto"><X size={22}/></button></div>
@@ -4429,6 +4432,49 @@ function CommandCenter({ matches, viols, fieldLog, presence, roster, countdown, 
         <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
           <div className="font-bold flex items-center gap-2"><Users size={17}/> Key Volunteer Status</div>
           <div className="mt-2 text-sm">{onlineNames.size} currently online · {(roster||[]).length} known volunteers</div>
+          <div className="mt-4">
+            <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">Online now</div>
+            {onlinePeople.length > 0 ? (
+              <div className="space-y-2">
+                {onlinePeople.map((person) => (
+                  <div key={person.name} className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{person.name}</span>
+                    {person.role && (
+                      <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">{person.role}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-slate-500 dark:text-slate-400">No volunteers are currently online.</div>
+            )}
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+            <div className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">Known volunteers</div>
+            {(roster || []).length > 0 ? (
+              <div className="space-y-2">
+                {[...(roster || [])].sort((a,b) => String(a.name || "").localeCompare(String(b.name || ""))).map((person) => {
+                  const isOnline = onlineNames.has(person.name);
+                  return (
+                    <div key={person.id || person.name} className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2">
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isOnline ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`} />
+                      <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{person.name || "Unknown volunteer"}</span>
+                      <div className="ml-auto flex items-center gap-2">
+                        {person.role && <span className="text-xs text-slate-500 dark:text-slate-400">{person.role}</span>}
+                        <span className={`text-[11px] font-semibold ${isOnline ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
+                          {isOnline ? "ONLINE" : "OFFLINE"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-sm text-slate-500 dark:text-slate-400">No known volunteers yet.</div>
+            )}
+          </div>
         </div>
         <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
           <div className="font-bold flex items-center gap-2"><Flag size={17}/> Event activity</div>
