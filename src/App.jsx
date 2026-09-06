@@ -585,6 +585,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   });
   const [showRankings, setShowRankings] = useState(false);
   const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
+  const [eventMembers, setEventMembers] = useState([]);
   const myRole = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
   const deviceId = useMemo(() => {
     try {
@@ -688,6 +689,40 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     sessionStorage.removeItem("refosAdmin");
     setAdminUnlocked(false);
     setMenu(false);
+  };
+
+  useEffect(() => {
+    if (isJudge || isEmcee) return;
+    let cancelled = false;
+    const syncServerAdminRole = async () => {
+      try {
+        const serverRole = await api.getMyEventRole(eventId);
+        if (cancelled) return;
+        const isServerAdmin = serverRole === "admin";
+        if (isServerAdmin) sessionStorage.setItem("refosAdmin", "1");
+        else sessionStorage.removeItem("refosAdmin");
+        setAdminUnlocked(isServerAdmin);
+      } catch {}
+    };
+    syncServerAdminRole();
+    const iv = setInterval(syncServerAdminRole, 10000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [eventId, isJudge, isEmcee]);
+
+  const loadEventMembers = useCallback(async () => {
+    if (!adminUnlocked) { setEventMembers([]); return; }
+    try { setEventMembers(await api.listEventMembersForAdmin(eventId)); }
+    catch { setEventMembers([]); }
+  }, [adminUnlocked, eventId]);
+
+  const setVolunteerAdmin = async (member, makeAdmin) => {
+    if (!member?.user_id) return;
+    try {
+      await api.setVolunteerAdminRole(eventId, member.user_id, makeAdmin);
+      await Promise.all([loadEventMembers(), api.listRefRoster(eventId).then(setRefRoster)]);
+    } catch (e) {
+      alert(e?.message || "Could not update admin role.");
+    }
   };
 
   const markTMSync = (key) => {
@@ -2147,7 +2182,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 <>
                 {adminUnlocked && <button onClick={() => { setMenu(false); setShowCommandCenter(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Event Command Center</button>}
                 <button onClick={() => { setMenu(false); setShowContactDirectory(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Contact size={16} /> Event Contact Directory</button>
-                <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Key Volunteer Status</button>
+                <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); if (adminUnlocked) loadEventMembers(); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Key Volunteer Status</button>
                 <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field log</button>
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
                 <button onClick={() => { setMenu(false); setTourStep(0); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided tour</button>
@@ -2403,7 +2438,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
               <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Users size={18} /> Key Volunteer Status</h2>
               <button onClick={() => setShowOnline(false)} className="text-slate-400"><X size={22} /></button>
             </div>
-            <div className="p-4"><OnlineList presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} /></div>
+            <div className="p-4"><OnlineList presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} eventMembers={eventMembers} onSetAdmin={adminUnlocked ? setVolunteerAdmin : undefined} /></div>
           </div>
         </div>
       )}
@@ -3877,7 +3912,7 @@ function roleChip(role) {
   }
 }
 
-function OnlineList({ presence, roster, meName, onRemove }) {
+function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onSetAdmin }) {
   const onlineCounts = {};
   const roleByName = {};
   for (const p of presence) { const n = p.name || "Ref"; onlineCounts[n] = (onlineCounts[n] || 0) + 1; if (p.role) roleByName[n] = p.role; }
@@ -3894,7 +3929,8 @@ function OnlineList({ presence, roster, meName, onRemove }) {
       <ul className="space-y-2">
         {refs.map((r) => {
           const isOnline = !!onlineCounts[r.name];
-          const role = roleByName[r.name] || r.role || "";
+          const member = eventMembers.find((m) => (m.name || "").trim().toLowerCase() === (r.name || "").trim().toLowerCase());
+          const role = member?.role === "admin" ? "Admin" : (roleByName[r.name] || r.role || "");
           return (
             <li key={r.name} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3">
               <span className={`w-8 h-8 rounded-full text-white text-xs font-bold grid place-items-center shrink-0 ${isOnline ? "bg-[#D7212B]" : "bg-slate-400"}`}>{initials(r.name)}</span>
@@ -3909,6 +3945,13 @@ function OnlineList({ presence, roster, meName, onRemove }) {
                 <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500" : "bg-slate-300"}`} />
                 {isOnline ? `online${onlineCounts[r.name] > 1 ? ` · ${onlineCounts[r.name]} devices` : ""}` : "offline"}
               </span>
+              {onSetAdmin && member && r.name !== meName && (
+                member.role === "admin" ? (
+                  <button onClick={() => { if (confirm(`Remove Admin access from ${r.name}?`)) onSetAdmin(member, false); }} className="text-[11px] font-semibold px-2 py-1 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 shrink-0" title="Remove Admin access">Remove Admin</button>
+                ) : (
+                  <button onClick={() => { if (confirm(`Give ${r.name} Admin access without requiring the Admin password?`)) onSetAdmin(member, true); }} className="text-[11px] font-semibold px-2 py-1 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 shrink-0" title="Give Admin access">Make Admin</button>
+                )
+              )}
               {onRemove && !isOnline && (
                 <button onClick={() => { if (confirm(`Remove ${r.name} from the volunteer list?`)) onRemove(r.name); }} className="text-slate-300 hover:text-red-600 shrink-0" title="Remove volunteer"><Trash2 size={15} /></button>
               )}

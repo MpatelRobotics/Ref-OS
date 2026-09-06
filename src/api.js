@@ -92,6 +92,27 @@ export async function clearAccessSession() {
   catch { await supabase.auth.signOut(); }
 }
 
+
+export async function listEventMembersForAdmin(eventId) {
+  if (E2E_MOCK) return [];
+  const { data, error } = await supabase
+    .from("event_members")
+    .select("user_id,name,role")
+    .eq("event_id", eventId);
+  if (error) throw error;
+  return data || [];
+}
+
+export async function setVolunteerAdminRole(eventId, userId, makeAdmin = true) {
+  if (E2E_MOCK) return;
+  const { error } = await supabase.rpc("set_event_member_admin", {
+    p_event: eventId,
+    p_user: userId,
+    p_make_admin: !!makeAdmin,
+  });
+  if (error) throw error;
+}
+
 export async function downgradeMyEventRole(eventId, role = "ref") {
   if (E2E_MOCK) return;
   const { error } = await supabase.rpc("downgrade_my_event_role", {
