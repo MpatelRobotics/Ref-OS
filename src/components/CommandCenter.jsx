@@ -14,10 +14,18 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
     new Map((presence || []).filter((p) => p?.name).map((p) => [p.name, p])).values()
   ).sort((a, b) => String(a.name).localeCompare(String(b.name)));
   const onlineNames = new Set(onlinePeople.map((p) => p.name));
-  const memberForName = (name) => eventMembers.find((m) => String(m.name || "").trim().toLowerCase() === String(name || "").trim().toLowerCase());
+  const presenceForName = (name) => (presence || []).find((p) => String(p.name || "").trim().toLowerCase() === String(name || "").trim().toLowerCase());
+  const memberForName = (name) => {
+    const person = presenceForName(name);
+    return eventMembers.find((m) =>
+      (person?.user_id && m.user_id === person.user_id) ||
+      String(m.name || "").trim().toLowerCase() === String(name || "").trim().toLowerCase()
+    );
+  };
   const adminButton = (name) => {
-    const member = memberForName(name);
-    if (!onSetAdmin || !member || name === meName) return null;
+    const person = presenceForName(name);
+    const member = memberForName(name) || (person?.user_id ? { user_id: person.user_id, role: String(person.role || "").toLowerCase() } : null);
+    if (!onSetAdmin || !member || !onlineNames.has(name) || name === meName) return null;
     const isAdmin = member.role === "admin";
     return (
       <button

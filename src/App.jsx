@@ -3921,7 +3921,13 @@ function roleChip(role) {
 function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onSetAdmin }) {
   const onlineCounts = {};
   const roleByName = {};
-  for (const p of presence) { const n = p.name || "Ref"; onlineCounts[n] = (onlineCounts[n] || 0) + 1; if (p.role) roleByName[n] = p.role; }
+  const userIdByName = {};
+  for (const p of presence) {
+    const n = p.name || "Ref";
+    onlineCounts[n] = (onlineCounts[n] || 0) + 1;
+    if (p.role) roleByName[n] = p.role;
+    if (p.user_id) userIdByName[n] = p.user_id;
+  }
   const all = new Map((roster || []).map((r) => [r.name, r]));
   Object.keys(onlineCounts).forEach((name) => { if (!all.has(name)) all.set(name, { name, lastSeen: Date.now() }); });
   const refs = [...all.values()].sort((a, b) => {
@@ -3935,7 +3941,12 @@ function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onS
       <ul className="space-y-2">
         {refs.map((r) => {
           const isOnline = !!onlineCounts[r.name];
-          const member = eventMembers.find((m) => (m.name || "").trim().toLowerCase() === (r.name || "").trim().toLowerCase());
+          const presenceUserId = userIdByName[r.name];
+          const member = eventMembers.find((m) =>
+            (presenceUserId && m.user_id === presenceUserId) ||
+            (m.name || "").trim().toLowerCase() === (r.name || "").trim().toLowerCase()
+          );
+          const adminTarget = member || (presenceUserId ? { user_id: presenceUserId, role: String(roleByName[r.name] || r.role || "").toLowerCase() } : null);
           const role = member?.role === "admin" ? "Admin" : (roleByName[r.name] || r.role || "");
           return (
             <li key={r.name} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3">
@@ -3951,11 +3962,11 @@ function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onS
                 <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500" : "bg-slate-300"}`} />
                 {isOnline ? `online${onlineCounts[r.name] > 1 ? ` · ${onlineCounts[r.name]} devices` : ""}` : "offline"}
               </span>
-              {onSetAdmin && member && r.name !== meName && (
-                member.role === "admin" ? (
-                  <button onClick={() => { if (confirm(`Remove Admin access from ${r.name}?`)) onSetAdmin(member, false); }} className="text-[11px] font-semibold px-2 py-1 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 shrink-0" title="Remove Admin access">Remove Admin</button>
+              {onSetAdmin && adminTarget && isOnline && r.name !== meName && (
+                adminTarget.role === "admin" ? (
+                  <button onClick={() => { if (confirm(`Remove Admin access from ${r.name}?`)) onSetAdmin(adminTarget, false); }} className="text-[11px] font-semibold px-2 py-1 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 shrink-0" title="Remove Admin access">Remove Admin</button>
                 ) : (
-                  <button onClick={() => { if (confirm(`Give ${r.name} Admin access without requiring the Admin password?`)) onSetAdmin(member, true); }} className="text-[11px] font-semibold px-2 py-1 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 shrink-0" title="Give Admin access">Make Admin</button>
+                  <button onClick={() => { if (confirm(`Give ${r.name} Admin access without requiring the Admin password?`)) onSetAdmin(adminTarget, true); }} className="text-[11px] font-semibold px-2 py-1 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 shrink-0" title="Give Admin access">Make Admin</button>
                 )
               )}
               {onRemove && !isOnline && (

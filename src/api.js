@@ -659,6 +659,15 @@ export function joinPresence(eventId, meta, onChange) {
   const key = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
   const ch = supabase.channel(`presence-${eventId}`, { config: { presence: { key } } });
   ch.on("presence", { event: "sync" }, () => onChange(Object.values(ch.presenceState()).flat()));
-  ch.subscribe((status) => { if (status === "SUBSCRIBED") ch.track(meta); });
+  ch.subscribe(async (status) => {
+    if (status === "SUBSCRIBED") {
+      let userId = null;
+      try {
+        const { data } = await supabase.auth.getSession();
+        userId = data?.session?.user?.id || null;
+      } catch {}
+      ch.track({ ...meta, user_id: userId });
+    }
+  });
   return () => supabase.removeChannel(ch);
 }
