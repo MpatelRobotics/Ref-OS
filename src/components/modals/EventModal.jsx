@@ -2,6 +2,15 @@ import React, { useState } from "react";
 import { CalendarDays, ListOrdered, X } from "lucide-react";
 import Label from "./FormLabel.jsx";
 
+const elimCounts = (bracket) => {
+  switch (Number(bracket)) {
+    case 16: return { r16: 8, qf: 4, sf: 2 };
+    case 8: return { qf: 4, sf: 2 };
+    case 4: return { sf: 2 };
+    default: return {};
+  }
+};
+
 export default function EventModal({ event, onSave, onClose }) {
   const [name, setName] = useState(event?.name || "");
   const [quals, setQuals] = useState(event?.quals ? String(event.quals) : "");
