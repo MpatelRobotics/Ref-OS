@@ -378,6 +378,11 @@ export default function App() {
 
   useEffect(() => {
     if (!unlocked || !meName) return;
+    api.setEventMemberName(EVENT_ID, meName).catch(() => {});
+  }, [unlocked, meName]);
+
+  useEffect(() => {
+    if (!unlocked || !meName) return;
     let live = true;
     setLoadErr(false);
     api.getEvent(EVENT_ID)
@@ -2180,7 +2185,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                   </>
                 ) : (
                 <>
-                {adminUnlocked && <button onClick={() => { setMenu(false); setShowCommandCenter(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Event Command Center</button>}
+                {adminUnlocked && <button onClick={() => { setMenu(false); loadEventMembers(); setShowCommandCenter(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Event Command Center</button>}
                 <button onClick={() => { setMenu(false); setShowContactDirectory(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Contact size={16} /> Event Contact Directory</button>
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); if (adminUnlocked) loadEventMembers(); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Key Volunteer Status</button>
                 <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field log</button>
@@ -2532,6 +2537,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onClose={() => setShowCountdownSetup(false)} />}
       {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => setShowOfflineTest(false)} />}
       {showCommandCenter && adminUnlocked && <CommandCenter matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
+        eventMembers={eventMembers} meName={meName} onSetAdmin={setVolunteerAdmin}
         failedSyncItems={failedSyncItems} onRetryFailedSync={retryFailedSync} onDiscardFailedSync={discardFailedSync}
         countdown={eventCountdown} countdownText={countdownText}
         onCountdown={() => { setShowCommandCenter(false); setShowCountdownSetup(true); }}

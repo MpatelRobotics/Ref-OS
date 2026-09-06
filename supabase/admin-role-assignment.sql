@@ -1,6 +1,32 @@
 -- Ref OS: allow an existing Admin to grant or revoke Admin access for a signed in event member.
 -- Run this once in the Supabase SQL editor.
 
+create or replace function public.list_event_members_for_admin(p_event uuid)
+returns table(user_id uuid, name text, role text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Authentication session required';
+  end if;
+
+  if not public.has_event_role(p_event, array['admin']) then
+    raise exception 'Admin role required';
+  end if;
+
+  return query
+    select m.user_id, m.name, m.role
+    from public.event_members m
+    where m.event_id = p_event
+    order by lower(coalesce(m.name, '')), m.user_id;
+end;
+$$;
+
+revoke all on function public.list_event_members_for_admin(uuid) from anon;
+grant execute on function public.list_event_members_for_admin(uuid) to authenticated;
+
 create or replace function public.set_event_member_admin(
   p_event uuid,
   p_user uuid,

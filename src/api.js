@@ -95,10 +95,9 @@ export async function clearAccessSession() {
 
 export async function listEventMembersForAdmin(eventId) {
   if (E2E_MOCK) return [];
-  const { data, error } = await supabase
-    .from("event_members")
-    .select("user_id,name,role")
-    .eq("event_id", eventId);
+  const { data, error } = await supabase.rpc("list_event_members_for_admin", {
+    p_event: eventId,
+  });
   if (error) throw error;
   return data || [];
 }

@@ -3,7 +3,7 @@ import { AlertTriangle, BarChart3, CalendarDays, ClipboardCheck, Clock, CloudOff
 
 const fmtTime = (ms) => ms ? new Date(ms).toLocaleString() : "—";
 
-export default function CommandCenter({ matches, viols, fieldLog, presence, roster, failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
+export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
@@ -14,6 +14,23 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
     new Map((presence || []).filter((p) => p?.name).map((p) => [p.name, p])).values()
   ).sort((a, b) => String(a.name).localeCompare(String(b.name)));
   const onlineNames = new Set(onlinePeople.map((p) => p.name));
+  const memberForName = (name) => eventMembers.find((m) => String(m.name || "").trim().toLowerCase() === String(name || "").trim().toLowerCase());
+  const adminButton = (name) => {
+    const member = memberForName(name);
+    if (!onSetAdmin || !member || name === meName) return null;
+    const isAdmin = member.role === "admin";
+    return (
+      <button
+        onClick={() => {
+          const verb = isAdmin ? "Remove Admin access from" : "Give Admin access to";
+          if (confirm(`${verb} ${name}?`)) onSetAdmin(member, !isAdmin);
+        }}
+        className={`text-[11px] font-semibold px-2 py-1 rounded-lg border shrink-0 ${isAdmin ? "border-amber-300 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30" : "border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"}`}
+      >
+        {isAdmin ? "Remove Admin" : "Make Admin"}
+      </button>
+    );
+  };
   return (
     <div className="fixed inset-0 z-[65] bg-slate-50 dark:bg-slate-900 flex flex-col">
       <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2"><BarChart3 size={20}/><div><h2 className="font-bold">Event Command Center</h2><p className="text-xs text-slate-400">Admin operations overview</p></div><button onClick={onClose} className="ml-auto"><X size={22}/></button></div>
@@ -70,9 +87,12 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
                   <div key={person.name} className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
                     <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{person.name}</span>
-                    {person.role && (
-                      <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">{person.role}</span>
-                    )}
+                    <div className="ml-auto flex items-center gap-2">
+                      {(memberForName(person.name)?.role || person.role) && (
+                        <span className="text-xs text-slate-500 dark:text-slate-400">{memberForName(person.name)?.role === "admin" ? "Admin" : (person.role || memberForName(person.name)?.role)}</span>
+                      )}
+                      {adminButton(person.name)}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -92,10 +112,11 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isOnline ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`} />
                       <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{person.name || "Unknown volunteer"}</span>
                       <div className="ml-auto flex items-center gap-2">
-                        {person.role && <span className="text-xs text-slate-500 dark:text-slate-400">{person.role}</span>}
+                        {(memberForName(person.name)?.role || person.role) && <span className="text-xs text-slate-500 dark:text-slate-400">{memberForName(person.name)?.role === "admin" ? "Admin" : (person.role || memberForName(person.name)?.role)}</span>}
                         <span className={`text-[11px] font-semibold ${isOnline ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
                           {isOnline ? "ONLINE" : "OFFLINE"}
                         </span>
+                        {isOnline && adminButton(person.name)}
                       </div>
                     </div>
                   );
