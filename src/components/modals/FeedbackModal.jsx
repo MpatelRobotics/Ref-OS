@@ -33,11 +33,14 @@ export default function FeedbackModal({ meName, myRole, onSubmit, onClose }) {
     setBusy(true);
     try {
       await onSubmit({
-        type,
-        message: message.trim(),
-        submittedBy: meName || "",
-        role: myRole || "",
-        ...device,
+        kind: "feedback",
+        note: message.trim(),
+        data: JSON.stringify({
+          type,
+          submittedBy: meName || "",
+          role: myRole || "",
+          ...device,
+        }),
       });
       setSent(true);
     } catch (e) {

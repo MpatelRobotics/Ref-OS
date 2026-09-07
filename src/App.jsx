@@ -515,7 +515,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [finalists, setFinalists] = useState(new Set()); // `${award}::${team}`
   const [watchNotes, setWatchNotes] = useState([]);
   const [fieldLog, setFieldLog] = useState([]);
-  const [feedback, setFeedback] = useState([]);
   const [eventSettings, setEventSettings] = useState({});
   const [failedSyncItems, setFailedSyncItems] = useState([]);
   const announcements = fieldLog.filter((e) => e.kind === "announcement").sort((a,b) => b.createdAt - a.createdAt);
@@ -980,24 +979,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     try { await api.deleteRefRoster(eventId, name); setRefRoster((cur) => cur.filter((r) => r.name !== name)); }
     catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to remove a ref."); return; } throw e; }
   };
-  const loadFeedback = async () => {
-    if (!adminUnlocked) return;
-    try { setFeedback(await api.listFeedback(eventId)); } catch (e) { console.error("Feedback load failed", e); }
-  };
-
-  const submitFeedback = async (payload) => {
-    return await api.submitFeedback(eventId, payload);
-  };
-
-  const deleteFeedbackSubmission = async (id) => {
-    try {
-      await api.deleteFeedback(id);
-      setFeedback((cur) => cur.filter((x) => x.id !== id));
-    } catch (e) {
-      alert("Could not delete feedback: " + (e.message || e));
-    }
-  };
-
   const addFieldLog = async (entry) => {
     try {
       const saved = await api.addFieldLog(eventId, { ...entry, by: meName });
@@ -2242,7 +2223,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 ) : (
                 <>
                 <div className="refos-menu-section">Event</div>
-                {adminUnlocked && <button onClick={() => { setMenu(false); loadEventMembers(); loadFeedback(); setShowCommandCenter(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Event Command Center</button>}
+                {adminUnlocked && <button onClick={() => { setMenu(false); loadEventMembers(); setShowCommandCenter(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Event Command Center</button>}
                 <button onClick={() => { setMenu(false); setShowContactDirectory(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Contact size={16} /> Event Contact Directory</button>
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); if (adminUnlocked) loadEventMembers(); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Key Volunteer Status</button>
                 <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field Log</button>
@@ -2460,7 +2441,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           <img src="/logo.svg" alt="Highlander Summit" className="h-10 w-10 object-contain opacity-90" />
           <p className="text-center text-xs text-slate-400">
             Made by Maharshi Patel ·{" "}
-            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 underline">@mpatel_ref</a>{" · "}v{APP_VERSION} · Private Beta
+            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 underline">@mpatel_ref</a>{" · "}v{APP_VERSION} · Highlander Release
           </p>
         </div>
       </main>
@@ -2619,7 +2600,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onBackupAll={backupAll}
         onActivityFeed={() => { setShowCommandCenter(false); setShowActivity(true); }}
         onRankings={() => { setShowCommandCenter(false); setShowRankings(true); }}
-        feedback={feedback} onRefreshFeedback={loadFeedback} onDeleteFeedback={deleteFeedbackSubmission}
         onClearData={() => { setShowCommandCenter(false); setShowClear(true); }}
         onClose={() => setShowCommandCenter(false)} />}
       {showAnnouncement && adminUnlocked && <AnnouncementModal onClose={() => setShowAnnouncement(false)} onSend={sendAnnouncement} />}
@@ -2644,7 +2624,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           </div>
         </div>
       )}
-      {showFeedback && <FeedbackModal meName={meName} myRole={myRole} onSubmit={submitFeedback} onClose={() => setShowFeedback(false)} />}
+      {showFeedback && <FeedbackModal meName={meName} myRole={myRole} onSubmit={addFieldLog} onClose={() => setShowFeedback(false)} />}
       {showActivity && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
           <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
@@ -5137,7 +5117,7 @@ function FeaturesGuide() {
       </Section>
 
       <p className="text-center text-xs text-slate-400 mt-4 mb-2">
-        Made by Maharshi Patel · <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="underline">@mpatel_ref</a> · v{APP_VERSION}
+        Made by Maharshi Patel · <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="underline">@mpatel_ref</a> · v{APP_VERSION} · Highlander Release
       </p>
     </>
   );
