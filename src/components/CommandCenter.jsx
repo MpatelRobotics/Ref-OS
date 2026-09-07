@@ -1,9 +1,9 @@
 import React from "react";
-import { AlertTriangle, BarChart3, CalendarDays, ClipboardCheck, Clock, CloudOff, Contact, Download, Flag, KeyRound, ListOrdered, RefreshCw, ShieldCheck, Trash2, Trophy, Users, Wifi, X } from "lucide-react";
+import { AlertTriangle, BarChart3, CalendarDays, ClipboardCheck, Clock, CloudOff, Contact, Download, Flag, KeyRound, ListOrdered, RefreshCw, ShieldCheck, Trash2, Trophy, Users, Wifi, X, MessageSquare } from "lucide-react";
 
 const fmtTime = (ms) => ms ? new Date(ms).toLocaleString() : "—";
 
-export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
+export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, feedback = [], onRefreshFeedback, onDeleteFeedback, onClose }) {
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
@@ -83,6 +83,41 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
             <button onClick={onRankings} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><BarChart3 size={16}/> Rankings</button>
           </div>
           <button onClick={onClearData} className="mt-2 w-full py-2.5 px-3 rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-semibold text-sm text-left flex items-center gap-2"><Trash2 size={16}/> Clear event data</button>
+        </div>
+        <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
+          <div className="flex items-center gap-2">
+            <div className="font-bold flex items-center gap-2"><MessageSquare size={17}/> Feedback Inbox</div>
+            <button onClick={onRefreshFeedback} className="ml-auto text-xs font-semibold px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-1"><RefreshCw size={13}/> Refresh</button>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Private Beta feedback submitted by volunteers. Feedback is stored separately from the Field Log.</p>
+          <div className="mt-3 space-y-2">
+            {feedback.length === 0 ? (
+              <div className="text-sm text-slate-500 dark:text-slate-400 rounded-lg border border-slate-200 dark:border-slate-700 p-3">No feedback has been submitted yet.</div>
+            ) : feedback.map((f) => (
+              <div key={f.id} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${f.type === "bug" ? "bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300" : f.type === "suggestion" ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300" : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"}`}>{f.type === "bug" ? "Bug" : f.type === "suggestion" ? "Suggestion" : "General Feedback"}</span>
+                      <span className="text-[11px] text-slate-400">{fmtTime(f.createdAt)}</span>
+                    </div>
+                    <div className="text-sm text-slate-900 dark:text-slate-100 whitespace-pre-wrap mt-2">{f.message}</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-2">{f.submittedBy || "Unknown volunteer"}{f.role ? ` · ${f.role}` : ""}</div>
+                    <details className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                      <summary className="cursor-pointer font-semibold">Device details</summary>
+                      <div className="mt-2 space-y-1 break-words">
+                        <div>Ref OS {f.appVersion || "Unknown"}</div>
+                        <div>{f.displayMode || "Unknown mode"} · {f.platform || "Unknown platform"} · {f.viewport || "Unknown viewport"}</div>
+                        <div>Connection: {f.online === true ? "Online" : f.online === false ? "Offline" : "Unknown"}</div>
+                        {f.browser && <div>{f.browser}</div>}
+                      </div>
+                    </details>
+                  </div>
+                  <button onClick={() => { if (confirm("Delete this feedback submission?")) onDeleteFeedback?.(f.id); }} className="shrink-0 p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30" title="Delete feedback"><Trash2 size={16}/></button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
           <div className="font-bold flex items-center gap-2"><Users size={17}/> Key Volunteer Status</div>

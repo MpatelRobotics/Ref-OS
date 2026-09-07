@@ -419,6 +419,56 @@ export async function deleteFieldLog(id) {
   if (error) throw error;
 }
 
+
+/* ================= feedback ================= */
+const mapFeedback = (r) => ({
+  id: r.id,
+  type: r.type || "general",
+  message: r.message || "",
+  submittedBy: r.submitted_by || "",
+  role: r.role || "",
+  appVersion: r.app_version || "",
+  browser: r.browser || "",
+  platform: r.platform || "",
+  viewport: r.viewport || "",
+  displayMode: r.display_mode || "",
+  online: r.online,
+  language: r.language || "",
+  createdAt: r.created_at ? new Date(r.created_at).getTime() : 0,
+});
+
+export async function submitFeedback(eventId, payload) {
+  const row = {
+    event_id: eventId,
+    type: payload.type || "general",
+    message: String(payload.message || "").trim(),
+    submitted_by: payload.submittedBy || "",
+    role: payload.role || "",
+    app_version: payload.appVersion || "",
+    browser: payload.browser || "",
+    platform: payload.platform || "",
+    viewport: payload.viewport || "",
+    display_mode: payload.displayMode || "",
+    online: typeof payload.online === "boolean" ? payload.online : null,
+    language: payload.language || "",
+  };
+  const { data, error } = await supabase.from("feedback").insert(row).select().single();
+  if (error) throw error;
+  return mapFeedback(data);
+}
+
+export async function listFeedback(eventId) {
+  if (E2E_MOCK) return [];
+  const { data, error } = await supabase.from("feedback").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data || []).map(mapFeedback);
+}
+
+export async function deleteFeedback(id) {
+  const { error } = await supabase.from("feedback").delete().eq("id", id);
+  if (error) throw error;
+}
+
 /* ================= elimination alliances ================= */
 const mapAlliance = (r) => ({ seed: r.seed, teams: r.teams || [] });
 export async function listAlliances(eventId) {
