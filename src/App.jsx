@@ -2157,51 +2157,54 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           <div className="relative">
             <button aria-label="Settings" onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
-              <div ref={menuRef} className="absolute right-0 mt-2 w-56 max-h-[75vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
+              <div ref={menuRef} className="refos-menu-pop absolute right-0 mt-2 w-56 max-h-[75vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
                 {isJudge ? (
                   <>
                     <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><Trophy size={12} /> Judge Advisor</div>
                     <button onClick={() => { setMenu(false); exportNominations(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export nominations</button>
                     <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
-<button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
-<button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
+<button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
+<button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                     <div className="border-t border-slate-100 my-1" />
-                    <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field log</button>
+                    <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field Log</button>
                 {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
-                <button onClick={() => { setMenu(false); setTourStep(0); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided tour</button>
-                    <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
-                <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
+                <button onClick={() => { setMenu(false); setTourStep(0); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided Tour</button>
+                    <div className="refos-menu-section">Help &amp; Display</div>
+                <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; Help</button>
+                <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
                   </>
                 ) : isEmcee ? (
                   <>
                     <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><Trophy size={12} /> Emcee</div>
                     <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
-                    <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
-                    <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
+                    <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
+                    <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                     {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
-                    <button onClick={() => { setMenu(false); setTourStep(0); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided tour</button>
+                    <button onClick={() => { setMenu(false); setTourStep(0); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided Tour</button>
                     <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
-                    <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
+                    <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
                   </>
                 ) : (
                 <>
+                <div className="refos-menu-section">Event</div>
                 {adminUnlocked && <button onClick={() => { setMenu(false); loadEventMembers(); setShowCommandCenter(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Event Command Center</button>}
                 <button onClick={() => { setMenu(false); setShowContactDirectory(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Contact size={16} /> Event Contact Directory</button>
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); if (adminUnlocked) loadEventMembers(); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Key Volunteer Status</button>
-                <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field log</button>
+                <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field Log</button>
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
-                <button onClick={() => { setMenu(false); setTourStep(0); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided tour</button>
-                <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
-                <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light mode" : "Dark mode"}</button>
-                <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite other Key Volunteers</button>
-                <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock this device</button>
+                <button onClick={() => { setMenu(false); setTourStep(0); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided Tour</button>
+                <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
+                <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
+                <div className="refos-menu-section">Access</div>
+                <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
+                <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
                 <div className="border-t border-slate-100 my-1" />
                 {!adminUnlocked ? (
-                  <button onClick={() => { setMenu(false); pendingAdminAction.current = null; setShowAdminPassword(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><KeyRound size={16} /> Admin login</button>
+                  <button onClick={() => { setMenu(false); pendingAdminAction.current = null; setShowAdminPassword(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><KeyRound size={16} /> Admin Login</button>
                 ) : (
                   <>
                     <div className="w-full px-4 py-2.5 flex items-center gap-2 text-emerald-700 bg-emerald-50/60"><KeyRound size={16} /> Admin mode <span className="ml-auto text-[10px] font-semibold">ACTIVE</span></div>
-                    <button onClick={lockAdmin} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2 text-amber-700"><KeyRound size={16} /> Lock admin access</button>
+                    <button onClick={lockAdmin} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2 text-amber-700"><KeyRound size={16} /> Lock Admin Access</button>
                   </>
                 )}
                 </>
@@ -2641,7 +2644,7 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
           {canDeleteTeam && (
             <button
               onClick={() => { if (confirm(`Delete team ${team.number} and all its violations?`)) onDeleteTeam(team.number); }}
-              className="text-slate-400 hover:text-red-600 p-1"
+              className="refos-destructive-icon p-1"
               title="Delete team (admin only)"
             >
               <Trash2 size={18} />
@@ -2659,7 +2662,7 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
               {watch.map((w) => (
                 <li key={w.id} className="flex items-start gap-2 text-sm">
                   <span className="text-slate-700 dark:text-slate-200 min-w-0"><span className="font-semibold">{w.by || "Ref"}:</span> {w.note || <span className="italic text-slate-400">(no note)</span>}</span>
-                  {(w.by === meName || canDeleteTeam) && <button onClick={() => onRemoveWatch(w.id)} className="ml-auto text-slate-400 hover:text-red-600 shrink-0" title="Remove note"><Trash2 size={13} /></button>}
+                  {(w.by === meName || canDeleteTeam) && <button onClick={() => onRemoveWatch(w.id)} className="ml-auto refos-destructive-icon shrink-0" title="Remove note"><Trash2 size={13} /></button>}
                 </li>
               ))}
             </ul>
@@ -2712,7 +2715,7 @@ function ViolationCard({ v, onDelete, onOpenPhoto, onEdit, showTeam }) {
         {v._pending && <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-300"><RefreshCw size={9} className="animate-spin" /> Saving</span>}
         <span className="text-[11px] text-slate-400 ml-auto">{fmtTime(v.createdAt)}</span>
         {canEdit && <button onClick={() => onEdit(v)} className="text-slate-300 hover:text-slate-700 dark:text-slate-200" title="Edit"><Pencil size={15} /></button>}
-        <button onClick={() => { if (confirm(v._pending ? "Discard this unsynced violation?" : "Delete this violation?")) onDelete(v); }} className="text-slate-300 hover:text-red-600" title="Delete"><Trash2 size={15} /></button>
+        <button onClick={() => { if (confirm(v._pending ? "Discard this unsynced violation?" : "Delete this violation?")) onDelete(v); }} className="refos-destructive-icon" title="Delete"><Trash2 size={15} /></button>
       </div>
       {v.desc && <p className={`text-sm mt-1.5 font-medium ${T.text}`}>{v.desc}</p>}
       {v.notes && <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{v.notes}</p>}
@@ -3442,7 +3445,7 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
                 {e.team && <span className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-200">{e.team}</span>}
                 {e.note && <span className="text-slate-600 dark:text-slate-300">{e.note}</span>}
                 <span className="text-[11px] text-slate-400 ml-auto">{e.by ? `${e.by} · ` : ""}{fmtTime(e.createdAt)}</span>
-                {(e.by === meName || canDelete) && <button onClick={() => onRemoveField(e.id)} className="text-slate-300 hover:text-red-600"><Trash2 size={13} /></button>}
+                {(e.by === meName || canDelete) && <button onClick={() => onRemoveField(e.id)} className="refos-destructive-icon"><Trash2 size={13} /></button>}
               </li>
             ))}
           </ul>
@@ -3964,13 +3967,13 @@ function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onS
               </span>
               {onSetAdmin && adminTarget && isOnline && r.name !== meName && (
                 adminTarget.role === "admin" ? (
-                  <button onClick={() => { if (confirm(`Remove Admin access from ${r.name}?`)) onSetAdmin(adminTarget, false); }} className="text-[11px] font-semibold px-2 py-1 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/30 shrink-0" title="Remove Admin access">Remove Admin</button>
+                  <button onClick={() => { if (confirm(`Remove Admin access from ${r.name}?`)) onSetAdmin(adminTarget, false); }} className="refos-destructive-button text-[11px] shrink-0" title="Remove Admin access">Remove Admin</button>
                 ) : (
                   <button onClick={() => { if (confirm(`Give ${r.name} Admin access without requiring the Admin password?`)) onSetAdmin(adminTarget, true); }} className="text-[11px] font-semibold px-2 py-1 rounded-lg border border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 shrink-0" title="Give Admin access">Make Admin</button>
                 )
               )}
               {onRemove && !isOnline && (
-                <button onClick={() => { if (confirm(`Remove ${r.name} from the volunteer list?`)) onRemove(r.name); }} className="text-slate-300 hover:text-red-600 shrink-0" title="Remove volunteer"><Trash2 size={15} /></button>
+                <button onClick={() => { if (confirm(`Remove ${r.name} from the volunteer list?`)) onRemove(r.name); }} className="refos-destructive-icon shrink-0" title="Remove volunteer"><Trash2 size={15} /></button>
               )}
             </li>
           );
@@ -4054,7 +4057,7 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onOpenPhoto, emcee }) {
             <div key={p} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700">
               <button onClick={() => onOpenPhoto(p)} className="w-full h-full"><Thumb pkey={p} /></button>
               {!emcee && <button onClick={() => { if (confirm("Delete this robot photo?")) onRemovePhoto(team.number, p); }}
-                className="absolute top-1 right-1 bg-slate-900/80 text-white rounded-full p-1"><Trash2 size={13} /></button>}
+                className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1"><Trash2 size={13} /></button>}
             </div>
           ))}
         </div>
@@ -4153,7 +4156,7 @@ function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNom
                           {n.by && <span className="flex items-center gap-1"><UserCircle2 size={12} /> {n.by}</span>}
                           {n.byRole && <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md border ${roleChip(n.byRole)}`}>{n.byRole}</span>}
                           <span className="ml-auto">{fmtTime(n.createdAt)}</span>
-                          {!emcee && <button onClick={() => { if (confirm("Remove this nomination?")) onDeleteNom(n.id); }} className="text-slate-300 hover:text-red-600"><Trash2 size={14} /></button>}
+                          {!emcee && <button onClick={() => { if (confirm("Remove this nomination?")) onDeleteNom(n.id); }} className="refos-destructive-icon"><Trash2 size={14} /></button>}
                         </div>
                         {n.reason ? <p className="text-slate-700 dark:text-slate-200 mt-1">{n.reason}</p> : <p className="text-slate-400 italic mt-1">No reason given</p>}
                         {n.criteria && n.criteria.length > 0 && (
@@ -4861,7 +4864,7 @@ function FieldLogView({ entries, onAdd, onRemove, meName, canDelete }) {
                 {e.field && <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{e.field}</span>}
                 {e.matchRef && <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{e.matchRef}</span>}
                 <span className="text-[11px] text-slate-400 ml-auto">{fmtTime(e.createdAt)}</span>
-                {(e.by === meName || canDelete) && <button onClick={() => { if (confirm("Remove this entry?")) onRemove(e.id); }} className="text-slate-300 hover:text-red-600"><Trash2 size={14} /></button>}
+                {(e.by === meName || canDelete) && <button onClick={() => { if (confirm("Remove this entry?")) onRemove(e.id); }} className="refos-destructive-icon"><Trash2 size={14} /></button>}
               </div>
               {e.note && <p className="text-sm text-slate-700 dark:text-slate-200 mt-1.5">{e.note}</p>}
               {e.by && <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1"><UserCircle2 size={12} /> {e.by}</p>}

@@ -19,10 +19,10 @@ export default function ClearModal({ counts, onClear, onClose }) {
     if (confirm(`Permanently delete: ${names}?\nThis cannot be undone.`)) onClear(sel);
   };
   return (
-    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-white dark:bg-slate-800 w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
+    <div className="refos-modal-backdrop fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
+      <div className="refos-modal-panel bg-white dark:bg-slate-800 w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
         <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
-          <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Trash2 size={18} /> Clear data</h2>
+          <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Trash2 size={18} /> Clear Data</h2>
           <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-2">
@@ -44,7 +44,7 @@ export default function ClearModal({ counts, onClear, onClose }) {
         <div className="p-4 pt-0 flex gap-2">
           <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
           <button onClick={doClear} disabled={!any}
-            className={`flex-1 py-2.5 rounded-lg font-semibold text-white ${any ? "bg-red-600 hover:bg-red-700" : "bg-slate-300"}`}>Clear selected</button>
+            className={`flex-1 py-2.5 rounded-lg font-semibold text-white ${any ? "bg-red-600 hover:bg-red-700" : "bg-slate-300"}`}>Delete Selected</button>
         </div>
       </div>
     </div>
