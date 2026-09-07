@@ -46,7 +46,7 @@ alter table public.event_members enable row level security;
 -- membership check as SECURITY DEFINER so policies don't recurse
 create or replace function public.is_member(p_event uuid)
 returns boolean language sql security definer stable
-set search_path = public as $$
+set search_path = public, extensions as $$
   select exists (
     select 1 from public.event_members m
     where m.event_id = p_event and m.user_id = auth.uid()
@@ -103,7 +103,7 @@ alter table public.event_access_attempts enable row level security;
 
 create or replace function public.has_event_role(p_event uuid, p_roles text[])
 returns boolean language sql security definer stable
-set search_path = public as $$
+set search_path = public, extensions as $$
   select exists (
     select 1 from public.event_members m
     where m.event_id = p_event
@@ -115,7 +115,7 @@ $$;
 create or replace function public.claim_event_access(p_event uuid, p_credential text)
 returns table(role text, is_admin boolean)
 language plpgsql security definer
-set search_path = public as $$
+set search_path = public, extensions as $$
 declare
   v_role text;
   v_hash text;
@@ -185,7 +185,7 @@ create or replace function public.set_event_access_credential(
   p_enabled boolean default true
 )
 returns void language plpgsql security definer
-set search_path = public as $$
+set search_path = public, extensions as $$
 begin
   if not public.has_event_role(p_event, array['admin']) then
     raise exception 'Admin role required';
@@ -205,7 +205,7 @@ $$;
 
 create or replace function public.disable_event_access_credential(p_event uuid, p_name text)
 returns void language plpgsql security definer
-set search_path = public as $$
+set search_path = public, extensions as $$
 begin
   if not public.has_event_role(p_event, array['admin']) then
     raise exception 'Admin role required';
@@ -219,7 +219,7 @@ $$;
 
 
 create or replace function public.set_my_event_member_name(p_event uuid, p_name text)
-returns void language plpgsql security definer set search_path=public as $$
+returns void language plpgsql security definer set search_path=public, extensions as $$
 begin
   if auth.uid() is null then raise exception 'Authentication session required'; end if;
   update public.event_members
@@ -229,7 +229,7 @@ end;
 $$;
 
 create or replace function public.downgrade_my_event_role(p_event uuid, p_role text)
-returns void language plpgsql security definer set search_path=public as $$
+returns void language plpgsql security definer set search_path=public, extensions as $$
 begin
   if p_role not in ('ref','judge','emcee') then raise exception 'Invalid downgrade role'; end if;
   if not public.has_event_role(p_event,array['admin']) then raise exception 'Admin role required'; end if;
@@ -307,7 +307,7 @@ create index if not exists teams_event_idx on public.teams(event_id);
 create or replace function public.create_event(
   p_name text, p_quals int, p_practice int, p_bracket int, p_finals int
 ) returns public.events language plpgsql security definer
-set search_path = public as $$
+set search_path = public, extensions as $$
 declare ev public.events; code text;
 begin
   code := upper(substr(replace(gen_random_uuid()::text,'-',''),1,6));
@@ -321,7 +321,7 @@ end; $$;
 
 create or replace function public.join_event_by_code(p_code text)
 returns public.events language plpgsql security definer
-set search_path = public as $$
+set search_path = public, extensions as $$
 declare ev public.events;
 begin
   select * into ev from public.events where join_code = upper(p_code);
@@ -522,7 +522,7 @@ alter table public.event_access_credentials enable row level security;
 
 create or replace function public.has_event_role(p_event uuid, p_roles text[])
 returns boolean language sql security definer stable
-set search_path = public as $$
+set search_path = public, extensions as $$
   select exists (
     select 1 from public.event_members m
     where m.event_id = p_event and m.user_id = auth.uid() and m.role = any(p_roles)
@@ -532,7 +532,7 @@ $$;
 create or replace function public.claim_event_access(p_event uuid, p_credential text)
 returns table(role text, is_admin boolean)
 language plpgsql security definer
-set search_path = public as $$
+set search_path = public, extensions as $$
 declare
   v_role text;
   v_hash text;
@@ -597,7 +597,7 @@ $$;
 create or replace function public.set_event_access_credential(
   p_event uuid, p_name text, p_role text, p_hash text, p_enabled boolean default true
 )
-returns void language plpgsql security definer set search_path=public as $$
+returns void language plpgsql security definer set search_path=public, extensions as $$
 begin
   if not public.has_event_role(p_event,array['admin']) then raise exception 'Admin role required'; end if;
   if p_role not in ('ref','judge','emcee','admin') then raise exception 'Invalid role'; end if;
@@ -609,7 +609,7 @@ end;
 $$;
 
 create or replace function public.disable_event_access_credential(p_event uuid,p_name text)
-returns void language plpgsql security definer set search_path=public as $$
+returns void language plpgsql security definer set search_path=public, extensions as $$
 begin
   if not public.has_event_role(p_event,array['admin']) then raise exception 'Admin role required'; end if;
   update public.event_access_credentials set enabled=false,updated_at=now()
@@ -813,7 +813,7 @@ drop policy if exists "credentials direct access" on public.event_access_credent
 
 
 create or replace function public.downgrade_my_event_role(p_event uuid, p_role text)
-returns void language plpgsql security definer set search_path=public as $$
+returns void language plpgsql security definer set search_path=public, extensions as $$
 begin
   if p_role not in ('ref','judge','emcee') then raise exception 'Invalid downgrade role'; end if;
   if not public.has_event_role(p_event,array['admin']) then raise exception 'Admin role required'; end if;
