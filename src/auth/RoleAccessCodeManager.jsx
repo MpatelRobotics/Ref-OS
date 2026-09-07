@@ -10,7 +10,13 @@ async function hashAccessCode(code) {
 
 export default function RoleAccessCodeManager({ eventId, config: sharedConfig, onSave, onClose }) {
   const [config, setConfig] = useState(() => sharedConfig || { version: 1, codes: {} });
-  const [revealed, setRevealed] = useState({});
+  const [revealed, setRevealed] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(`refosRoleCodes:${eventId}`) || "{}");
+    } catch {
+      return {};
+    }
+  });
   const [busyRole, setBusyRole] = useState("");
   const [error, setError] = useState("");
 
@@ -63,7 +69,11 @@ export default function RoleAccessCodeManager({ eventId, config: sharedConfig, o
       };
       await onSave(next);
       setConfig(next);
-      setRevealed((cur) => ({ ...cur, [role]: code }));
+      setRevealed((cur) => {
+        const nextRevealed = { ...cur, [role]: code };
+        try { sessionStorage.setItem(`refosRoleCodes:${eventId}`, JSON.stringify(nextRevealed)); } catch {}
+        return nextRevealed;
+      });
     } catch (e) {
       setError(e.message || String(e));
     } finally {
@@ -94,6 +104,7 @@ export default function RoleAccessCodeManager({ eventId, config: sharedConfig, o
       setRevealed((cur) => {
         const copy = { ...cur };
         delete copy[role];
+        try { sessionStorage.setItem(`refosRoleCodes:${eventId}`, JSON.stringify(copy)); } catch {}
         return copy;
       });
     } catch (e) {
@@ -115,6 +126,7 @@ export default function RoleAccessCodeManager({ eventId, config: sharedConfig, o
       await onSave(next);
       setConfig(next);
       setRevealed({});
+      try { sessionStorage.removeItem(`refosRoleCodes:${eventId}`); } catch {}
     } catch (e) {
       setError(e.message || String(e));
     } finally {

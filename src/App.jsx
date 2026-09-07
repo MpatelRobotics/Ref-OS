@@ -2592,7 +2592,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><Rankings viols={viols} teamName={teamNameMap} /></div></div>
         </div>
       )}
-      {showShare && <ShareModal event={event} onClose={() => setShowShare(false)} />}
+      {showShare && <ShareModal
+        event={event}
+        adminUnlocked={adminUnlocked}
+        roleCodeConfig={eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config}
+        onManageCodes={() => { setShowShare(false); setShowRoleCodeManager(true); }}
+        onClose={() => setShowShare(false)}
+      />}
       {showAdminPassword && <AdminPasswordModal onUnlock={unlockAdmin} onClose={() => { pendingAdminAction.current = null; setShowAdminPassword(false); }} />}
       {showInstallHelp && (
         <Modal onClose={() => setShowInstallHelp(false)}>
