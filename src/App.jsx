@@ -460,6 +460,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [syncing, setSyncing] = useState(false);
   const [syncedAt, setSyncedAt] = useState(0);
   const [online, setOnline] = useState(typeof navigator === "undefined" || navigator.onLine !== false);
+  const [cloudReachable, setCloudReachable] = useState(null);
+  const [queuedWrites, setQueuedWrites] = useState(0);
+  const [lastCloudError, setLastCloudError] = useState("");
   const [matches, setMatches] = useState({}); // { [num]: {red:[], blue:[]} }
   const [rules, setRules] = useState([]);      // [{ code, desc, category }]
   const [presence, setPresence] = useState([]); // [{ name, ... }] currently online
@@ -736,26 +739,41 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     try { localStorage.setItem(`refosTmSync:${eventId}`, JSON.stringify(next)); } catch {}
   };
 
+  const refreshQueueHealth = useCallback(async () => {
+    try { setQueuedWrites((await outbox.loadQueue(eventId)).length); } catch {}
+  }, [eventId]);
+
   const refresh = useCallback(async () => {
     setSyncing(true);
     setAlliancesLoaded(false);
-    const [ev, t, v, nm, sl, wn] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), api.listViolations(eventId), api.listNominations(eventId), api.listShortlist(eventId), api.listWatchNotes(eventId)]);
-    if (ev) setEvent(ev);
-    // keep optimistic items the server hasn't caught up on yet (unsynced writes)
-    setTeams((cur) => {
-      const pending = cur.filter((x) => x._pending && !t.some((s) => s.number === x.number));
-      return [...t, ...pending];
-    });
-    setViols((cur) => { const pend = cur.filter((x) => x._pending && !v.some((s) => s.id === x.id)); return [...pend, ...v]; });
-    setNoms(nm);
-    setFinalists(new Set(sl.map((s) => `${s.award}::${s.team}`)));
-    setWatchNotes(wn);
-    api.listFieldLog(eventId).then(setFieldLog).catch(() => {});
-    api.listEventSettings(eventId).then(setEventSettings).catch(() => {});
-    outbox.loadFailed(eventId).then(setFailedSyncItems).catch(() => {});
-    api.listAlliances(eventId).then((rows) => { const m = {}; for (const a of rows) m[a.seed] = a.teams; setAlliances(m); setAlliancesLoaded(true); }).catch(() => { setAlliancesLoaded(true); });
-    setSyncedAt(Date.now()); setSyncing(false);
-  }, [eventId]);
+    try {
+      const [ev, t, v, nm, sl, wn] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), api.listViolations(eventId), api.listNominations(eventId), api.listShortlist(eventId), api.listWatchNotes(eventId)]);
+      if (ev) setEvent(ev);
+      setTeams((cur) => {
+        const pending = cur.filter((x) => x._pending && !t.some((s) => s.number === x.number));
+        return [...t, ...pending];
+      });
+      setViols((cur) => { const pend = cur.filter((x) => x._pending && !v.some((s) => s.id === x.id)); return [...pend, ...v]; });
+      setNoms(nm);
+      setFinalists(new Set(sl.map((s) => `${s.award}::${s.team}`)));
+      setWatchNotes(wn);
+      api.listFieldLog(eventId).then(setFieldLog).catch(() => {});
+      api.listEventSettings(eventId).then(setEventSettings).catch(() => {});
+      outbox.loadFailed(eventId).then(setFailedSyncItems).catch(() => {});
+      api.listAlliances(eventId).then((rows) => { const m = {}; for (const a of rows) m[a.seed] = a.teams; setAlliances(m); setAlliancesLoaded(true); }).catch(() => { setAlliancesLoaded(true); });
+      const now = Date.now();
+      setSyncedAt(now);
+      setCloudReachable(true);
+      setLastCloudError("");
+    } catch (e) {
+      setCloudReachable(false);
+      setLastCloudError(e?.message || String(e || "Cloud connection failed"));
+      throw e;
+    } finally {
+      setSyncing(false);
+      refreshQueueHealth();
+    }
+  }, [eventId, refreshQueueHealth]);
 
   const doFlush = useCallback(async () => {
     await outbox.flush(eventId, {
@@ -765,9 +783,12 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         console.error("outbox op retained as failed", op, e);
         outbox.loadFailed(eventId).then(setFailedSyncItems).catch(() => {});
       },
-      onIdle: () => outbox.loadFailed(eventId).then(setFailedSyncItems).catch(() => {}),
+      onIdle: () => {
+        outbox.loadFailed(eventId).then(setFailedSyncItems).catch(() => {});
+        refreshQueueHealth();
+      },
     });
-  }, [eventId]);
+  }, [eventId, refreshQueueHealth]);
 
   const retryFailedSync = async (failedId) => {
     await outbox.retryFailed(eventId, failedId);
@@ -790,6 +811,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       api.listRules(eventId).then(setRules);
       // restore violations still waiting in the queue (e.g. after a reload while offline)
       const q = await outbox.loadQueue(eventId);
+      setQueuedWrites(q.length);
       const pendingTeams = q.filter((o) => o.kind === "team").map((o) => ({
         number: normNum(o.number), name: (o.name || "").trim(), createdAt: o.createdAt || Date.now(), _pending: true,
       }));
@@ -808,8 +830,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     })();
     const unsub = api.subscribeEvent(eventId, () => refresh());
     const onFocus = () => { refresh(); doFlush(); };
-    const goOnline = () => { setOnline(true); doFlush(); };
-    const goOffline = () => setOnline(false);
+    const goOnline = () => { setOnline(true); setCloudReachable(null); refresh().catch(() => {}); doFlush(); };
+    const goOffline = () => { setOnline(false); setCloudReachable(false); };
     window.addEventListener("focus", onFocus);
     window.addEventListener("online", goOnline);
     window.addEventListener("offline", goOffline);
@@ -2099,6 +2121,18 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   };
 
 
+  const connectionHealth = !online
+    ? { label: queuedWrites > 0 ? `Offline • ${queuedWrites} saved locally` : "Offline • local mode", tone: "amber", icon: "offline" }
+    : syncing
+      ? { label: "Ref OS Cloud • Syncing", tone: "blue", icon: "sync" }
+      : cloudReachable === false
+        ? { label: "Ref OS Cloud • Unavailable", tone: "red", icon: "offline" }
+        : cloudReachable === null
+          ? { label: "Ref OS Cloud • Checking", tone: "slate", icon: "sync" }
+          : queuedWrites > 0
+            ? { label: `Ref OS Cloud • ${queuedWrites} queued`, tone: "amber", icon: "sync" }
+            : { label: "Ref OS Cloud • Connected", tone: "green", icon: "cloud" };
+
   if (!ready) return <FullPage>Loading event…</FullPage>;
 
   const filteredTeams = teams
@@ -2127,20 +2161,20 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           <div className="flex-1 min-w-0">
             <div className="flex items-start gap-1.5 flex-wrap">
               <h1 className="font-bold tracking-tight leading-tight text-[15px] sm:text-base line-clamp-2">{event?.name || "Violation Log"}</h1>
-              {online ? (
-                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-300 bg-emerald-900/40 px-1.5 py-0.5 rounded-full shrink-0 mt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> live
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 text-[10px] text-amber-300 bg-amber-900/40 px-1.5 py-0.5 rounded-full shrink-0 mt-0.5">
-                  <CloudOff size={10} /> offline
-                </span>
-              )}
-              {pendingCount > 0 && (
-                <span className="inline-flex items-center gap-1 text-[10px] text-amber-200 bg-amber-900/40 px-1.5 py-0.5 rounded-full shrink-0 mt-0.5">
-                  <RefreshCw size={9} className="animate-spin" /> {pendingCount} pending
-                </span>
-              )}
+              <button
+                onClick={() => adminUnlocked && setShowDiagnosticReport(true)}
+                title={adminUnlocked ? "Open Admin Diagnostics" : connectionHealth.label}
+                className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${
+                  connectionHealth.tone === "green" ? "text-emerald-300 bg-emerald-900/40" :
+                  connectionHealth.tone === "blue" ? "text-sky-300 bg-sky-900/40" :
+                  connectionHealth.tone === "red" ? "text-red-300 bg-red-900/40" :
+                  connectionHealth.tone === "amber" ? "text-amber-300 bg-amber-900/40" :
+                  "text-slate-300 bg-slate-700/60"
+                } ${adminUnlocked ? "hover:ring-1 hover:ring-white/30" : "cursor-default"}`}
+              >
+                {connectionHealth.icon === "cloud" ? <Cloud size={10} /> : connectionHealth.icon === "sync" ? <RefreshCw size={10} className={syncing ? "animate-spin" : ""} /> : <CloudOff size={10} />}
+                {connectionHealth.label}
+              </button>
             </div>
             <button onClick={() => { refresh(); doFlush(); }} className="text-[11px] text-slate-400 leading-tight mt-0.5 flex items-center gap-1 hover:text-slate-200">
               <RefreshCw size={10} className={syncing ? "animate-spin" : ""} />
@@ -2529,6 +2563,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       {showDiagnosticReport && adminUnlocked && <EventDiagnosticReport event={event} eventId={eventId} teams={teams} matches={matches}
         viols={viols} rules={rules} fieldLog={fieldLog} presence={presence} roster={refRoster} contacts={eventContacts}
         countdown={eventCountdown} tmSyncStatus={tmSyncStatus} online={online} pendingCount={pendingCount}
+        queuedWrites={queuedWrites} failedSyncCount={failedSyncItems.length} cloudReachable={cloudReachable}
+        lastCloudError={lastCloudError} syncedAt={syncedAt} syncing={syncing}
         lastSystemTest={lastSystemTest} onClose={() => setShowDiagnosticReport(false)} />}
       {showRoleCodeManager && adminUnlocked && <RoleAccessCodeManager eventId={eventId} config={eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config}
         onSave={saveRoleAccessConfig} onClose={() => setShowRoleCodeManager(false)} />}
@@ -3773,7 +3809,7 @@ function TwoDeviceSyncTest({ fieldLog, deviceId, meName, onAdd, onRemove, onClos
   );
 }
 
-function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, fieldLog, presence, roster, contacts, countdown, tmSyncStatus, online, pendingCount, lastSystemTest, onClose }) {
+function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, fieldLog, presence, roster, contacts, countdown, tmSyncStatus, online, pendingCount, queuedWrites = 0, failedSyncCount = 0, cloudReachable = null, lastCloudError = "", syncedAt = 0, syncing = false, lastSystemTest, onClose }) {
   const [runtime, setRuntime] = useState({ cacheCount: null, swControlled: false, swSupported: false });
   useEffect(() => {
     (async () => {
@@ -3810,6 +3846,14 @@ function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, f
       serviceWorkerControlled: runtime.swControlled,
       cacheCount: runtime.cacheCount,
       pendingOfflineChanges: pendingCount,
+      queuedWrites,
+      failedSyncItems: failedSyncCount,
+      cloudReachable,
+      cloudSyncing: syncing,
+      lastSuccessfulCloudSync: syncedAt ? new Date(syncedAt).toISOString() : null,
+      lastCloudError: lastCloudError || null,
+      displayMode: window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true ? "standalone" : "browser",
+      viewport: `${window.innerWidth}x${window.innerHeight}`,
     },
     data: {
       teams: (teams || []).length,
@@ -3850,7 +3894,7 @@ function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, f
     <div className="fixed inset-0 z-[80] bg-slate-50 dark:bg-slate-900 flex flex-col">
       <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2">
         <ShieldCheck size={20}/>
-        <div><h2 className="font-bold">Event Diagnostic Report</h2><p className="text-xs text-slate-400">Technical event and device snapshot</p></div>
+        <div><h2 className="font-bold">Admin Diagnostics</h2><p className="text-xs text-slate-400">Cloud, device, sync, and app health</p></div>
         <button onClick={onClose} className="ml-auto"><X size={22}/></button>
       </div>
       <div className="flex-1 overflow-y-auto">
@@ -3862,11 +3906,22 @@ function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, f
           </div>
 
           <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 space-y-2 text-sm">
-            <div className="font-bold">Device status</div>
-            <div className="flex justify-between"><span>Online</span><b>{report.device.online ? "Yes" : "No"}</b></div>
+            <div className="font-bold">Connection & Sync</div>
+            <div className="flex justify-between"><span>Network</span><b className={report.device.online ? "text-emerald-600" : "text-amber-600"}>{report.device.online ? "Online" : "Offline"}</b></div>
+            <div className="flex justify-between"><span>Ref OS Cloud</span><b className={cloudReachable === true ? "text-emerald-600" : cloudReachable === false ? "text-red-600" : "text-slate-500"}>{syncing ? "Syncing" : cloudReachable === true ? "Connected" : cloudReachable === false ? "Unavailable" : "Checking"}</b></div>
+            <div className="flex justify-between"><span>Last successful sync</span><b>{syncedAt ? ago(syncedAt) : "Not yet"}</b></div>
+            <div className="flex justify-between"><span>Queued writes</span><b>{queuedWrites}</b></div>
+            <div className="flex justify-between"><span>Failed sync items</span><b className={failedSyncCount ? "text-red-600" : ""}>{failedSyncCount}</b></div>
+            {lastCloudError && <div className="mt-2 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 p-2 text-xs text-red-700 dark:text-red-300 break-words">Last cloud error: {lastCloudError}</div>}
+          </div>
+
+          <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 space-y-2 text-sm">
+            <div className="font-bold">Device & App</div>
+            <div className="flex justify-between"><span>Ref OS version</span><b>v{APP_VERSION}</b></div>
+            <div className="flex justify-between"><span>App mode</span><b>{report.device.displayMode === "standalone" ? "Installed PWA" : "Browser"}</b></div>
+            <div className="flex justify-between"><span>Viewport</span><b>{report.device.viewport}</b></div>
             <div className="flex justify-between"><span>Service worker</span><b>{report.device.serviceWorkerControlled ? "Controlling app" : report.device.serviceWorkerSupported ? "Supported, not controlling" : "Unsupported"}</b></div>
             <div className="flex justify-between"><span>Offline caches</span><b>{runtime.cacheCount == null ? "Unknown" : runtime.cacheCount}</b></div>
-            <div className="flex justify-between"><span>Pending offline changes</span><b>{pendingCount}</b></div>
           </div>
 
           <div className="rounded-xl border bg-white dark:bg-slate-800 p-4 space-y-2 text-sm">
