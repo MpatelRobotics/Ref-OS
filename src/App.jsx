@@ -26,6 +26,7 @@ import AddTeamModal from "./components/modals/AddTeamModal.jsx";
 import AnnouncementModal from "./components/modals/AnnouncementModal.jsx";
 import CountdownSetupModal from "./components/modals/CountdownSetupModal.jsx";
 import OfflineReadinessModal from "./components/modals/OfflineReadinessModal.jsx";
+import FeedbackModal from "./components/modals/FeedbackModal.jsx";
 
 /* This build is locked to one event: The Highlander Summit Signature Event.
    EVENT_ID must match supabase/seed.sql. A shared site password gates entry. */
@@ -541,6 +542,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showByRule, setShowByRule] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const [showFeatures, setShowFeatures] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [showTMSync, setShowTMSync] = useState(false);
   const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [showCountdownSetup, setShowCountdownSetup] = useState(false);
@@ -2550,7 +2552,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Flag size={18} /> Field log</h2>
           </div>
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4">
-            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
+            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","feedback"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
           </div></div>
         </div>
       )}
@@ -2607,9 +2609,22 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             <button onClick={() => setShowFeatures(false)} className="text-slate-500 p-1 -ml-1"><ChevronLeft size={22} /></button>
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Info size={18} /> Features &amp; help</h2>
           </div>
-          <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><FeaturesGuide /></div></div>
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-2xl mx-auto px-4 py-4">
+              <div className="mb-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/30 text-[#D7212B] flex items-center justify-center shrink-0"><Mail size={18} /></div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-slate-900 dark:text-slate-100">Help Improve Ref OS</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Report a bug, request a feature, or send general feedback.</div>
+                </div>
+                <button onClick={() => setShowFeedback(true)} className="px-3 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-semibold shrink-0">Send Feedback</button>
+              </div>
+              <FeaturesGuide />
+            </div>
+          </div>
         </div>
       )}
+      {showFeedback && <FeedbackModal meName={meName} myRole={myRole} onSubmit={addFieldLog} onClose={() => setShowFeedback(false)} />}
       {showActivity && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
           <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
@@ -3823,7 +3838,7 @@ function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, f
     })();
   }, []);
 
-  const internalKinds = new Set(["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes"]);
+  const internalKinds = new Set(["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","feedback"]);
   const operationalFieldLog = (fieldLog || []).filter((e) => !internalKinds.has(e.kind));
   const report = {
     generatedAt: new Date().toISOString(),
