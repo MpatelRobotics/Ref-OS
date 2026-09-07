@@ -6,3 +6,7 @@ dist
 # TM bridge secrets
 tm-bridge/.env
 tm-bridge/node_modules/
+*.zip
+test-results/
+dist/
+node_modules/
