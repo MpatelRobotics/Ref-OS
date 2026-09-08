@@ -2144,7 +2144,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-700 font-sans text-slate-800 dark:text-slate-100 antialiased">
-      <header className="sticky top-0 z-20 bg-[#0D0F32] text-white shadow-lg">
+      <header className="sticky top-0 z-20 bg-[#0D0F32] text-white border-b border-white/10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           {(openTeam || openMatch || openRobot) ? (
             <button onClick={() => { setOpenTeam(null); setOpenMatch(null); setOpenRobot(null); }} className="p-1 -ml-1 rounded hover:bg-white/10"><ChevronLeft size={22} /></button>
@@ -2154,7 +2154,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
               <div className="leading-tight hidden sm:block">
                 <div className="flex items-center gap-1.5">
                   <div className="font-bold text-[13px] text-white">Ref-OS</div>
-                  <span className="rounded-full border border-amber-300/50 bg-amber-400/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-200">Private Beta</span>
+                  <span className="rounded-sm border border-amber-300/40 bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-200">Private Beta</span>
                 </div>
                 <div className="text-[9px] text-slate-400">Referee Operating System</div>
               </div>
@@ -2166,7 +2166,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
               <button
                 onClick={() => adminUnlocked && setShowDiagnosticReport(true)}
                 title={adminUnlocked ? "Open Admin Diagnostics" : connectionHealth.label}
-                className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${
+                className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm shrink-0 mt-0.5 ${
                   connectionHealth.tone === "green" ? "text-emerald-300 bg-emerald-900/40" :
                   connectionHealth.tone === "blue" ? "text-sky-300 bg-sky-900/40" :
                   connectionHealth.tone === "red" ? "text-red-300 bg-red-900/40" :
@@ -2186,14 +2186,14 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           <OnlineCluster presence={presence} onClick={() => setShowOnline(true)} />
           {!isJudge && !isEmcee && <button onClick={() => setShowByRule(true)} title="By rule" className="p-1.5 rounded hover:bg-white/10"><BarChart3 size={18} /></button>}
           <button onClick={() => setShowIdentity(true)} title="Your full name"
-            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-full pl-1 pr-2.5 py-1">
+            className="flex items-center gap-1.5 border border-white/15 bg-white/5 hover:bg-white/10 rounded-md pl-1 pr-2.5 py-1">
             <span className="w-6 h-6 rounded-full bg-[#D7212B] text-white text-[11px] font-bold grid place-items-center">{meName ? initials(meName) : "?"}</span>
             <span className="text-xs font-medium max-w-[70px] truncate">{meName || "Set name"}</span>
           </button>
           <div className="relative">
             <button aria-label="Settings" onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
-              <div ref={menuRef} className="refos-menu-pop absolute right-0 mt-2 w-56 max-h-[75vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
+              <div ref={menuRef} className="refos-menu-pop absolute right-0 mt-2 w-56 max-h-[75vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-md shadow-lg border border-slate-200 dark:border-slate-700 py-1 text-sm">
                 {isJudge ? (
                   <>
                     <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><Trophy size={12} /> Judge Advisor</div>
@@ -2384,14 +2384,14 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         ) : (
           <>
             {!event?.quals ? (
-              <button onClick={() => requireAdmin(() => setShowEvent(true))} className="w-full mb-4 bg-[#0D0F32] text-white rounded-xl p-4 flex items-center gap-3 text-left hover:bg-[#171a45]">
+              <button onClick={() => requireAdmin(() => setShowEvent(true))} className="w-full mb-4 bg-[#0D0F32] text-white rounded-md p-4 flex items-center gap-3 text-left hover:bg-[#171a45]">
                 <CalendarDays size={22} className="text-[#EBA622] shrink-0" />
                 <div className="flex-1"><p className="font-semibold leading-tight">Finish event setup</p>
                   <p className="text-xs text-slate-400 mt-0.5">Add how many matches so logging picks the match from a list.</p></div>
                 <ChevronRight size={18} className="text-slate-500 dark:text-slate-400" />
               </button>
             ) : (
-              <button onClick={() => requireAdmin(() => setShowEvent(true))} className="w-full mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 flex items-center gap-2 text-left hover:border-slate-300 dark:border-slate-600">
+              <button onClick={() => requireAdmin(() => setShowEvent(true))} className="w-full mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-4 py-2.5 flex items-center gap-2 text-left hover:border-slate-300 dark:border-slate-600">
                 <CalendarDays size={16} className="text-slate-400 shrink-0" />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate flex-1">{event.name || "Event"}</span>
                 <span className="text-xs text-slate-400">{event.quals} quals{event.bracket ? ` · top ${event.bracket}` : ""}</span>
@@ -2402,10 +2402,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
               <div className="relative flex-1">
                 <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search team #"
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                  className="w-full pl-9 pr-3 py-2.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
               </div>
-              <button onClick={() => setShowTeamScanner(true)} className="px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Camera size={17} /> Scan</button>
-              {!isEmcee && <button onClick={() => setAddTeam(true)} className="px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Plus size={17} /> Team</button>}
+              <button onClick={() => setShowTeamScanner(true)} className="px-3 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Camera size={17} /> Scan</button>
+              {!isEmcee && <button onClick={() => setAddTeam(true)} className="px-3 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Plus size={17} /> Team</button>}
             </div>
             {filteredTeams.length === 0 ? (
               <Empty title={teams.length ? "No matches" : "No teams yet"} sub={teams.length ? "Try a different team number." : "Add a team, or just log a violation and the team is created for you."} />
@@ -2415,7 +2415,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                   const c = countsByTeam[t.number] || { total: 0 };
                   return (
                     <li key={t.number}>
-                      <button onClick={() => setOpenTeam(t.number)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
+                      <button onClick={() => setOpenTeam(t.number)} className="w-full text-left bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
                         <span className="font-mono font-bold text-lg text-slate-900 dark:text-slate-100">{t.number}</span>
                         {t.rank != null && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-200 dark:border-indigo-800 text-xs font-bold shrink-0">Rank {t.rank}</span>}
                         {!isEmcee && teamWatch[t.number]?.length > 0 && <span title={teamWatch[t.number].map((w) => `${w.by || "Ref"}: ${w.note}`).join("\n")} className="inline-flex items-center gap-1 text-amber-600 text-xs font-semibold shrink-0"><Star size={15} fill="currentColor" /> WATCH{teamWatch[t.number].length > 1 ? ` ${teamWatch[t.number].length}` : ""}</span>}
@@ -2447,7 +2447,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       </main>
 
       {!openTeam && !openMatch && !openRobot && view !== "judging" && !isEmcee && (
-        <button onClick={() => setLogFor("")} className="fixed bottom-5 left-1/2 -translate-x-1/2 z-20 bg-[#D7212B] text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
+        <button onClick={() => setLogFor("")} className="fixed bottom-5 right-5 z-20 bg-[#D7212B] text-white px-4 py-3 rounded-md shadow-lg border border-red-800/20 flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
           <Plus size={20} /> Log violation
         </button>
       )}
@@ -3204,7 +3204,7 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search match # or team"
-          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+          className="w-full pl-9 pr-3 py-2.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
       </div>
       {tab === "elim" && canAdd && (
         <button onClick={onAddMatch} className="w-full mb-3 py-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-medium flex items-center justify-center gap-2 hover:border-slate-400"><Plus size={16} /> Add elimination match</button>
@@ -3215,7 +3215,7 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
         <ul className="space-y-2">
           {filtered.map((m) => (
             <li key={m.id}>
-              <button onClick={() => onOpen(m.id)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
+              <button onClick={() => onOpen(m.id)} className="w-full text-left bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-14 shrink-0">{rowLabel(m)}</span>
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
                   <span className="text-red-700 font-semibold">{m.red.join("  ")}</span>
@@ -4072,7 +4072,7 @@ function RobotList({ teams, query, setQuery, onOpen }) {
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search team #"
-          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+          className="w-full pl-9 pr-3 py-2.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
       </div>
       {filtered.length === 0 ? (
         <Empty title="No teams" sub="Try a different team number." />
@@ -5169,7 +5169,7 @@ function RuleBook({ rules }) {
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search rules — code or wording"
-          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+          className="w-full pl-9 pr-3 py-2.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
       </div>
       {groups.length === 0 ? (
         <Empty title="No rules match" sub="Try a different word or code." />

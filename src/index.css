@@ -127,3 +127,53 @@ button:active:not(:disabled) {
     transform: none;
   }
 }
+
+/* Highlander Release visual system
+   Deliberately flatter and more utilitarian than a generic SaaS card UI. */
+:root {
+  --refos-surface: #ffffff;
+  --refos-page: #f3f4f6;
+  --refos-border: #d7dce3;
+}
+body {
+  background: var(--refos-page);
+}
+
+/* Keep the interface compact and operational. */
+.rounded-xl { border-radius: 0.5rem !important; }
+.rounded-2xl { border-radius: 0.625rem !important; }
+.shadow-xl { box-shadow: 0 8px 20px rgb(15 23 42 / 0.12) !important; }
+.shadow-2xl { box-shadow: 0 10px 26px rgb(15 23 42 / 0.16) !important; }
+
+/* Cards read as records and controls, not floating tiles. */
+main .bg-white.border,
+main .dark\\:bg-slate-800.border {
+  box-shadow: none;
+}
+
+/* Menus and modals use a restrained enterprise-style edge treatment. */
+.refos-menu-pop,
+.refos-modal-panel {
+  border-radius: 0.5rem !important;
+}
+.refos-menu-pop {
+  box-shadow: 0 8px 20px rgb(15 23 42 / 0.14) !important;
+}
+
+/* Smaller motion footprint for an event operations tool. */
+@keyframes refosMenuIn {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes refosModalIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+button:active:not(:disabled) { transform: none; }
+
+/* Tighten helper copy so primary data has more visual weight. */
+.refos-menu-section {
+  font-size: 0.62rem;
+  letter-spacing: 0.075em;
+  font-weight: 700;
+}
