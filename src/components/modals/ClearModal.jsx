@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import { Check, Trash2, X } from "lucide-react";
 
 export default function ClearModal({ counts, onClear, onClose }) {
-  const [sel, setSel] = useState({ violations: false, teams: false, schedule: false, replays: false, judging: false, alliances: false, watchlist: false });
+  const [sel, setSel] = useState({ violations: false, teams: false, schedule: false, replays: false, awp: false, judging: false, alliances: false, watchlist: false });
   const opts = [
     { key: "violations", label: "Violations", desc: `${counts.violations} logged`, note: "Clears every violation and its photos." },
     { key: "replays", label: "Match replays", desc: `${counts.replays} flagged`, note: "Clears all matches marked to re-run (does not delete the matches)." },
+    { key: "awp", label: "AWP checks", desc: `${counts.awp} saved`, note: "Clears all saved qualification AWP checks and AWP analytics history." },
     { key: "teams", label: "Teams", desc: `${counts.teams} teams`, note: "Removes the team roster." },
     { key: "schedule", label: "Match schedule", desc: `${counts.schedule} matches`, note: "Removes the imported matches. Also clears team rankings and W-L-T (both come from the schedule)." },
     { key: "judging", label: "Judging", desc: `${counts.judging} nominations`, note: "Clears all award nominations and finalist selections." },

@@ -1654,6 +1654,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         for (const id of ids) await api.deleteFieldLog(id);
         setFieldLog((cur) => cur.filter((e) => e.kind !== "replay"));
       }
+      if (sel.awp) {
+        const ids = fieldLog.filter((e) => e.kind === "awp").map((e) => e.id);
+        for (const id of ids) await api.deleteFieldLog(id);
+        setFieldLog((cur) => cur.filter((e) => e.kind !== "awp"));
+      }
       if (sel.teams) { await api.clearTeams(eventId); setTeams([]); }
       if (sel.schedule) { await api.clearMatches(eventId); setMatches({}); await api.clearRankings(eventId); setTeams((cur) => cur.map((t) => ({ ...t, rank: null }))); }
       if (sel.judging) { await api.clearJudging(eventId); setNoms([]); setFinalists(new Set()); }
@@ -2474,7 +2479,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       )}
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
       {showIdentity && <IdentityModal me={{ name: meName }} onSave={async (n) => { await onEditName(n); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
-      {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length }} onClear={clearSelected} onClose={() => setShowClear(false)} />}
+      {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, awp: fieldLog.filter((e) => e.kind === "awp").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length }} onClear={clearSelected} onClose={() => setShowClear(false)} />}
       {showOnline && (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
           <div className="bg-white dark:bg-slate-800 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
