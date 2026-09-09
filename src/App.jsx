@@ -5075,7 +5075,294 @@ function RuleBook({ rules }) {
   const [selected, setSelected] = useState(null); // rule object shown in the notes popup
   const [showGameManual, setShowGameManual] = useState(false);
   const MANUAL_PAGE_COUNT = 129;
+  const manualPageRefs = useRef({});
   const manualPageSrc = (page) => `/game-manual-pages/page-${String(page).padStart(3, "0")}.jpg`;
+  const manualTocLinks = [
+  {
+    "sourcePage": 3,
+    "targetPage": 5,
+    "left": 5.71895,
+    "top": 13.64242,
+    "width": 9.28355,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 5,
+    "left": 7.18954,
+    "top": 16.67272,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 7,
+    "left": 7.18954,
+    "top": 19.70303,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 12,
+    "left": 5.71895,
+    "top": 26.9,
+    "width": 36.85212,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 17,
+    "left": 5.71895,
+    "top": 32.9606,
+    "width": 33.06683,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 17,
+    "left": 7.18954,
+    "top": 35.99091,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 22,
+    "left": 7.18954,
+    "top": 39.02121,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 24,
+    "left": 7.18954,
+    "top": 42.05152,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 29,
+    "left": 7.18954,
+    "top": 45.08182,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 37,
+    "left": 7.18954,
+    "top": 48.11212,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 38,
+    "left": 7.18954,
+    "top": 51.14242,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 40,
+    "left": 7.18954,
+    "top": 54.17273,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 49,
+    "left": 5.71895,
+    "top": 61.3697,
+    "width": 35.99052,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 49,
+    "left": 7.18954,
+    "top": 64.4,
+    "width": 77.94118,
+    "height": 3.72373
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 54,
+    "left": 5.71895,
+    "top": 71.59697,
+    "width": 33.43938,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 54,
+    "left": 16.19593,
+    "top": 74.62727,
+    "width": 68.93479,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 68,
+    "left": 5.71895,
+    "top": 81.82424,
+    "width": 42.84641,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 3,
+    "targetPage": 68,
+    "left": 7.18954,
+    "top": 84.85454,
+    "width": 77.94118,
+    "height": 3.7237
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 81,
+    "left": 5.71895,
+    "top": 8.97475,
+    "width": 26.99134,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 81,
+    "left": 7.18954,
+    "top": 12.00505,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 81,
+    "left": 7.18954,
+    "top": 15.03536,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 82,
+    "left": 7.18954,
+    "top": 18.06566,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 85,
+    "left": 7.18954,
+    "top": 21.09596,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 86,
+    "left": 7.18954,
+    "top": 24.12626,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 88,
+    "left": 7.18954,
+    "top": 27.15657,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 89,
+    "left": 7.18954,
+    "top": 30.18687,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 95,
+    "left": 7.18954,
+    "top": 33.21717,
+    "width": 77.94118,
+    "height": 3.72373
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 97,
+    "left": 5.71895,
+    "top": 40.41414,
+    "width": 43.93529,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 97,
+    "left": 7.18954,
+    "top": 43.44444,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 97,
+    "left": 7.18954,
+    "top": 46.47475,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 98,
+    "left": 7.18954,
+    "top": 49.50505,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 99,
+    "left": 7.18954,
+    "top": 52.53535,
+    "width": 77.94118,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 114,
+    "left": 5.71895,
+    "top": 59.73232,
+    "width": 48.93938,
+    "height": 3.72374
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 126,
+    "left": 5.71895,
+    "top": 65.79292,
+    "width": 44.09444,
+    "height": 3.72375
+  },
+  {
+    "sourcePage": 4,
+    "targetPage": 128,
+    "left": 5.71895,
+    "top": 71.85354,
+    "width": 82.31667,
+    "height": 3.72374
+  }
+];
+  const jumpToManualPage = (page) => {
+    const target = manualPageRefs.current[page];
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
   const q = query.trim().toUpperCase();
   const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
@@ -5108,14 +5395,39 @@ function RuleBook({ rules }) {
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-slate-200 dark:bg-slate-900 px-2 py-2 sm:px-4 sm:py-4">
             <div className="mx-auto max-w-4xl space-y-2 sm:space-y-3">
               {Array.from({ length: MANUAL_PAGE_COUNT }, (_, i) => i + 1).map((page) => (
-                <div key={page} className="bg-white shadow-sm">
+                <div
+                  key={page}
+                  ref={(el) => {
+                    if (el) manualPageRefs.current[page] = el;
+                    else delete manualPageRefs.current[page];
+                  }}
+                  className="relative bg-white shadow-sm scroll-mt-2"
+                >
                   <img
                     src={manualPageSrc(page)}
                     alt={`Game Manual page ${page}`}
                     className="block w-full h-auto"
-                    loading={page <= 3 ? "eager" : "lazy"}
+                    loading={page <= 4 ? "eager" : "lazy"}
                     draggable="false"
                   />
+                  {manualTocLinks
+                    .filter((link) => link.sourcePage === page)
+                    .map((link, index) => (
+                      <button
+                        key={`${page}-${index}`}
+                        type="button"
+                        onClick={() => jumpToManualPage(link.targetPage)}
+                        className="absolute z-10 bg-transparent active:bg-sky-400/20 focus:outline-none focus:ring-2 focus:ring-sky-500/60"
+                        style={{
+                          left: `${link.left}%`,
+                          top: `${link.top}%`,
+                          width: `${link.width}%`,
+                          height: `${link.height}%`,
+                        }}
+                        aria-label={`Jump to Game Manual page ${link.targetPage}`}
+                        title={`Go to page ${link.targetPage}`}
+                      />
+                    ))}
                 </div>
               ))}
             </div>
