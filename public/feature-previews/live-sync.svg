@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+      <rect width="960" height="540" fill="#F7F8FB"/>
+      <rect width="960" height="64" fill="#0D0F32"/>
+      <rect x="0" y="64" width="960" height="4" fill="#D7212B"/>
+      <text x="40" y="39" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#FFFFFF">Ref OS</text>
+      <text x="919" y="39" text-anchor="end" font-family="Arial, sans-serif" font-size="13" font-weight="600" fill="#CBD5E1">Highlander Release</text>
+      <text x="58" y="112" font-family="Arial, sans-serif" font-size="28" font-weight="800" fill="#111827">Live Sync</text>
+      <text x="902" y="111" text-anchor="end" font-family="Arial, sans-serif" font-size="13" fill="#64748B">Event workspace</text>
+      <g transform="translate(58 150)">
+        <rect width="844" height="92" rx="10" fill="#FFFFFF" stroke="#DDE2EA"/>
+        <text x="22" y="34" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#111827">Cloud</text>
+        <text x="22" y="61" font-family="Arial, sans-serif" font-size="14" fill="#64748B">Connected</text>
+        <rect x="700" y="27" width="118" height="36" rx="6" fill="#ECFDF3"/>
+        <text x="759" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#15803D">Healthy</text>
+      </g><g transform="translate(58 258)">
+        <rect width="844" height="92" rx="10" fill="#FFFFFF" stroke="#DDE2EA"/>
+        <text x="22" y="34" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#111827">Last sync</text>
+        <text x="22" y="61" font-family="Arial, sans-serif" font-size="14" fill="#64748B">4 sec ago</text>
+        <rect x="700" y="27" width="118" height="36" rx="6" fill="#ECFDF3"/>
+        <text x="759" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#15803D">Current</text>
+      </g><g transform="translate(58 366)">
+        <rect width="844" height="92" rx="10" fill="#FFFFFF" stroke="#DDE2EA"/>
+        <text x="22" y="34" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#111827">Pending writes</text>
+        <text x="22" y="61" font-family="Arial, sans-serif" font-size="14" fill="#64748B">0</text>
+        <rect x="700" y="27" width="118" height="36" rx="6" fill="#ECFDF3"/>
+        <text x="759" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#15803D">Clear</text>
+      </g>
+      <text x="58" y="505" font-family="Arial, sans-serif" font-size="12" fill="#94A3B8">Ref OS 1.2.0 • Private Beta</text>
+    </svg>
