@@ -4959,28 +4959,32 @@ function FieldLogView({ entries, onAdd, onRemove, meName, canDelete }) {
 
 /* ============================ FEATURES & HELP ============================ */
 function FeaturesGuide() {
+  const [selectedFeature, setSelectedFeature] = useState(null);
+
   const features = [
-    { icon: ListOrdered, title: "Match Operations", text: "Open a match, select a team, log violations, flag replays, record field faults, and keep the crew moving without jumping between tools." },
-    { icon: ShieldAlert, title: "Violation Tracking", text: "Log Minor, Major, and Inspection violations with rules, notes, photos, duplicate protection, and repeat-violation escalation warnings." },
-    { icon: Clock, title: "AWP Checks", text: "Record qualification AWP observations for each alliance and review success rates across Pins, Goals, perimeter contact, and autonomous violations." },
-    { icon: Users, title: "Teams & Watchlist", text: "Search the roster, review a team's event history, scan team numbers, save robot photos, and share watchlist notes across the referee crew." },
-    { icon: BookOpen, title: "Rules Reference", text: "Search the event rule index, favorite frequently used rules, reopen recent rules, and keep referee guidance available even when Wi-Fi is unreliable." },
-    { icon: Flag, title: "Field Log", text: "Keep a clean operational record of timeouts, field faults, replays, and field notes without exposing internal system records." },
-    { icon: Trophy, title: "Judging", text: "Collect Sportsmanship and Energy nominations, support the Judge Advisor workflow, and export official nomination forms from one shared workspace." },
-    { icon: GitBranch, title: "Alliance Selection", text: "Seed captains from rankings, manage picks, handle captain shifting, and follow the elimination bracket while preserving Tournament Manager as the source of truth." },
-    { icon: BarChart3, title: "Tournament Manager Imports", text: "Import teams, matches, rankings, alliances, and supported scores with a change preview before Ref OS writes anything to the event." },
-    { icon: CloudOff, title: "Offline Ready", text: "Cache teams, matches, and rules locally, queue supported writes during an outage, and automatically retry when the event connection comes back." },
-    { icon: Wifi, title: "Live Sync", text: "Keep connected devices aligned through Supabase realtime, with connection health, pending-write visibility, and failed-sync recovery for Admins." },
-    { icon: BarChart3, title: "Event Command Center", text: "Give Admins one operations hub for volunteer status, announcements, countdowns, contacts, diagnostics, imports, exports, backups, and event setup." },
-    { icon: KeyRound, title: "Role Based Access", text: "Separate Referee, Judge Advisor, Emcee, and Admin access with server-validated event credentials and role-specific permissions." },
-    { icon: Users, title: "Key Volunteer Status", text: "See who is online, maintain the known volunteer roster, and let current Admins grant or revoke Admin access when needed." },
-    { icon: Contact, title: "Event Contact Directory", text: "Keep event contacts, roles, phone numbers, email addresses, locations, and notes in one shared directory for the key volunteer team." },
-    { icon: Mail, title: "Feedback Inbox", text: "Private Beta users can report bugs, request features, or send general feedback with app and device details attached for Admin review." },
-    { icon: Download, title: "Reports & Backups", text: "Export event reports, violation records, judging forms, field comparisons, and a complete JSON backup for event-day insurance." },
-    { icon: ShieldCheck, title: "Admin Diagnostics", text: "Inspect cloud connectivity, sync state, queued writes, service worker status, device information, and event health from the Command Center." },
-    { icon: PlayCircle, title: "Guided Tour", text: "Walk volunteers through the live Ref OS interface with a role-aware tour that opens the same screens they will use during the event." },
-    { icon: QrCode, title: "Fast Volunteer Onboarding", text: "Share Ref OS with event staff using role access codes and QR join cards, then identify each volunteer by first and last name." },
+    { icon: ListOrdered, title: "Match Operations", text: "Run the referee workflow from one screen.", detail: "Match Operations keeps the core referee workflow together so the crew can move from match to match without bouncing between separate tools or paper notes.", bullets: ["Open a match and immediately see the teams involved", "Log violations directly from the active match", "Flag a match for replay without deleting the schedule", "Record field faults and operational notes", "Keep the workflow consistent across phones, tablets, and laptops"] },
+    { icon: ShieldAlert, title: "Violation Tracking", text: "Log, review, and escalate violations consistently.", detail: "Violation Tracking gives referees a shared record of Minor, Major, and Inspection violations while helping the crew identify repeated issues and maintain consistent rulings throughout the event.", bullets: ["Attach the relevant rule, notes, and optional photos", "Warn when the same team repeatedly receives a Minor for the same rule", "Review prior team violations before making a ruling", "Protect against accidental duplicate entries", "Keep changes synchronized with the rest of the referee crew"] },
+    { icon: Clock, title: "AWP Checks", text: "Track Autonomous Win Point observations by alliance.", detail: "AWP Checks provide a dedicated place to record qualification AWP observations without mixing them into the violation or field log workflows.", bullets: ["Record AWP results for each alliance", "Track Pins, Goals, perimeter contact, and autonomous violations", "Review AWP success rates across the event", "Keep AWP records separate from match replay and violation data", "Clear AWP data independently from Clear Data"] },
+    { icon: Users, title: "Teams & Watchlist", text: "Keep team history and referee notes easy to find.", detail: "The Teams workspace gives the referee crew a fast way to search a team, review its event history, and maintain shared watchlist notes when something deserves extra attention.", bullets: ["Search imported teams quickly", "Review violations and event history by team", "Scan or enter team numbers", "Save robot photos where supported", "Share watchlist notes across the referee crew"] },
+    { icon: BookOpen, title: "Rules Reference", text: "Keep the rules you need close during the event.", detail: "The Rules Reference is designed for fast event-day lookup. Referees can search the rule set, save commonly used rules, and reopen recent rules without digging through multiple documents.", bullets: ["Search by rule number or text", "Favorite frequently used rules", "Quickly reopen recently viewed rules", "Display referee notes for selected rules", "Keep cached rule content available during connectivity problems"] },
+    { icon: Flag, title: "Field Log", text: "A shared record for field operations.", detail: "Field Log is the operational notebook for things that matter to the event crew but are not team violations, judging records, or private feedback.", bullets: ["Record timeouts and field faults", "Document replays and operational decisions", "Add field-specific notes", "Track who created each entry and when", "Keep internal system records hidden from the normal log"] },
+    { icon: Trophy, title: "Judging", text: "Shared award nominations for the Judge Advisor workflow.", detail: "The Judging workspace lets authorized users collect nominations in the same event environment while keeping judging access separated from referee permissions.", bullets: ["Collect Sportsmanship and Energy nominations", "Maintain shared nomination lists", "Support finalist selection", "Export nomination forms", "Restrict access through the Judge Advisor role"] },
+    { icon: GitBranch, title: "Alliance Selection", text: "Manage alliance picks and elimination setup.", detail: "Alliance Selection helps event staff organize captain and pick information while keeping Tournament Manager as the official source of truth.", bullets: ["Seed alliance captains from imported rankings", "Record first and additional picks", "Handle captain shifting during selection", "Review elimination bracket information", "Clear alliance data independently when needed"] },
+    { icon: BarChart3, title: "Tournament Manager Imports", text: "Bring event data into Ref OS without live TM dependency.", detail: "Ref OS can import supported Tournament Manager exports so volunteers have the data they need while avoiding a dependency on a live TM connection during the event.", bullets: ["Import teams and match schedules", "Import rankings and alliance information", "Import supported score data", "Preview changes before writing them", "Keep Tournament Manager as the authoritative event system"] },
+    { icon: CloudOff, title: "Offline Ready", text: "Stay useful when venue Wi-Fi becomes unreliable.", detail: "Ref OS was built for event venues where internet access is not guaranteed. Core event information is cached locally and supported writes can wait for connectivity to return.", bullets: ["Cache teams, matches, and rules locally", "Queue supported writes while offline", "Retry queued writes after reconnection", "Show offline and pending-write status", "Run as an installable PWA on supported devices"] },
+    { icon: Wifi, title: "Live Sync", text: "Keep connected Ref OS devices aligned.", detail: "When cloud connectivity is available, Ref OS synchronizes shared event information across devices and exposes enough health information for Admins to know when something is waiting to sync.", bullets: ["Use Supabase realtime for shared updates", "Display connection health in the interface", "Show pending and failed writes", "Track the last successful cloud communication", "Provide recovery information through Admin Diagnostics"] },
+    { icon: BarChart3, title: "Event Command Center", text: "One operational hub for event Admins.", detail: "The Event Command Center collects the Admin tools that would otherwise be scattered throughout the application into one event operations workspace.", bullets: ["Review Key Volunteer Status", "Manage announcements and event countdowns", "Open contacts, diagnostics, imports, and exports", "Access the Feedback Inbox", "Manage event setup and administrative tools"] },
+    { icon: KeyRound, title: "Role Based Access", text: "Give each volunteer only the tools their role needs.", detail: "Ref OS separates Referee, Judge Advisor, Emcee, and Admin access so the interface and privileged operations can follow the volunteer's actual responsibility at the event.", bullets: ["Use event-specific role access codes", "Validate access against the backend", "Separate Admin operations from normal volunteer access", "Allow current Admins to grant or revoke Admin role", "Keep role credentials hashed rather than stored as readable passwords"] },
+    { icon: Users, title: "Key Volunteer Status", text: "See which key volunteers are currently connected.", detail: "Key Volunteer Status provides a quick operational view of the people using Ref OS and gives Admins tools to manage access when responsibilities change during the event.", bullets: ["See currently online volunteers", "Maintain the known volunteer roster", "Identify volunteer names across devices", "Grant Admin access to an online volunteer", "Remove Admin access when it is no longer needed"] },
+    { icon: Contact, title: "Event Contact Directory", text: "Keep important event contacts in one shared place.", detail: "The Event Contact Directory keeps key contact information available to the volunteer crew without requiring everyone to search old messages or maintain separate contact lists.", bullets: ["Store names and event roles", "Add phone numbers and email addresses", "Record locations and useful notes", "Reorder contacts for event-specific priority", "Make the same directory available across authorized devices"] },
+    { icon: Mail, title: "Feedback Inbox", text: "Collect Private Beta feedback directly inside Ref OS.", detail: "Private Beta users can report bugs, request features, or send general feedback from the application. Feedback stays separate from Field Log and is reviewed from the Event Command Center.", bullets: ["Choose Bug, Suggestion, or General Feedback", "Attach Ref OS version and device context automatically", "Keep submissions out of the normal Field Log", "Let Admins review submissions in Feedback Inbox", "Delete feedback after it has been handled"] },
+    { icon: Download, title: "Reports & Backups", text: "Export event records when you need them.", detail: "Ref OS includes export and backup tools so important event records can leave the browser in useful formats and the event has a recovery option if needed.", bullets: ["Export violation and event records", "Generate supported judging forms", "Export field comparison information", "Create event data backups", "Keep a portable record outside the live application"] },
+    { icon: ShieldCheck, title: "Admin Diagnostics", text: "See what Ref OS thinks is happening on the device.", detail: "Admin Diagnostics exposes the technical state that matters when troubleshooting an event device, particularly around connectivity, synchronization, and PWA behavior.", bullets: ["Inspect cloud connectivity", "See queued and failed writes", "Review the last successful sync", "Check service worker and offline cache state", "View app version, browser, device, and event information"] },
+    { icon: PlayCircle, title: "Guided Tour", text: "Teach volunteers from inside the live application.", detail: "The Guided Tour walks volunteers through the actual Ref OS interface instead of relying only on a separate manual or slide deck.", bullets: ["Open real screens as the tour progresses", "Adjust guidance based on the volunteer role", "Introduce major event workflows", "Allow volunteers to replay the tour when needed", "Reduce event-day onboarding time"] },
+    { icon: QrCode, title: "Fast Volunteer Onboarding", text: "Get key volunteers into the correct role quickly.", detail: "Ref OS combines event access codes, volunteer identity, and share tools so new volunteers can join the event workspace without a complicated account setup process.", bullets: ["Share role-specific join codes", "Use QR join cards where supported", "Collect first and last name for identification", "Separate Referee, Judge Advisor, and Emcee access", "Let Admins manage active join credentials"] },
   ];
+
+  const SelectedIcon = selectedFeature?.icon;
 
   return (
     <div className="refos-features-page">
@@ -5003,23 +5007,30 @@ function FeaturesGuide() {
         <div className="mb-4">
           <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D7212B]">Features</div>
           <h3 className="text-xl sm:text-2xl font-black text-slate-950 dark:text-white mt-1">Built around the way an event actually runs</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">Each tool is designed to reduce handoffs, duplicate entry, and scattered event information while keeping the workflows familiar to key volunteers.</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">Select any feature for a closer look at what it does and how it fits into the event workflow.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-          {features.map(({ icon: Icon, title, text }) => (
-            <article key={title} className="group bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5 transition-colors hover:border-slate-300 dark:hover:border-slate-600">
-              <div className="flex items-start gap-3.5">
-                <div className="w-10 h-10 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 text-[#D7212B] flex items-center justify-center shrink-0">
-                  <Icon size={20} strokeWidth={2} />
+          {features.map((feature) => {
+            const Icon = feature.icon;
+            return (
+              <button key={feature.title} type="button" onClick={() => setSelectedFeature(feature)} className="group text-left bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5 transition-all hover:border-slate-400 dark:hover:border-slate-500 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#D7212B]/40">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 text-[#D7212B] flex items-center justify-center shrink-0">
+                    <Icon size={20} strokeWidth={2} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-extrabold text-slate-950 dark:text-white text-[15px] sm:text-base">{feature.title}</h4>
+                      <ChevronRight size={16} className="ml-auto text-slate-400 group-hover:text-[#D7212B] transition-colors shrink-0" />
+                    </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mt-1">{feature.text}</p>
+                    <div className="mt-3 text-xs font-bold text-[#D7212B]">View details</div>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <h4 className="font-extrabold text-slate-950 dark:text-white text-[15px] sm:text-base">{title}</h4>
-                  <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mt-1">{text}</p>
-                </div>
-              </div>
-            </article>
-          ))}
+              </button>
+            );
+          })}
         </div>
       </section>
 
@@ -5049,6 +5060,45 @@ function FeaturesGuide() {
       </section>
 
       <p className="text-center text-xs text-slate-400 mt-4 mb-2">Made by Maharshi Patel · <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="underline">@mpatel_ref</a> · v{APP_VERSION} · Highlander Release</p>
+
+      {selectedFeature && (
+        <div className="refos-modal-backdrop fixed inset-0 z-[80] bg-black/50 flex items-end sm:items-center justify-center" onClick={() => setSelectedFeature(null)}>
+          <div className="refos-modal-panel bg-white dark:bg-slate-850 w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl max-h-[88vh] overflow-y-auto border border-slate-200 dark:border-slate-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 z-10 bg-white/95 dark:bg-slate-850/95 backdrop-blur border-b border-slate-200 dark:border-slate-700 px-5 py-4 flex items-center gap-3">
+              <div className="w-11 h-11 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 text-[#D7212B] flex items-center justify-center shrink-0">
+                {SelectedIcon && <SelectedIcon size={22} strokeWidth={2} />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#D7212B]">Ref OS Feature</div>
+                <h3 className="text-lg sm:text-xl font-black text-slate-950 dark:text-white leading-tight">{selectedFeature.title}</h3>
+              </div>
+              <button type="button" onClick={() => setSelectedFeature(null)} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Close feature details"><X size={20} /></button>
+            </div>
+
+            <div className="p-5 sm:p-6">
+              <p className="text-base sm:text-lg font-semibold text-slate-800 dark:text-slate-100 leading-relaxed">{selectedFeature.text}</p>
+              <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed mt-3">{selectedFeature.detail}</p>
+
+              <div className="mt-6">
+                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400 mb-3">What it includes</div>
+                <div className="space-y-2.5">
+                  {selectedFeature.bullets.map((item) => (
+                    <div key={item} className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200">
+                      <CheckCircle2 size={17} className="text-[#D7212B] mt-0.5 shrink-0" />
+                      <span className="leading-relaxed">{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-7 pt-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+                <div className="text-xs text-slate-400">Ref OS 1.2.0 • Highlander Release</div>
+                <button type="button" onClick={() => setSelectedFeature(null)} className="px-4 py-2 rounded-lg bg-slate-950 dark:bg-white text-white dark:text-slate-950 text-sm font-bold">Back to Features</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
