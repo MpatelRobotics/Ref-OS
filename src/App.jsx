@@ -5074,6 +5074,9 @@ function RuleBook({ rules }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(null); // rule object shown in the notes popup
   const [showGameManual, setShowGameManual] = useState(false);
+  const [manualPage, setManualPage] = useState(1);
+  const MANUAL_PAGE_COUNT = 129;
+  const manualPageSrc = (page) => `/game-manual-pages/page-${String(page).padStart(3, "0")}.jpg`;
   if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
   const q = query.trim().toUpperCase();
   const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
@@ -5101,12 +5104,55 @@ function RuleBook({ rules }) {
               <div className="font-bold text-sm sm:text-base truncate">Game Manual</div>
               <div className="text-[11px] sm:text-xs text-slate-300 truncate">VEX V5 Robotics Competition Override • Version 2.0</div>
             </div>
+            <div className="text-xs sm:text-sm text-slate-300 shrink-0">
+              {manualPage} / {MANUAL_PAGE_COUNT}
+            </div>
           </div>
-          <iframe
-            src="/override-game-manual-v2.0.pdf#view=FitH"
-            title="VEX V5RC Override Game Manual Version 2.0"
-            className="w-full flex-1 min-h-0 bg-white"
-          />
+
+          <div className="flex-1 min-h-0 overflow-auto overscroll-contain bg-slate-200 dark:bg-slate-900 p-2 sm:p-4">
+            <div className="mx-auto max-w-4xl">
+              <img
+                key={manualPage}
+                src={manualPageSrc(manualPage)}
+                alt={`Game Manual page ${manualPage}`}
+                className="block w-full h-auto bg-white shadow-sm"
+                draggable="false"
+              />
+            </div>
+          </div>
+
+          <div className="shrink-0 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 px-3 py-2 flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => setManualPage((p) => Math.max(1, p - 1))}
+              disabled={manualPage <= 1}
+              className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-700 dark:text-slate-200 disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <label className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              Page
+              <input
+                type="number"
+                min="1"
+                max={MANUAL_PAGE_COUNT}
+                value={manualPage}
+                onChange={(e) => {
+                  const next = Number(e.target.value);
+                  if (Number.isFinite(next)) setManualPage(Math.min(MANUAL_PAGE_COUNT, Math.max(1, next)));
+                }}
+                className="w-16 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-2 text-center text-sm text-slate-900 dark:text-slate-100"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => setManualPage((p) => Math.min(MANUAL_PAGE_COUNT, p + 1))}
+              disabled={manualPage >= MANUAL_PAGE_COUNT}
+              className="px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-700 dark:text-slate-200 disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
       <div className="relative mb-3">
