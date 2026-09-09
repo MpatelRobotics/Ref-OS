@@ -574,8 +574,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     try { const parsed = JSON.parse(eventCountdownEntry.note); return parsed?.target ? parsed : null; }
     catch { return null; }
   })();
-  const eventCountdown = eventSettings?.event_countdown?.value?.target
-    ? eventSettings.event_countdown.value
+  // If the shared setting exists, it is authoritative even when it is cleared.
+  // Only fall back to the legacy Field Log countdown when no shared setting exists at all.
+  const countdownSetting = eventSettings?.event_countdown;
+  const eventCountdown = countdownSetting
+    ? (countdownSetting.value?.target ? countdownSetting.value : null)
     : legacyCountdown;
   const countdownRemaining = eventCountdown?.target ? Math.max(0, new Date(eventCountdown.target).getTime() - countdownNow) : 0;
   const countdownText = countdownRemaining > 0 ? (() => {
@@ -1775,15 +1778,22 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 
   const clearSharedCountdown = async () => {
     try {
-      // Clear the countdown through the same upsert path used to save it.
-      // This is more reliable than relying on a DELETE event/policy and still
-      // makes the shared countdown immediately inactive on every device.
+      // Store an explicit cleared setting so older Field Log countdown records
+      // cannot reappear as a fallback.
       const saved = await api.upsertEventSetting(
         eventId,
         "event_countdown",
         { label: "", target: null, cleared: true },
         meName
       );
+
+      // Clean up any legacy countdown records from older Ref OS builds.
+      const legacyEntries = fieldLog.filter((e) => e.kind === "event_countdown");
+      if (legacyEntries.length) {
+        await Promise.allSettled(legacyEntries.map((e) => api.deleteFieldLog(e.id)));
+        setFieldLog((prev) => prev.filter((e) => e.kind !== "event_countdown"));
+      }
+
       setEventSettings((cur) => ({ ...cur, event_countdown: saved }));
       setShowCountdownSetup(false);
     } catch (e) {
