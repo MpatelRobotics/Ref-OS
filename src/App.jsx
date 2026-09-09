@@ -7682,6 +7682,23 @@ function RuleBook({ rules }) {
             </div>
           </div>
 
+          <div className="shrink-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2 flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => jumpToManualPage(3)}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+            >
+              Table of Contents
+            </button>
+            <button
+              type="button"
+              onClick={() => jumpToManualPage(7)}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+            >
+              Quick Reference Guide
+            </button>
+          </div>
+
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-slate-200 dark:bg-slate-900 px-2 py-2 sm:px-4 sm:py-4">
             <div className="mx-auto max-w-4xl space-y-2 sm:space-y-3">
               {Array.from({ length: MANUAL_PAGE_COUNT }, (_, i) => i + 1).map((page) => (
