@@ -4959,172 +4959,97 @@ function FieldLogView({ entries, onAdd, onRemove, meName, canDelete }) {
 
 /* ============================ FEATURES & HELP ============================ */
 function FeaturesGuide() {
-  const Section = ({ icon: Ic, title, children }) => (
-    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-3">
-      <h3 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-2">{Ic && <Ic size={17} className="text-[#D7212B]" />}{title}</h3>
-      <div className="text-sm text-slate-600 dark:text-slate-300 space-y-2 leading-relaxed">{children}</div>
-    </div>
-  );
-  const Li = ({ children }) => <li className="flex gap-2"><span className="text-[#D7212B] mt-0.5">•</span><span>{children}</span></li>;
+  const features = [
+    { icon: ListOrdered, title: "Match Operations", text: "Open a match, select a team, log violations, flag replays, record field faults, and keep the crew moving without jumping between tools." },
+    { icon: ShieldAlert, title: "Violation Tracking", text: "Log Minor, Major, and Inspection violations with rules, notes, photos, duplicate protection, and repeat-violation escalation warnings." },
+    { icon: Clock, title: "AWP Checks", text: "Record qualification AWP observations for each alliance and review success rates across Pins, Goals, perimeter contact, and autonomous violations." },
+    { icon: Users, title: "Teams & Watchlist", text: "Search the roster, review a team's event history, scan team numbers, save robot photos, and share watchlist notes across the referee crew." },
+    { icon: BookOpen, title: "Rules Reference", text: "Search the event rule index, favorite frequently used rules, reopen recent rules, and keep referee guidance available even when Wi-Fi is unreliable." },
+    { icon: Flag, title: "Field Log", text: "Keep a clean operational record of timeouts, field faults, replays, and field notes without exposing internal system records." },
+    { icon: Trophy, title: "Judging", text: "Collect Sportsmanship and Energy nominations, support the Judge Advisor workflow, and export official nomination forms from one shared workspace." },
+    { icon: GitBranch, title: "Alliance Selection", text: "Seed captains from rankings, manage picks, handle captain shifting, and follow the elimination bracket while preserving Tournament Manager as the source of truth." },
+    { icon: BarChart3, title: "Tournament Manager Imports", text: "Import teams, matches, rankings, alliances, and supported scores with a change preview before Ref OS writes anything to the event." },
+    { icon: CloudOff, title: "Offline Ready", text: "Cache teams, matches, and rules locally, queue supported writes during an outage, and automatically retry when the event connection comes back." },
+    { icon: Wifi, title: "Live Sync", text: "Keep connected devices aligned through Supabase realtime, with connection health, pending-write visibility, and failed-sync recovery for Admins." },
+    { icon: BarChart3, title: "Event Command Center", text: "Give Admins one operations hub for volunteer status, announcements, countdowns, contacts, diagnostics, imports, exports, backups, and event setup." },
+    { icon: KeyRound, title: "Role Based Access", text: "Separate Referee, Judge Advisor, Emcee, and Admin access with server-validated event credentials and role-specific permissions." },
+    { icon: Users, title: "Key Volunteer Status", text: "See who is online, maintain the known volunteer roster, and let current Admins grant or revoke Admin access when needed." },
+    { icon: Contact, title: "Event Contact Directory", text: "Keep event contacts, roles, phone numbers, email addresses, locations, and notes in one shared directory for the key volunteer team." },
+    { icon: Mail, title: "Feedback Inbox", text: "Private Beta users can report bugs, request features, or send general feedback with app and device details attached for Admin review." },
+    { icon: Download, title: "Reports & Backups", text: "Export event reports, violation records, judging forms, field comparisons, and a complete JSON backup for event-day insurance." },
+    { icon: ShieldCheck, title: "Admin Diagnostics", text: "Inspect cloud connectivity, sync state, queued writes, service worker status, device information, and event health from the Command Center." },
+    { icon: PlayCircle, title: "Guided Tour", text: "Walk volunteers through the live Ref OS interface with a role-aware tour that opens the same screens they will use during the event." },
+    { icon: QrCode, title: "Fast Volunteer Onboarding", text: "Share Ref OS with event staff using role access codes and QR join cards, then identify each volunteer by first and last name." },
+  ];
 
   return (
-    <>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-        Ref-OS is the shared referee, event operations, alliance, and judging workspace for the Highlander Summit. This guide reflects Ref-OS v{APP_VERSION}.
-      </p>
+    <div className="refos-features-page">
+      <section className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-950 text-white px-5 py-7 sm:px-8 sm:py-9 mb-6">
+        <div className="absolute -right-16 -top-20 w-56 h-56 rounded-full bg-[#D7212B]/20 blur-3xl" />
+        <div className="relative max-w-2xl">
+          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-red-300 mb-2">Ref OS 1.2.0 • Highlander Release</div>
+          <h2 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">Everything your event crew needs, in one place.</h2>
+          <p className="mt-3 text-sm sm:text-base text-slate-300 leading-relaxed max-w-xl">Built specifically for VEX event operations. Ref OS keeps referees, Judge Advisors, Emcees, and Admins working from the same event data across phones, tablets, and laptops.</p>
+          <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
+            <span className="px-3 py-1.5 rounded-md bg-white/10 border border-white/10">Offline capable</span>
+            <span className="px-3 py-1.5 rounded-md bg-white/10 border border-white/10">Role based</span>
+            <span className="px-3 py-1.5 rounded-md bg-white/10 border border-white/10">Realtime sync</span>
+            <span className="px-3 py-1.5 rounded-md bg-white/10 border border-white/10">Installable PWA</span>
+          </div>
+        </div>
+      </section>
 
-      <Section icon={KeyRound} title="Login, access codes & roles">
-        <p>Ref-OS supports the normal role passwords plus event access codes and QR login. Role access is enforced by Supabase on the server, not only by hiding buttons in the interface.</p>
-        <ul className="space-y-1.5">
-          <Li><b>Referee / crew</b> — teams, matches, violations, robot photos, rules, watchlist, field operations, judging nominations, and bracket advancement.</Li>
-          <Li><b>Judge Advisor</b> — Judging plus view access to Alliances and the elimination bracket. Judge Advisors do not get referee violation tools or bracket editing.</Li>
-          <Li><b>Emcee / announcer</b> — teams, matches, scores, rules, alliances, bracket information, and judging nominations without exposing referee disciplinary information.</Li>
-          <Li><b>Admin</b> — all normal event access plus the Event Command Center, setup, imports, exports, role access code management, diagnostics, data clearing, and alliance selection controls.</Li>
-          <Li><b>Permanent Admin keypad code</b> — the fixed event Admin code can be entered directly on the keypad. Generated volunteer codes use the pattern number, letter A-D, number, number.</Li>
-          <Li><b>QR login</b> — admins can generate a QR login card for a role access code. QR creation and QR decoding are local to Ref-OS; the actual login still verifies access with Supabase.</Li>
-        </ul>
-        <p>After login, enter your <b>first and last name</b>. Your name is used to identify entries and volunteer presence across the event.</p>
-      </Section>
+      <section className="mb-7">
+        <div className="mb-4">
+          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D7212B]">Features</div>
+          <h3 className="text-xl sm:text-2xl font-black text-slate-950 dark:text-white mt-1">Built around the way an event actually runs</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">Each tool is designed to reduce handoffs, duplicate entry, and scattered event information while keeping the workflows familiar to key volunteers.</p>
+        </div>
 
-      <Section icon={ShieldAlert} title="Security & permissions">
-        <ul className="space-y-1.5">
-          <Li><b>Database enforced permissions</b> — Supabase Row Level Security restricts event data reads and writes by the signed-in role.</Li>
-          <Li><b>Server validated credentials</b> — role passwords and access codes are verified by server-side RPCs instead of being compared in the browser.</Li>
-          <Li><b>Private robot photos</b> — robot images are stored privately and opened with signed URLs for authorized event members.</Li>
-          <Li><b>Disabled access codes</b> — disabling a generated code blocks future logins with that code. It does not automatically kick out volunteers who are already signed in.</Li>
-        </ul>
-      </Section>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+          {features.map(({ icon: Icon, title, text }) => (
+            <article key={title} className="group bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5 transition-colors hover:border-slate-300 dark:hover:border-slate-600">
+              <div className="flex items-start gap-3.5">
+                <div className="w-10 h-10 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 text-[#D7212B] flex items-center justify-center shrink-0">
+                  <Icon size={20} strokeWidth={2} />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="font-extrabold text-slate-950 dark:text-white text-[15px] sm:text-base">{title}</h4>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mt-1">{text}</p>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
-      <Section icon={BarChart3} title="Event Command Center (Admin)">
-        <p>The Event Command Center is the main Admin operations screen. Most event management tools that used to live directly in the gear menu are now organized here.</p>
-        <ul className="space-y-1.5">
-          <Li><b>Event overview</b> — quick counts for matches, violations, replays, field faults, volunteer presence, and event activity.</Li>
-          <Li><b>Key Volunteer Status</b> — see volunteers online now and the known volunteer roster with role and online or offline status.</Li>
-          <Li><b>Announcements</b> — send a shared Key Volunteer Announcement to connected Ref-OS devices. Each device can acknowledge it.</Li>
-          <Li><b>Shared countdown</b> — create or clear an event countdown that syncs across devices.</Li>
-          <Li><b>Event Contact Directory</b> — shared names, roles, phone numbers, email, locations, and notes for event contacts. Admins can edit and reorder it.</Li>
-          <Li><b>Role access codes</b> — generate, display, print, QR encode, or disable event role codes.</Li>
-          <Li><b>Pre Event System Test</b> — checks browser storage, service worker readiness, database read/write, realtime sync, Tournament Manager parsing, PDF generation, and other event-critical functions.</Li>
-          <Li><b>Two Device Sync Test</b> — verifies that two Ref-OS devices can exchange a live probe and acknowledgement through the event backend.</Li>
-          <Li><b>Event Diagnostic Report</b> — displays the app, device, event, storage, network, and sync snapshot and can copy or download the report as JSON.</Li>
-          <Li><b>Failed Sync Items</b> — permanent offline write failures are retained so an Admin can retry or discard them instead of silently losing the entry.</Li>
-          <Li><b>Event setup, TM Sync Center, exports, backup, Activity feed, Rankings, and Clear event data</b> are also accessed from the Command Center.</Li>
-        </ul>
-      </Section>
+      <section className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-7">
+        <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 bg-slate-50 dark:bg-slate-900/50">
+          <div className="font-black text-slate-950 dark:text-white">One shared workspace</div>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Keep event operations out of scattered chats, paper notes, and separate spreadsheets.</p>
+        </div>
+        <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 bg-slate-50 dark:bg-slate-900/50">
+          <div className="font-black text-slate-950 dark:text-white">Designed for bad Wi-Fi</div>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Cached event data and queued writes help Ref OS remain useful when venue connectivity is inconsistent.</p>
+        </div>
+        <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 bg-slate-50 dark:bg-slate-900/50">
+          <div className="font-black text-slate-950 dark:text-white">Private Beta</div>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Feedback from real event volunteers feeds directly into the Admin Feedback Inbox.</p>
+        </div>
+      </section>
 
-      <Section icon={CloudOff} title="Offline & live sync">
-        <p>If Wi-Fi drops, supported entries are queued on the device and automatically retried when connectivity returns. Pending items show their saving state so volunteers do not need to enter them twice.</p>
-        <ul className="space-y-1.5">
-          <Li><b>Offline queue</b> — temporary failures remain queued locally until they can sync.</Li>
-          <Li><b>Cached teams</b> — every successful team roster sync is saved on the device. If the network drops, Ref-OS keeps the last synced roster visible and searchable instead of replacing it with an empty list.</Li>
-          <Li><b>Cached matches</b> — every successful match schedule sync is saved on the device. Previously loaded qualification and elimination matches remain available while offline.</Li>
-          <Li><b>Permanent failures</b> — rejected writes are moved into Failed Sync Items for Admin review.</Li>
-          <Li><b>Realtime updates</b> — shared event data and event settings update across connected devices through Supabase realtime.</Li>
-        </ul>
-      </Section>
+      <section className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 sm:p-6 mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="text-lg font-black text-slate-950 dark:text-white">Need help using Ref OS?</div>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Use the Guided Tour for a live walkthrough, or send feedback if something does not behave the way you expect.</p>
+          </div>
+          <div className="text-xs font-semibold text-slate-400 whitespace-nowrap">v{APP_VERSION} • Highlander Release</div>
+        </div>
+      </section>
 
-      <Section icon={ListOrdered} title="Matches & logging violations">
-        <p>The fastest referee workflow is <b>Matches</b>: open a match, tap the team involved, then complete the violation form.</p>
-        <ul className="space-y-1.5">
-          <Li>Choose <b>Minor</b>, <b>Major</b>, or <b>Inspection</b>, select the applicable rule, add notes, and attach robot photos when useful.</Li>
-          <Li><b>Duplicate protection</b> warns before adding the same team, rule, and match combination twice.</Li>
-          <Li><b>Field filters</b>, match jumping, replay flags, field faults, timeouts, watchlist information, and match violation history are available from the match workflow.</Li>
-          <Li><b>Elimination priority</b> — when elimination matches exist, the Matches view prioritizes them while qualifications remain available.</Li>
-          <Li><b>Timeouts</b> are available for elimination matches and are tracked by alliance across the elimination bracket.</Li>
-        </ul>
-      </Section>
-
-      <Section icon={Clock} title="AWP checks & analytics">
-        <ul className="space-y-1.5">
-          <Li><b>Qualification AWP check</b> — record what was observed for Red and Blue at the end of autonomous. Ref-OS evaluates the event checklist but does not change the official Tournament Manager score.</Li>
-          <Li><b>AWP history</b> — open AWP history from the Matches area next to the field filters instead of from the main navigation.</Li>
-          <Li><b>AWP analytics</b> — review overall, Red, and Blue success rates and the success rate for Pins, Goals, Field Perimeter, and autonomous violation criteria.</Li>
-        </ul>
-      </Section>
-
-      <Section icon={Users} title="Teams, watchlist & robot scanner">
-        <ul className="space-y-1.5">
-          <Li><b>Teams</b> — search teams, open their full history, add teams, review Tournament Manager rank, and start a new log from the team record.</Li>
-          <Li><b>Team scanner</b> — use the camera OCR scanner to recognize a team number and jump to the team record.</Li>
-          <Li><b>Watchlist</b> — add shared watch notes to teams. Watched teams are flagged and their notes appear during relevant matches.</Li>
-          <Li><b>Robot photos</b> — store inspection photos for teams so referees can identify and review robots later.</Li>
-        </ul>
-      </Section>
-
-      <Section icon={BookOpen} title="Rules, favorites & recent rules">
-        <p>The Rules tab and violation rule picker use the same searchable rule reference.</p>
-        <ul className="space-y-1.5">
-          <Li><b>Favorites</b> — star frequently used rules so they appear in a Favorites group when no search is active.</Li>
-          <Li><b>Recently used</b> — recently selected rules are shown automatically for faster repeat access.</Li>
-          <Li><b>Offline rule index</b> — the event rule index is bundled with Ref-OS, so rule codes, descriptions, categories, favorites, recent rules, and referee notes remain available when Supabase or Wi-Fi is unavailable.</Li>
-          <Li><b>Referee guidance</b> — rules with supplemental guidance can be opened for violation notes, escalation guidance, and event-specific interpretation.</Li>
-        </ul>
-        <p>Favorites and recently used rules are stored on the local browser or device.</p>
-      </Section>
-
-      <Section icon={Flag} title="Field log">
-        <p>The Field Log is the referee-facing running list for operational entries such as timeouts, field faults, replays, and other field notes. Internal Ref-OS sync, announcement, access-code, diagnostic, and settings records are intentionally hidden from this view.</p>
-      </Section>
-
-      <Section icon={Trophy} title="Judging">
-        <ul className="space-y-1.5">
-          <Li><b>Sportsmanship and Energy nominations</b> — record the team, match, observed criteria, specific example, and supporting details.</Li>
-          <Li><b>Judge Advisor workflow</b> — Judge Advisors can manage judging information without receiving referee disciplinary views.</Li>
-          <Li><b>Official form export</b> — Ref-OS can generate a combined PDF using the supplied official nomination forms.</Li>
-          <Li><b>Alliance visibility</b> — Judge Advisors can view the Alliances section and bracket but cannot edit alliance selection or advance the bracket.</Li>
-        </ul>
-      </Section>
-
-      <Section icon={Trophy} title="Alliance selection & elimination bracket">
-        <ul className="space-y-1.5">
-          <Li><b>Ranking seeded captains</b> — uploaded Tournament Manager rankings automatically seed alliance captains before the official elimination bracket is imported.</Li>
-          <Li><b>Captain shifting</b> — if a higher seed selects a team that would have been a later captain, that team drops from the captain list and the remaining ranked teams move up.</Li>
-          <Li><b>Admin selection controls</b> — alliance captain and pick editing is Admin only.</Li>
-          <Li><b>Bracket permissions</b> — regular Referee and Emcee access can use their permitted bracket workflow; Judge Advisor access is view only.</Li>
-          <Li><b>Tournament Manager source of truth</b> — after a Round of 16 bracket is imported, Ref-OS preserves the imported alliances instead of overwriting them from rankings.</Li>
-        </ul>
-      </Section>
-
-      <Section icon={BarChart3} title="Tournament Manager Sync Center">
-        <ul className="space-y-1.5">
-          <Li><b>Teams</b> — import or update the event roster from Tournament Manager CSV.</Li>
-          <Li><b>Matches</b> — import the qualification and elimination schedule and update existing matches in place.</Li>
-          <Li><b>Rankings</b> — import qualification rankings using TeamNum and store the rank on each team.</Li>
-          <Li><b>Alliances</b> — import the official elimination bracket. Round 6 is treated as Round of 16 and its Instance value determines the R16 matchup.</Li>
-          <Li><b>Change preview</b> — before a Tournament Manager import writes anything, Ref-OS compares the file with the current event and shows what will be added, changed, or left untouched. If no differences are found, the import is blocked as unnecessary.</Li>
-          <Li><b>Scores</b> — when elimination scores are present, Ref-OS prioritizes elimination score updates and leaves qualification score importing alone. Qualification records update when qualification results are imported without elimination results.</Li>
-        </ul>
-      </Section>
-
-      <Section icon={BarChart3} title="Exports, analytics & backup">
-        <ul className="space-y-1.5">
-          <Li><b>Event Report PDF</b> — includes event overview, AWP analytics, field comparison, violation summary, alliance selections, and judging totals.</Li>
-          <Li><b>Violation export</b> — violation data can be exported and the official Match Anomaly Log PDF can be filled from Ref-OS data.</Li>
-          <Li><b>Judging export</b> — create the combined official Energy and Sportsmanship nomination PDF.</Li>
-          <Li><b>Field comparison</b> — Admin view comparing matches, violations, replays, and field faults by field.</Li>
-          <Li><b>Backup all JSON</b> — download a snapshot of the event data for event-day insurance.</Li>
-          <Li><b>Clear event data</b> — Admins can selectively clear supported event data, including judging, alliances, and watchlist data.</Li>
-        </ul>
-      </Section>
-
-      <Section icon={Info} title="Guided tour, install & device settings">
-        <ul className="space-y-1.5">
-          <Li><b>Interactive Guided Tour</b> — walks through the live role-specific Ref-OS interface and opens real sections such as Teams, Matches, a match, violation logging, Rules, Field Log, Alliances, and contacts.</Li>
-          <Li><b>Install Ref-OS</b> — add the deployed HTTPS site to the device home screen for an app-like PWA experience.</Li>
-          <Li><b>Dark / Light mode</b> and <b>Text size</b> are saved per device.</Li>
-          <Li><b>Mobile navigation</b> — phones use the compact Go to section menu instead of forcing the full desktop navigation across the screen.</Li>
-          <Li><b>Device readiness</b> — event staff can approve modern devices by running the Pre Event System Test before use.</Li>
-        </ul>
-      </Section>
-
-      <Section icon={Pencil} title="Editing & correcting records">
-        <p>Synced violations can be reopened, edited, and deleted according to the signed-in role. Editing keeps the existing record and reopens the form with its current information so corrections can be made without creating a second violation.</p>
-      </Section>
-
-      <p className="text-center text-xs text-slate-400 mt-4 mb-2">
-        Made by Maharshi Patel · <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="underline">@mpatel_ref</a> · v{APP_VERSION} · Highlander Release
-      </p>
-    </>
+      <p className="text-center text-xs text-slate-400 mt-4 mb-2">Made by Maharshi Patel · <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="underline">@mpatel_ref</a> · v{APP_VERSION} · Highlander Release</p>
+    </div>
   );
 }
 
