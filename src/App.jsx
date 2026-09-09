@@ -1774,13 +1774,23 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   };
 
   const clearSharedCountdown = async () => {
-    await api.deleteEventSetting(eventId, "event_countdown");
-    setEventSettings((cur) => {
-      const next = { ...cur };
-      delete next.event_countdown;
-      return next;
-    });
-    setShowCountdownSetup(false);
+    try {
+      // Clear the countdown through the same upsert path used to save it.
+      // This is more reliable than relying on a DELETE event/policy and still
+      // makes the shared countdown immediately inactive on every device.
+      const saved = await api.upsertEventSetting(
+        eventId,
+        "event_countdown",
+        { label: "", target: null, cleared: true },
+        meName
+      );
+      setEventSettings((cur) => ({ ...cur, event_countdown: saved }));
+      setShowCountdownSetup(false);
+    } catch (e) {
+      console.error("Could not remove Event Countdown", e);
+      alert(e?.message || "Could not remove the Event Countdown.");
+      throw e;
+    }
   };
 
   const exportEventReport = async () => {

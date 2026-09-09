@@ -178,8 +178,9 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
           <div className="flex items-center gap-2">
             <div className="font-bold flex items-center gap-2"><Clock size={17}/> Countdown management</div>
             {countdown && (
-              <button onClick={() => {
-                if (confirm("Remove the Event Countdown for everyone?")) onClearCountdown();
+              <button onClick={async () => {
+                if (!confirm("Remove the Event Countdown for everyone?")) return;
+                try { await onClearCountdown(); } catch {}
               }} className="ml-auto text-xs font-semibold text-red-600 hover:text-red-700">
                 Remove countdown
               </button>
@@ -206,8 +207,9 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
               {countdown ? "Edit countdown" : "Set countdown"}
             </button>
             {countdown && (
-              <button onClick={() => {
-                if (confirm("Remove the Event Countdown for everyone?")) onClearCountdown();
+              <button onClick={async () => {
+                if (!confirm("Remove the Event Countdown for everyone?")) return;
+                try { await onClearCountdown(); } catch {}
               }} className="px-4 py-2 rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-semibold text-sm">
                 Remove
               </button>
