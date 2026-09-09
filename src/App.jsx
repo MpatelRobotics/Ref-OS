@@ -5073,6 +5073,7 @@ const RULE_NOTES = {
 function RuleBook({ rules }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(null); // rule object shown in the notes popup
+  const [showGameManual, setShowGameManual] = useState(false);
   if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
   const q = query.trim().toUpperCase();
   const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
@@ -5084,10 +5085,45 @@ function RuleBook({ rules }) {
   }
   return (
     <>
-      <div className="relative mb-4">
+      {showGameManual && (
+        <div className="fixed inset-0 z-[100] bg-slate-100 dark:bg-slate-950 flex flex-col">
+          <div className="shrink-0 bg-[#0D0F32] text-white border-b border-white/10 px-3 sm:px-4 py-3 flex items-center gap-3 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setShowGameManual(false)}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-white/20 bg-white/10 hover:bg-white/15 text-sm font-semibold"
+              aria-label="Back to Rules"
+            >
+              <ChevronLeft size={18} />
+              Back
+            </button>
+            <div className="min-w-0 flex-1">
+              <div className="font-bold text-sm sm:text-base truncate">Game Manual</div>
+              <div className="text-[11px] sm:text-xs text-slate-300 truncate">VEX V5 Robotics Competition Override • Version 2.0</div>
+            </div>
+          </div>
+          <iframe
+            src="/override-game-manual-v2.0.pdf#view=FitH"
+            title="VEX V5RC Override Game Manual Version 2.0"
+            className="w-full flex-1 min-h-0 bg-white"
+          />
+        </div>
+      )}
+      <div className="relative mb-3">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search rules — code or wording"
           className="w-full pl-9 pr-3 py-2.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+      </div>
+      <div className="flex justify-end mb-4">
+        <button
+          type="button"
+          onClick={() => setShowGameManual(true)}
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+          title="Open the VEX V5RC Override Game Manual Version 2.0"
+        >
+          <BookOpen size={16} />
+          Open Game Manual
+        </button>
       </div>
       {groups.length === 0 ? (
         <Empty title="No rules match" sub="Try a different word or code." />
