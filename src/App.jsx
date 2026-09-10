@@ -469,6 +469,40 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [rules, setRules] = useState([]);      // [{ code, desc, category }]
   const [presence, setPresence] = useState([]); // [{ name, ... }] currently online
   const [refRoster, setRefRoster] = useState([]); // refs seen at this event, including offline
+  const [deviceStatuses, setDeviceStatuses] = useState([]);
+  const presenceLeaveRef = useRef(null);
+  const deviceId = useMemo(() => {
+    try {
+      const key = `refosDeviceId:${eventId}`;
+      let id = localStorage.getItem(key);
+      if (!id) {
+        id = (crypto?.randomUUID?.() || Math.random().toString(36).slice(2));
+        localStorage.setItem(key, id);
+      }
+      return id;
+    } catch {
+      return Math.random().toString(36).slice(2);
+    }
+  }, [eventId]);
+  const deviceInfo = useMemo(() => {
+    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+    const platform = typeof navigator !== "undefined" ? (navigator.userAgentData?.platform || navigator.platform || "") : "";
+    let browser = "Browser";
+    if (/Edg\//.test(ua)) browser = "Edge";
+    else if (/CriOS\//.test(ua)) browser = "Chrome iOS";
+    else if (/Chrome\//.test(ua)) browser = "Chrome";
+    else if (/FxiOS\//.test(ua)) browser = "Firefox iOS";
+    else if (/Firefox\//.test(ua)) browser = "Firefox";
+    else if (/Safari\//.test(ua)) browser = "Safari";
+    let deviceLabel = "Desktop";
+    if (/iPad/i.test(ua) || (/Macintosh/i.test(ua) && typeof navigator !== "undefined" && navigator.maxTouchPoints > 1)) deviceLabel = "iPad";
+    else if (/iPhone/i.test(ua)) deviceLabel = "iPhone";
+    else if (/Android/i.test(ua) && /Mobile/i.test(ua)) deviceLabel = "Android phone";
+    else if (/Android/i.test(ua)) deviceLabel = "Android tablet";
+    else if (/Windows/i.test(ua)) deviceLabel = "Windows PC";
+    else if (/Macintosh/i.test(ua)) deviceLabel = "Mac";
+    return { browser, platform, deviceLabel };
+  }, []);
   const pendingCount = viols.filter((v) => v._pending).length;
 
   const [lastMatch, setLastMatch] = useState(() => {
@@ -850,10 +884,72 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     const name = meName || "Ref";
     const loadRoster = () => api.listRefRoster(eventId).then(setRefRoster);
     api.touchRefRoster(eventId, name, myRole).then(loadRoster);
-    const leave = api.joinPresence(eventId, { name, role: myRole, online_at: Date.now() }, setPresence);
+    const leave = api.joinPresence(eventId, {
+      name,
+      role: myRole,
+      online_at: Date.now(),
+      device_id: deviceId,
+      device_label: deviceInfo.deviceLabel,
+      browser: deviceInfo.browser,
+      platform: deviceInfo.platform,
+      app_version: APP_VERSION,
+    }, setPresence);
+    presenceLeaveRef.current = leave;
     const iv = setInterval(() => { api.touchRefRoster(eventId, name, myRole); loadRoster(); }, 60000);
-    return () => { clearInterval(iv); leave(); };
-  }, [eventId, meName, myRole]);
+    return () => {
+      clearInterval(iv);
+      presenceLeaveRef.current = null;
+      leave();
+    };
+  }, [eventId, meName, myRole, deviceId, deviceInfo]);
+
+  const publishDeviceStatus = useCallback(() => {
+    const payload = {
+      name: meName || "Ref",
+      role: myRole,
+      device_id: deviceId,
+      device_label: deviceInfo.deviceLabel,
+      browser: deviceInfo.browser,
+      platform: deviceInfo.platform,
+      viewport: typeof window !== "undefined" ? `${window.innerWidth}×${window.innerHeight}` : "",
+      display_mode: typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true) ? "PWA" : "Browser",
+      app_version: APP_VERSION,
+      cloud_reachable: cloudReachable,
+      syncing,
+      queued_writes: queuedWrites,
+      failed_writes: failedSyncItems.length,
+      last_synced_at: syncedAt || null,
+      heartbeat_at: Date.now(),
+    };
+    presenceLeaveRef.current?.update?.(payload);
+    if (online && cloudReachable !== false) api.upsertDeviceStatus(eventId, payload).catch(() => {});
+  }, [eventId, meName, myRole, deviceId, deviceInfo, cloudReachable, syncing, queuedWrites, failedSyncItems.length, syncedAt, online]);
+
+  useEffect(() => {
+    const timer = setTimeout(publishDeviceStatus, 350);
+    const heartbeat = setInterval(publishDeviceStatus, 15000);
+    const resize = () => publishDeviceStatus();
+    window.addEventListener("resize", resize);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(heartbeat);
+      window.removeEventListener("resize", resize);
+    };
+  }, [publishDeviceStatus]);
+
+  useEffect(() => {
+    if (!adminUnlocked) { setDeviceStatuses([]); return; }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const rows = await api.listDeviceStatuses(eventId);
+        if (!cancelled) setDeviceStatuses(rows);
+      } catch {}
+    };
+    load();
+    const iv = setInterval(load, 15000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [adminUnlocked, eventId]);
 
   const saveEvent = async (data) => {
     const ev = await api.updateEvent(eventId, {
@@ -2597,6 +2693,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => setShowOfflineTest(false)} />}
       {showCommandCenter && adminUnlocked && <CommandCenter matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
         eventMembers={eventMembers} meName={meName} onSetAdmin={setVolunteerAdmin}
+        deviceStatuses={deviceStatuses} currentDeviceId={deviceId}
         failedSyncItems={failedSyncItems} onRetryFailedSync={retryFailedSync} onDiscardFailedSync={discardFailedSync}
         countdown={eventCountdown} countdownText={countdownText}
         onCountdown={() => { setShowCommandCenter(false); setShowCountdownSetup(true); }}

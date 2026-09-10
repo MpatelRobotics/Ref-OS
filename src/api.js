@@ -655,19 +655,74 @@ export async function deleteRefRoster(eventId, name) {
 }
 
 export function joinPresence(eventId, meta, onChange) {
-  if (E2E_MOCK) { onChange?.([]); return () => {}; }
+  if (E2E_MOCK) {
+    const leave = () => {};
+    leave.update = () => {};
+    onChange?.([]);
+    return leave;
+  }
   const key = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
   const ch = supabase.channel(`presence-${eventId}`, { config: { presence: { key } } });
+  let currentMeta = { ...meta };
+  let userId = null;
   ch.on("presence", { event: "sync" }, () => onChange(Object.values(ch.presenceState()).flat()));
   ch.subscribe(async (status) => {
     if (status === "SUBSCRIBED") {
-      let userId = null;
       try {
         const { data } = await supabase.auth.getSession();
         userId = data?.session?.user?.id || null;
       } catch {}
-      ch.track({ ...meta, user_id: userId });
+      ch.track({ ...currentMeta, user_id: userId });
     }
   });
-  return () => supabase.removeChannel(ch);
+  const leave = () => supabase.removeChannel(ch);
+  leave.update = (nextMeta = {}) => {
+    currentMeta = { ...currentMeta, ...nextMeta };
+    ch.track({ ...currentMeta, user_id: userId }).catch(() => {});
+  };
+  return leave;
+}
+
+export async function upsertDeviceStatus(eventId, status = {}) {
+  if (E2E_MOCK) return null;
+  let userId = null;
+  try {
+    const { data } = await supabase.auth.getSession();
+    userId = data?.session?.user?.id || null;
+  } catch {}
+  if (!userId || !status.device_id) return null;
+  const row = {
+    event_id: eventId,
+    device_id: status.device_id,
+    user_id: userId,
+    name: status.name || "Ref",
+    role: status.role || "ref",
+    device_label: status.device_label || "Unknown device",
+    browser: status.browser || "",
+    platform: status.platform || "",
+    viewport: status.viewport || "",
+    display_mode: status.display_mode || "browser",
+    app_version: status.app_version || "",
+    cloud_reachable: status.cloud_reachable ?? null,
+    syncing: !!status.syncing,
+    queued_writes: Math.max(0, Number(status.queued_writes) || 0),
+    failed_writes: Math.max(0, Number(status.failed_writes) || 0),
+    last_synced_at: status.last_synced_at ? new Date(status.last_synced_at).toISOString() : null,
+    last_seen: new Date().toISOString(),
+  };
+  const { error } = await supabase.from("device_status").upsert(row, { onConflict: "event_id,device_id" });
+  if (error) throw error;
+  return row;
+}
+
+export async function listDeviceStatuses(eventId) {
+  if (E2E_MOCK) return [];
+  const cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase.from("device_status").select("*").eq("event_id", eventId).gte("last_seen", cutoff).order("last_seen", { ascending: false });
+  if (error) throw error;
+  return (data || []).map((row) => ({
+    ...row,
+    lastSeen: row.last_seen ? new Date(row.last_seen).getTime() : 0,
+    lastSyncedAt: row.last_synced_at ? new Date(row.last_synced_at).getTime() : 0,
+  }));
 }

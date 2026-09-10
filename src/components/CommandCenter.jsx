@@ -3,13 +3,45 @@ import { AlertTriangle, BarChart3, CalendarDays, ClipboardCheck, Clock, CloudOff
 
 const fmtTime = (ms) => ms ? new Date(ms).toLocaleString() : "—";
 
-export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
+export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, deviceStatuses = [], currentDeviceId = "", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
   const announcementEntries = fieldLog.filter(e=>e.kind==="announcement").sort((a,b)=>b.createdAt-a.createdAt);
   const announcements = announcementEntries.length;
   const awps = fieldLog.filter(e=>e.kind==="awp").length;
+  const [showDeviceSync, setShowDeviceSync] = React.useState(false);
+  const presenceDeviceIds = new Set((presence || []).map((p) => p?.device_id).filter(Boolean));
+  const livePresenceByDevice = new Map((presence || []).filter((p) => p?.device_id).map((p) => [p.device_id, p]));
+  const mergedDevices = (() => {
+    const map = new Map();
+    for (const row of deviceStatuses || []) map.set(row.device_id, { ...row });
+    for (const row of presence || []) {
+      if (!row?.device_id) continue;
+      map.set(row.device_id, { ...(map.get(row.device_id) || {}), ...row, lastSeen: Date.now() });
+    }
+    return [...map.values()].sort((a, b) => {
+      const aLive = presenceDeviceIds.has(a.device_id) ? 1 : 0;
+      const bLive = presenceDeviceIds.has(b.device_id) ? 1 : 0;
+      if (aLive !== bLive) return bLive - aLive;
+      return (b.lastSeen || b.last_seen ? new Date(b.lastSeen || b.last_seen).getTime() : 0) - (a.lastSeen || a.last_seen ? new Date(a.lastSeen || a.last_seen).getTime() : 0);
+    });
+  })();
+  const syncAttentionCount = mergedDevices.filter((d) => {
+    const live = presenceDeviceIds.has(d.device_id);
+    return !live || d.cloud_reachable === false || Number(d.queued_writes || 0) > 0 || Number(d.failed_writes || 0) > 0;
+  }).length;
+  const ago = (value) => {
+    const ms = typeof value === "number" ? value : (value ? new Date(value).getTime() : 0);
+    if (!ms) return "Never";
+    const sec = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+    if (sec < 10) return "Just now";
+    if (sec < 60) return `${sec}s ago`;
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    return `${hr}h ago`;
+  };
   const onlinePeople = Array.from(
     new Map((presence || []).filter((p) => p?.name).map((p) => [p.name, p])).values()
   ).sort((a, b) => String(a.name).localeCompare(String(b.name)));
@@ -84,6 +116,87 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
           </div>
           <button onClick={onClearData} className="mt-2 w-full py-2.5 px-3 rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-semibold text-sm text-left flex items-center gap-2"><Trash2 size={16}/> Clear event data</button>
         </div>
+        <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="font-bold flex items-center gap-2"><Wifi size={17}/> Device Sync Dashboard</div>
+              <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                {mergedDevices.length} recent {mergedDevices.length === 1 ? "device" : "devices"} · {presenceDeviceIds.size} connected
+                {syncAttentionCount > 0 ? ` · ${syncAttentionCount} need attention` : " · All healthy"}
+              </div>
+            </div>
+            <button onClick={() => setShowDeviceSync((v) => !v)} className="shrink-0 py-2 px-3 rounded-lg border font-semibold text-sm">
+              {showDeviceSync ? "Hide" : "Open"}
+            </button>
+          </div>
+
+          {showDeviceSync && (
+            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-2">
+                  <div className="text-xl font-bold text-slate-900 dark:text-white">{presenceDeviceIds.size}</div>
+                  <div className="text-[11px] uppercase tracking-wide text-slate-500">Connected</div>
+                </div>
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-2">
+                  <div className="text-xl font-bold text-emerald-600">{Math.max(0, mergedDevices.length - syncAttentionCount)}</div>
+                  <div className="text-[11px] uppercase tracking-wide text-slate-500">Healthy</div>
+                </div>
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-2">
+                  <div className={`text-xl font-bold ${syncAttentionCount ? "text-amber-600" : "text-slate-400"}`}>{syncAttentionCount}</div>
+                  <div className="text-[11px] uppercase tracking-wide text-slate-500">Attention</div>
+                </div>
+              </div>
+
+              {mergedDevices.length === 0 ? (
+                <div className="text-sm text-slate-500 dark:text-slate-400">No device status has been reported yet.</div>
+              ) : (
+                <div className="space-y-2">
+                  {mergedDevices.map((device) => {
+                    const live = presenceDeviceIds.has(device.device_id);
+                    const liveMeta = livePresenceByDevice.get(device.device_id) || {};
+                    const queued = Number(liveMeta.queued_writes ?? device.queued_writes ?? 0);
+                    const failed = Number(liveMeta.failed_writes ?? device.failed_writes ?? 0);
+                    const cloudOk = liveMeta.cloud_reachable ?? device.cloud_reachable;
+                    const isSyncing = !!(liveMeta.syncing ?? device.syncing);
+                    const lastSync = liveMeta.last_synced_at ?? device.lastSyncedAt ?? device.last_synced_at;
+                    const needsAttention = !live || cloudOk === false || queued > 0 || failed > 0;
+                    const statusText = !live ? "Offline" : isSyncing ? "Syncing" : cloudOk === false ? "Cloud unavailable" : queued > 0 ? `${queued} queued` : failed > 0 ? `${failed} failed` : "Synced";
+                    const dotClass = !live ? "bg-slate-400" : needsAttention ? "bg-amber-500" : "bg-emerald-500";
+                    return (
+                      <div key={device.device_id} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+                        <div className="flex items-start gap-2">
+                          <span className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${dotClass}`} />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="font-bold text-sm text-slate-900 dark:text-white">{device.name || liveMeta.name || "Unknown volunteer"}</span>
+                              {device.device_id === currentDeviceId && <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">This device</span>}
+                              <span className={`text-[11px] font-bold uppercase tracking-wide ${needsAttention ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}`}>{statusText}</span>
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                              {liveMeta.device_label || device.device_label || "Unknown device"}
+                              {(liveMeta.browser || device.browser) ? ` · ${liveMeta.browser || device.browser}` : ""}
+                              {(liveMeta.display_mode || device.display_mode) ? ` · ${liveMeta.display_mode || device.display_mode}` : ""}
+                              {(liveMeta.viewport || device.viewport) ? ` · ${liveMeta.viewport || device.viewport}` : ""}
+                            </div>
+                            <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-1 text-xs">
+                              <div><span className="text-slate-400">Last sync</span> <b className="ml-1">{ago(lastSync)}</b></div>
+                              <div><span className="text-slate-400">Queued</span> <b className={queued ? "ml-1 text-amber-600" : "ml-1"}>{queued}</b></div>
+                              <div><span className="text-slate-400">Failed</span> <b className={failed ? "ml-1 text-red-600" : "ml-1"}>{failed}</b></div>
+                              <div><span className="text-slate-400">Version</span> <b className="ml-1">v{liveMeta.app_version || device.app_version || "—"}</b></div>
+                            </div>
+                            {!live && <div className="mt-1 text-[11px] text-slate-400">Last seen {ago(device.lastSeen || device.last_seen)}</div>}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="mt-3 text-[11px] text-slate-400">Offline devices show their last reported sync state. Queued changes created after a device loses its connection cannot be seen by another device until it reconnects.</p>
+            </div>
+          )}
+        </div>
+
         <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
           <div className="font-bold flex items-center gap-2"><Users size={17}/> Key Volunteer Status</div>
           <div className="mt-2 text-sm">{onlineNames.size} currently online · {(roster||[]).length} known volunteers</div>
