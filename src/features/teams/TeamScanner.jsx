@@ -67,7 +67,7 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
       const canvas = ensureCanvas();
 
       // Keep OCR lightweight on phones. The live video remains untouched.
-      const targetWidth = 640;
+      const targetWidth = 512;
       const scale = Math.min(1, targetWidth / video.videoWidth);
       canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
       canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
@@ -115,6 +115,8 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
           await worker.setParameters({
             tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
             preserve_interword_spaces: "0",
+            tessedit_pageseg_mode: "11",
+            user_defined_dpi: "150",
           });
         } catch {}
 
@@ -227,10 +229,10 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
       // This prevents a heavy OCR startup from delaying the camera screen.
       initOcrWorker();
 
-      // A conservative scan cadence keeps Safari/PWA rendering smooth.
+      // A faster scan cadence starts the next pass quickly without overlapping OCR jobs.
       timer = window.setInterval(() => {
         scanOnce();
-      }, 1600);
+      }, 650);
     })();
 
     return () => {
