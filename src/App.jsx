@@ -477,6 +477,18 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   });
 
   const [view, setView] = useState(role === "judge" ? "judging" : "teams");
+  const initialMatchDefaultAppliedRef = useRef(false);
+
+  // Matches load asynchronously. The first time this event reports matches,
+  // make Matches the landing tab for non-Judge users. This runs only once,
+  // so manually selecting Teams afterward will stay on Teams.
+  useEffect(() => {
+    if (role === "judge" || initialMatchDefaultAppliedRef.current) return;
+    if (Object.keys(matches).length === 0) return;
+
+    initialMatchDefaultAppliedRef.current = true;
+    setView("matches");
+  }, [matches, role]);
 
   // Warm the OCR engine while the user is already on the Teams screen.
   // Opening Scan can then go straight to camera + worker startup instead of
@@ -2262,8 +2274,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             { k: "judging", label: "Judging", Icon: Trophy },
             { k: "alliances", label: "Alliances", Icon: GitBranch }
           ] : [
-            { k: "teams", label: "Teams", Icon: Users },
             ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
+            { k: "teams", label: "Teams", Icon: Users },
             ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
             { k: "robots", label: "Robots", Icon: Camera },
             { k: "alliances", label: "Alliances", Icon: GitBranch },
@@ -2299,8 +2311,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           { k: "judging", label: "Judging", Icon: Trophy },
           { k: "alliances", label: "Alliances", Icon: GitBranch }
         ] : [
-          { k: "teams", label: "Teams", Icon: Users },
           ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
+          { k: "teams", label: "Teams", Icon: Users },
           ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
           { k: "robots", label: "Robots", Icon: Camera },
           { k: "alliances", label: "Alliances", Icon: GitBranch },
