@@ -666,20 +666,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
   const [eventMembers, setEventMembers] = useState([]);
   const myRole = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
-  const deviceId = useMemo(() => {
-    try {
-      let id = localStorage.getItem("refosDeviceId");
-      if (!id) {
-        id = (globalThis.crypto?.randomUUID?.() || `device-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-        localStorage.setItem("refosDeviceId", id);
-      }
-      return id;
-    } catch {
-      return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    }
-  }, []);
-
-
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const pendingAdminAction = useRef(null);
 
