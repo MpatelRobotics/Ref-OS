@@ -7,12 +7,14 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
   const [error, setError] = useState("");
   const videoRef = useRef(null);
   const streamRef = useRef(null);
-  const scanningRef = useRef(false);
   const stoppedRef = useRef(false);
-  const tesseractRef = useRef(null);
+  const scanningRef = useRef(false);
   const teamsRef = useRef(teams);
   const onDetectedRef = useRef(onDetected);
   const onCloseRef = useRef(onClose);
+  const workerRef = useRef(null);
+  const workerReadyRef = useRef(false);
+  const hiddenCanvasRef = useRef(null);
 
   useEffect(() => {
     teamsRef.current = teams;
@@ -20,15 +22,12 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
 
   useEffect(() => {
     onDetectedRef.current = onDetected;
-  }, []);
+  }, [onDetected]);
 
   useEffect(() => {
     onCloseRef.current = onClose;
   }, [onClose]);
 
-  // Start the camera once for the lifetime of this scanner screen.
-  // Callback props are kept in refs so unrelated parent renders cannot
-  // tear down and recreate the video stream.
   useEffect(() => {
     let live = true;
     stoppedRef.current = false;
@@ -54,149 +53,203 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
         });
     };
 
-    const getFrame = () => {
+    const ensureCanvas = () => {
+      if (!hiddenCanvasRef.current) {
+        hiddenCanvasRef.current = document.createElement("canvas");
+      }
+      return hiddenCanvasRef.current;
+    };
+
+    const captureSmallFrame = () => {
       const video = videoRef.current;
       if (!video?.videoWidth || !video?.videoHeight) return null;
 
-      const canvas = document.createElement("canvas");
-      const maxWidth = 1280;
-      const scale = Math.min(1, maxWidth / video.videoWidth);
+      const canvas = ensureCanvas();
+
+      // Keep OCR lightweight on phones. The live video remains untouched.
+      const targetWidth = 640;
+      const scale = Math.min(1, targetWidth / video.videoWidth);
       canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
       canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
 
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const ctx = canvas.getContext("2d", {
+        alpha: false,
+        willReadFrequently: false,
+      });
 
-      // Increase contrast slightly to improve OCR on printed robot number plates.
-      try {
-        const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = image.data;
-        for (let i = 0; i < data.length; i += 4) {
-          for (let c = 0; c < 3; c++) {
-            const v = data[i + c];
-            data[i + c] = Math.max(0, Math.min(255, (v - 128) * 1.18 + 128));
-          }
-        }
-        ctx.putImageData(image, 0, 0);
-      } catch {}
+      // Contrast is applied only to the offscreen OCR copy.
+      // The visible camera preview is never filtered or redrawn.
+      ctx.save();
+      ctx.filter = "grayscale(1) contrast(1.35)";
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      ctx.restore();
 
       return canvas;
     };
 
-    const readText = async (canvas) => {
-      // Fast path where the browser provides native text detection.
-      if ("TextDetector" in globalThis) {
-        try {
-          const found = await new TextDetector().detect(canvas);
-          const text = found.map((x) => x.rawValue || "").join(" ");
-          if (text.trim()) return text;
-        } catch {}
-      }
+    const initOcrWorker = async () => {
+      if (workerReadyRef.current || workerRef.current || stoppedRef.current) return;
 
-      // Fallback OCR. Loaded once and then reused for subsequent scans.
-      if (!tesseractRef.current) {
-        setStatus("Loading AI scanner…");
-        tesseractRef.current = await loadExternalScript(
+      try {
+        setStatus("Camera ready • preparing team scanner…");
+
+        const Tesseract = await loadExternalScript(
           "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js",
           "Tesseract"
         );
-      }
 
-      setStatus("Searching for team number…");
-      const result = await tesseractRef.current.recognize(canvas, "eng", {
-        logger: () => {},
-      });
-      return result?.data?.text || "";
+        if (!live || stoppedRef.current) return;
+
+        // Create ONE OCR worker and reuse it for every frame.
+        // Tesseract.recognize() on every pass can repeatedly create heavy work.
+        const worker = await Tesseract.createWorker("eng", 1, {
+          logger: () => {},
+        });
+
+        if (!live || stoppedRef.current) {
+          await worker.terminate();
+          return;
+        }
+
+        try {
+          await worker.setParameters({
+            tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+            preserve_interword_spaces: "0",
+          });
+        } catch {}
+
+        workerRef.current = worker;
+        workerReadyRef.current = true;
+        setStatus("Searching for team number…");
+      } catch {
+        if (live && !stoppedRef.current) {
+          setStatus("Camera ready • scanner loading failed");
+        }
+      }
     };
 
     const scanOnce = async () => {
       if (
-        stoppedRef.current ||
         !live ||
+        stoppedRef.current ||
         scanningRef.current ||
-        !videoRef.current?.videoWidth
+        !workerReadyRef.current ||
+        !workerRef.current
       ) {
         return;
       }
 
+      const canvas = captureSmallFrame();
+      if (!canvas) return;
+
       scanningRef.current = true;
-      setError("");
-      setStatus("Searching for team number…");
 
       try {
-        const canvas = getFrame();
-        if (!canvas) return;
+        const result = await workerRef.current.recognize(canvas);
+        if (!live || stoppedRef.current) return;
 
-        const rawText = await readText(canvas);
+        const rawText = result?.data?.text || "";
         const match = findTeam(rawText);
 
-        if (match && !stoppedRef.current) {
+        if (match) {
           stoppedRef.current = true;
           setStatus(`Team ${match.number} found`);
           stopCamera();
-          window.setTimeout(() => onDetectedRef.current?.(match.number), 250);
+
+          try {
+            await workerRef.current?.terminate?.();
+          } catch {}
+
+          workerRef.current = null;
+          workerReadyRef.current = false;
+
+          window.setTimeout(() => {
+            onDetectedRef.current?.(match.number);
+          }, 200);
         }
       } catch {
-        if (!stoppedRef.current) {
-          setStatus("Searching for team number…");
-        }
+        // Keep the preview alive even if an OCR pass fails.
       } finally {
         scanningRef.current = false;
       }
     };
 
-    (async () => {
+    const startCamera = async () => {
       if (!navigator.mediaDevices?.getUserMedia) {
         setError("Camera access is not supported on this browser.");
         setStatus("Scanner unavailable");
-        return;
+        return false;
       }
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: "environment" },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            frameRate: { ideal: 30, max: 30 },
           },
           audio: false,
         });
 
         if (!live) {
           stream.getTracks().forEach((track) => track.stop());
-          return;
+          return false;
         }
 
         streamRef.current = stream;
-        const video = videoRef.current;
 
-        if (video) {
-          video.srcObject = stream;
-          video.muted = true;
-          video.setAttribute("playsinline", "true");
-          await video.play();
-          setStatus("Searching for team number…");
-        }
+        const video = videoRef.current;
+        if (!video) return false;
+
+        video.srcObject = stream;
+        video.muted = true;
+        video.setAttribute("playsinline", "true");
+        await video.play();
+
+        // Camera becomes visible immediately. OCR initializes afterward.
+        setStatus("Camera ready • preparing team scanner…");
+        return true;
       } catch {
         setError("Camera access was not available. Allow camera permission and try again.");
         setStatus("Scanner unavailable");
-        return;
+        return false;
       }
+    };
 
-      // Continuously scan the whole camera view. A new pass begins after
-      // the previous OCR pass finishes, preventing overlapping OCR jobs.
-      while (live && !stoppedRef.current) {
-        await scanOnce();
-        await new Promise((resolve) => window.setTimeout(resolve, 1100));
-      }
+    let timer = null;
+
+    (async () => {
+      const cameraStarted = await startCamera();
+      if (!cameraStarted || !live) return;
+
+      // Initialize OCR only after the live preview is already running.
+      // This prevents a heavy OCR startup from delaying the camera screen.
+      initOcrWorker();
+
+      // A conservative scan cadence keeps Safari/PWA rendering smooth.
+      timer = window.setInterval(() => {
+        scanOnce();
+      }, 1600);
     })();
 
     return () => {
       live = false;
       stoppedRef.current = true;
+
+      if (timer) window.clearInterval(timer);
+
       stopCamera();
+
+      const worker = workerRef.current;
+      workerRef.current = null;
+      workerReadyRef.current = false;
+
+      if (worker?.terminate) {
+        worker.terminate().catch(() => {});
+      }
     };
-  }, [onDetected]);
+  }, []);
 
   return (
     <div className="fixed inset-0 z-[100] bg-black text-white overflow-hidden">
@@ -209,12 +262,11 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
       />
 
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute inset-2 sm:inset-3 border-4 border-white/90 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.12)]">
+        <div className="absolute inset-2 sm:inset-3 border-4 border-white/90 rounded-2xl">
           <span className="absolute left-0 top-0 w-14 h-14 border-l-4 border-t-4 border-cyan-400 rounded-tl-xl" />
           <span className="absolute right-0 top-0 w-14 h-14 border-r-4 border-t-4 border-cyan-400 rounded-tr-xl" />
           <span className="absolute left-0 bottom-0 w-14 h-14 border-l-4 border-b-4 border-cyan-400 rounded-bl-xl" />
           <span className="absolute right-0 bottom-0 w-14 h-14 border-r-4 border-b-4 border-cyan-400 rounded-br-xl" />
-          <div className="absolute left-4 right-4 top-1/2 h-0.5 bg-cyan-400/80 shadow-[0_0_12px_rgba(34,211,238,0.85)]" />
         </div>
       </div>
 
@@ -228,6 +280,7 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
             Point the camera at a robot team number
           </div>
         </div>
+
         <button
           type="button"
           onClick={() => onCloseRef.current?.()}
@@ -250,7 +303,7 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
               {status}
             </div>
             <div className="text-xs text-white/70 mt-1">
-              The entire camera view is being scanned automatically
+              The camera stays live while Ref OS scans a lightweight copy of the frame
             </div>
           </div>
         )}
