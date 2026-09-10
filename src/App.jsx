@@ -5113,6 +5113,11 @@ function RuleBook({ rules }) {
   const [manualSearchLoading, setManualSearchLoading] = useState(false);
   const [manualSearchError, setManualSearchError] = useState("");
   const [manualSearchExpanded, setManualSearchExpanded] = useState(false);
+  const [manualSearchFilter, setManualSearchFilter] = useState("all");
+  const [manualSuggestions, setManualSuggestions] = useState([]);
+  const [manualChangelog, setManualChangelog] = useState(null);
+  const [showManualChanges, setShowManualChanges] = useState(false);
+  const [manualChangeVersion, setManualChangeVersion] = useState("2.0");
   const MANUAL_PAGE_COUNT = 129;
   const manualPageRefs = useRef({});
   const manualPageSrc = (page) => `/game-manual-pages/page-${String(page).padStart(3, "0")}.jpg`;
@@ -7698,11 +7703,24 @@ function RuleBook({ rules }) {
     setManualSearchLoading(true);
     setManualSearchError("");
     try {
-      const response = await fetch("/game-manual-search.json", { cache: "force-cache" });
-      if (!response.ok) throw new Error(`Search index unavailable (${response.status})`);
-      const data = await response.json();
+      const [indexResponse, suggestionsResponse, changelogResponse] = await Promise.all([
+        fetch("/game-manual-search.json", { cache: "force-cache" }),
+        fetch("/game-manual-suggestions.json", { cache: "force-cache" }),
+        fetch("/game-manual-changelog.json", { cache: "force-cache" }),
+      ]);
+      if (!indexResponse.ok) throw new Error(`Search index unavailable (${indexResponse.status})`);
+      const data = await indexResponse.json();
       if (!Array.isArray(data?.pages)) throw new Error("Search index is invalid");
       setManualSearchIndex(data);
+
+      if (suggestionsResponse.ok) {
+        const suggestionData = await suggestionsResponse.json();
+        setManualSuggestions(Array.isArray(suggestionData?.suggestions) ? suggestionData.suggestions : []);
+      }
+      if (changelogResponse.ok) {
+        const changeData = await changelogResponse.json();
+        setManualChangelog(changeData);
+      }
     } catch (error) {
       console.warn("Game Manual search index unavailable", error);
       setManualSearchError("Full manual search is unavailable on this device right now.");
@@ -7739,6 +7757,7 @@ function RuleBook({ rules }) {
 
     const results = [];
     for (const entry of manualSearchIndex.pages) {
+      if (manualSearchFilter !== "all" && !entry.categories?.includes(manualSearchFilter)) continue;
       const pageText = String(entry.text || "");
       const lower = pageText.toLowerCase();
       const exactPos = lower.indexOf(queryLower);
@@ -7778,7 +7797,19 @@ function RuleBook({ rules }) {
     }
 
     return results.sort((a, b) => b.score - a.score || a.page - b.page);
-  }, [manualSearchIndex, manualSearchQuery]);
+  }, [manualSearchIndex, manualSearchQuery, manualSearchFilter]);
+
+  const manualSearchSuggestions = useMemo(() => {
+    const q = manualSearchQuery.trim().toLowerCase();
+    if (!q || q.length < 1) return [];
+    return manualSuggestions
+      .filter((item) => item.label.toLowerCase().includes(q) || item.query.toLowerCase().startsWith(q))
+      .slice(0, 6);
+  }, [manualSuggestions, manualSearchQuery]);
+
+  const selectedManualChanges = useMemo(() => {
+    return manualChangelog?.versions?.find((entry) => entry.version === manualChangeVersion) || null;
+  }, [manualChangelog, manualChangeVersion]);
 
   if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
   const q = query.trim().toUpperCase();
@@ -7807,6 +7838,18 @@ function RuleBook({ rules }) {
               <div className="font-bold text-sm sm:text-base truncate">Game Manual</div>
               <div className="text-[11px] sm:text-xs text-slate-300 truncate">VEX V5 Robotics Competition Override • Version 2.0</div>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                loadManualSearchIndex();
+                setShowManualChanges(true);
+              }}
+              className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-2 rounded-md border border-white/20 bg-white/10 hover:bg-white/15 text-xs sm:text-sm font-semibold"
+              title="See Game Manual changes by version"
+            >
+              <GitBranch size={16} />
+              Changes
+            </button>
           </div>
 
           <div className="shrink-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2">
@@ -7857,6 +7900,53 @@ function RuleBook({ rules }) {
                 </button>
               )}
 
+              {manualSearchQuery.trim() && manualSearchSuggestions.length > 0 && manualSearchExpanded && (
+                <div className="mt-1.5 flex gap-1.5 overflow-x-auto pb-0.5">
+                  {manualSearchSuggestions.map((item, index) => (
+                    <button
+                      key={`${item.type}-${item.query}-${index}`}
+                      type="button"
+                      onClick={() => {
+                        setManualSearchQuery(item.query);
+                        setManualSearchExpanded(true);
+                      }}
+                      className="shrink-0 max-w-[260px] truncate px-2.5 py-1.5 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 hover:border-slate-400"
+                      title={item.label}
+                    >
+                      <span className="font-semibold">{item.type}:</span> {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5" aria-label="Manual search filters">
+                {[
+                  ["all", "All"],
+                  ["general", "General Rules"],
+                  ["game", "Game Rules"],
+                  ["robot", "Robot Rules"],
+                  ["tournament", "Tournament Rules"],
+                  ["definitions", "Definitions"],
+                  ["violations", "Violation Notes"],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      setManualSearchFilter(key);
+                      if (manualSearchQuery.trim()) setManualSearchExpanded(true);
+                    }}
+                    className={`shrink-0 px-2.5 py-1.5 rounded-md border text-xs font-semibold ${
+                      manualSearchFilter === key
+                        ? "bg-[#0D0F32] text-white border-[#0D0F32] dark:bg-white dark:text-[#0D0F32] dark:border-white"
+                        : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
               {manualSearchLoading && !manualSearchIndex && (
                 <div className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Preparing offline manual search…</div>
               )}
@@ -7869,6 +7959,7 @@ function RuleBook({ rules }) {
                   <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                       {manualSearchResults.length} {manualSearchResults.length === 1 ? "page" : "pages"} found
+                      {manualSearchFilter !== "all" ? " in selected section" : ""}
                     </span>
                     <span className="ml-auto text-[11px] text-slate-400">Version 2.0 • offline index</span>
                   </div>
@@ -7896,6 +7987,92 @@ function RuleBook({ rules }) {
               )}
             </div>
           </div>
+
+          {showManualChanges && (
+            <div className="absolute inset-0 z-[120] bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowManualChanges(false)}>
+              <div className="w-full sm:max-w-2xl max-h-[88vh] bg-white dark:bg-slate-900 rounded-t-xl sm:rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                <div className="shrink-0 px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3">
+                  <GitBranch size={19} className="text-[#D7212B]" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-slate-900 dark:text-white">Rule Change Tracker</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400">Official Game Manual changelog</div>
+                  </div>
+                  <button type="button" onClick={() => setShowManualChanges(false)} className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close changes">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="shrink-0 px-3 py-2 border-b border-slate-200 dark:border-slate-700 flex gap-1.5 overflow-x-auto">
+                  {(manualChangelog?.versions || []).map((entry) => (
+                    <button
+                      key={entry.version}
+                      type="button"
+                      onClick={() => setManualChangeVersion(entry.version)}
+                      className={`shrink-0 px-3 py-1.5 rounded-md border text-xs font-semibold ${
+                        manualChangeVersion === entry.version
+                          ? "bg-[#0D0F32] text-white border-[#0D0F32]"
+                          : "bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      v{entry.version}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+                  {!selectedManualChanges ? (
+                    <div className="text-sm text-slate-500">Loading changelog…</div>
+                  ) : (
+                    <>
+                      <div className="mb-3 flex items-baseline gap-2">
+                        <span className="font-bold text-slate-900 dark:text-white">Version {selectedManualChanges.version}</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">{selectedManualChanges.date}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {selectedManualChanges.changes.map((change, index) => {
+                          const ruleCodes = [...change.matchAll(/<([A-Z]{1,5}\d+[a-zA-Z0-9]*)>/g)].map((match) => match[1]);
+                          return (
+                            <div key={`${selectedManualChanges.version}-${index}`} className="p-3 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                              <div className="text-sm leading-5 text-slate-700 dark:text-slate-200">{change}</div>
+                              {ruleCodes.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {ruleCodes.map((code) => (
+                                    <button
+                                      key={`${index}-${code}`}
+                                      type="button"
+                                      onClick={() => {
+                                        setShowManualChanges(false);
+                                        setManualSearchQuery(code);
+                                        setManualSearchFilter("all");
+                                        setManualSearchExpanded(true);
+                                      }}
+                                      className="px-2 py-1 rounded border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 font-mono text-xs font-bold text-[#D7212B]"
+                                    >
+                                      &lt;{code}&gt;
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowManualChanges(false);
+                          jumpToManualPage(selectedManualChanges.page);
+                        }}
+                        className="mt-4 w-full px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200"
+                      >
+                        Open this changelog page
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-slate-200 dark:bg-slate-900 px-2 py-2 sm:px-4 sm:py-4">
             <div className="mx-auto max-w-4xl space-y-2 sm:space-y-3">
