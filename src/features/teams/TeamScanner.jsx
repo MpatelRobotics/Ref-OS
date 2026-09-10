@@ -11,11 +11,24 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
   const stoppedRef = useRef(false);
   const tesseractRef = useRef(null);
   const teamsRef = useRef(teams);
+  const onDetectedRef = useRef(onDetected);
+  const onCloseRef = useRef(onClose);
 
   useEffect(() => {
     teamsRef.current = teams;
   }, [teams]);
 
+  useEffect(() => {
+    onDetectedRef.current = onDetected;
+  }, []);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  // Start the camera once for the lifetime of this scanner screen.
+  // Callback props are kept in refs so unrelated parent renders cannot
+  // tear down and recreate the video stream.
   useEffect(() => {
     let live = true;
     stoppedRef.current = false;
@@ -121,7 +134,7 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
           stoppedRef.current = true;
           setStatus(`Team ${match.number} found`);
           stopCamera();
-          window.setTimeout(() => onDetected(match.number), 250);
+          window.setTimeout(() => onDetectedRef.current?.(match.number), 250);
         }
       } catch {
         if (!stoppedRef.current) {
@@ -174,7 +187,7 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
       // the previous OCR pass finishes, preventing overlapping OCR jobs.
       while (live && !stoppedRef.current) {
         await scanOnce();
-        await new Promise((resolve) => window.setTimeout(resolve, 650));
+        await new Promise((resolve) => window.setTimeout(resolve, 1100));
       }
     })();
 
@@ -201,7 +214,7 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
           <span className="absolute right-0 top-0 w-14 h-14 border-r-4 border-t-4 border-cyan-400 rounded-tr-xl" />
           <span className="absolute left-0 bottom-0 w-14 h-14 border-l-4 border-b-4 border-cyan-400 rounded-bl-xl" />
           <span className="absolute right-0 bottom-0 w-14 h-14 border-r-4 border-b-4 border-cyan-400 rounded-br-xl" />
-          <div className="absolute left-4 right-4 top-1/2 h-0.5 bg-cyan-400/80 shadow-[0_0_12px_rgba(34,211,238,0.85)] animate-pulse" />
+          <div className="absolute left-4 right-4 top-1/2 h-0.5 bg-cyan-400/80 shadow-[0_0_12px_rgba(34,211,238,0.85)]" />
         </div>
       </div>
 
@@ -217,7 +230,7 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
         </div>
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => onCloseRef.current?.()}
           className="ml-auto p-2 rounded-md bg-black/40 border border-white/20"
           aria-label="Close scanner"
         >
@@ -233,7 +246,7 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
         ) : (
           <div className="mx-auto max-w-md rounded-lg bg-black/55 backdrop-blur-sm border border-white/20 px-4 py-3 text-center">
             <div className="flex items-center justify-center gap-2 font-semibold">
-              <Camera size={18} className="animate-pulse" />
+              <Camera size={18} />
               {status}
             </div>
             <div className="text-xs text-white/70 mt-1">
