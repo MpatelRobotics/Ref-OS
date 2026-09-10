@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Camera, X, ScanSearch } from "lucide-react";
-import { loadExternalScript } from "../../utils/loadExternalScript.js";
+import { preloadTeamScannerOcr } from "./preloadTeamScannerOcr.js";
 
 export default function TeamScanner({ teams, onDetected, onClose }) {
   const [status, setStatus] = useState("Starting camera…");
@@ -93,10 +93,7 @@ export default function TeamScanner({ teams, onDetected, onClose }) {
       try {
         setStatus("Camera ready • preparing team scanner…");
 
-        const Tesseract = await loadExternalScript(
-          "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js",
-          "Tesseract"
-        );
+        const Tesseract = await preloadTeamScannerOcr();
 
         if (!live || stoppedRef.current) return;
 

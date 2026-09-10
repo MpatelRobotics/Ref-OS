@@ -17,6 +17,7 @@ import NameScreen from "./auth/NameScreen.jsx";
 import RoleAccessCodeManager from "./auth/RoleAccessCodeManager.jsx";
 import { latestRoleAccessConfig } from "./auth/accessConfig.js";
 import TeamScanner from "./features/teams/TeamScanner.jsx";
+import { preloadTeamScannerOcr } from "./features/teams/preloadTeamScannerOcr.js";
 import IdentityModal from "./components/modals/IdentityModal.jsx";
 import ShareModal from "./components/modals/ShareModal.jsx";
 import AdminPasswordModal from "./components/modals/AdminPasswordModal.jsx";
@@ -476,6 +477,27 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   });
 
   const [view, setView] = useState(role === "judge" ? "judging" : "teams");
+
+  // Warm the OCR engine while the user is already on the Teams screen.
+  // Opening Scan can then go straight to camera + worker startup instead of
+  // waiting for the OCR library download first.
+  useEffect(() => {
+    if (view !== "teams") return;
+
+    const warmScanner = () => {
+      preloadTeamScannerOcr().catch(() => {
+        // Preloading is opportunistic. The scanner itself can retry later.
+      });
+    };
+
+    if ("requestIdleCallback" in window) {
+      const idleId = window.requestIdleCallback(warmScanner, { timeout: 1200 });
+      return () => window.cancelIdleCallback?.(idleId);
+    }
+
+    const timer = window.setTimeout(warmScanner, 250);
+    return () => window.clearTimeout(timer);
+  }, [view]);
   const [openTeam, setOpenTeam] = useState(null);
   const [openMatch, setOpenMatch] = useState(null);
   const [openRobot, setOpenRobot] = useState(null);
