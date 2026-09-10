@@ -1,4 +1,4 @@
-const CACHE = "refos-v10-1.2.0-highlander-mobile-manual";
+const CACHE = "refos-v11-1.2.0-highlander-manual-search";
 
 const APP_SHELL = [
   "/",
@@ -7,6 +7,7 @@ const APP_SHELL = [
   "/icon-180.png",
   "/icon-192.png",
   "/icon-512.png",
+  "/game-manual-search.json",
 ];
 
 const GAME_MANUAL_PAGES = [
@@ -182,7 +183,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   // Manual pages are cache-first so the viewer works identically online and offline.
-  if (url.pathname.startsWith("/game-manual-pages/")) {
+  if (url.pathname.startsWith("/game-manual-pages/") || url.pathname === "/game-manual-search.json") {
     event.respondWith(
       caches.match(req).then((cached) => cached || fetch(req).then((res) => {
         if (res.ok) caches.open(CACHE).then((cache) => cache.put(req, res.clone())).catch(() => {});

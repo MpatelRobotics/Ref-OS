@@ -5108,6 +5108,11 @@ function RuleBook({ rules }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(null); // rule object shown in the notes popup
   const [showGameManual, setShowGameManual] = useState(false);
+  const [manualSearchIndex, setManualSearchIndex] = useState(null);
+  const [manualSearchQuery, setManualSearchQuery] = useState("");
+  const [manualSearchLoading, setManualSearchLoading] = useState(false);
+  const [manualSearchError, setManualSearchError] = useState("");
+  const [manualSearchExpanded, setManualSearchExpanded] = useState(false);
   const MANUAL_PAGE_COUNT = 129;
   const manualPageRefs = useRef({});
   const manualPageSrc = (page) => `/game-manual-pages/page-${String(page).padStart(3, "0")}.jpg`;
@@ -7687,6 +7692,94 @@ function RuleBook({ rules }) {
     const target = manualPageRefs.current[page];
     if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+
+  const loadManualSearchIndex = useCallback(async () => {
+    if (manualSearchIndex || manualSearchLoading) return;
+    setManualSearchLoading(true);
+    setManualSearchError("");
+    try {
+      const response = await fetch("/game-manual-search.json", { cache: "force-cache" });
+      if (!response.ok) throw new Error(`Search index unavailable (${response.status})`);
+      const data = await response.json();
+      if (!Array.isArray(data?.pages)) throw new Error("Search index is invalid");
+      setManualSearchIndex(data);
+    } catch (error) {
+      console.warn("Game Manual search index unavailable", error);
+      setManualSearchError("Full manual search is unavailable on this device right now.");
+    } finally {
+      setManualSearchLoading(false);
+    }
+  }, [manualSearchIndex, manualSearchLoading]);
+
+  // Warm the small text index while the Rules screen is open so full-manual
+  // search is normally ready before the user opens the manual. The index is
+  // also pre-cached by the service worker for offline event use.
+  useEffect(() => {
+    if (manualSearchIndex || manualSearchLoading) return;
+    const warm = () => loadManualSearchIndex();
+    if ("requestIdleCallback" in window) {
+      const id = window.requestIdleCallback(warm, { timeout: 1500 });
+      return () => window.cancelIdleCallback?.(id);
+    }
+    const timer = window.setTimeout(warm, 350);
+    return () => window.clearTimeout(timer);
+  }, [manualSearchIndex, manualSearchLoading, loadManualSearchIndex]);
+
+  useEffect(() => {
+    if (showGameManual) loadManualSearchIndex();
+  }, [showGameManual, loadManualSearchIndex]);
+
+  const manualSearchResults = useMemo(() => {
+    const rawQuery = manualSearchQuery.trim();
+    if (!rawQuery || !manualSearchIndex?.pages) return [];
+
+    const queryLower = rawQuery.toLowerCase();
+    const tokens = [...new Set(queryLower.match(/[a-z0-9]+/g) || [])];
+    if (!tokens.length) return [];
+
+    const results = [];
+    for (const entry of manualSearchIndex.pages) {
+      const pageText = String(entry.text || "");
+      const lower = pageText.toLowerCase();
+      const exactPos = lower.indexOf(queryLower);
+      const tokenPositions = tokens.map((token) => lower.indexOf(token));
+      const allTokensPresent = tokenPositions.every((pos) => pos >= 0);
+
+      // Multi-word searches require every word unless the exact phrase itself
+      // is present. This keeps common words from flooding the results.
+      if (exactPos < 0 && !allTokensPresent) continue;
+
+      const exactMatches = exactPos >= 0
+        ? Math.max(1, lower.split(queryLower).length - 1)
+        : 0;
+      const tokenHits = tokens.reduce((sum, token) => {
+        let count = 0;
+        let from = 0;
+        while (count < 8) {
+          const pos = lower.indexOf(token, from);
+          if (pos < 0) break;
+          count += 1;
+          from = pos + token.length;
+        }
+        return sum + count;
+      }, 0);
+
+      const positions = tokenPositions.filter((pos) => pos >= 0);
+      const hitPos = exactPos >= 0 ? exactPos : (positions.length ? Math.min(...positions) : 0);
+      const snippetStart = Math.max(0, hitPos - 95);
+      const snippetEnd = Math.min(pageText.length, hitPos + Math.max(rawQuery.length, 20) + 170);
+      const snippet = `${snippetStart > 0 ? "…" : ""}${pageText.slice(snippetStart, snippetEnd).trim()}${snippetEnd < pageText.length ? "…" : ""}`;
+
+      results.push({
+        page: entry.page,
+        snippet,
+        score: (exactMatches * 100) + (tokenHits * 4) + (allTokensPresent ? 25 : 0),
+      });
+    }
+
+    return results.sort((a, b) => b.score - a.score || a.page - b.page);
+  }, [manualSearchIndex, manualSearchQuery]);
+
   if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
   const q = query.trim().toUpperCase();
   const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
@@ -7716,21 +7809,92 @@ function RuleBook({ rules }) {
             </div>
           </div>
 
-          <div className="shrink-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2 flex flex-wrap items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => jumpToManualPage(3)}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
-            >
-              Table of Contents
-            </button>
-            <button
-              type="button"
-              onClick={() => jumpToManualPage(7)}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
-            >
-              Quick Reference Guide
-            </button>
+          <div className="shrink-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2">
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => jumpToManualPage(3)}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+              >
+                Table of Contents
+              </button>
+              <button
+                type="button"
+                onClick={() => jumpToManualPage(7)}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
+              >
+                Quick Reference Guide
+              </button>
+            </div>
+
+            <div className="relative mx-auto max-w-4xl">
+              <Search size={17} className="absolute left-3 top-[18px] -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                value={manualSearchQuery}
+                onChange={(e) => {
+                  setManualSearchQuery(e.target.value);
+                  setManualSearchExpanded(true);
+                }}
+                onFocus={() => {
+                  if (manualSearchQuery.trim()) setManualSearchExpanded(true);
+                  loadManualSearchIndex();
+                }}
+                placeholder="Search the entire Game Manual"
+                className="w-full pl-9 pr-10 py-2.5 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600"
+                aria-label="Search the entire Game Manual"
+              />
+              {manualSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setManualSearchQuery("");
+                    setManualSearchExpanded(false);
+                  }}
+                  className="absolute right-2 top-[18px] -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                  aria-label="Clear manual search"
+                >
+                  <X size={17} />
+                </button>
+              )}
+
+              {manualSearchLoading && !manualSearchIndex && (
+                <div className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Preparing offline manual search…</div>
+              )}
+              {manualSearchError && !manualSearchIndex && (
+                <div className="mt-1.5 text-xs text-red-600 dark:text-red-400">{manualSearchError}</div>
+              )}
+
+              {manualSearchExpanded && manualSearchQuery.trim() && manualSearchIndex && (
+                <div className="absolute z-30 left-0 right-0 top-full mt-1 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
+                  <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      {manualSearchResults.length} {manualSearchResults.length === 1 ? "page" : "pages"} found
+                    </span>
+                    <span className="ml-auto text-[11px] text-slate-400">Version 2.0 • offline index</span>
+                  </div>
+                  <div className="max-h-[38vh] overflow-y-auto overscroll-contain divide-y divide-slate-100 dark:divide-slate-800">
+                    {manualSearchResults.length > 0 ? manualSearchResults.map((result) => (
+                      <button
+                        key={`manual-search-${result.page}`}
+                        type="button"
+                        onClick={() => {
+                          setManualSearchExpanded(false);
+                          jumpToManualPage(result.page);
+                        }}
+                        className="w-full text-left px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800"
+                      >
+                        <div className="text-xs font-bold text-[#D7212B] mb-0.5">Page {result.page}</div>
+                        <div className="text-xs leading-5 text-slate-600 dark:text-slate-300 line-clamp-3">{result.snippet}</div>
+                      </button>
+                    )) : (
+                      <div className="px-3 py-4 text-sm text-slate-500 dark:text-slate-400 text-center">
+                        No pages contain all of those search terms.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-slate-200 dark:bg-slate-900 px-2 py-2 sm:px-4 sm:py-4">
