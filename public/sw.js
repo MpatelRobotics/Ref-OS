@@ -1,4 +1,4 @@
-const CACHE = "refos-v15-1.2.0-highlander-live-field-overlay-lock";
+const CACHE = "refos-v16-1.2.0-highlander-field-object-detection";
 
 const APP_SHELL = [
   "/",
