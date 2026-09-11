@@ -1,4 +1,4 @@
-const CACHE = "refos-v13-1.2.0-highlander-live-field-check";
+const CACHE = "refos-v14-1.2.0-highlander-live-field-overlay-lock";
 
 const APP_SHELL = [
   "/",
@@ -9,6 +9,7 @@ const APP_SHELL = [
   "/icon-512.png",
   "/game-manual-search.json",
   "/field-setup/override-starting-field.png",
+  "/field-setup/override-starting-field-headref.png",
 ];
 
 const GAME_MANUAL_PAGES = [
