@@ -15,35 +15,35 @@ const DEFAULT_OVERLAY = {
 // Reference zones measured from the exact field-only overlay image supplied for this tool.
 // This is intentionally a zone detector rather than an official object-counting system.
 const DETECTION_ZONES = [
-  { id: "top-left-load", x: 0.347, y: 0.040, label: "Top left starting group" },
-  { id: "top-right-load", x: 0.645, y: 0.040, label: "Top right starting group" },
-  { id: "toggle-a", x: 0.195, y: 0.184, label: "Upper left Toggle" },
-  { id: "upper-left-pin", x: 0.345, y: 0.184, label: "Upper left Pin" },
-  { id: "upper-blue-goal", x: 0.645, y: 0.184, label: "Upper blue Goal" },
-  { id: "upper-right-pin", x: 0.800, y: 0.184, label: "Upper right Pin" },
-  { id: "left-mid-object", x: 0.192, y: 0.342, label: "Left middle object" },
-  { id: "toggle-b", x: 0.345, y: 0.342, label: "Upper middle Toggle" },
-  { id: "center-upper", x: 0.496, y: 0.342, label: "Upper center object" },
-  { id: "right-mid-pin", x: 0.645, y: 0.342, label: "Right middle Pin" },
-  { id: "right-mid-goal", x: 0.795, y: 0.342, label: "Right middle Goal" },
-  { id: "center-left", x: 0.345, y: 0.495, label: "Center left object" },
-  { id: "center", x: 0.496, y: 0.495, label: "Center Pin" },
-  { id: "center-right", x: 0.645, y: 0.495, label: "Center right object" },
-  { id: "lower-left-goal", x: 0.195, y: 0.648, label: "Lower left Goal" },
-  { id: "lower-left-pin", x: 0.345, y: 0.648, label: "Lower left Pin" },
-  { id: "lower-center", x: 0.496, y: 0.648, label: "Lower center object" },
-  { id: "toggle-c", x: 0.645, y: 0.648, label: "Lower middle Toggle" },
-  { id: "lower-right-pin", x: 0.795, y: 0.648, label: "Lower right Pin" },
-  { id: "bottom-left-pin", x: 0.195, y: 0.806, label: "Bottom left Pin" },
-  { id: "bottom-left-goal", x: 0.345, y: 0.806, label: "Bottom left Goal" },
-  { id: "bottom-mid-pin", x: 0.645, y: 0.806, label: "Bottom middle Pin" },
-  { id: "toggle-d", x: 0.795, y: 0.806, label: "Bottom right Toggle" },
-  { id: "bottom-left-load", x: 0.347, y: 0.955, label: "Bottom left starting group" },
-  { id: "bottom-right-load", x: 0.645, y: 0.955, label: "Bottom right starting group" },
-  { id: "left-side-upper", x: 0.055, y: 0.342, label: "Left upper perimeter group" },
-  { id: "left-side-lower", x: 0.055, y: 0.648, label: "Left lower perimeter group" },
-  { id: "right-side-upper", x: 0.935, y: 0.342, label: "Right upper perimeter group" },
-  { id: "right-side-lower", x: 0.935, y: 0.648, label: "Right lower perimeter group" },
+  { id: "top-left-load", x: 0.347, y: 0.040, type: "Cup + Pin group", label: "Top left perimeter group" },
+  { id: "top-right-load", x: 0.645, y: 0.040, type: "Cup + Pin group", label: "Top right perimeter group" },
+  { id: "toggle-a", x: 0.195, y: 0.184, type: "Toggle", label: "Upper left Toggle" },
+  { id: "upper-left-pin", x: 0.345, y: 0.184, type: "Pin", label: "Upper left Pin" },
+  { id: "upper-blue-goal", x: 0.645, y: 0.184, type: "Goal", label: "Upper blue Goal" },
+  { id: "upper-right-pin", x: 0.800, y: 0.184, type: "Pin", label: "Upper right Pin" },
+  { id: "left-mid-object", x: 0.192, y: 0.342, type: "Pin", label: "Left middle Pin" },
+  { id: "toggle-b", x: 0.345, y: 0.342, type: "Toggle", label: "Upper middle Toggle" },
+  { id: "center-upper", x: 0.496, y: 0.342, type: "Goal", label: "Upper center Goal" },
+  { id: "right-mid-pin", x: 0.645, y: 0.342, type: "Pin", label: "Right middle Pin" },
+  { id: "right-mid-goal", x: 0.795, y: 0.342, type: "Goal", label: "Right middle Goal" },
+  { id: "center-left", x: 0.345, y: 0.495, type: "Goal", label: "Center left Goal" },
+  { id: "center", x: 0.496, y: 0.495, type: "Pin", label: "Center Pin" },
+  { id: "center-right", x: 0.645, y: 0.495, type: "Goal", label: "Center right Goal" },
+  { id: "lower-left-goal", x: 0.195, y: 0.648, type: "Goal", label: "Lower left Goal" },
+  { id: "lower-left-pin", x: 0.345, y: 0.648, type: "Pin", label: "Lower left Pin" },
+  { id: "lower-center", x: 0.496, y: 0.648, type: "Goal", label: "Lower center Goal" },
+  { id: "toggle-c", x: 0.645, y: 0.648, type: "Toggle", label: "Lower middle Toggle" },
+  { id: "lower-right-pin", x: 0.795, y: 0.648, type: "Pin", label: "Lower right Pin" },
+  { id: "bottom-left-pin", x: 0.195, y: 0.806, type: "Pin", label: "Bottom left Pin" },
+  { id: "bottom-left-goal", x: 0.345, y: 0.806, type: "Goal", label: "Bottom left Goal" },
+  { id: "bottom-mid-pin", x: 0.645, y: 0.806, type: "Pin", label: "Bottom middle Pin" },
+  { id: "toggle-d", x: 0.795, y: 0.806, type: "Toggle", label: "Bottom right Toggle" },
+  { id: "bottom-left-load", x: 0.347, y: 0.955, type: "Cup + Pin group", label: "Bottom left perimeter group" },
+  { id: "bottom-right-load", x: 0.645, y: 0.955, type: "Cup + Pin group", label: "Bottom right perimeter group" },
+  { id: "left-side-upper", x: 0.055, y: 0.342, type: "Cup + Pin group", label: "Left upper perimeter group" },
+  { id: "left-side-lower", x: 0.055, y: 0.648, type: "Cup + Pin group", label: "Left lower perimeter group" },
+  { id: "right-side-upper", x: 0.935, y: 0.342, type: "Cup + Pin group", label: "Right upper perimeter group" },
+  { id: "right-side-lower", x: 0.935, y: 0.648, type: "Cup + Pin group", label: "Right lower perimeter group" },
 ];
 
 function normalizeRotation(value) {
@@ -100,13 +100,16 @@ function zoneToStage(zone, overlay, stageW, stageH) {
 }
 
 function analyzePatch(data, width, height) {
-  if (!data?.length || !width || !height) return 0;
+  if (!data?.length || !width || !height) return null;
   let mean = 0;
   let meanSq = 0;
   let saturated = 0;
   let veryDark = 0;
   let veryBright = 0;
   let edges = 0;
+  let red = 0;
+  let blue = 0;
+  let yellow = 0;
   let samples = 0;
   const luminance = new Float32Array(width * height);
 
@@ -125,6 +128,9 @@ function analyzePatch(data, width, height) {
       if (max - min > 42) saturated += 1;
       if (lum < 58) veryDark += 1;
       if (lum > 212) veryBright += 1;
+      if (r > g * 1.2 && r > b * 1.35 && r > 90) red += 1;
+      if (b > r * 1.15 && b > g * 1.05 && b > 80) blue += 1;
+      if (r > 120 && g > 105 && b < Math.min(r, g) * 0.72) yellow += 1;
       samples += 1;
     }
   }
@@ -141,21 +147,61 @@ function analyzePatch(data, width, height) {
   mean /= samples;
   meanSq /= samples;
   const variance = Math.max(0, meanSq - mean * mean);
-  const saturationRatio = saturated / samples;
-  const darkRatio = veryDark / samples;
-  const brightRatio = veryBright / samples;
-  const edgeRatio = edges / Math.max(1, Math.floor((width - 1) / 2) * Math.floor((height - 1) / 2));
+  const edgeDenom = Math.max(1, Math.floor((width - 1) / 2) * Math.floor((height - 1) / 2));
+  return {
+    mean: mean / 255,
+    variance: Math.min(1, variance / 3800),
+    saturation: saturated / samples,
+    dark: veryDark / samples,
+    bright: veryBright / samples,
+    edge: Math.min(1, edges / edgeDenom),
+    red: red / samples,
+    blue: blue / samples,
+    yellow: yellow / samples,
+  };
+}
 
-  // Gray foam tiles are usually low-saturation and comparatively low-detail. Objects add
-  // color, black outlines, highlights, and strong edges. Score is intentionally conservative.
+function descriptorSimilarity(live, reference) {
+  if (!live || !reference) return 0;
+  const weights = {
+    mean: 0.45,
+    variance: 1.1,
+    saturation: 1.3,
+    dark: 0.9,
+    bright: 0.55,
+    edge: 1.45,
+    red: 1.7,
+    blue: 1.7,
+    yellow: 1.7,
+  };
+  let weightedDiff = 0;
+  let total = 0;
+  for (const [key, weight] of Object.entries(weights)) {
+    weightedDiff += Math.min(1, Math.abs((live[key] || 0) - (reference[key] || 0))) * weight;
+    total += weight;
+  }
+  return Math.max(0, Math.min(1, 1 - weightedDiff / total));
+}
+
+function objectPresenceScore(desc) {
+  if (!desc) return 0;
   return Math.min(
     1,
-    saturationRatio * 1.9 +
-      darkRatio * 1.15 +
-      brightRatio * 0.55 +
-      Math.min(1, variance / 1650) * 0.7 +
-      edgeRatio * 1.2
+    desc.saturation * 1.7 +
+      desc.dark * 0.75 +
+      desc.bright * 0.35 +
+      desc.variance * 0.75 +
+      desc.edge * 1.15
   );
+}
+
+function typeColorHint(type, desc) {
+  if (!desc) return 0;
+  if (type === "Toggle") return Math.min(1, (desc.red + desc.blue + desc.yellow) * 4.0 + desc.edge * 0.35);
+  if (type === "Pin") return Math.min(1, (desc.yellow + desc.red + desc.blue) * 3.1 + desc.edge * 0.28);
+  if (type === "Goal") return Math.min(1, (desc.red + desc.blue + desc.dark) * 2.1 + desc.edge * 0.32);
+  if (type === "Cup + Pin group") return Math.min(1, (desc.bright + desc.dark + desc.yellow) * 1.35 + desc.edge * 0.25);
+  return objectPresenceScore(desc);
 }
 
 export default function LiveFieldSetupCheck({ onClose }) {
@@ -164,6 +210,8 @@ export default function LiveFieldSetupCheck({ onClose }) {
   const stageRef = useRef(null);
   const dragRef = useRef(null);
   const detectCanvasRef = useRef(null);
+  const referenceCanvasRef = useRef(null);
+  const referenceImageRef = useRef(null);
   const detectionBusyRef = useRef(false);
 
   const [error, setError] = useState("");
@@ -173,6 +221,8 @@ export default function LiveFieldSetupCheck({ onClose }) {
   const [detectionEnabled, setDetectionEnabled] = useState(false);
   const [detectionResults, setDetectionResults] = useState({});
   const [sensitivity, setSensitivity] = useState(52);
+  const [selectedZoneId, setSelectedZoneId] = useState(null);
+  const [referenceReady, setReferenceReady] = useState(false);
 
   const startCamera = async () => {
     setError("");
@@ -204,7 +254,25 @@ export default function LiveFieldSetupCheck({ onClose }) {
   }, []);
 
   useEffect(() => {
-    if (!detectionEnabled || !ready || !overlay.locked) {
+    const image = new Image();
+    image.src = "/field-setup/override-starting-field-overlay.png";
+    image.onload = () => {
+      referenceImageRef.current = image;
+      const canvas = referenceCanvasRef.current;
+      if (!canvas) return;
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, 0, 0);
+      setReferenceReady(true);
+    };
+    image.onerror = () => setReferenceReady(false);
+  }, []);
+
+  useEffect(() => {
+    if (!detectionEnabled || !ready || !overlay.locked || !referenceReady) {
       setDetectionResults({});
       return undefined;
     }
@@ -255,13 +323,43 @@ export default function LiveFieldSetupCheck({ onClose }) {
           const sh = Math.min(scanH - sy, radius * 2);
           if (sw < 4 || sh < 4) continue;
           const patch = ctx.getImageData(sx, sy, sw, sh);
-          const score = analyzePatch(patch.data, sw, sh);
-          const threshold = 0.74 - (sensitivity / 100) * 0.34;
-          const margin = 0.09;
+          const liveDesc = analyzePatch(patch.data, sw, sh);
+
+          const refCanvas = referenceCanvasRef.current;
+          const refCtx = refCanvas?.getContext("2d", { willReadFrequently: true });
+          let refDesc = null;
+          if (refCanvas && refCtx) {
+            const refRadius = Math.max(8, Math.round(Math.min(refCanvas.width, refCanvas.height) * 0.027));
+            const rx = Math.max(0, Math.round(zone.x * refCanvas.width - refRadius));
+            const ry = Math.max(0, Math.round(zone.y * refCanvas.height - refRadius));
+            const rw = Math.min(refCanvas.width - rx, refRadius * 2);
+            const rh = Math.min(refCanvas.height - ry, refRadius * 2);
+            if (rw >= 4 && rh >= 4) {
+              const refPatch = refCtx.getImageData(rx, ry, rw, rh);
+              refDesc = analyzePatch(refPatch.data, rw, rh);
+            }
+          }
+
+          const similarity = descriptorSimilarity(liveDesc, refDesc);
+          const presence = objectPresenceScore(liveDesc);
+          const typeHint = typeColorHint(zone.type, liveDesc);
+          const confidence = Math.min(1, similarity * 0.58 + presence * 0.22 + typeHint * 0.20);
+          const threshold = 0.71 - (sensitivity / 100) * 0.24;
+          const margin = 0.055;
           let status = "uncertain";
-          if (score >= threshold + margin) status = "detected";
-          else if (score < threshold - margin) status = "missing";
-          next[zone.id] = { status, score, x: point.x, y: point.y };
+          if (confidence >= threshold + margin && similarity >= 0.62) status = "detected";
+          else if (confidence < threshold - margin || similarity < 0.46) status = "missing";
+
+          next[zone.id] = {
+            status,
+            confidence,
+            similarity,
+            presence,
+            typeHint,
+            expectedType: zone.type,
+            x: point.x,
+            y: point.y,
+          };
         }
         setDetectionResults(next);
       } finally {
@@ -270,7 +368,7 @@ export default function LiveFieldSetupCheck({ onClose }) {
     }, 420);
 
     return () => window.clearInterval(timer);
-  }, [detectionEnabled, ready, overlay, sensitivity]);
+  }, [detectionEnabled, ready, overlay, sensitivity, referenceReady]);
 
   const updateOverlay = (patch) => {
     setOverlay((current) => ({ ...current, ...patch }));
@@ -360,7 +458,7 @@ export default function LiveFieldSetupCheck({ onClose }) {
         <Camera size={19} />
         <div className="min-w-0 flex-1">
           <div className="font-bold">Live Field Setup Check</div>
-          <div className="text-[11px] text-slate-300">ADMIN TEST • Live object detection</div>
+          <div className="text-[11px] text-slate-300">ADMIN TEST • Object-specific live detection</div>
         </div>
         <button onClick={onClose} className="p-2" aria-label="Close"><X size={22}/></button>
       </div>
@@ -368,6 +466,7 @@ export default function LiveFieldSetupCheck({ onClose }) {
       <div ref={stageRef} className="relative flex-1 min-h-0 overflow-hidden bg-black touch-none">
         <video ref={videoRef} playsInline muted className="absolute inset-0 w-full h-full object-contain" />
         <canvas ref={detectCanvasRef} className="hidden" />
+        <canvas ref={referenceCanvasRef} className="hidden" />
 
         {ready && (
           <div
@@ -397,21 +496,34 @@ export default function LiveFieldSetupCheck({ onClose }) {
           const result = detectionResults[zone.id];
           if (!result || result.status === "outside") return null;
           const style = result.status === "detected"
-            ? "border-emerald-300 bg-emerald-500/25"
+            ? "border-emerald-300 bg-emerald-500/35"
             : result.status === "missing"
-              ? "border-red-300 bg-red-500/25"
-              : "border-amber-300 bg-amber-400/25";
+              ? "border-red-300 bg-red-500/35"
+              : "border-amber-300 bg-amber-400/35";
+          const selected = selectedZoneId === zone.id;
           return (
-            <div
+            <button
               key={zone.id}
-              className={`absolute z-20 w-8 h-8 sm:w-10 sm:h-10 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 ${style} pointer-events-none shadow-[0_0_0_2px_rgba(0,0,0,0.35)]`}
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setSelectedZoneId((current) => current === zone.id ? null : zone.id);
+              }}
+              className={`absolute z-30 w-5 h-5 sm:w-6 sm:h-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 ${style} shadow-[0_0_0_1px_rgba(0,0,0,0.55)]`}
               style={{ left: result.x, top: result.y }}
-              title={`${zone.label}: ${result.status}`}
+              aria-label={`${zone.label}: ${result.status}`}
             >
-              <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black drop-shadow">
+              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black drop-shadow">
                 {result.status === "detected" ? "✓" : result.status === "missing" ? "×" : "?"}
               </span>
-            </div>
+              {selected && (
+                <span className="absolute left-1/2 top-7 -translate-x-1/2 w-max max-w-[210px] rounded-md border border-white/15 bg-black/90 px-2.5 py-2 text-left text-[11px] leading-4 text-white shadow-xl">
+                  <b className="block">{zone.type} {result.status === "detected" ? "✓" : result.status === "missing" ? "✕" : "?"}</b>
+                  <span className="block text-slate-300">{zone.label}</span>
+                  <span className="block mt-1 text-slate-400">Match {Math.round((result.similarity || 0) * 100)}% • confidence {Math.round((result.confidence || 0) * 100)}%</span>
+                </span>
+              )}
+            </button>
           );
         })}
 
@@ -420,7 +532,7 @@ export default function LiveFieldSetupCheck({ onClose }) {
         </div>
         <div className="absolute right-3 top-3 rounded-md bg-black/80 px-2.5 py-1.5 text-xs pointer-events-none">
           {detectionEnabled && overlay.locked
-            ? `${detectionSummary.detected} detected • ${detectionSummary.uncertain} uncertain • ${detectionSummary.missing} missing`
+            ? `${detectionSummary.detected} correct • ${detectionSummary.uncertain} unsure • ${detectionSummary.missing} mismatch`
             : overlay.locked
               ? "Overlay position locked"
               : "Drag the overlay to align it with the field"}
@@ -523,9 +635,9 @@ export default function LiveFieldSetupCheck({ onClose }) {
               <span className="text-xs tabular-nums w-9 text-right">{sensitivity}%</span>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-300">
-              <span><b className="text-emerald-300">Green</b> object-like detail detected</span>
-              <span><b className="text-amber-300">Amber</b> uncertain</span>
-              <span><b className="text-red-300">Red</b> expected zone looks empty</span>
+              <span><b className="text-emerald-300">Green</b> expected object type appears to match</span>
+              <span><b className="text-amber-300">Amber</b> type match uncertain</span>
+              <span><b className="text-red-300">Red</b> missing or wrong visual match</span>
             </div>
           </div>
         )}
@@ -537,7 +649,7 @@ export default function LiveFieldSetupCheck({ onClose }) {
         )}
 
         <div className="rounded-md border border-amber-400/40 bg-amber-950/30 px-3 py-2 text-[11px] leading-4 text-amber-100">
-          Experimental object detection. Lock the overlay only after it is aligned with the real field. Ref OS then checks the live camera around expected starting-object zones using local color, contrast, and edge detail. Green means the zone appears occupied, red means it appears empty, and amber means the camera result is uncertain. Lighting, perspective, robots, people, shadows, or a poor alignment can produce incorrect results. This is not an official field measurement, object count, or ruling tool; confirm any questionable setup against the current Game Manual and field specifications.
+          Experimental object-specific detection. After the overlay is locked, Ref OS compares each live starting-object zone with the same zone in the official setup overlay and checks color, edge, brightness, and shape-like visual signatures for the expected type such as Pin, Goal, Toggle, or Cup + Pin group. Green means the live zone resembles the expected object type, red means the zone is missing or visually mismatched, and amber means the match is uncertain. Tap any marker to see the expected type and confidence. This is still a browser-based visual check, not a trained competition-object model or an official measurement/ruling tool; lighting, perspective, shadows, robots, people, or poor alignment can produce incorrect results.
         </div>
       </div>
     </div>
