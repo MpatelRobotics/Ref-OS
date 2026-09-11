@@ -1,9 +1,9 @@
 import React from "react";
-import { AlertTriangle, BarChart3, CalendarDays, ClipboardCheck, Clock, CloudOff, Contact, Download, Flag, KeyRound, ListOrdered, RefreshCw, ShieldCheck, Trash2, Trophy, Users, Wifi, X } from "lucide-react";
+import { AlertTriangle, BarChart3, CalendarDays, ClipboardCheck, Clock, CloudOff, Contact, Download, Flag, Camera, KeyRound, ListOrdered, RefreshCw, ShieldCheck, Trash2, Trophy, Users, Wifi, X } from "lucide-react";
 
 const fmtTime = (ms) => ms ? new Date(ms).toLocaleString() : "—";
 
-export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, deviceStatuses = [], currentDeviceId = "", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
+export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, deviceStatuses = [], currentDeviceId = "", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onLiveFieldSetupCheck, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
@@ -105,6 +105,7 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
             <button onClick={onPreEventTest} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ClipboardCheck size={16}/> Pre Event System Test</button>
             <button onClick={onTwoDeviceSyncTest} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Wifi size={16}/> Two Device Sync Test</button>
             <button onClick={onDiagnosticReport} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ShieldCheck size={16}/> Admin Diagnostics</button>
+            <button onClick={onLiveFieldSetupCheck} className="py-2.5 px-3 rounded-lg border border-amber-300 dark:border-amber-800 font-semibold text-sm text-left flex items-center gap-2"><Camera size={16}/> Live Field Setup Check <span className="ml-auto text-[10px] text-amber-600">TEST</span></button>
             <button onClick={onEventSetup} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><CalendarDays size={16}/> Event setup</button>
             <button onClick={onTMSync} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><RefreshCw size={16}/> TM Sync Center</button>
             <button onClick={onExportViolations} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Download size={16}/> Export violations</button>

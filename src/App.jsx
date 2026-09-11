@@ -11,6 +11,7 @@ import * as outbox from "./outbox";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { APP_VERSION } from "./appVersion";
 import CommandCenter from "./components/CommandCenter.jsx";
+import LiveFieldSetupCheck from "./components/LiveFieldSetupCheck.jsx";
 import EventContactDirectory from "./components/EventContactDirectory.jsx";
 import LoginScreen from "./auth/LoginScreen.jsx";
 import NameScreen from "./auth/NameScreen.jsx";
@@ -616,6 +617,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showCountdownSetup, setShowCountdownSetup] = useState(false);
   const [showOfflineTest, setShowOfflineTest] = useState(false);
   const [showCommandCenter, setShowCommandCenter] = useState(false);
+  const [showLiveFieldSetupCheck, setShowLiveFieldSetupCheck] = useState(false);
   const [showContactDirectory, setShowContactDirectory] = useState(false);
   const [showPreEventTest, setShowPreEventTest] = useState(false);
   const [showTwoDeviceSyncTest, setShowTwoDeviceSyncTest] = useState(false);
@@ -2693,6 +2695,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onPreEventTest={() => { setShowCommandCenter(false); setShowPreEventTest(true); }}
         onTwoDeviceSyncTest={() => { setShowCommandCenter(false); setShowTwoDeviceSyncTest(true); }}
         onDiagnosticReport={() => { setShowCommandCenter(false); setShowDiagnosticReport(true); }}
+        onLiveFieldSetupCheck={() => { setShowCommandCenter(false); setShowLiveFieldSetupCheck(true); }}
         onEventSetup={() => { setShowCommandCenter(false); setShowEvent(true); }}
         onTMSync={() => { setShowCommandCenter(false); setShowTMSync(true); }}
         onExportViolations={exportCSV}
@@ -2703,6 +2706,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onRankings={() => { setShowCommandCenter(false); setShowRankings(true); }}
         onClearData={() => { setShowCommandCenter(false); setShowClear(true); }}
         onClose={() => setShowCommandCenter(false)} />}
+      {showLiveFieldSetupCheck && adminUnlocked && <LiveFieldSetupCheck onClose={() => setShowLiveFieldSetupCheck(false)} />}
       {showAnnouncement && adminUnlocked && <AnnouncementModal onClose={() => setShowAnnouncement(false)} onSend={sendAnnouncement} />}
       {showFeatures && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
