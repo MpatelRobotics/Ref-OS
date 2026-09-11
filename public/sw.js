@@ -1,4 +1,4 @@
-const CACHE = "refos-v16-1.2.0-highlander-field-object-detection";
+const CACHE = "refos-v16-1.2.0-highlander-field-object-detection-camera-only";
 
 const APP_SHELL = [
   "/",
@@ -8,7 +8,6 @@ const APP_SHELL = [
   "/icon-192.png",
   "/icon-512.png",
   "/game-manual-search.json",
-    "/field-setup/override-starting-field-overlay.png",
 ];
 
 const GAME_MANUAL_PAGES = [
