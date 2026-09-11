@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Camera, Lock, RefreshCw, RotateCcw, RotateCw, Unlock, X } from "lucide-react";
 
-const STORAGE_KEY = "refosLiveFieldSetupOverlayV2";
+const STORAGE_KEY = "refosLiveFieldSetupOverlayV3";
 const DEFAULT_OVERLAY = {
   xPct: 0,
   yPct: 0,
@@ -175,7 +175,7 @@ export default function LiveFieldSetupCheck({ onClose }) {
             onPointerCancel={endDrag}
           >
             <img
-              src="/field-setup/override-starting-field-headref.png"
+              src="/field-setup/override-starting-field-overlay.png"
               alt="Override starting field reference"
               draggable="false"
               className="w-full h-full object-contain pointer-events-none"
@@ -271,7 +271,7 @@ export default function LiveFieldSetupCheck({ onClose }) {
         )}
 
         <div className="rounded-md border border-amber-400/40 bg-amber-950/30 px-3 py-2 text-[11px] leading-4 text-amber-100">
-          Experimental setup aid only. The uploaded starting-field view is used as the live overlay. Head Ref default is rotated 180° so the red Alliance is on the Head Ref&apos;s right. Locking stores rotation, size, opacity, and alignment locally on this device for the next time this tool opens. Verify questionable setup against the current Game Manual and field specifications.
+          Experimental setup aid only. The provided field-only starting setup image is used as the live overlay. Head Ref default is rotated 180° so the red Alliance is on the Head Ref&apos;s right. Locking stores rotation, size, opacity, and alignment locally on this device for the next time this tool opens. Verify questionable setup against the current Game Manual and field specifications.
         </div>
       </div>
     </div>
