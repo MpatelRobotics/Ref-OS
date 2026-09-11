@@ -2335,6 +2335,19 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
                 <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
+                {adminUnlocked && (
+                  <>
+                    <div className="refos-menu-section">Experimental</div>
+                    <button
+                      onClick={() => { setMenu(false); setShowLiveFieldSetupCheck(true); }}
+                      className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"
+                    >
+                      <Camera size={16} />
+                      Live Field Setup Check
+                      <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400">TEST</span>
+                    </button>
+                  </>
+                )}
                 <div className="refos-menu-section">Access</div>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
@@ -2695,7 +2708,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onPreEventTest={() => { setShowCommandCenter(false); setShowPreEventTest(true); }}
         onTwoDeviceSyncTest={() => { setShowCommandCenter(false); setShowTwoDeviceSyncTest(true); }}
         onDiagnosticReport={() => { setShowCommandCenter(false); setShowDiagnosticReport(true); }}
-        onLiveFieldSetupCheck={() => { setShowCommandCenter(false); setShowLiveFieldSetupCheck(true); }}
         onEventSetup={() => { setShowCommandCenter(false); setShowEvent(true); }}
         onTMSync={() => { setShowCommandCenter(false); setShowTMSync(true); }}
         onExportViolations={exportCSV}
