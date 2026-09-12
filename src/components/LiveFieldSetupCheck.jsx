@@ -115,7 +115,7 @@ export default function LiveFieldSetupCheck({ onClose }) {
         <input type="range" min="20" max="85" value={Math.round(threshold*100)} onChange={e=>setThreshold(Number(e.target.value)/100)} className="w-full mt-1"/>
       </label></div>
       <button onClick={startCamera} className="w-full rounded-md border border-white/20 py-2.5 text-sm font-semibold flex items-center justify-center gap-2"><RefreshCw size={16}/>Restart camera</button>
-      <div className="text-[11px] text-amber-100">Experimental V2 detector trained with CAD, real match footage, hard negatives, and manually boxed real game objects. Verify detections manually before making event decisions.</div>
+      <div className="text-[11px] text-amber-100">Experimental V2 Lab detector trained with CAD, match footage, hard negatives, and real phone field footage. Verify detections manually before making event decisions.</div>
     </div>
   </div>;
 }

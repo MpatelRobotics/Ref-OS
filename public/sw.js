@@ -1,4 +1,4 @@
-const CACHE = "refos-v16-1.2.0-highlander-field-object-detection-camera-only-onnx-detector-v2";
+const CACHE = "refos-v16-1.2.0-highlander-field-object-detection-camera-only-v2-lab-detector-v2";
 
 const APP_SHELL = [
   "/models/refos_tiny_detector.onnx",
