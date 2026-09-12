@@ -23,7 +23,7 @@ function nms(items, threshold=.42) {
 export default function LiveFieldSetupCheck({ onClose }) {
   const videoRef=useRef(null), streamRef=useRef(null), canvasRef=useRef(null), sessionRef=useRef(null), busyRef=useRef(false);
   const [error,setError]=useState(""), [ready,setReady]=useState(false), [modelReady,setModelReady]=useState(false);
-  const [detections,setDetections]=useState([]), [threshold,setThreshold]=useState(.45), [fps,setFps]=useState(0);
+  const [detections,setDetections]=useState([]), [threshold,setThreshold]=useState(.65), [fps,setFps]=useState(0);
 
   async function startCamera() {
     setError(""); setReady(false);
@@ -64,12 +64,25 @@ export default function LiveFieldSetupCheck({ onClose }) {
         const outputs=await s.run(feeds), out=outputs[s.outputNames[0]], d=out.data, dims=out.dims;
         const H=dims[dims.length-2], W=dims[dims.length-1], stride=H*W, found=[];
         for(let y=0;y<H;y++) for(let x=0;x<W;x++){
-          const idx=y*W+x, obj=sigmoid(d[4*stride+idx]); if(obj<threshold*.7) continue;
+          const idx=y*W+x;
+          const obj=sigmoid(d[idx]);
+          if(obj<threshold*.65) continue;
+
+          let maxLogit=-Infinity;
+          for(let k=0;k<4;k++) maxLogit=Math.max(maxLogit,d[(1+k)*stride+idx]);
+          const probs=[];
+          let denom=0;
+          for(let k=0;k<4;k++) { const e=Math.exp(d[(1+k)*stride+idx]-maxLogit); probs.push(e); denom+=e; }
           let cid=0,cp=0;
-          for(let k=0;k<4;k++){const p=sigmoid(d[(5+k)*stride+idx]); if(p>cp){cp=p;cid=k;}}
-          const score=obj*cp; if(score<threshold) continue;
-          const cx=(sigmoid(d[idx])+x)/W, cy=(sigmoid(d[stride+idx])+y)/H;
-          const bw=Math.min(1,Math.exp(Math.min(4,d[2*stride+idx]))/W), bh=Math.min(1,Math.exp(Math.min(4,d[3*stride+idx]))/H);
+          for(let k=0;k<4;k++) { const p=probs[k]/Math.max(1e-9,denom); if(p>cp){cp=p;cid=k;} }
+
+          const score=obj*cp;
+          if(score<threshold) continue;
+
+          const cx=(sigmoid(d[5*stride+idx])+x)/W;
+          const cy=(sigmoid(d[6*stride+idx])+y)/H;
+          const bw=Math.min(1,sigmoid(d[7*stride+idx]));
+          const bh=Math.min(1,sigmoid(d[8*stride+idx]));
           found.push({classId:cid,label:CLASSES[cid],score,x1:Math.max(0,cx-bw/2),y1:Math.max(0,cy-bh/2),x2:Math.min(1,cx+bw/2),y2:Math.min(1,cy+bh/2)});
         }
         setDetections(nms(found)); setFps(1000/Math.max(1,performance.now()-started));
@@ -82,7 +95,7 @@ export default function LiveFieldSetupCheck({ onClose }) {
   return <div className="fixed inset-0 z-[100] bg-black flex flex-col text-white">
     <div className="shrink-0 px-3 py-3 bg-[#0D0F32] flex items-center gap-2 border-b border-white/10">
       <Camera size={19}/><div className="min-w-0 flex-1"><div className="font-bold">Live Field Setup Check</div>
-      <div className="text-[11px] text-slate-300">ADMIN TEST • Live ONNX object detection</div></div>
+      <div className="text-[11px] text-slate-300">ADMIN TEST • V2 real-footage ONNX detector</div></div>
       <button onClick={onClose} className="p-2" aria-label="Close"><X size={22}/></button>
     </div>
     <div className="relative flex-1 min-h-0 overflow-hidden bg-black">
@@ -102,7 +115,7 @@ export default function LiveFieldSetupCheck({ onClose }) {
         <input type="range" min="20" max="85" value={Math.round(threshold*100)} onChange={e=>setThreshold(Number(e.target.value)/100)} className="w-full mt-1"/>
       </label></div>
       <button onClick={startCamera} className="w-full rounded-md border border-white/20 py-2.5 text-sm font-semibold flex items-center justify-center gap-2"><RefreshCw size={16}/>Restart camera</button>
-      <div className="text-[11px] text-amber-100">Synthetic prototype. Verify detections manually. Real field footage is still needed before relying on this for event decisions.</div>
+      <div className="text-[11px] text-amber-100">Experimental V2 detector trained with CAD, real match footage, hard negatives, and manually boxed real game objects. Verify detections manually before making event decisions.</div>
     </div>
   </div>;
 }
