@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, CheckCircle2, Circle, RotateCcw, ShieldCheck, MapPin, X } from "lucide-react";
+import { ChevronLeft, CheckCircle2, Circle, RotateCcw, ShieldCheck, MapPin, X, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 
 const STORAGE_KEY = "refos.experimental.quadrant-reset.v4";
 const CROP_BASE = "/field-setup/quadrant-crops";
@@ -67,6 +67,7 @@ export default function QuadrantFieldResetCheck({ onClose }) {
   const [active, setActive] = useState(0);
   const [showReference, setShowReference] = useState(false);
   const [showQuadrantOverview, setShowQuadrantOverview] = useState(false);
+  const [referenceZoom, setReferenceZoom] = useState(1);
   const [state, setState] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
@@ -137,7 +138,27 @@ export default function QuadrantFieldResetCheck({ onClose }) {
         <button onClick={() => setShowReference(v => !v)} className="w-full border border-slate-700 px-3 py-2.5 text-sm font-semibold flex items-center justify-center gap-2 bg-slate-900">
           <MapPin size={16} /> {showReference ? "Hide full field reference" : "Show full field reference"}
         </button>
-        {showReference && <img src="/field-setup/quadrant-reference.png" alt="Field reference labeled with quadrants 1 through 4" className="w-full max-h-[38vh] object-contain bg-white border border-slate-700" />}
+        {showReference && (
+          <div className="border border-slate-700 bg-white">
+            <div className="flex items-center justify-center gap-2 p-2 border-b border-slate-300 bg-slate-100 text-slate-900">
+              <button onClick={() => setReferenceZoom(z => Math.max(1, +(z - 0.25).toFixed(2)))} disabled={referenceZoom <= 1} className="p-2 border border-slate-300 bg-white disabled:opacity-40" aria-label="Zoom out full field reference"><ZoomOut size={18} /></button>
+              <div className="min-w-16 text-center text-xs font-bold">{Math.round(referenceZoom * 100)}%</div>
+              <button onClick={() => setReferenceZoom(z => Math.min(3, +(z + 0.25).toFixed(2)))} disabled={referenceZoom >= 3} className="p-2 border border-slate-300 bg-white disabled:opacity-40" aria-label="Zoom in full field reference"><ZoomIn size={18} /></button>
+              <button onClick={() => setReferenceZoom(1)} className="p-2 border border-slate-300 bg-white" aria-label="Reset full field reference zoom"><Maximize2 size={18} /></button>
+            </div>
+            <div className="max-h-[45vh] overflow-auto bg-white">
+              <div className="min-w-full min-h-full flex items-center justify-center p-2">
+                <img
+                  src="/field-setup/quadrant-reference.png"
+                  alt="Field reference labeled with quadrants 1 through 4"
+                  className="block max-w-none origin-center select-none"
+                  draggable="false"
+                  style={{ width: `${referenceZoom * 100}%`, height: "auto" }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-4 border-b border-slate-800 bg-slate-900">

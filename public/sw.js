@@ -1,4 +1,4 @@
-const CACHE = "refos-v20-1.2.0-highlander-quadrant-correction";
+const CACHE = "refos-v21-1.2.0-highlander-full-field-zoom";
 
 const APP_SHELL = [
   "/models/refos_tiny_detector.onnx",
