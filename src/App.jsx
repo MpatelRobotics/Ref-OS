@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download, Save,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, QrCode, ScanLine, CheckCircle2, Bot,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, QrCode, ScanLine, CheckCircle2, Bot, ArrowUp,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -520,6 +520,21 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 
   const [view, setView] = useState(role === "judge" ? "judging" : "teams");
   const initialMatchDefaultAppliedRef = useRef(false);
+
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  // Show a manual return-to-top control after the user has scrolled down.
+  useEffect(() => {
+    const updateScrollTopVisibility = () => setShowScrollTop(window.scrollY > 320);
+    updateScrollTopVisibility();
+    window.addEventListener("scroll", updateScrollTopVisibility, { passive: true });
+    return () => window.removeEventListener("scroll", updateScrollTopVisibility);
+  }, [view, openTeam, openMatch, openRobot]);
+
+  const scrollPageToTop = () => {
+    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+    document.scrollingElement?.scrollTo?.({ top: 0, left: 0, behavior: "smooth" });
+  };
 
   // Matches load asynchronously. The first time this event reports matches,
   // make Matches the landing tab for non-Judge users. This runs only once,
@@ -2571,6 +2586,18 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           </p>
         </div>
       </main>
+
+      {showScrollTop && (
+        <button
+          type="button"
+          onClick={scrollPageToTop}
+          className={`fixed z-30 grid h-11 w-11 place-items-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-lg transition hover:bg-slate-50 active:scale-95 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 ${!openTeam && !openMatch && !openRobot && view !== "judging" && !isEmcee ? "bottom-20 right-5" : "bottom-5 right-5"}`}
+          aria-label="Scroll to top"
+          title="Scroll to top"
+        >
+          <ArrowUp size={20} />
+        </button>
+      )}
 
       {!openTeam && !openMatch && !openRobot && view !== "judging" && !isEmcee && (
         <button onClick={() => setLogFor("")} className="fixed bottom-5 right-5 z-20 bg-[#D7212B] text-white px-4 py-3 rounded-md shadow-lg border border-red-800/20 flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
