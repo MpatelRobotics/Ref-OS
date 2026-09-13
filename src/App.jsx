@@ -3127,10 +3127,10 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
               ))}
               <button type="button" onClick={() => setShowRulePicker(true)}
                 className="w-full px-3 py-2.5 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:border-slate-400">
-                + {selectedRules.length ? "Add another rule" : "Select rule"}
+                {selectedRules.length ? "Change rule selection" : "Select rules"}
               </button>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">Select every rule that applies to this violation. Tap × to remove one.</p>
+            <p className="text-[11px] text-slate-400 mt-1">Select every rule that applies in one pass. Tap a selected rule again to unselect it, then tap Done.</p>
           </div>
 
           <div>
@@ -3166,8 +3166,9 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
       </div>
       {showRulePicker && (
         <RulePicker rules={rules} knownRules={knownRules}
-          onPickRule={(c, d) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs : [...rs, { code: clean, desc: d || ruleBook[clean] || knownRules[clean] || "" }]); setShowRulePicker(false); }}
-          onPickCustom={(c) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs : [...rs, { code: clean, desc: ruleBook[clean] || knownRules[clean] || "" }]); setShowRulePicker(false); }}
+          selectedCodes={selectedRules.map((r) => r.code)}
+          onPickRule={(c, d) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs.filter((r) => r.code !== clean) : [...rs, { code: clean, desc: d || ruleBook[clean] || knownRules[clean] || "" }]); }}
+          onPickCustom={(c) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs.filter((r) => r.code !== clean) : [...rs, { code: clean, desc: ruleBook[clean] || knownRules[clean] || "" }]); }}
           onClose={() => setShowRulePicker(false)} />
       )}
     </div>
@@ -3175,7 +3176,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
 }
 
 /* ============================ RULE PICKER ============================ */
-function RulePicker({ rules, knownRules, onPickRule, onPickCustom, onClose }) {
+function RulePicker({ rules, knownRules, selectedCodes = [], onPickRule, onPickCustom, onClose }) {
   const [q, setQ] = useState("");
   const [favoriteCodes, setFavoriteCodes] = useState(() => { try { return JSON.parse(localStorage.getItem("refosRuleFavorites") || "[]"); } catch { return []; } });
   const [recentCodes, setRecentCodes] = useState(() => { try { return JSON.parse(localStorage.getItem("refosRecentRules") || "[]"); } catch { return []; } });
@@ -3216,7 +3217,8 @@ function RulePicker({ rules, knownRules, onPickRule, onPickCustom, onClose }) {
     <div className="fixed inset-0 z-50 bg-white dark:bg-slate-800 flex flex-col font-sans">
       <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2 shrink-0">
         <button onClick={onClose} className="text-slate-500 dark:text-slate-400 p-1 -ml-1"><ChevronLeft size={22} /></button>
-        <h2 className="font-bold text-slate-900 dark:text-slate-100">Cite a rule</h2>
+        <h2 className="font-bold text-slate-900 dark:text-slate-100 flex-1">Cite rules</h2>
+        <button type="button" onClick={onClose} className="px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-semibold">Done{selectedCodes.length ? ` (${selectedCodes.length})` : ""}</button>
       </div>
       <div className="p-3 border-b border-slate-100 shrink-0">
         <div className="relative">
@@ -3238,7 +3240,8 @@ function RulePicker({ rules, knownRules, onPickRule, onPickCustom, onClose }) {
             <div className="sticky top-0 bg-slate-100 dark:bg-slate-700 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{g.cat}</div>
             {g.items.map((r) => (
               <div key={`${g.cat}-${r.code}`} className="flex border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700">
-                <button onClick={() => chooseRule(r)} className="flex-1 min-w-0 text-left px-4 py-2.5 flex gap-3 items-baseline">
+                <button onClick={() => chooseRule(r)} className="flex-1 min-w-0 text-left px-4 py-2.5 flex gap-3 items-center">
+                  <span className={`w-5 h-5 shrink-0 rounded border grid place-items-center ${selectedCodes.includes(r.code) ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 dark:border-slate-600"}`}>{selectedCodes.includes(r.code) ? "✓" : ""}</span>
                   <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
                   <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
                 </button>
