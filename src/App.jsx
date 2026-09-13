@@ -2349,9 +2349,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                     Quadrant Field Reset Check
                     <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400">TEST</span>
                   </button>
-                  {adminUnlocked && (
-                    
-                  )}
                 </>
                 <div className="refos-menu-section">Access</div>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
