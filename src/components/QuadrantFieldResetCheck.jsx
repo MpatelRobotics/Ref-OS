@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, CheckCircle2, Circle, RotateCcw, ShieldCheck, MapPin, X, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 
 const STORAGE_KEY = "refos.experimental.quadrant-reset.v4";
@@ -68,6 +68,7 @@ export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_
   const [showReference, setShowReference] = useState(false);
   const [showQuadrantOverview, setShowQuadrantOverview] = useState(false);
   const [referenceZoom, setReferenceZoom] = useState(1);
+  const contentRef = useRef(null);
   const [state, setState] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
@@ -115,6 +116,18 @@ export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_
       ...prev,
       quadrants: prev.quadrants.map((item, qi) => qi === active ? { ...item, verifiedAt: Date.now() } : item),
     }));
+
+    // Move directly into the next quadrant so field resetters can keep working
+    // without scrolling back to the quadrant tabs after every verification.
+    if (active < QUADRANTS.length - 1) {
+      setActive(active + 1);
+    }
+
+    // Return the checklist pane to the top for the next quadrant (or the final
+    // verified state on Q4). Using the pane ref avoids moving the surrounding app.
+    requestAnimationFrame(() => {
+      contentRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    });
   };
 
   const reset = () => {
@@ -180,7 +193,7 @@ export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 pb-28">
+      <div ref={contentRef} className="flex-1 overflow-y-auto p-3 pb-28">
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
             <div className="text-lg font-bold">Quadrant {def.id} • {def.name}</div>
