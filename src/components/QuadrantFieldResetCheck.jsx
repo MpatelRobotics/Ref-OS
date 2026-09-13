@@ -158,7 +158,7 @@ export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_
         <button onClick={onClose} className="p-1 text-slate-300" aria-label="Back"><ChevronLeft size={24} /></button>
         <div className="min-w-0">
           <div className="font-bold leading-tight">Quadrant Field Reset Check{matchLabel ? ` • ${matchLabel}` : ""}</div>
-          <div className="text-[11px] text-amber-300">EXPERIMENTAL • Position verification</div>
+          <div className="text-[11px] text-amber-300">EXPERIMENTAL • Position verification • Field oriented from Head Ref side</div>
         </div>
         <button onClick={reset} className="ml-auto px-3 py-2 border border-slate-700 text-xs font-semibold flex items-center gap-1.5">
           <RotateCcw size={14} /> Reset
