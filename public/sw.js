@@ -1,4 +1,4 @@
-const CACHE = "refos-v21-1.2.0-highlander-full-field-zoom";
+const CACHE = "refos-v23-1.2.0-highlander-match-field-reset";
 
 const APP_SHELL = [
   "/models/refos_tiny_detector.onnx",

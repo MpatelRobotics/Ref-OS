@@ -63,22 +63,22 @@ const freshState = () => ({
   startedAt: Date.now(),
 });
 
-export default function QuadrantFieldResetCheck({ onClose }) {
+export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_KEY, matchLabel = "" }) {
   const [active, setActive] = useState(0);
   const [showReference, setShowReference] = useState(false);
   const [showQuadrantOverview, setShowQuadrantOverview] = useState(false);
   const [referenceZoom, setReferenceZoom] = useState(1);
   const [state, setState] = useState(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+      const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
       if (saved?.quadrants?.length === 4 && saved.quadrants.every((q, i) => q?.checks?.length === QUADRANTS[i].items.length)) return saved;
     } catch {}
     return freshState();
   });
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
-  }, [state]);
+    try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {}
+  }, [state, storageKey]);
 
   const verifiedCount = useMemo(() => state.quadrants.filter(q => q.verifiedAt).length, [state]);
   const allReady = verifiedCount === 4;
@@ -117,7 +117,7 @@ export default function QuadrantFieldResetCheck({ onClose }) {
       <div className="px-3 py-3 border-b border-slate-800 bg-slate-950 flex items-center gap-2 shrink-0">
         <button onClick={onClose} className="p-1 text-slate-300" aria-label="Back"><ChevronLeft size={24} /></button>
         <div className="min-w-0">
-          <div className="font-bold leading-tight">Quadrant Field Reset Check</div>
+          <div className="font-bold leading-tight">Quadrant Field Reset Check{matchLabel ? ` • ${matchLabel}` : ""}</div>
           <div className="text-[11px] text-amber-300">EXPERIMENTAL • Position verification</div>
         </div>
         <button onClick={reset} className="ml-auto px-3 py-2 border border-slate-700 text-xs font-semibold flex items-center gap-1.5">

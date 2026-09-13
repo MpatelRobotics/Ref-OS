@@ -2312,6 +2312,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                     <div className="border-t border-slate-100 my-1" />
                     <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field Log</button>
+                    <div className="refos-menu-section">Experimental</div>
+                    <button onClick={() => { setMenu(false); setShowQuadrantFieldResetCheck(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><CheckCircle2 size={16} /> Quadrant Field Reset Check <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400">TEST</span></button>
                 {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
                     <div className="refos-menu-section">Help &amp; Display</div>
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; Help</button>
@@ -2323,6 +2325,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                     <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
                     <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
                     <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
+                    <div className="refos-menu-section">Experimental</div>
+                    <button onClick={() => { setMenu(false); setShowQuadrantFieldResetCheck(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><CheckCircle2 size={16} /> Quadrant Field Reset Check <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400">TEST</span></button>
                     {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
                     <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
                     <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
@@ -2337,17 +2341,17 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
                 <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
-                {adminUnlocked && (
-                  <>
-                    <div className="refos-menu-section">Experimental</div>
-                    <button
-                      onClick={() => { setMenu(false); setShowQuadrantFieldResetCheck(true); }}
-                      className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"
-                    >
-                      <CheckCircle2 size={16} />
-                      Quadrant Field Reset Check
-                      <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400">TEST</span>
-                    </button>
+                <>
+                  <div className="refos-menu-section">Experimental</div>
+                  <button
+                    onClick={() => { setMenu(false); setShowQuadrantFieldResetCheck(true); }}
+                    className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"
+                  >
+                    <CheckCircle2 size={16} />
+                    Quadrant Field Reset Check
+                    <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400">TEST</span>
+                  </button>
+                  {adminUnlocked && (
                     <button
                       onClick={() => { setMenu(false); setShowLiveFieldSetupCheck(true); }}
                       className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"
@@ -2356,8 +2360,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                       Live Field Setup Check
                       <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400">TEST</span>
                     </button>
-                  </>
-                )}
+                  )}
+                </>
                 <div className="refos-menu-section">Access</div>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
@@ -2728,7 +2732,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onRankings={() => { setShowCommandCenter(false); setShowRankings(true); }}
         onClearData={() => { setShowCommandCenter(false); setShowClear(true); }}
         onClose={() => setShowCommandCenter(false)} />}
-      {showQuadrantFieldResetCheck && adminUnlocked && <QuadrantFieldResetCheck onClose={() => setShowQuadrantFieldResetCheck(false)} />}
+      {showQuadrantFieldResetCheck && <QuadrantFieldResetCheck onClose={() => setShowQuadrantFieldResetCheck(false)} />}
       {showLiveFieldSetupCheck && adminUnlocked && <LiveFieldSetupCheck onClose={() => setShowLiveFieldSetupCheck(false)} />}
       {showAnnouncement && adminUnlocked && <AnnouncementModal onClose={() => setShowAnnouncement(false)} onSend={sendAnnouncement} />}
       {showFeatures && (
@@ -3468,6 +3472,7 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
   const [faultOpen, setFaultOpen] = useState(false);
   const [faultNote, setFaultNote] = useState("");
   const [awpOpen, setAwpOpen] = useState(false);
+  const [fieldResetOpen, setFieldResetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
   const m = match;
@@ -3599,6 +3604,12 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
         </div>
         {!isElim && <button onClick={() => { setAwpOpen((v) => !v); setToOpen(false); setFaultOpen(false); }} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${awpOpen ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"}`}><ClipboardCheck size={15} /> AWP check</button>}
         {!isElim && awpOpen && <AwpChecker onSave={(note) => onAddField({ kind: "awp", matchId: m.id, matchRef: heading, note })} />}
+        <button
+          onClick={() => setFieldResetOpen(true)}
+          className="w-full mt-2 py-2.5 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"
+        >
+          <CheckCircle2 size={15} /> Field Reset Check <span className="text-[10px] font-bold text-amber-500">EXPERIMENTAL</span>
+        </button>
         {isElim && toOpen && (
           <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2">
             <div className="flex gap-2">
@@ -3634,6 +3645,14 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
           </ul>
         )}
       </div>)}
+      {emcee && (
+        <button
+          onClick={() => setFieldResetOpen(true)}
+          className="w-full mb-4 py-2.5 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"
+        >
+          <CheckCircle2 size={15} /> Field Reset Check <span className="text-[10px] font-bold text-amber-500">EXPERIMENTAL</span>
+        </button>
+      )}
       {(() => {
         const inMatch = [...(match.red || []), ...(match.blue || [])].flatMap((n) => teamWatch[n] || []);
         if (emcee || inMatch.length === 0) return null;
@@ -3656,6 +3675,13 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
         <ul className="space-y-2">{mv.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} showTeam />)}</ul>
       )}
       </>)}
+      {fieldResetOpen && (
+        <QuadrantFieldResetCheck
+          onClose={() => setFieldResetOpen(false)}
+          storageKey={`refos-quadrant-field-reset-v1:${m.id}`}
+          matchLabel={heading}
+        />
+      )}
     </>
   );
 }
