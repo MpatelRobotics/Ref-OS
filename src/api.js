@@ -465,6 +465,12 @@ export async function upsertFieldResetStatus(eventId, matchId, status = {}) {
   return mapFieldResetStatus(data);
 }
 
+export async function clearFieldResetStatuses(eventId) {
+  if (E2E_MOCK) return;
+  const { error } = await supabase.from("field_reset_status").delete().eq("event_id", eventId);
+  if (error) throw error;
+}
+
 export function subscribeFieldResetStatus(eventId, matchId, onChange) {
   if (E2E_MOCK) return () => {};
   const wanted = String(matchId);

@@ -1769,6 +1769,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         await api.clearAwpStatuses(eventId);
         setFieldLog((cur) => cur.filter((e) => e.kind !== "awp"));
       }
+      if (sel.fieldReset) {
+        await api.clearFieldResetStatuses(eventId);
+      }
       if (sel.teams) { await api.clearTeams(eventId); setTeams([]); }
       if (sel.schedule) { await api.clearMatches(eventId); setMatches({}); await api.clearRankings(eventId); setTeams((cur) => cur.map((t) => ({ ...t, rank: null }))); }
       if (sel.judging) { await api.clearJudging(eventId); setNoms([]); setFinalists(new Set()); }

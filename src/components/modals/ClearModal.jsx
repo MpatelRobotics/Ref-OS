@@ -2,13 +2,14 @@ import React, { useMemo, useState } from "react";
 import { Check, ChevronDown, Trash2, X } from "lucide-react";
 
 export default function ClearModal({ counts, onClear, onClose }) {
-  const [sel, setSel] = useState({ violations: false, teams: false, schedule: false, replays: false, awp: false, judging: false, alliances: false, watchlist: false });
+  const [sel, setSel] = useState({ violations: false, teams: false, schedule: false, replays: false, awp: false, fieldReset: false, judging: false, alliances: false, watchlist: false });
   const [open, setOpen] = useState(false);
 
   const opts = [
     { key: "violations", label: "Violations", desc: `${counts.violations} logged`, note: "Clears every violation and its photos." },
     { key: "replays", label: "Match replays", desc: `${counts.replays} flagged`, note: "Clears matches marked to re-run without deleting the matches." },
     { key: "awp", label: "AWP checks", desc: `${counts.awp} saved`, note: "Clears saved qualification AWP checks, shared in-progress AWP status, and AWP analytics history." },
+    { key: "fieldReset", label: "Field reset checks", desc: "Shared status", note: "Clears all shared quadrant progress, Field Ready status, verifier names, and timestamps for every match." },
     { key: "teams", label: "Teams", desc: `${counts.teams} teams`, note: "Removes the team roster." },
     { key: "schedule", label: "Match schedule", desc: `${counts.schedule} matches`, note: "Removes imported matches and clears rankings and W-L-T." },
     { key: "judging", label: "Judging", desc: `${counts.judging} nominations`, note: "Clears award nominations and finalist selections." },
