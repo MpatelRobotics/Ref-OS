@@ -95,7 +95,7 @@ export default function LiveFieldSetupCheck({ onClose }) {
   return <div className="fixed inset-0 z-[100] bg-black flex flex-col text-white">
     <div className="shrink-0 px-3 py-3 bg-[#0D0F32] flex items-center gap-2 border-b border-white/10">
       <Camera size={19}/><div className="min-w-0 flex-1"><div className="font-bold">Live Field Setup Check</div>
-      <div className="text-[11px] text-slate-300">ADMIN TEST • V2 real-footage ONNX detector</div></div>
+      <div className="text-[11px] text-slate-300">ADMIN TEST • V2 ground-truth ONNX detector</div></div>
       <button onClick={onClose} className="p-2" aria-label="Close"><X size={22}/></button>
     </div>
     <div className="relative flex-1 min-h-0 overflow-hidden bg-black">
@@ -115,7 +115,7 @@ export default function LiveFieldSetupCheck({ onClose }) {
         <input type="range" min="20" max="85" value={Math.round(threshold*100)} onChange={e=>setThreshold(Number(e.target.value)/100)} className="w-full mt-1"/>
       </label></div>
       <button onClick={startCamera} className="w-full rounded-md border border-white/20 py-2.5 text-sm font-semibold flex items-center justify-center gap-2"><RefreshCw size={16}/>Restart camera</button>
-      <div className="text-[11px] text-amber-100">Experimental V2 Lab detector trained with CAD, match footage, hard negatives, and real phone field footage. Verify detections manually before making event decisions.</div>
+      <div className="text-[11px] text-amber-100">Experimental V2 ground-truth detector fine-tuned with human-confirmed Pin, Cup, Goal, and Toggle photos plus prior CAD and real-field training. Verify detections manually before making event decisions.</div>
     </div>
   </div>;
 }
