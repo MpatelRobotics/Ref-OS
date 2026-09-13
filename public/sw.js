@@ -1,4 +1,4 @@
-const CACHE = "refos-v19-1.2.0-highlander-quadrant-position-check";
+const CACHE = "refos-v20-1.2.0-highlander-quadrant-reference-screenshots";
 
 const APP_SHELL = [
   "/models/refos_tiny_detector.onnx",

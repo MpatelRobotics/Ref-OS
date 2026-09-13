@@ -1,58 +1,59 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, CheckCircle2, Circle, RotateCcw, ShieldCheck, MapPin } from "lucide-react";
 
-const STORAGE_KEY = "refos.experimental.quadrant-reset.v2";
+const STORAGE_KEY = "refos.experimental.quadrant-reset.v3";
+const CROP_BASE = "/field-setup/quadrant-crops";
 
-// Each entry is an expected field position. The resetter taps the position only
-// after visually confirming that the correct game object is in that spot.
+// Each entry is an expected field position. Every checklist row includes a
+// cropped field reference so the resetter can compare the exact location.
 const QUADRANTS = [
   {
     id: 1,
     name: "Bottom",
     items: [
-      "Left diagonal Pin",
-      "Left blue Goal",
-      "Lower blue Goal",
-      "Center black Cup / Pin assembly",
-      "Right black Cup / Pin assembly",
-      "Right Pin cluster",
-      "Lower-right Pin cluster",
-      "Bottom wall positions",
+      { label: "Left diagonal Pin", image: "q1-left-diagonal-pin.jpg" },
+      { label: "Left blue Goal", image: "q1-left-blue-goal.jpg" },
+      { label: "Lower blue Goal", image: "q1-lower-blue-goal.jpg" },
+      { label: "Center black Cup / Pin assembly", image: "q1-center-black-cup-pin.jpg" },
+      { label: "Right black Cup / Pin assembly", image: "q1-right-black-cup-pin.jpg" },
+      { label: "Right Pin cluster", image: "q1-right-pin-cluster.jpg" },
+      { label: "Lower-right Pin cluster", image: "q1-lower-right-pin-cluster.jpg" },
+      { label: "Bottom wall positions", image: "q1-bottom-wall.jpg" },
     ],
   },
   {
     id: 2,
     name: "Left",
     items: [
-      "Upper-left Pin cluster",
-      "Mid-left black Cup / Pin assembly",
-      "Center-left Pin cluster",
-      "Left wall positions",
-      "Blue-side diagonal positions",
+      { label: "Upper-left Pin cluster", image: "q2-upper-left-pin-cluster.jpg" },
+      { label: "Mid-left black Cup / Pin assembly", image: "q2-mid-left-black-cup-pin.jpg" },
+      { label: "Center-left Pin cluster", image: "q2-center-left-pin-cluster.jpg" },
+      { label: "Left wall positions", image: "q2-left-wall.jpg" },
+      { label: "Blue-side diagonal positions", image: "q2-blue-diagonal.jpg" },
     ],
   },
   {
     id: 3,
     name: "Top",
     items: [
-      "Top wall Toggle",
-      "Upper-left black Cup / Pin assembly",
-      "Upper-right red Goal",
-      "Upper-right diagonal Pin",
-      "Top wall positions",
-      "Red-side diagonal positions",
+      { label: "Top wall Toggle", image: "q3-top-wall-toggle.jpg" },
+      { label: "Upper-left black Cup / Pin assembly", image: "q3-upper-left-black-cup-pin.jpg" },
+      { label: "Upper-right red Goal", image: "q3-upper-right-red-goal.jpg" },
+      { label: "Upper-right diagonal Pin", image: "q3-upper-right-diagonal-pin.jpg" },
+      { label: "Top wall positions", image: "q3-top-wall.jpg" },
+      { label: "Red-side diagonal positions", image: "q3-red-diagonal.jpg" },
     ],
   },
   {
     id: 4,
     name: "Right",
     items: [
-      "Upper-right red Goal",
-      "Center-right red Goal",
-      "Right wall positions",
-      "Right Pin cluster",
-      "Lower-right black Cup / Pin assembly",
-      "Red-side diagonal positions",
+      { label: "Upper-right red Goal", image: "q4-upper-right-red-goal.jpg" },
+      { label: "Center-right red Goal", image: "q4-center-right-red-goal.jpg" },
+      { label: "Right wall positions", image: "q4-right-wall.jpg" },
+      { label: "Right Pin cluster", image: "q4-right-pin-cluster.jpg" },
+      { label: "Lower-right black Cup / Pin assembly", image: "q4-lower-right-black-cup-pin.jpg" },
+      { label: "Red-side diagonal positions", image: "q4-red-diagonal.jpg" },
     ],
   },
 ];
@@ -133,7 +134,7 @@ export default function QuadrantFieldResetCheck({ onClose }) {
           </div>
         </div>
         <button onClick={() => setShowReference(v => !v)} className="w-full border border-slate-700 px-3 py-2.5 text-sm font-semibold flex items-center justify-center gap-2 bg-slate-900">
-          <MapPin size={16} /> {showReference ? "Hide field reference" : "Show labeled field reference"}
+          <MapPin size={16} /> {showReference ? "Hide full field reference" : "Show full field reference"}
         </button>
         {showReference && <img src="/field-setup/quadrant-reference.png" alt="Field reference labeled with quadrants 1 through 4" className="w-full max-h-[38vh] object-contain bg-white border border-slate-700" />}
       </div>
@@ -150,18 +151,25 @@ export default function QuadrantFieldResetCheck({ onClose }) {
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
             <div className="text-lg font-bold">Quadrant {def.id} • {def.name}</div>
-            <div className="text-xs text-slate-400">Tap each position after the correct object is physically in that spot.</div>
+            <div className="text-xs text-slate-400">Compare each screenshot to the field, then tap the position when it matches.</div>
           </div>
           <div className="text-xs font-bold text-slate-300 whitespace-nowrap">{checkedCount}/{def.items.length}</div>
         </div>
 
         <div className="border border-slate-800 divide-y divide-slate-800 bg-slate-900/60">
-          {def.items.map((label, idx) => (
-            <button key={label} onClick={() => toggleCheck(idx)} className={`w-full px-3 py-4 text-left flex items-center gap-3 active:bg-slate-800 ${q.checks[idx] ? "bg-emerald-950/20" : ""}`}>
-              {q.checks[idx] ? <CheckCircle2 size={24} className="text-emerald-400 shrink-0" /> : <Circle size={24} className="text-slate-500 shrink-0" />}
-              <div className="min-w-0">
-                <div className={q.checks[idx] ? "text-white font-semibold" : "text-slate-200"}>{label}</div>
-                <div className="text-[11px] text-slate-500">{q.checks[idx] ? "Correct position confirmed" : "Tap when correct"}</div>
+          {def.items.map((item, idx) => (
+            <button key={item.label} onClick={() => toggleCheck(idx)} className={`w-full p-3 text-left flex items-center gap-3 active:bg-slate-800 ${q.checks[idx] ? "bg-emerald-950/20" : ""}`}>
+              <div className="w-28 h-20 sm:w-36 sm:h-24 shrink-0 border border-slate-700 bg-black overflow-hidden">
+                <img src={`${CROP_BASE}/${item.image}`} alt={`${item.label} field reference`} className="w-full h-full object-cover" loading="lazy" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start gap-2">
+                  {q.checks[idx] ? <CheckCircle2 size={24} className="text-emerald-400 shrink-0 mt-0.5" /> : <Circle size={24} className="text-slate-500 shrink-0 mt-0.5" />}
+                  <div className="min-w-0">
+                    <div className={q.checks[idx] ? "text-white font-semibold" : "text-slate-200"}>{item.label}</div>
+                    <div className="text-[11px] text-slate-500 mt-1">{q.checks[idx] ? "Correct position confirmed" : "Tap when field matches screenshot"}</div>
+                  </div>
+                </div>
               </div>
             </button>
           ))}
