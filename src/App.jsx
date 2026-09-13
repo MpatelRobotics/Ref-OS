@@ -3455,7 +3455,7 @@ function AwpAlliance({ color, th, state, onChange }) {
 // alliances at once and this evaluates each against the v2.0 criteria.
 // Signature/Worlds-qualifying = 7 Pins / 3 Goals; standard events = 6 Pins / 2 Goals.
 // "Save to match log" writes the result to the field log so the match can be referenced later.
-function AwpChecker({ onSave, matchId, matchRef, meName = "", onStatusChange }) {
+function AwpChecker({ onSave, onSaved, matchId, matchRef, meName = "", onStatusChange }) {
   const [sig, setSig] = useState(true);
   const [red, setRed] = useState({ pins: 0, goals: 0, perim: true, noViol: true });
   const [blue, setBlue] = useState({ pins: 0, goals: 0, perim: true, noViol: true });
@@ -3543,7 +3543,7 @@ function AwpChecker({ onSave, matchId, matchRef, meName = "", onStatusChange }) 
       setRemoteMeta(status);
       onStatusChange?.(status);
       setSavedMsg("Shared AWP check saved ✓");
-      setTimeout(() => setSavedMsg(""), 3000);
+      onSaved?.();
     } catch (e) {
       alert(e.message || "Couldn't save the AWP result.");
     } finally { setSaving(false); }
@@ -3806,7 +3806,7 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
             {awpMeta && <span className={`text-[10px] font-medium ${awpOpen && !awpVerified ? "text-white/80" : "text-emerald-700 dark:text-emerald-300"}`}>{awpMeta}</span>}
           </button>
         </div>}
-        {!isElim && awpOpen && <AwpChecker matchId={m.id} matchRef={heading} meName={meName} onStatusChange={setAwpStatus} onSave={(note) => onAddField({ kind: "awp", matchId: m.id, matchRef: heading, note })} />}
+        {!isElim && awpOpen && <AwpChecker matchId={m.id} matchRef={heading} meName={meName} onStatusChange={setAwpStatus} onSaved={() => setAwpOpen(false)} onSave={(note) => onAddField({ kind: "awp", matchId: m.id, matchRef: heading, note })} />}
         <div className="mt-2">
           <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1 px-1">Field setup</div>
           <button
