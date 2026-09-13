@@ -1,4 +1,4 @@
-const CACHE = "refos-v25-1.2.0-highlander-shared-field-reset";
+const CACHE = "refos-v26-1.2.0-highlander-shared-awp";
 
 const APP_SHELL = [
   "/models/refos_tiny_detector.onnx",

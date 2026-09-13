@@ -1766,6 +1766,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       if (sel.awp) {
         const ids = fieldLog.filter((e) => e.kind === "awp").map((e) => e.id);
         for (const id of ids) await api.deleteFieldLog(id);
+        await api.clearAwpStatuses(eventId);
         setFieldLog((cur) => cur.filter((e) => e.kind !== "awp"));
       }
       if (sel.teams) { await api.clearTeams(eventId); setTeams([]); }
@@ -3454,13 +3455,67 @@ function AwpAlliance({ color, th, state, onChange }) {
 // alliances at once and this evaluates each against the v2.0 criteria.
 // Signature/Worlds-qualifying = 7 Pins / 3 Goals; standard events = 6 Pins / 2 Goals.
 // "Save to match log" writes the result to the field log so the match can be referenced later.
-function AwpChecker({ onSave }) {
+function AwpChecker({ onSave, matchId, matchRef, meName = "", onStatusChange }) {
   const [sig, setSig] = useState(true);
   const [red, setRed] = useState({ pins: 0, goals: 0, perim: true, noViol: true });
   const [blue, setBlue] = useState({ pins: 0, goals: 0, perim: true, noViol: true });
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
+  const [remoteMeta, setRemoteMeta] = useState(null);
+  const syncingRef = useRef(false);
   const th = sig ? { pins: 7, goals: 3 } : { pins: 6, goals: 2 };
+
+  const applyRemote = useCallback((remote) => {
+    if (!remote?.state) return;
+    syncingRef.current = true;
+    if (typeof remote.state.sig === "boolean") setSig(remote.state.sig);
+    if (remote.state.red) setRed((v) => ({ ...v, ...remote.state.red }));
+    if (remote.state.blue) setBlue((v) => ({ ...v, ...remote.state.blue }));
+    setRemoteMeta(remote);
+    onStatusChange?.(remote);
+    queueMicrotask(() => { syncingRef.current = false; });
+  }, [onStatusChange]);
+
+  useEffect(() => {
+    if (!matchId) return undefined;
+    let alive = true;
+    api.getAwpStatus(EVENT_ID, matchId).then((r) => { if (alive && r) applyRemote(r); }).catch(() => {});
+    const unsub = api.subscribeAwpStatus(EVENT_ID, matchId, (r) => { if (alive && r) applyRemote(r); });
+    return () => { alive = false; unsub?.(); };
+  }, [matchId, applyRemote]);
+
+  const pushShared = useCallback(async (next = {}) => {
+    if (!matchId || syncingRef.current) return;
+    const state = {
+      sig: next.sig ?? sig,
+      red: next.red ?? red,
+      blue: next.blue ?? blue,
+    };
+    try {
+      const r = await api.upsertAwpStatus(EVENT_ID, matchId, {
+        matchRef,
+        state,
+        verifiedBy: null,
+        verifiedAt: null,
+        updatedBy: meName || "Ref",
+      });
+      setRemoteMeta(r);
+      onStatusChange?.(r);
+    } catch {}
+  }, [matchId, matchRef, sig, red, blue, meName, onStatusChange]);
+
+  const setSigShared = (v) => { setSig(v); pushShared({ sig: v }); };
+  const setRedShared = (patch) => {
+    const next = { ...red, ...patch };
+    setRed(next);
+    pushShared({ red: next });
+  };
+  const setBlueShared = (patch) => {
+    const next = { ...blue, ...patch };
+    setBlue(next);
+    pushShared({ blue: next });
+  };
+
   const summarize = (label, s) => {
     const ok = s.pins >= th.pins && s.goals >= th.goals && s.perim && s.noViol;
     const gaps = [];
@@ -3470,36 +3525,80 @@ function AwpChecker({ onSave }) {
     if (!s.noViol) gaps.push("auton violation");
     return `${label}: ${ok ? "MET" : "NOT met"} (${s.pins}P/${s.goals}G${!ok && gaps.length ? " — " + gaps.join(", ") : ""})`;
   };
+
   const doSave = async () => {
     if (!onSave) return;
     const note = `AWP ${sig ? "Sig 7/3" : "Std 6/2"} — ${summarize("Red", red)}; ${summarize("Blue", blue)}`;
     setSaving(true);
     try {
       await onSave(note);
-      setSavedMsg("Saved to the match log ✓");
+      const now = Date.now();
+      const status = await api.upsertAwpStatus(EVENT_ID, matchId, {
+        matchRef,
+        state: { sig, red, blue },
+        verifiedBy: meName || "Ref",
+        verifiedAt: now,
+        updatedBy: meName || "Ref",
+      });
+      setRemoteMeta(status);
+      onStatusChange?.(status);
+      setSavedMsg("Shared AWP check saved ✓");
       setTimeout(() => setSavedMsg(""), 3000);
     } catch (e) {
       alert(e.message || "Couldn't save the AWP result.");
     } finally { setSaving(false); }
   };
+
+  const doReset = async () => {
+    const who = remoteMeta?.verifiedBy ? ` by ${remoteMeta.verifiedBy}` : "";
+    if (!confirm(`Reset the shared AWP check${who}? This clears the current shared checklist for this match but does not delete saved AWP history.`)) return;
+    const nextRed = { pins: 0, goals: 0, perim: true, noViol: true };
+    const nextBlue = { pins: 0, goals: 0, perim: true, noViol: true };
+    setSig(true); setRed(nextRed); setBlue(nextBlue);
+    try {
+      const status = await api.upsertAwpStatus(EVENT_ID, matchId, {
+        matchRef,
+        state: { sig: true, red: nextRed, blue: nextBlue },
+        verifiedBy: null,
+        verifiedAt: null,
+        updatedBy: meName || "Ref",
+      });
+      setRemoteMeta(status);
+      onStatusChange?.(status);
+    } catch (e) { alert(e.message || "Couldn't reset the shared AWP check."); }
+  };
+
+  const meta = remoteMeta?.verifiedAt
+    ? `Verified by ${remoteMeta.verifiedBy || "Ref"} • ${new Date(remoteMeta.verifiedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+    : remoteMeta?.updatedAt
+      ? `Shared progress • updated by ${remoteMeta.updatedBy || "Ref"}`
+      : "Shared across event devices";
+
   return (
     <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-bold text-emerald-700 dark:text-emerald-300">Shared AWP check</div>
+          <div className="text-[11px] text-slate-500 dark:text-slate-400">{meta}</div>
+        </div>
+        <button onClick={doReset} className="px-2 py-1 rounded-md text-xs font-semibold border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300">Reset</button>
+      </div>
       <div className="flex items-center justify-between">
         <span className="text-xs text-slate-500 dark:text-slate-400">Criteria (exclude anything across the auton line)</span>
         <div className="flex gap-1 shrink-0">
-          <button onClick={() => setSig(true)} className={`px-2 py-1 rounded-md text-xs font-semibold border ${sig ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>Signature 7/3</button>
-          <button onClick={() => setSig(false)} className={`px-2 py-1 rounded-md text-xs font-semibold border ${!sig ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>Standard 6/2</button>
+          <button onClick={() => setSigShared(true)} className={`px-2 py-1 rounded-md text-xs font-semibold border ${sig ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>Signature 7/3</button>
+          <button onClick={() => setSigShared(false)} className={`px-2 py-1 rounded-md text-xs font-semibold border ${!sig ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>Standard 6/2</button>
         </div>
       </div>
       <div className="grid sm:grid-cols-2 gap-3">
-        <AwpAlliance color="red" th={th} state={red} onChange={(patch) => setRed((s) => ({ ...s, ...patch }))} />
-        <AwpAlliance color="blue" th={th} state={blue} onChange={(patch) => setBlue((s) => ({ ...s, ...patch }))} />
+        <AwpAlliance color="red" th={th} state={red} onChange={setRedShared} />
+        <AwpAlliance color="blue" th={th} state={blue} onChange={setBlueShared} />
       </div>
       {onSave && (
-        <button onClick={doSave} disabled={saving} className="w-full py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold flex items-center justify-center gap-2 disabled:bg-slate-300 hover:bg-[#171a45]"><Save size={16} /> {saving ? "Saving…" : "Save result to match log"}</button>
+        <button onClick={doSave} disabled={saving} className="w-full py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold flex items-center justify-center gap-2 disabled:bg-slate-300 hover:bg-[#171a45]"><Save size={16} /> {saving ? "Saving…" : "Save shared AWP result"}</button>
       )}
       {savedMsg && <p className="text-xs text-emerald-600 dark:text-emerald-400 text-center font-medium">{savedMsg}</p>}
-      <p className="text-[11px] text-slate-400">Manual aid — enter what you saw at the end of auton. It changes no scores; Tournament Manager records the official AWP. Saving keeps a copy in this match's log for later reference. Every saved result is also collected in the <b>AWP tab</b>, where you can see the match and which criteria each alliance met.</p>
+      <p className="text-[11px] text-slate-400">Manual aid only. Tournament Manager records the official AWP. Current checklist progress syncs across event devices. Saving records who verified the check and when, and also keeps the result in this match's AWP history.</p>
     </div>
   );
 }
@@ -3511,10 +3610,23 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
   const [faultOpen, setFaultOpen] = useState(false);
   const [faultNote, setFaultNote] = useState("");
   const [awpOpen, setAwpOpen] = useState(false);
+  const [awpStatus, setAwpStatus] = useState(null);
   const [fieldResetOpen, setFieldResetOpen] = useState(false);
   const [fieldResetReady, setFieldResetReady] = useState(false);
   const [fieldResetStatus, setFieldResetStatus] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!match?.id) {
+      setAwpStatus(null);
+      return undefined;
+    }
+    let alive = true;
+    const applyAwp = (remote) => { if (alive) setAwpStatus(remote || null); };
+    api.getAwpStatus(EVENT_ID, match.id).then(applyAwp).catch(() => applyAwp(null));
+    const unsub = api.subscribeAwpStatus(EVENT_ID, match.id, applyAwp);
+    return () => { alive = false; unsub?.(); };
+  }, [match?.id]);
 
   useEffect(() => {
     if (!match?.id) {
@@ -3550,6 +3662,12 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
   const m = match;
   const heading = m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`);
+  const awpVerified = !!awpStatus?.verifiedAt;
+  const awpMeta = awpVerified
+    ? `Verified by ${awpStatus.verifiedBy || "Ref"} • ${new Date(awpStatus.verifiedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+    : awpStatus?.updatedAt
+      ? `Shared progress • updated by ${awpStatus.updatedBy || "Ref"}`
+      : "";
   const fieldResetMeta = fieldResetReady && fieldResetStatus?.verifiedAt
     ? `Verified by ${fieldResetStatus.verifiedBy || "Ref"} • ${new Date(fieldResetStatus.verifiedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
     : "";
@@ -3681,8 +3799,14 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
           <button onClick={() => { setFaultOpen((v) => !v); setToOpen(false); }} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${faultOpen ? "bg-red-600 text-white border-red-600" : "bg-white dark:bg-slate-800 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700"}`}><AlertTriangle size={15} /> Field fault</button>
           <button onClick={toggleReplay} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${replayEntry ? "bg-amber-500 text-white border-amber-500" : "bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"}`}><RefreshCw size={15} /> {replayEntry ? "For replay ✓" : "Replay"}</button>
         </div>
-        {!isElim && <button onClick={() => { setAwpOpen((v) => !v); setToOpen(false); setFaultOpen(false); }} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${awpOpen ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"}`}><ClipboardCheck size={15} /> AWP check</button>}
-        {!isElim && awpOpen && <AwpChecker onSave={(note) => onAddField({ kind: "awp", matchId: m.id, matchRef: heading, note })} />}
+        {!isElim && <div className="mt-2">
+          <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1 px-1">Autonomous Win Point</div>
+          <button onClick={() => { setAwpOpen((v) => !v); setToOpen(false); setFaultOpen(false); }} className={`w-full py-2.5 rounded-lg border text-sm font-semibold flex flex-col items-center justify-center gap-0.5 ${awpVerified ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : awpOpen ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"}`}>
+            <span className="flex items-center gap-1.5"><ClipboardCheck size={15} /> {awpVerified ? "AWP Checked ✓" : "AWP Check"}</span>
+            {awpMeta && <span className={`text-[10px] font-medium ${awpOpen && !awpVerified ? "text-white/80" : "text-emerald-700 dark:text-emerald-300"}`}>{awpMeta}</span>}
+          </button>
+        </div>}
+        {!isElim && awpOpen && <AwpChecker matchId={m.id} matchRef={heading} meName={meName} onStatusChange={setAwpStatus} onSave={(note) => onAddField({ kind: "awp", matchId: m.id, matchRef: heading, note })} />}
         <div className="mt-2">
           <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1 px-1">Field setup</div>
           <button
@@ -5159,7 +5283,7 @@ function FeaturesGuide() {
   const features = [
     { icon: ListOrdered, title: "Match Tab", preview: "/feature-previews/match-tab.png", text: "Keep the active match and referee workflow together.", detail: "The Match tab gives referees a fast event day view of the schedule and the teams assigned to each match, with direct access to the actions they need while officiating.", bullets: ["Browse imported qualification and elimination matches", "See the teams assigned to each alliance", "Open match specific referee actions", "Flag matches for replay when needed", "Use the same match data across authorized devices"] },
     { icon: ShieldAlert, title: "Violation Tracking", preview: "/feature-previews/violation-tracking.png", text: "Log violations with one or multiple rules and review them consistently across the referee crew.", detail: "Violation Tracking creates a shared record of Minor, Major, and Inspection violations so Head Referees and field crews can make more consistent decisions throughout the event. A single violation can cite multiple rules at once without combining those rules into one record for reporting.", bullets: ["Record the team, match, severity, notes, and one or multiple cited rules", "Select multiple rules directly in the violation form", "Display every cited rule separately in the violation log", "Count each cited rule separately in Violations by Rule", "Attach supported photos to a violation", "Review a team's prior violation history"] },
-    { icon: Clock, title: "AWP Checker", preview: "/feature-previews/awp-checker.png", text: "Record Autonomous Win Point checks without mixing them into violations.", detail: "The AWP Checker gives the referee crew a dedicated workflow for recording Autonomous Win Point observations and reviewing AWP information during qualification matches.", bullets: ["Record AWP checks by alliance", "Track the relevant autonomous conditions", "Keep AWP records separate from violations", "Review saved checks during the event", "Clear AWP data independently from Clear Data"] },
+    { icon: Clock, title: "AWP Checker", preview: "/feature-previews/awp-checker.png", text: "Record and share Autonomous Win Point checks without mixing them into violations.", detail: "The AWP Checker gives the referee crew a dedicated shared workflow for recording Autonomous Win Point observations during qualification matches. In-progress criteria sync across event devices, and a saved check records who verified it and when while keeping AWP separate from Field Ready and violations.", bullets: ["Share in-progress Red and Blue alliance AWP criteria across event devices", "Record the verifier name and time when an AWP check is saved", "Show AWP Checked status directly on the match", "Require confirmation before resetting shared AWP progress", "Keep AWP records separate from Field Ready and violations", "Review saved checks during the event", "Clear AWP history independently from Clear Data"] },
     { icon: CheckCircle2, title: "Quadrant Field Reset Check", preview: "/feature-previews/quadrant-field-reset.png", text: "Verify the field reset quadrant by quadrant before the next match. Field is oriented from the Head Ref side.", detail: "The Quadrant Field Reset Check is oriented from the Head Ref side and gives the field crew a shared visual checklist for confirming that game objects are back in their correct starting positions. Match progress syncs across event devices, records who completed the final verification and when, and keeps Field Ready separate from the AWP workflow.", bullets: ["Verify Q1 through Q4 with position specific reference images", "Share partial quadrant progress across event devices in real time", "Record the verifier name and time when the field becomes ready", "Require confirmation before resetting shared field setup progress", "Keep Field Ready visibly separate from the AWP check", "Use Check All and automatically advance to the next quadrant", "Open and zoom the full field reference when needed"] },
     { icon: Users, title: "Teams Tab", preview: "/feature-previews/teams-tab.png", text: "Search teams and review their Ref OS event history.", detail: "The Teams tab centralizes team information so referees can quickly find a team and review the records Ref OS has collected for it during the event.", bullets: ["Search the imported team roster", "Open individual team records", "Review violations associated with a team", "Use team information throughout referee workflows", "Keep the roster available to authorized devices"] },
     { icon: Bot, title: "Robots Tab", preview: "/feature-previews/robots-tab.png", text: "Keep robot information and inspection context easy to find.", detail: "The Robots tab gives the event crew a dedicated place to review robot related information without burying it inside team or violation screens.", bullets: ["Review robot records by team", "Keep robot photos and notes where supported", "Surface robot information during event operations", "Separate robot context from violation history", "Use the same records across Ref OS devices"] },
