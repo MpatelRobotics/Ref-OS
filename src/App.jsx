@@ -12,6 +12,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { APP_VERSION } from "./appVersion";
 import CommandCenter from "./components/CommandCenter.jsx";
 import LiveFieldSetupCheck from "./components/LiveFieldSetupCheck.jsx";
+import QuadrantFieldResetCheck from "./components/QuadrantFieldResetCheck.jsx";
 import EventContactDirectory from "./components/EventContactDirectory.jsx";
 import LoginScreen from "./auth/LoginScreen.jsx";
 import NameScreen from "./auth/NameScreen.jsx";
@@ -618,6 +619,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showOfflineTest, setShowOfflineTest] = useState(false);
   const [showCommandCenter, setShowCommandCenter] = useState(false);
   const [showLiveFieldSetupCheck, setShowLiveFieldSetupCheck] = useState(false);
+  const [showQuadrantFieldResetCheck, setShowQuadrantFieldResetCheck] = useState(false);
   const [showContactDirectory, setShowContactDirectory] = useState(false);
   const [showPreEventTest, setShowPreEventTest] = useState(false);
   const [showTwoDeviceSyncTest, setShowTwoDeviceSyncTest] = useState(false);
@@ -2339,6 +2341,14 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                   <>
                     <div className="refos-menu-section">Experimental</div>
                     <button
+                      onClick={() => { setMenu(false); setShowQuadrantFieldResetCheck(true); }}
+                      className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"
+                    >
+                      <CheckCircle2 size={16} />
+                      Quadrant Field Reset Check
+                      <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400">TEST</span>
+                    </button>
+                    <button
                       onClick={() => { setMenu(false); setShowLiveFieldSetupCheck(true); }}
                       className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"
                     >
@@ -2718,6 +2728,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onRankings={() => { setShowCommandCenter(false); setShowRankings(true); }}
         onClearData={() => { setShowCommandCenter(false); setShowClear(true); }}
         onClose={() => setShowCommandCenter(false)} />}
+      {showQuadrantFieldResetCheck && adminUnlocked && <QuadrantFieldResetCheck onClose={() => setShowQuadrantFieldResetCheck(false)} />}
       {showLiveFieldSetupCheck && adminUnlocked && <LiveFieldSetupCheck onClose={() => setShowLiveFieldSetupCheck(false)} />}
       {showAnnouncement && adminUnlocked && <AnnouncementModal onClose={() => setShowAnnouncement(false)} onSend={sendAnnouncement} />}
       {showFeatures && (
