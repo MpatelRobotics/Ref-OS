@@ -1,4 +1,4 @@
-const CACHE = "refos-v17-1.2.0-highlander-camera-aspect-letterbox-fix";
+const CACHE = "refos-v18-1.2.0-highlander-hardpin-camera-fix";
 
 const APP_SHELL = [
   "/models/refos_tiny_detector.onnx",
