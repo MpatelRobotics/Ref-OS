@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, CheckCircle2, Circle, RotateCcw, ShieldCheck, MapPin } from "lucide-react";
+import { ChevronLeft, CheckCircle2, Circle, RotateCcw, ShieldCheck, MapPin, X } from "lucide-react";
 
 const STORAGE_KEY = "refos.experimental.quadrant-reset.v4";
 const CROP_BASE = "/field-setup/quadrant-crops";
@@ -66,6 +66,7 @@ const freshState = () => ({
 export default function QuadrantFieldResetCheck({ onClose }) {
   const [active, setActive] = useState(0);
   const [showReference, setShowReference] = useState(false);
+  const [showQuadrantOverview, setShowQuadrantOverview] = useState(false);
   const [state, setState] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
@@ -153,10 +154,10 @@ export default function QuadrantFieldResetCheck({ onClose }) {
             <div className="text-lg font-bold">Quadrant {def.id} • {def.name}</div>
             <div className="text-xs text-slate-400">Compare each screenshot to the field, then tap the position when it matches.</div>
           </div>
-          <div className="flex items-center gap-2">
+          <button onClick={() => setShowQuadrantOverview(true)} className="flex items-center gap-2 p-1 -m-1 active:bg-slate-800" aria-label={`Expand Quadrant ${def.id} reference`}>
             <img src={`/field-setup/quadrant-overviews/q${def.id}.jpg`} alt={`Quadrant ${def.id} reference`} className="w-20 h-16 object-cover border border-slate-700 bg-black" />
             <div className="text-xs font-bold text-slate-300 whitespace-nowrap">{checkedCount}/{def.items.length}</div>
-          </div>
+          </button>
         </div>
 
         <div className="border border-slate-800 divide-y divide-slate-800 bg-slate-900/60">
@@ -180,6 +181,21 @@ export default function QuadrantFieldResetCheck({ onClose }) {
 
         {q.verifiedAt && <div className="mt-3 text-xs text-emerald-300">Quadrant {def.id} verified at {new Date(q.verifiedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.</div>}
       </div>
+
+      {showQuadrantOverview && (
+        <div className="fixed inset-0 z-[90] bg-black/95 flex flex-col" onClick={() => setShowQuadrantOverview(false)}>
+          <div className="px-4 py-3 flex items-center justify-between border-b border-slate-800 bg-slate-950" onClick={e => e.stopPropagation()}>
+            <div>
+              <div className="font-bold">Quadrant {def.id} • {def.name}</div>
+              <div className="text-xs text-slate-400">Tap outside the image or close to return</div>
+            </div>
+            <button onClick={() => setShowQuadrantOverview(false)} className="p-2 border border-slate-700" aria-label="Close expanded quadrant"><X size={22} /></button>
+          </div>
+          <div className="flex-1 min-h-0 p-3 flex items-center justify-center" onClick={() => setShowQuadrantOverview(false)}>
+            <img src={`/field-setup/quadrant-overviews/q${def.id}.jpg`} alt={`Expanded Quadrant ${def.id} reference`} className="max-w-full max-h-full object-contain bg-black border border-slate-700" />
+          </div>
+        </div>
+      )}
 
       <div className="fixed bottom-0 left-0 right-0 p-3 border-t border-slate-800 bg-slate-950">
         <button onClick={verify} disabled={!allChecks || !!q.verifiedAt} className={`w-full py-3.5 font-bold ${q.verifiedAt ? "bg-emerald-800 text-emerald-100" : allChecks ? "bg-emerald-600 text-white" : "bg-slate-800 text-slate-500"}`}>
