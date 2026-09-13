@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, CheckCircle2, Circle, RotateCcw, ShieldCheck, MapPin } from "lucide-react";
 
-const STORAGE_KEY = "refos.experimental.quadrant-reset.v3";
+const STORAGE_KEY = "refos.experimental.quadrant-reset.v4";
 const CROP_BASE = "/field-setup/quadrant-crops";
 
 // Each entry is an expected field position. Every checklist row includes a
@@ -23,7 +23,7 @@ const QUADRANTS = [
   },
   {
     id: 2,
-    name: "Left",
+    name: "Right",
     items: [
       { label: "Upper-left Pin cluster", image: "q2-upper-left-pin-cluster.jpg" },
       { label: "Mid-left black Cup / Pin assembly", image: "q2-mid-left-black-cup-pin.jpg" },
@@ -46,7 +46,7 @@ const QUADRANTS = [
   },
   {
     id: 4,
-    name: "Right",
+    name: "Left",
     items: [
       { label: "Upper-right red Goal", image: "q4-upper-right-red-goal.jpg" },
       { label: "Center-right red Goal", image: "q4-center-right-red-goal.jpg" },
@@ -153,7 +153,10 @@ export default function QuadrantFieldResetCheck({ onClose }) {
             <div className="text-lg font-bold">Quadrant {def.id} • {def.name}</div>
             <div className="text-xs text-slate-400">Compare each screenshot to the field, then tap the position when it matches.</div>
           </div>
-          <div className="text-xs font-bold text-slate-300 whitespace-nowrap">{checkedCount}/{def.items.length}</div>
+          <div className="flex items-center gap-2">
+            <img src={`/field-setup/quadrant-overviews/q${def.id}.jpg`} alt={`Quadrant ${def.id} reference`} className="w-20 h-16 object-cover border border-slate-700 bg-black" />
+            <div className="text-xs font-bold text-slate-300 whitespace-nowrap">{checkedCount}/{def.items.length}</div>
+          </div>
         </div>
 
         <div className="border border-slate-800 divide-y divide-slate-800 bg-slate-900/60">
