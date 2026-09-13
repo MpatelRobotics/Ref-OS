@@ -298,6 +298,12 @@ const availablePhases = (event) => MATCH_PHASES.filter((p) => {
 
 const splitRuleCodes = (code) => String(code || "").split("|").map((c) => c.trim().replace(/[<>]/g, "").toUpperCase()).filter(Boolean);
 const fmtRule = (code) => { const codes = splitRuleCodes(code); return codes.length ? codes.map((c) => `<${c}>`).join(" ") : "—"; };
+const splitRuleDescs = (desc) => String(desc || "").split("|").map((d) => d.trim());
+const ruleEntries = (v) => {
+  const codes = splitRuleCodes(v?.code);
+  const descs = splitRuleDescs(v?.desc);
+  return codes.length ? codes.map((code, i) => ({ code, desc: descs[i] || "" })) : [{ code: "", desc: String(v?.desc || "").trim() }];
+};
 const fmtTime = (ts) => new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const ago = (ts) => {
   if (!ts) return "";
@@ -2802,10 +2808,12 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
   const byRule = useMemo(() => {
     const m = {};
     for (const v of viols) {
-      const key = v.code || "—";
-      m[key] = m[key] || { code: v.code, desc: v.desc, count: 0, types: {} };
-      m[key].count++; m[key].types[v.type] = (m[key].types[v.type] || 0) + 1;
-      if (!m[key].desc && v.desc) m[key].desc = v.desc;
+      for (const entry of ruleEntries(v)) {
+        const key = entry.code || "—";
+        m[key] = m[key] || { code: entry.code, desc: entry.desc, count: 0, types: {} };
+        m[key].count++; m[key].types[v.type] = (m[key].types[v.type] || 0) + 1;
+        if (!m[key].desc && entry.desc) m[key].desc = entry.desc;
+      }
     }
     return Object.values(m).sort((a, b) => b.count - a.count);
   }, [viols]);
@@ -2887,14 +2895,14 @@ function ViolationCard({ v, onDelete, onOpenPhoto, onEdit, showTeam }) {
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border ${T.badge}`}><T.Icon size={12} /> {T.label}</span>
         {showTeam && <span className="font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-200 dark:bg-slate-600 px-1.5 py-0.5 rounded-md text-sm">{v.team}</span>}
-        <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{fmtRule(v.code)}</span>
+        <div className="flex flex-wrap gap-1.5">{splitRuleCodes(v.code).map((code) => <span key={code} className="font-mono font-bold text-slate-900 dark:text-slate-100">{fmtRule(code)}</span>)}</div>
         {fmtMatch(v.match) && <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200">{fmtMatch(v.match)}</span>}
         {v._pending && <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-300"><RefreshCw size={9} className="animate-spin" /> Saving</span>}
         <span className="text-[11px] text-slate-400 ml-auto">{fmtTime(v.createdAt)}</span>
         {canEdit && <button onClick={() => onEdit(v)} className="text-slate-300 hover:text-slate-700 dark:text-slate-200" title="Edit"><Pencil size={15} /></button>}
         <button onClick={() => { if (confirm(v._pending ? "Discard this unsynced violation?" : "Delete this violation?")) onDelete(v); }} className="refos-destructive-icon" title="Delete"><Trash2 size={15} /></button>
       </div>
-      {v.desc && <p className={`text-sm mt-1.5 font-medium ${T.text}`}>{v.desc}</p>}
+      {ruleEntries(v).some((r) => r.desc) && <div className="mt-1.5 space-y-1">{ruleEntries(v).filter((r) => r.desc).map((r) => <div key={r.code || r.desc} className={`text-sm font-medium ${T.text}`}><span className="font-mono font-bold">{r.code ? fmtRule(r.code) : ""}</span>{r.code ? " " : ""}{r.desc}</div>)}</div>}
       {v.notes && <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{v.notes}</p>}
       {v._localPhotos?.length > 0 ? (
         <div className="flex gap-2 mt-2 overflow-x-auto">{v._localPhotos.map((src, i) => (
@@ -2913,11 +2921,13 @@ function ByRule({ viols, expandRule, setExpandRule }) {
   const rules = useMemo(() => {
     const m = {};
     for (const v of viols) {
-      const key = v.code || "—";
-      m[key] = m[key] || { code: v.code, desc: v.desc, count: 0, types: {}, teams: {} };
-      m[key].count++; m[key].types[v.type] = (m[key].types[v.type] || 0) + 1;
-      m[key].teams[v.team] = (m[key].teams[v.team] || 0) + 1;
-      if (!m[key].desc && v.desc) m[key].desc = v.desc;
+      for (const entry of ruleEntries(v)) {
+        const key = entry.code || "—";
+        m[key] = m[key] || { code: entry.code, desc: entry.desc, count: 0, types: {}, teams: {} };
+        m[key].count++; m[key].types[v.type] = (m[key].types[v.type] || 0) + 1;
+        m[key].teams[v.team] = (m[key].teams[v.team] || 0) + 1;
+        if (!m[key].desc && entry.desc) m[key].desc = entry.desc;
+      }
     }
     return Object.values(m).sort((a, b) => b.count - a.count);
   }, [viols]);
