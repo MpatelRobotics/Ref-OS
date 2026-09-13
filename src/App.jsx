@@ -523,14 +523,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 
   const [showScrollTop, setShowScrollTop] = useState(false);
 
-  // Show a manual return-to-top control after the user has scrolled down.
-  useEffect(() => {
-    const updateScrollTopVisibility = () => setShowScrollTop(window.scrollY > 320);
-    updateScrollTopVisibility();
-    window.addEventListener("scroll", updateScrollTopVisibility, { passive: true });
-    return () => window.removeEventListener("scroll", updateScrollTopVisibility);
-  }, [view, openTeam, openMatch, openRobot]);
-
   const scrollPageToTop = () => {
     window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
     document.scrollingElement?.scrollTo?.({ top: 0, left: 0, behavior: "smooth" });
@@ -570,6 +562,16 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [openTeam, setOpenTeam] = useState(null);
   const [openMatch, setOpenMatch] = useState(null);
   const [openRobot, setOpenRobot] = useState(null);
+
+  // Show a manual return-to-top control after the user has scrolled down.
+  // Keep this effect after the open* state declarations so its dependency
+  // array never touches a block-scoped variable before initialization.
+  useEffect(() => {
+    const updateScrollTopVisibility = () => setShowScrollTop(window.scrollY > 320);
+    updateScrollTopVisibility();
+    window.addEventListener("scroll", updateScrollTopVisibility, { passive: true });
+    return () => window.removeEventListener("scroll", updateScrollTopVisibility);
+  }, [view, openTeam, openMatch, openRobot]);
   const [query, setQuery] = useState("");
   const [showTeamScanner, setShowTeamScanner] = useState(false);
   const [lightbox, setLightbox] = useState(null);
