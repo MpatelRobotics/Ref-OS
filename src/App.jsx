@@ -3473,7 +3473,22 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
   const [faultNote, setFaultNote] = useState("");
   const [awpOpen, setAwpOpen] = useState(false);
   const [fieldResetOpen, setFieldResetOpen] = useState(false);
+  const [fieldResetReady, setFieldResetReady] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!match?.id) {
+      setFieldResetReady(false);
+      return;
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem(`refos-quadrant-field-reset-v1:${match.id}`) || "null");
+      setFieldResetReady(!!(saved?.quadrants?.length === 4 && saved.quadrants.every(q => !!q?.verifiedAt)));
+    } catch {
+      setFieldResetReady(false);
+    }
+  }, [match?.id]);
+
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
   const m = match;
   const heading = m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`);
@@ -3606,9 +3621,9 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
         {!isElim && awpOpen && <AwpChecker onSave={(note) => onAddField({ kind: "awp", matchId: m.id, matchRef: heading, note })} />}
         <button
           onClick={() => setFieldResetOpen(true)}
-          className="w-full mt-2 py-2.5 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"
+          className={`w-full mt-2 py-2.5 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${fieldResetReady ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"}`}
         >
-          <CheckCircle2 size={15} /> Field Reset Check <span className="text-[10px] font-bold text-amber-500">EXPERIMENTAL</span>
+          <CheckCircle2 size={15} /> {fieldResetReady ? "Field Ready ✓" : "Field Reset Check"} {!fieldResetReady && <span className="text-[10px] font-bold text-amber-500">EXPERIMENTAL</span>}
         </button>
         {isElim && toOpen && (
           <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2">
@@ -3648,9 +3663,9 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
       {emcee && (
         <button
           onClick={() => setFieldResetOpen(true)}
-          className="w-full mb-4 py-2.5 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"
+          className={`w-full mb-4 py-2.5 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${fieldResetReady ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"}`}
         >
-          <CheckCircle2 size={15} /> Field Reset Check <span className="text-[10px] font-bold text-amber-500">EXPERIMENTAL</span>
+          <CheckCircle2 size={15} /> {fieldResetReady ? "Field Ready ✓" : "Field Reset Check"} {!fieldResetReady && <span className="text-[10px] font-bold text-amber-500">EXPERIMENTAL</span>}
         </button>
       )}
       {(() => {
@@ -3680,6 +3695,8 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
           onClose={() => setFieldResetOpen(false)}
           storageKey={`refos-quadrant-field-reset-v1:${m.id}`}
           matchLabel={heading}
+          onReadyChange={setFieldResetReady}
+          autoCloseOnComplete
         />
       )}
     </>

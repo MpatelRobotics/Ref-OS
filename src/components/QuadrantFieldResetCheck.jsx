@@ -63,7 +63,7 @@ const freshState = () => ({
   startedAt: Date.now(),
 });
 
-export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_KEY, matchLabel = "" }) {
+export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_KEY, matchLabel = "", onReadyChange, autoCloseOnComplete = false }) {
   const [active, setActive] = useState(0);
   const [showReference, setShowReference] = useState(false);
   const [showQuadrantOverview, setShowQuadrantOverview] = useState(false);
@@ -112,10 +112,23 @@ export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_
 
   const verify = () => {
     if (!allChecks) return;
-    setState(prev => ({
-      ...prev,
-      quadrants: prev.quadrants.map((item, qi) => qi === active ? { ...item, verifiedAt: Date.now() } : item),
-    }));
+    const now = Date.now();
+    const nextState = {
+      ...state,
+      quadrants: state.quadrants.map((item, qi) => qi === active ? { ...item, verifiedAt: now } : item),
+    };
+    setState(nextState);
+
+    const nowReady = nextState.quadrants.every(item => !!item.verifiedAt);
+    if (nowReady) {
+      // Persist immediately before an optional auto-close unmounts the checker.
+      try { localStorage.setItem(storageKey, JSON.stringify(nextState)); } catch {}
+      onReadyChange?.(true);
+      if (autoCloseOnComplete) {
+        requestAnimationFrame(() => onClose?.());
+        return;
+      }
+    }
 
     // Move directly into the next quadrant so field resetters can keep working
     // without scrolling back to the quadrant tabs after every verification.
@@ -132,7 +145,10 @@ export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_
 
   const reset = () => {
     if (!window.confirm("Reset all four quadrant checks for the next field reset?")) return;
-    setState(freshState());
+    const nextState = freshState();
+    setState(nextState);
+    try { localStorage.setItem(storageKey, JSON.stringify(nextState)); } catch {}
+    onReadyChange?.(false);
     setActive(0);
   };
 
