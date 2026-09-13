@@ -23,14 +23,14 @@ function nms(items, threshold=.42) {
 export default function LiveFieldSetupCheck({ onClose }) {
   const videoRef=useRef(null), streamRef=useRef(null), canvasRef=useRef(null), sessionRef=useRef(null), busyRef=useRef(false);
   const [error,setError]=useState(""), [ready,setReady]=useState(false), [modelReady,setModelReady]=useState(false);
-  const [detections,setDetections]=useState([]), [threshold,setThreshold]=useState(.65), [fps,setFps]=useState(0);
+  const [detections,setDetections]=useState([]), [threshold,setThreshold]=useState(.65), [fps,setFps]=useState(0), [videoMetrics,setVideoMetrics]=useState({w:0,h:0});
 
   async function startCamera() {
     setError(""); setReady(false);
     try {
       streamRef.current?.getTracks?.().forEach(t=>t.stop());
       const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}},audio:false});
-      streamRef.current=stream; videoRef.current.srcObject=stream; await videoRef.current.play(); setReady(true);
+      streamRef.current=stream; videoRef.current.srcObject=stream; await videoRef.current.play(); setVideoMetrics({w:videoRef.current.videoWidth||0,h:videoRef.current.videoHeight||0}); setReady(true);
     } catch(e) { setError(e?.message || "Camera access failed."); }
   }
 
@@ -57,7 +57,11 @@ export default function LiveFieldSetupCheck({ onClose }) {
       busyRef.current=true; const started=performance.now();
       try {
         c.width=SIZE;c.height=SIZE; const ctx=c.getContext("2d",{willReadFrequently:true});
-        ctx.drawImage(v,0,0,SIZE,SIZE); const px=ctx.getImageData(0,0,SIZE,SIZE).data;
+        ctx.fillStyle="#000"; ctx.fillRect(0,0,SIZE,SIZE);
+        const vw=v.videoWidth||1280, vh=v.videoHeight||720;
+        const scale=Math.min(SIZE/vw,SIZE/vh);
+        const dw=vw*scale, dh=vh*scale, dx=(SIZE-dw)/2, dy=(SIZE-dh)/2;
+        ctx.drawImage(v,0,0,vw,vh,dx,dy,dw,dh); const px=ctx.getImageData(0,0,SIZE,SIZE).data;
         const input=new Float32Array(3*SIZE*SIZE);
         for(let i=0;i<SIZE*SIZE;i++){ input[i]=px[i*4]/255; input[SIZE*SIZE+i]=px[i*4+1]/255; input[2*SIZE*SIZE+i]=px[i*4+2]/255; }
         const feeds={}; feeds[s.inputNames[0]]=new ort.Tensor("float32",input,[1,3,SIZE,SIZE]);
@@ -79,11 +83,17 @@ export default function LiveFieldSetupCheck({ onClose }) {
           const score=obj*cp;
           if(score<threshold) continue;
 
-          const cx=(sigmoid(d[5*stride+idx])+x)/W;
-          const cy=(sigmoid(d[6*stride+idx])+y)/H;
-          const bw=Math.min(1,sigmoid(d[7*stride+idx]));
-          const bh=Math.min(1,sigmoid(d[8*stride+idx]));
-          found.push({classId:cid,label:CLASSES[cid],score,x1:Math.max(0,cx-bw/2),y1:Math.max(0,cy-bh/2),x2:Math.min(1,cx+bw/2),y2:Math.min(1,cy+bh/2)});
+          const mcx=(sigmoid(d[5*stride+idx])+x)/W;
+          const mcy=(sigmoid(d[6*stride+idx])+y)/H;
+          const mbw=Math.min(1,sigmoid(d[7*stride+idx]));
+          const mbh=Math.min(1,sigmoid(d[8*stride+idx]));
+
+          const mx1=(mcx-mbw/2)*SIZE, my1=(mcy-mbh/2)*SIZE, mx2=(mcx+mbw/2)*SIZE, my2=(mcy+mbh/2)*SIZE;
+          const ix1=Math.max(dx,Math.min(dx+dw,mx1)), iy1=Math.max(dy,Math.min(dy+dh,my1));
+          const ix2=Math.max(dx,Math.min(dx+dw,mx2)), iy2=Math.max(dy,Math.min(dy+dh,my2));
+          if(ix2<=ix1 || iy2<=iy1) continue;
+          const x1=(ix1-dx)/dw, y1=(iy1-dy)/dh, x2=(ix2-dx)/dw, y2=(iy2-dy)/dh;
+          found.push({classId:cid,label:CLASSES[cid],score,x1,y1,x2,y2});
         }
         setDetections(nms(found)); setFps(1000/Math.max(1,performance.now()-started));
       } catch(e){ setError(`Detection error: ${e?.message||e}`); }
@@ -99,11 +109,14 @@ export default function LiveFieldSetupCheck({ onClose }) {
       <button onClick={onClose} className="p-2" aria-label="Close"><X size={22}/></button>
     </div>
     <div className="relative flex-1 min-h-0 overflow-hidden bg-black">
-      <video ref={videoRef} playsInline muted className="absolute inset-0 w-full h-full object-fill"/>
-      {detections.map((d,i)=><div key={`${d.classId}-${i}`} className="absolute border-2 border-emerald-400 pointer-events-none"
-        style={{left:`${d.x1*100}%`,top:`${d.y1*100}%`,width:`${(d.x2-d.x1)*100}%`,height:`${(d.y2-d.y1)*100}%`}}>
+      <video ref={videoRef} playsInline muted onLoadedMetadata={()=>setVideoMetrics({w:videoRef.current?.videoWidth||0,h:videoRef.current?.videoHeight||0})} className="absolute inset-0 w-full h-full object-contain bg-black"/>
+      {detections.map((d,i)=>{
+        const cw=videoRef.current?.clientWidth||1, ch=videoRef.current?.clientHeight||1, vw=videoMetrics.w||16, vh=videoMetrics.h||9;
+        const rs=Math.min(cw/vw,ch/vh), rw=vw*rs, rh=vh*rs, ox=(cw-rw)/2, oy=(ch-rh)/2;
+        return <div key={`${d.classId}-${i}`} className="absolute border-2 border-emerald-400 pointer-events-none"
+        style={{left:`${ox+d.x1*rw}px`,top:`${oy+d.y1*rh}px`,width:`${(d.x2-d.x1)*rw}px`,height:`${(d.y2-d.y1)*rh}px`}}>
         <div className="absolute left-0 -top-6 bg-emerald-500 text-black text-[11px] font-bold px-1.5 py-1 whitespace-nowrap">{d.label.toUpperCase()} {Math.round(d.score*100)}%</div>
-      </div>)}
+      </div>})}
       <div className="absolute left-3 top-3 bg-black/80 px-2.5 py-1.5 rounded-md text-xs font-bold">
         {ready?"CAMERA ✓":"CAMERA…"} • {modelReady?"MODEL ✓":"MODEL…"} • {detections.length} objects • {fps.toFixed(1)} FPS
       </div>
