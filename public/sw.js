@@ -1,4 +1,4 @@
-const CACHE = "refos-v26-1.2.0-highlander-match-field-ready";
+const CACHE = "refos-v21-1.2.0-highlander-no-camera-checker";
 
 const APP_SHELL = [
   "/models/refos_tiny_detector.onnx",

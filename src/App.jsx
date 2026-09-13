@@ -11,7 +11,6 @@ import * as outbox from "./outbox";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { APP_VERSION } from "./appVersion";
 import CommandCenter from "./components/CommandCenter.jsx";
-import LiveFieldSetupCheck from "./components/LiveFieldSetupCheck.jsx";
 import QuadrantFieldResetCheck from "./components/QuadrantFieldResetCheck.jsx";
 import EventContactDirectory from "./components/EventContactDirectory.jsx";
 import LoginScreen from "./auth/LoginScreen.jsx";
@@ -618,7 +617,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showCountdownSetup, setShowCountdownSetup] = useState(false);
   const [showOfflineTest, setShowOfflineTest] = useState(false);
   const [showCommandCenter, setShowCommandCenter] = useState(false);
-  const [showLiveFieldSetupCheck, setShowLiveFieldSetupCheck] = useState(false);
   const [showQuadrantFieldResetCheck, setShowQuadrantFieldResetCheck] = useState(false);
   const [showContactDirectory, setShowContactDirectory] = useState(false);
   const [showPreEventTest, setShowPreEventTest] = useState(false);
@@ -2352,14 +2350,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                     <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400">TEST</span>
                   </button>
                   {adminUnlocked && (
-                    <button
-                      onClick={() => { setMenu(false); setShowLiveFieldSetupCheck(true); }}
-                      className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"
-                    >
-                      <Camera size={16} />
-                      Live Field Setup Check
-                      <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400">TEST</span>
-                    </button>
+                    
                   )}
                 </>
                 <div className="refos-menu-section">Access</div>
@@ -2733,8 +2724,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onClearData={() => { setShowCommandCenter(false); setShowClear(true); }}
         onClose={() => setShowCommandCenter(false)} />}
       {showQuadrantFieldResetCheck && <QuadrantFieldResetCheck onClose={() => setShowQuadrantFieldResetCheck(false)} />}
-      {showLiveFieldSetupCheck && adminUnlocked && <LiveFieldSetupCheck onClose={() => setShowLiveFieldSetupCheck(false)} />}
-      {showAnnouncement && adminUnlocked && <AnnouncementModal onClose={() => setShowAnnouncement(false)} onSend={sendAnnouncement} />}
+{showAnnouncement && adminUnlocked && <AnnouncementModal onClose={() => setShowAnnouncement(false)} onSend={sendAnnouncement} />}
       {showFeatures && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
           <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
