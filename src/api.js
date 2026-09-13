@@ -419,6 +419,66 @@ export async function deleteFieldLog(id) {
   if (error) throw error;
 }
 
+
+/* ================= shared field reset status ================= */
+const mapFieldResetStatus = (r) => r ? ({
+  eventId: r.event_id,
+  matchId: r.match_id || "",
+  matchRef: r.match_ref || "",
+  state: r.state || null,
+  verifiedBy: r.verified_by || "",
+  verifiedAt: r.verified_at ? new Date(r.verified_at).getTime() : null,
+  updatedBy: r.updated_by || "",
+  updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : 0,
+}) : null;
+
+export async function getFieldResetStatus(eventId, matchId) {
+  if (E2E_MOCK) return null;
+  const { data, error } = await supabase
+    .from("field_reset_status")
+    .select("*")
+    .eq("event_id", eventId)
+    .eq("match_id", String(matchId))
+    .maybeSingle();
+  if (error) throw error;
+  return mapFieldResetStatus(data);
+}
+
+export async function upsertFieldResetStatus(eventId, matchId, status = {}) {
+  if (E2E_MOCK) return { eventId, matchId: String(matchId), ...status, updatedAt: Date.now() };
+  const row = {
+    event_id: eventId,
+    match_id: String(matchId),
+    match_ref: status.matchRef || null,
+    state: status.state || {},
+    verified_by: status.verifiedBy || null,
+    verified_at: status.verifiedAt ? new Date(status.verifiedAt).toISOString() : null,
+    updated_by: status.updatedBy || "",
+    updated_at: new Date().toISOString(),
+  };
+  const { data, error } = await supabase
+    .from("field_reset_status")
+    .upsert(row, { onConflict: "event_id,match_id" })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapFieldResetStatus(data);
+}
+
+export function subscribeFieldResetStatus(eventId, matchId, onChange) {
+  if (E2E_MOCK) return () => {};
+  const wanted = String(matchId);
+  const ch = supabase
+    .channel(`field-reset-${eventId}-${wanted}-${Math.random().toString(36).slice(2)}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "field_reset_status", filter: `event_id=eq.${eventId}` }, (payload) => {
+      const row = payload.new && Object.keys(payload.new).length ? payload.new : payload.old;
+      if (String(row?.match_id || "") !== wanted) return;
+      onChange?.(payload.eventType === "DELETE" ? null : mapFieldResetStatus(row));
+    })
+    .subscribe();
+  return () => supabase.removeChannel(ch);
+}
+
 /* ================= elimination alliances ================= */
 const mapAlliance = (r) => ({ seed: r.seed, teams: r.teams || [] });
 export async function listAlliances(eventId) {
@@ -622,6 +682,7 @@ export function subscribeEvent(eventId, onChange) {
     .on("postgres_changes", { event: "*", schema: "public", table: "watch_notes", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "field_log", filter: `event_id=eq.${eventId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "field_reset_status", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "event_settings", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "alliances", filter: `event_id=eq.${eventId}` }, onChange)
     .subscribe();

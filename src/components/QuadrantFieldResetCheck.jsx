@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, CheckCircle2, Circle, RotateCcw, ShieldCheck, MapPin, X, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { ChevronLeft, CheckCircle2, Circle, RotateCcw, ShieldCheck, MapPin, X, ZoomIn, ZoomOut, Maximize2, Cloud, CloudOff } from "lucide-react";
+import * as api from "../api";
 
 const STORAGE_KEY = "refos.experimental.quadrant-reset.v4";
 const CROP_BASE = "/field-setup/quadrant-crops";
@@ -59,20 +60,24 @@ const QUADRANTS = [
 ];
 
 const freshState = () => ({
-  quadrants: QUADRANTS.map(q => ({ checks: Array(q.items.length).fill(false), verifiedAt: null })),
+  quadrants: QUADRANTS.map(q => ({ checks: Array(q.items.length).fill(false), verifiedAt: null, verifiedBy: "" })),
   startedAt: Date.now(),
 });
 
-export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_KEY, matchLabel = "", onReadyChange, autoCloseOnComplete = false }) {
+const validState = (value) => !!(value?.quadrants?.length === 4 && value.quadrants.every((q, i) => q?.checks?.length === QUADRANTS[i].items.length));
+
+export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_KEY, matchLabel = "", onReadyChange, autoCloseOnComplete = false, eventId = "", matchId = "", meName = "" }) {
   const [active, setActive] = useState(0);
   const [showReference, setShowReference] = useState(false);
   const [showQuadrantOverview, setShowQuadrantOverview] = useState(false);
   const [referenceZoom, setReferenceZoom] = useState(1);
   const contentRef = useRef(null);
+  const syncQueueRef = useRef(Promise.resolve());
+  const [sharedSync, setSharedSync] = useState(matchId ? "loading" : "local");
   const [state, setState] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
-      if (saved?.quadrants?.length === 4 && saved.quadrants.every((q, i) => q?.checks?.length === QUADRANTS[i].items.length)) return saved;
+      if (validState(saved)) return saved;
     } catch {}
     return freshState();
   });
@@ -80,6 +85,61 @@ export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_
   useEffect(() => {
     try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {}
   }, [state, storageKey]);
+
+  useEffect(() => {
+    if (!eventId || !matchId) { setSharedSync("local"); return undefined; }
+    let alive = true;
+    api.getFieldResetStatus(eventId, matchId).then((remote) => {
+      if (!alive) return;
+      if (validState(remote?.state)) {
+        setState(remote.state);
+        try { localStorage.setItem(storageKey, JSON.stringify(remote.state)); } catch {}
+      }
+      setSharedSync("synced");
+    }).catch((e) => {
+      console.warn("Shared field reset status unavailable", e);
+      if (alive) setSharedSync("error");
+    });
+    const unsub = api.subscribeFieldResetStatus(eventId, matchId, (remote) => {
+      if (!alive || !validState(remote?.state)) return;
+      setState(remote.state);
+      try { localStorage.setItem(storageKey, JSON.stringify(remote.state)); } catch {}
+      setSharedSync("synced");
+      const ready = remote.state.quadrants.every((item) => !!item.verifiedAt);
+      onReadyChange?.(ready, { verifiedBy: remote.verifiedBy || "", verifiedAt: remote.verifiedAt || null });
+    });
+    return () => { alive = false; unsub?.(); };
+  }, [eventId, matchId, storageKey]);
+
+  const pushShared = (nextState, finalVerifier = "") => {
+    if (!eventId || !matchId) return Promise.resolve(null);
+    const ready = nextState.quadrants.every((item) => !!item.verifiedAt);
+    const times = nextState.quadrants.map((item) => Number(item.verifiedAt) || 0);
+    const latestAt = ready ? Math.max(...times) : null;
+    const lastQuadrant = ready ? nextState.quadrants[times.indexOf(latestAt)] : null;
+    const verifiedBy = ready ? (finalVerifier || lastQuadrant?.verifiedBy || meName || "") : "";
+    setSharedSync("syncing");
+    syncQueueRef.current = syncQueueRef.current
+      .then(() => api.upsertFieldResetStatus(eventId, matchId, {
+        matchRef: matchLabel, state: nextState, verifiedBy, verifiedAt: latestAt, updatedBy: meName || "",
+      }))
+      .then((saved) => {
+        setSharedSync("synced");
+        onReadyChange?.(ready, { verifiedBy: saved?.verifiedBy || verifiedBy, verifiedAt: saved?.verifiedAt || latestAt });
+      })
+      .catch((e) => {
+        console.warn("Could not sync field reset status", e);
+        setSharedSync("error");
+        return null;
+      });
+    return syncQueueRef.current;
+  };
+
+  const commitState = (nextState, finalVerifier = "") => {
+    setState(nextState);
+    try { localStorage.setItem(storageKey, JSON.stringify(nextState)); } catch {}
+    return pushShared(nextState, finalVerifier);
+  };
 
   const verifiedCount = useMemo(() => state.quadrants.filter(q => q.verifiedAt).length, [state]);
   const allReady = verifiedCount === 4;
@@ -89,41 +149,46 @@ export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_
   const checkedCount = q.checks.filter(Boolean).length;
 
   const toggleCheck = (idx) => {
-    setState(prev => ({
-      ...prev,
-      quadrants: prev.quadrants.map((item, qi) => qi !== active ? item : {
+    const nextState = {
+      ...state,
+      quadrants: state.quadrants.map((item, qi) => qi !== active ? item : {
         ...item,
         checks: item.checks.map((v, ci) => ci === idx ? !v : v),
         verifiedAt: null,
+        verifiedBy: "",
       }),
-    }));
+    };
+    commitState(nextState);
   };
 
   const setAllChecks = (value) => {
-    setState(prev => ({
-      ...prev,
-      quadrants: prev.quadrants.map((item, qi) => qi !== active ? item : {
+    const nextState = {
+      ...state,
+      quadrants: state.quadrants.map((item, qi) => qi !== active ? item : {
         ...item,
         checks: item.checks.map(() => value),
         verifiedAt: null,
+        verifiedBy: "",
       }),
-    }));
+    };
+    commitState(nextState);
   };
 
-  const verify = () => {
+  const verify = async () => {
     if (!allChecks) return;
     const now = Date.now();
     const nextState = {
       ...state,
-      quadrants: state.quadrants.map((item, qi) => qi === active ? { ...item, verifiedAt: now } : item),
+      quadrants: state.quadrants.map((item, qi) => qi === active ? { ...item, verifiedAt: now, verifiedBy: meName || "Ref" } : item),
     };
-    setState(nextState);
+    const syncPromise = commitState(nextState, meName || "Ref");
 
     const nowReady = nextState.quadrants.every(item => !!item.verifiedAt);
     if (nowReady) {
       // Persist immediately before an optional auto-close unmounts the checker.
       try { localStorage.setItem(storageKey, JSON.stringify(nextState)); } catch {}
-      onReadyChange?.(true);
+      onReadyChange?.(true, { verifiedBy: meName || "Ref", verifiedAt: now });
+      await syncPromise;
       if (autoCloseOnComplete) {
         requestAnimationFrame(() => onClose?.());
         return;
@@ -144,11 +209,13 @@ export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_
   };
 
   const reset = () => {
-    if (!window.confirm("Reset all four quadrant checks for the next field reset?")) return;
+    const warning = allReady
+      ? "This match is currently marked FIELD READY. Reset all four shared quadrant checks for the next field reset?"
+      : "Reset all shared quadrant checks for this match?";
+    if (!window.confirm(warning)) return;
     const nextState = freshState();
-    setState(nextState);
-    try { localStorage.setItem(storageKey, JSON.stringify(nextState)); } catch {}
-    onReadyChange?.(false);
+    commitState(nextState);
+    onReadyChange?.(false, { verifiedBy: "", verifiedAt: null });
     setActive(0);
   };
 
@@ -159,6 +226,7 @@ export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_
         <div className="min-w-0">
           <div className="font-bold leading-tight">Quadrant Field Reset Check{matchLabel ? ` • ${matchLabel}` : ""}</div>
           <div className="text-[11px] text-amber-700 dark:text-amber-300">EXPERIMENTAL • Position verification • Field oriented from Head Ref side</div>
+          {matchId && <div className={`text-[10px] flex items-center gap-1 mt-0.5 ${sharedSync === "error" ? "text-red-600 dark:text-red-400" : "text-emerald-700 dark:text-emerald-400"}`}>{sharedSync === "error" ? <CloudOff size={11} /> : <Cloud size={11} />} {sharedSync === "syncing" || sharedSync === "loading" ? "Syncing shared field reset…" : sharedSync === "error" ? "Shared sync unavailable • saved on this device" : "Shared across event devices"}</div>}
         </div>
         <button onClick={reset} className="ml-auto px-3 py-2 border border-slate-300 dark:border-slate-700 text-xs font-semibold flex items-center gap-1.5 bg-white dark:bg-transparent">
           <RotateCcw size={14} /> Reset
@@ -172,6 +240,7 @@ export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_
             <div>
               <div className={`font-black tracking-wide ${allReady ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}>{allReady ? "FIELD READY" : "FIELD NOT READY"}</div>
               <div className="text-xs text-slate-600 dark:text-slate-300">{verifiedCount}/4 quadrants verified{allReady ? "" : ` • ${4 - verifiedCount} remaining`}</div>
+              {allReady && <div className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-0.5">Verified by {state.quadrants.slice().sort((a,b) => (b.verifiedAt || 0) - (a.verifiedAt || 0))[0]?.verifiedBy || "Ref"} • {new Date(Math.max(...state.quadrants.map(item => item.verifiedAt || 0))).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div>}
             </div>
           </div>
         </div>
@@ -245,7 +314,7 @@ export default function QuadrantFieldResetCheck({ onClose, storageKey = STORAGE_
           ))}
         </div>
 
-        {q.verifiedAt && <div className="mt-3 text-xs text-emerald-700 dark:text-emerald-300">Quadrant {def.id} verified at {new Date(q.verifiedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.</div>}
+        {q.verifiedAt && <div className="mt-3 text-xs text-emerald-700 dark:text-emerald-300">Quadrant {def.id} verified by {q.verifiedBy || "Ref"} at {new Date(q.verifiedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.</div>}
       </div>
 
       {showQuadrantOverview && (

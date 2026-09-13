@@ -3513,24 +3513,49 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
   const [awpOpen, setAwpOpen] = useState(false);
   const [fieldResetOpen, setFieldResetOpen] = useState(false);
   const [fieldResetReady, setFieldResetReady] = useState(false);
+  const [fieldResetStatus, setFieldResetStatus] = useState(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!match?.id) {
       setFieldResetReady(false);
-      return;
+      setFieldResetStatus(null);
+      return undefined;
     }
-    try {
-      const saved = JSON.parse(localStorage.getItem(`refos-quadrant-field-reset-v1:${match.id}`) || "null");
-      setFieldResetReady(!!(saved?.quadrants?.length === 4 && saved.quadrants.every(q => !!q?.verifiedAt)));
-    } catch {
-      setFieldResetReady(false);
-    }
+    let alive = true;
+    const applyStatus = (remote) => {
+      if (!alive) return;
+      if (remote?.state?.quadrants?.length === 4) {
+        const ready = remote.state.quadrants.every((q) => !!q?.verifiedAt);
+        setFieldResetReady(ready);
+        setFieldResetStatus(remote);
+        try { localStorage.setItem(`refos-quadrant-field-reset-v1:${match.id}`, JSON.stringify(remote.state)); } catch {}
+        return;
+      }
+      try {
+        const saved = JSON.parse(localStorage.getItem(`refos-quadrant-field-reset-v1:${match.id}`) || "null");
+        const ready = !!(saved?.quadrants?.length === 4 && saved.quadrants.every(q => !!q?.verifiedAt));
+        setFieldResetReady(ready);
+        if (!ready) setFieldResetStatus(null);
+      } catch {
+        setFieldResetReady(false);
+        setFieldResetStatus(null);
+      }
+    };
+    api.getFieldResetStatus(EVENT_ID, match.id).then(applyStatus).catch(() => applyStatus(null));
+    const unsub = api.subscribeFieldResetStatus(EVENT_ID, match.id, applyStatus);
+    return () => { alive = false; unsub?.(); };
   }, [match?.id]);
 
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
   const m = match;
   const heading = m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`);
+  const fieldResetMeta = fieldResetReady && fieldResetStatus?.verifiedAt
+    ? `Verified by ${fieldResetStatus.verifiedBy || "Ref"} • ${new Date(fieldResetStatus.verifiedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+    : "";
+  const fieldResetProgress = fieldResetStatus?.state?.quadrants?.length === 4
+    ? fieldResetStatus.state.quadrants.filter((q) => !!q?.verifiedAt).length
+    : 0;
   const matchEntries = fieldLog.filter((e) => e.matchId === m.id).sort((a, b) => b.createdAt - a.createdAt);
   const replayEntry = matchEntries.find((e) => e.kind === "replay");
   const allTimeouts = fieldLog.filter((e) => e.kind === "timeout");
@@ -3658,12 +3683,17 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
         </div>
         {!isElim && <button onClick={() => { setAwpOpen((v) => !v); setToOpen(false); setFaultOpen(false); }} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${awpOpen ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"}`}><ClipboardCheck size={15} /> AWP check</button>}
         {!isElim && awpOpen && <AwpChecker onSave={(note) => onAddField({ kind: "awp", matchId: m.id, matchRef: heading, note })} />}
-        <button
-          onClick={() => setFieldResetOpen(true)}
-          className={`w-full mt-2 py-2.5 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${fieldResetReady ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"}`}
-        >
-          <CheckCircle2 size={15} /> {fieldResetReady ? "Field Ready ✓" : "Field Reset Check"} {!fieldResetReady && <span className="text-[10px] font-bold text-amber-500">EXPERIMENTAL</span>}
-        </button>
+        <div className="mt-2">
+          <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1 px-1">Field setup</div>
+          <button
+            onClick={() => setFieldResetOpen(true)}
+            className={`w-full py-2.5 rounded-lg border text-sm font-semibold flex flex-col items-center justify-center gap-0.5 ${fieldResetReady ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"}`}
+          >
+            <span className="flex items-center gap-1.5"><CheckCircle2 size={15} /> {fieldResetReady ? "Field Ready ✓" : "Field Reset Check"} {!fieldResetReady && <span className="text-[10px] font-bold text-amber-500">EXPERIMENTAL</span>}</span>
+            {fieldResetMeta && <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300">{fieldResetMeta}</span>}
+            {!fieldResetReady && fieldResetProgress > 0 && <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300">Shared progress • {fieldResetProgress}/4 quadrants verified</span>}
+          </button>
+        </div>
         {isElim && toOpen && (
           <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2">
             <div className="flex gap-2">
@@ -3700,12 +3730,17 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
         )}
       </div>)}
       {emcee && (
-        <button
-          onClick={() => setFieldResetOpen(true)}
-          className={`w-full mb-4 py-2.5 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${fieldResetReady ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"}`}
-        >
-          <CheckCircle2 size={15} /> {fieldResetReady ? "Field Ready ✓" : "Field Reset Check"} {!fieldResetReady && <span className="text-[10px] font-bold text-amber-500">EXPERIMENTAL</span>}
-        </button>
+        <div className="mb-4">
+          <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1 px-1">Field setup</div>
+          <button
+            onClick={() => setFieldResetOpen(true)}
+            className={`w-full py-2.5 rounded-lg border text-sm font-semibold flex flex-col items-center justify-center gap-0.5 ${fieldResetReady ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"}`}
+          >
+            <span className="flex items-center gap-1.5"><CheckCircle2 size={15} /> {fieldResetReady ? "Field Ready ✓" : "Field Reset Check"} {!fieldResetReady && <span className="text-[10px] font-bold text-amber-500">EXPERIMENTAL</span>}</span>
+            {fieldResetMeta && <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300">{fieldResetMeta}</span>}
+            {!fieldResetReady && fieldResetProgress > 0 && <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300">Shared progress • {fieldResetProgress}/4 quadrants verified</span>}
+          </button>
+        </div>
       )}
       {(() => {
         const inMatch = [...(match.red || []), ...(match.blue || [])].flatMap((n) => teamWatch[n] || []);
@@ -3734,7 +3769,13 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
           onClose={() => setFieldResetOpen(false)}
           storageKey={`refos-quadrant-field-reset-v1:${m.id}`}
           matchLabel={heading}
-          onReadyChange={setFieldResetReady}
+          eventId={EVENT_ID}
+          matchId={m.id}
+          meName={meName}
+          onReadyChange={(ready, meta = {}) => {
+            setFieldResetReady(ready);
+            setFieldResetStatus((cur) => ({ ...(cur || {}), verifiedBy: meta.verifiedBy || "", verifiedAt: meta.verifiedAt || null }));
+          }}
           autoCloseOnComplete
         />
       )}
@@ -5119,7 +5160,7 @@ function FeaturesGuide() {
     { icon: ListOrdered, title: "Match Tab", preview: "/feature-previews/match-tab.png", text: "Keep the active match and referee workflow together.", detail: "The Match tab gives referees a fast event day view of the schedule and the teams assigned to each match, with direct access to the actions they need while officiating.", bullets: ["Browse imported qualification and elimination matches", "See the teams assigned to each alliance", "Open match specific referee actions", "Flag matches for replay when needed", "Use the same match data across authorized devices"] },
     { icon: ShieldAlert, title: "Violation Tracking", preview: "/feature-previews/violation-tracking.png", text: "Log violations with one or multiple rules and review them consistently across the referee crew.", detail: "Violation Tracking creates a shared record of Minor, Major, and Inspection violations so Head Referees and field crews can make more consistent decisions throughout the event. A single violation can cite multiple rules at once without combining those rules into one record for reporting.", bullets: ["Record the team, match, severity, notes, and one or multiple cited rules", "Select multiple rules directly in the violation form", "Display every cited rule separately in the violation log", "Count each cited rule separately in Violations by Rule", "Attach supported photos to a violation", "Review a team's prior violation history"] },
     { icon: Clock, title: "AWP Checker", preview: "/feature-previews/awp-checker.png", text: "Record Autonomous Win Point checks without mixing them into violations.", detail: "The AWP Checker gives the referee crew a dedicated workflow for recording Autonomous Win Point observations and reviewing AWP information during qualification matches.", bullets: ["Record AWP checks by alliance", "Track the relevant autonomous conditions", "Keep AWP records separate from violations", "Review saved checks during the event", "Clear AWP data independently from Clear Data"] },
-    { icon: CheckCircle2, title: "Quadrant Field Reset Check", preview: "/feature-previews/quadrant-field-reset.png", text: "Verify the field reset quadrant by quadrant before the next match. Field is oriented from the Head Ref side.", detail: "The Quadrant Field Reset Check is oriented from the Head Ref side and gives the field crew a fast visual checklist for confirming that game objects are back in their correct starting positions. Each quadrant uses reference screenshots, supports Check All, advances automatically after verification, and shows Field Ready when all four quadrants are complete.", bullets: ["Verify Q1 through Q4 with position specific reference images", "Use Check All when an entire quadrant is already correct", "Automatically move to the next quadrant after verification", "Open and zoom the full field reference when needed", "Show Field Ready on the match once all four quadrants are verified"] },
+    { icon: CheckCircle2, title: "Quadrant Field Reset Check", preview: "/feature-previews/quadrant-field-reset.png", text: "Verify the field reset quadrant by quadrant before the next match. Field is oriented from the Head Ref side.", detail: "The Quadrant Field Reset Check is oriented from the Head Ref side and gives the field crew a shared visual checklist for confirming that game objects are back in their correct starting positions. Match progress syncs across event devices, records who completed the final verification and when, and keeps Field Ready separate from the AWP workflow.", bullets: ["Verify Q1 through Q4 with position specific reference images", "Share partial quadrant progress across event devices in real time", "Record the verifier name and time when the field becomes ready", "Require confirmation before resetting shared field setup progress", "Keep Field Ready visibly separate from the AWP check", "Use Check All and automatically advance to the next quadrant", "Open and zoom the full field reference when needed"] },
     { icon: Users, title: "Teams Tab", preview: "/feature-previews/teams-tab.png", text: "Search teams and review their Ref OS event history.", detail: "The Teams tab centralizes team information so referees can quickly find a team and review the records Ref OS has collected for it during the event.", bullets: ["Search the imported team roster", "Open individual team records", "Review violations associated with a team", "Use team information throughout referee workflows", "Keep the roster available to authorized devices"] },
     { icon: Bot, title: "Robots Tab", preview: "/feature-previews/robots-tab.png", text: "Keep robot information and inspection context easy to find.", detail: "The Robots tab gives the event crew a dedicated place to review robot related information without burying it inside team or violation screens.", bullets: ["Review robot records by team", "Keep robot photos and notes where supported", "Surface robot information during event operations", "Separate robot context from violation history", "Use the same records across Ref OS devices"] },
     { icon: BookOpen, title: "Rules", preview: "/feature-previews/rules.png", text: "Search the rules quickly during event day decisions.", detail: "The Rules workspace is built for fast lookup when a referee needs to verify a rule during a match, discussion, or Head Referee review.", bullets: ["Search by rule number or rule text", "Open relevant rules without leaving Ref OS", "Favorite frequently referenced rules", "Return to recently viewed rules quickly", "Keep supported rule content available during connectivity problems"] },
