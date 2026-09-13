@@ -1,4 +1,4 @@
-const CACHE = "refos-v23-1.2.0-highlander-scroll-top-button";
+const CACHE = "refos-v24-1.2.0-highlander-quadrant-light-mode";
 
 const APP_SHELL = [
   "/models/refos_tiny_detector.onnx",
