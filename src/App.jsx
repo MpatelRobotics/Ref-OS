@@ -296,7 +296,8 @@ const availablePhases = (event) => MATCH_PHASES.filter((p) => {
   return p.key in elimCounts(event.bracket);
 });
 
-const fmtRule = (code) => { const c = (code || "").trim().replace(/[<>]/g, "").toUpperCase(); return c ? `<${c}>` : "—"; };
+const splitRuleCodes = (code) => String(code || "").split("|").map((c) => c.trim().replace(/[<>]/g, "").toUpperCase()).filter(Boolean);
+const fmtRule = (code) => { const codes = splitRuleCodes(code); return codes.length ? codes.map((c) => `<${c}>`).join(" ") : "—"; };
 const fmtTime = (ts) => new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const ago = (ts) => {
   if (!ts) return "";
@@ -2970,8 +2971,13 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
   const [matchPhase, setMatchPhase] = useState((edit && edit.match?.phase) || (presetMatch?.phase) || (lastMatch?.phase || "qual"));
   const [matchNum, setMatchNum] = useState((edit && edit.match?.num) || (presetMatch && presetMatch.num != null ? String(presetMatch.num) : (lastMatch?.num || "")));
   const [type, setType] = useState((edit && edit.type) || "minor");
-  const [code, setCode] = useState((edit && edit.code) || "");
-  const [desc, setDesc] = useState((edit && edit.desc) || "");
+  const [selectedRules, setSelectedRules] = useState(() => {
+    const codes = splitRuleCodes((edit && edit.code) || "");
+    const descriptions = String((edit && edit.desc) || "").split(" | ");
+    return codes.map((c, i) => ({ code: c, desc: descriptions[i] || ruleBook[c] || knownRules[c] || "" }));
+  });
+  const code = selectedRules.map((r) => r.code).join(" | ");
+  const desc = selectedRules.map((r) => r.desc).filter(Boolean).join(" | ");
   const [notes, setNotes] = useState((edit && edit.notes) || "");
   const [photos, setPhotos] = useState([]);
   const [keepKeys, setKeepKeys] = useState((edit && edit.photoKeys) || []);
@@ -2980,7 +2986,6 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
   const fileRef = useRef(null);
   const T = TYPES[type];
 
-  const onCode = (val) => { setCode(val); const clean = normNum(val).replace(/[<>]/g, ""); const d = ruleBook[clean] || knownRules[clean]; if (d && !desc) setDesc(d); };
   const addPhotos = async (files) => { const list = Array.from(files).slice(0, 4); const out = []; for (const f of list) { try { out.push(await compress(f)); } catch {} } setPhotos((p) => [...p, ...out].slice(0, 6)); };
   const valid = (creatingNew ? newNumber.trim() : team) && (code.trim() || desc.trim());
   const doSave = async () => {
@@ -2995,19 +3000,19 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
   const submit = async () => {
     if (!valid || busy) return;
     const selectedTeam = normNum(creatingNew ? newNumber : team);
-    const selectedRule = normNum(code).replace(/[<>]/g, "");
-    // duplicate guard (all users): same team + rule + match already logged
-    if (!edit && selectedTeam && selectedRule) {
+    const selectedRuleCodes = splitRuleCodes(code);
+    // duplicate guard (all users): same team + any selected rule + match already logged
+    if (!edit && selectedTeam && selectedRuleCodes.length) {
       const myKey = matchPhase !== "none" && matchNum ? `${matchPhase}:${matchNum}` : "";
-      const dup = (viols || []).some((v) => {
+      const duplicateCodes = selectedRuleCodes.filter((selectedRule) => (viols || []).some((v) => {
         if (normNum(v.team) !== selectedTeam) return false;
-        if (normNum(v.code).replace(/[<>]/g, "") !== selectedRule) return false;
+        if (!splitRuleCodes(v.code).includes(selectedRule)) return false;
         const vKey = v.match && v.match.phase && v.match.phase !== "none" && v.match.num ? `${v.match.phase}:${v.match.num}` : "";
         return vKey === myKey;
-      });
-      if (dup) {
+      }));
+      if (duplicateCodes.length) {
         const where = myKey ? ` in ${fmtMatch({ phase: matchPhase, num: matchNum })}` : "";
-        if (!window.confirm(`Possible duplicate — ${selectedTeam} already has ${fmtRule(selectedRule)}${where} logged. Add it again anyway?`)) return;
+        if (!window.confirm(`Possible duplicate — ${selectedTeam} already has ${fmtRule(duplicateCodes.join(" | "))}${where} logged. Add it again anyway?`)) return;
       }
     }
     await doSave();
@@ -3111,16 +3116,21 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
           </div>
 
           <div>
-            <Label>Rule cited</Label>
-            <div className="flex gap-2 items-start">
+            <Label>Rules cited</Label>
+            <div className="space-y-2">
+              {selectedRules.map((r) => (
+                <div key={r.code} className="flex items-start gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2">
+                  <span className="font-mono font-semibold text-slate-900 dark:text-slate-100 shrink-0">{fmtRule(r.code)}</span>
+                  <span className="text-sm text-slate-500 dark:text-slate-400 flex-1">{r.desc || "Custom rule"}</span>
+                  <button type="button" onClick={() => setSelectedRules((rs) => rs.filter((x) => x.code !== r.code))} className="text-slate-400 hover:text-red-600" title="Remove rule"><X size={16} /></button>
+                </div>
+              ))}
               <button type="button" onClick={() => setShowRulePicker(true)}
-                className="w-28 shrink-0 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono text-left hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300">
-                {code ? <span className="text-slate-900 dark:text-slate-100 font-semibold">{fmtRule(code)}</span> : <span className="text-slate-400 font-sans">Rule…</span>}
+                className="w-full px-3 py-2.5 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:border-slate-400">
+                + {selectedRules.length ? "Add another rule" : "Select rule"}
               </button>
-              <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What the rule covers" rows={2}
-                className="flex-1 min-w-0 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm leading-snug resize-y focus:outline-none focus:ring-2 focus:ring-slate-300" />
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">Tap the box to pick a rule — search by code or description.</p>
+            <p className="text-[11px] text-slate-400 mt-1">Select every rule that applies to this violation. Tap × to remove one.</p>
           </div>
 
           <div>
@@ -3156,8 +3166,8 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
       </div>
       {showRulePicker && (
         <RulePicker rules={rules} knownRules={knownRules}
-          onPickRule={(c, d) => { setCode(c); setDesc(d || ""); setShowRulePicker(false); }}
-          onPickCustom={(c) => { setCode(c); setShowRulePicker(false); }}
+          onPickRule={(c, d) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs : [...rs, { code: clean, desc: d || ruleBook[clean] || knownRules[clean] || "" }]); setShowRulePicker(false); }}
+          onPickCustom={(c) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs : [...rs, { code: clean, desc: ruleBook[clean] || knownRules[clean] || "" }]); setShowRulePicker(false); }}
           onClose={() => setShowRulePicker(false)} />
       )}
     </div>
