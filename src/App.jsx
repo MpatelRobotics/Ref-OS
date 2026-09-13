@@ -5116,11 +5116,11 @@ function FeaturesGuide() {
         <div className="relative max-w-2xl">
           <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-red-300 mb-2">Ref OS 1.2.0 • Highlander Release</div>
           <h2 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">Everything your event crew needs, in one place.</h2>
-          <p className="mt-3 text-sm sm:text-base text-slate-300 leading-relaxed max-w-xl">Built specifically for VEX event operations. Ref OS keeps referees, Judge Advisors, Emcees, and Admins working from the same event data across phones, tablets, and laptops.</p>
+          <p className="mt-3 text-sm sm:text-base text-slate-300 leading-relaxed max-w-xl">Built specifically for VEX event operations. Ref OS keeps Referees, Judge Advisors, Emcees, and Admins working from the same event data across phones, tablets, and laptops.</p>
           <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
-            <span className="px-3 py-1.5 rounded-md bg-white/10 border border-white/10">Offline capable</span>
-            <span className="px-3 py-1.5 rounded-md bg-white/10 border border-white/10">Role based</span>
-            <span className="px-3 py-1.5 rounded-md bg-white/10 border border-white/10">Realtime sync</span>
+            <span className="px-3 py-1.5 rounded-md bg-white/10 border border-white/10">Offline Capable</span>
+            <span className="px-3 py-1.5 rounded-md bg-white/10 border border-white/10">Role Based</span>
+            <span className="px-3 py-1.5 rounded-md bg-white/10 border border-white/10">Real Time Sync</span>
             <span className="px-3 py-1.5 rounded-md bg-white/10 border border-white/10">Installable PWA</span>
           </div>
         </div>
