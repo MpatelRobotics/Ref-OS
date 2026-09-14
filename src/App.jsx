@@ -2278,11 +2278,12 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       || a.number.localeCompare(b.number, undefined, { numeric: true }));
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-700 font-sans text-slate-800 dark:text-slate-100 antialiased">
-      <header className="sticky top-0 z-20 bg-[#0D0F32] text-white border-b border-white/10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+    <div className="refos-shell min-h-screen font-sans antialiased">
+      <a className="refos-skip" href="#workspace">Skip to workspace</a>
+      <header className="refos-header sticky top-0 z-20 text-white">
+        <div className="refos-header-inner mx-auto px-4 py-3 flex items-center gap-3">
           {(openTeam || openMatch || openRobot) ? (
-            <button onClick={() => { setOpenTeam(null); setOpenMatch(null); setOpenRobot(null); }} className="p-1 -ml-1 rounded hover:bg-white/10"><ChevronLeft size={22} /></button>
+            <button onClick={() => { setOpenTeam(null); setOpenMatch(null); setOpenRobot(null); }} aria-label="Back to workspace" className="p-1 -ml-1 rounded hover:bg-white/10"><ChevronLeft size={22} /></button>
           ) : (
             <div className="flex items-center gap-2 shrink-0">
               <img src="/logo.svg" alt="Highlander Summit" className="h-9 w-9 object-contain" />
@@ -2412,14 +2413,14 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           const ActiveIcon = active?.Icon || Menu;
           return (
             <>
-              <div className="max-w-2xl mx-auto px-4 hidden sm:flex gap-1 overflow-x-auto">
+              <nav aria-label="Main navigation" className="refos-desktop-nav hidden sm:flex">
                 {navItems.map(({ k, label, Icon }) => (
-                  <button key={k} onClick={() => { setView(k); setQuery(""); }}
+                  <button key={k} aria-current={view === k ? "page" : undefined} onClick={() => { setView(k); setQuery(""); }}
                     className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
                     <Icon size={15} /> {label}
                   </button>
                 ))}
-              </div>
+              </nav>
               <div className="sm:hidden max-w-2xl mx-auto px-4 pb-2">
                 <button onClick={() => setMobileNavOpen(true)}
                   className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2.5 flex items-center gap-2 text-white">
@@ -2503,7 +2504,17 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           </div>
         </div>
       )}
-      <main className="max-w-2xl mx-auto px-4 pb-28 pt-4">
+      <main id="workspace" tabIndex={-1} className="refos-workspace mx-auto px-4 pb-28 pt-4">
+        {!openTeam && !openMatch && !openRobot && <section className="refos-page-heading" aria-label="Workspace overview">
+          <div><p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: "Alliance selection"}[view] || "Event workspace"}</h2>
+          <p className="refos-description">{{teams: "Find a team. Review its history. Keep your crew informed.", matches: "Your schedule, field activity, and match details in one place.", robots: "A shared visual reference for every robot.", judging: "Capture the moments that deserve recognition.", rulebook: "Find the right rule when you need it.", awp: "Review autonomous observations across the event.", alliances: "Follow the path from selection to the final."}[view]}</p></div>
+          <span className="refos-role">{adminUnlocked ? "Admin" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
+        </section>}
+        {!openTeam && !openMatch && !openRobot && view === "teams" && <dl className="refos-stats">
+          <div><dt>Event roster</dt><dd>{teams.length}<span> teams</span></dd></div>
+          <div><dt>Match schedule</dt><dd>{Object.keys(matches).length}<span> matches</span></dd></div>
+          {!isJudge && !isEmcee && <div><dt>Shared log</dt><dd>{viols.length}<span> entries</span></dd></div>}
+        </dl>}
         {openTeam ? (
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={teamRecords[openTeam]}
             onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
@@ -2548,7 +2559,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             <div className="flex gap-2 mb-4">
               <div className="relative flex-1">
                 <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search team #"
+                <input value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search teams by number or name" placeholder="Search team #"
                   className="w-full pl-9 pr-3 py-2.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
               </div>
               <button onClick={() => setShowTeamScanner(true)} className="px-3 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Camera size={17} /> Scan</button>
@@ -2557,7 +2568,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             {filteredTeams.length === 0 ? (
               <Empty title={teams.length ? "No matches" : "No teams yet"} sub={teams.length ? "Try a different team number." : "Add a team, or just log a violation and the team is created for you."} />
             ) : (
-              <ul className="space-y-2">
+              <ul className="refos-team-list space-y-2">
                 {filteredTeams.map((t) => {
                   const c = countsByTeam[t.number] || { total: 0 };
                   return (
@@ -4398,7 +4409,7 @@ function RobotList({ teams, query, setQuery, onOpen }) {
       <p className="text-xs text-slate-400 mb-3">{withPhotos} of {teams.length} teams have a robot photo. Tap a team to add inspection photos.</p>
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search team #"
+        <input value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search teams by number or name" placeholder="Search team #"
           className="w-full pl-9 pr-3 py-2.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
       </div>
       {filtered.length === 0 ? (

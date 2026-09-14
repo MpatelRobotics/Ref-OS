@@ -128,52 +128,61 @@ button:active:not(:disabled) {
   }
 }
 
-/* Highlander Release visual system
-   Deliberately flatter and more utilitarian than a generic SaaS card UI. */
-:root {
-  --refos-surface: #ffffff;
-  --refos-page: #f3f4f6;
-  --refos-border: #d7dce3;
-}
-body {
-  background: var(--refos-page);
-}
 
-/* Keep the interface compact and operational. */
-.rounded-xl { border-radius: 0.5rem !important; }
-.rounded-2xl { border-radius: 0.625rem !important; }
-.shadow-xl { box-shadow: 0 8px 20px rgb(15 23 42 / 0.12) !important; }
-.shadow-2xl { box-shadow: 0 10px 26px rgb(15 23 42 / 0.16) !important; }
-
-/* Cards read as records and controls, not floating tiles. */
-main .bg-white.border,
-main .dark\\:bg-slate-800.border {
-  box-shadow: none;
+/* Ref-OS workspace system: navy structure, neutral surfaces, semantic status. */
+:root { --ref-bg:#f3f5f8; --ref-surface:#fff; --ref-text:#17243a; --ref-muted:#526176; --ref-border:#d9e1eb; --ref-accent:#1d4ed8; --ref-navy:#101d33; }
+.dark { --ref-bg:#101827; --ref-surface:#1a2638; --ref-text:#eef3fb; --ref-muted:#afbdd0; --ref-border:#3d4d64; --ref-accent:#93c5fd; }
+body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
+.refos-shell { background:var(--ref-bg); color:var(--ref-text); }
+.refos-header { background:var(--ref-navy); border-bottom:1px solid #33425b; box-shadow:0 2px 8px #0f172a12; }
+.refos-header-inner { max-width:1120px; min-height:88px; }
+.refos-header button { min-height:32px; }
+.refos-header button[title='Settings'],.refos-header button[title='By rule'],.refos-header button[aria-label='Back to workspace'] { min-width:44px; min-height:44px; }
+.refos-workspace { max-width:1056px; padding-top:32px; }
+.refos-page-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:28px; }
+.refos-eyebrow { color:var(--ref-muted); font-size:11px; letter-spacing:.16em; font-weight:750; margin-bottom:8px; }
+.refos-page-heading h2 { font-size:clamp(1.6rem,3vw,2.2rem); letter-spacing:-.035em; font-weight:750; line-height:1.15; }
+.refos-description { color:var(--ref-muted); font-size:14px; line-height:1.6; margin-top:10px; max-width:560px; }
+.refos-role { border:1px solid var(--ref-border); border-radius:8px; padding:7px 12px; background:var(--ref-surface); color:var(--ref-muted); font-size:12px; font-weight:650; white-space:nowrap; }
+.refos-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-bottom:28px; }
+.refos-stats>div { background:var(--ref-surface); border:1px solid var(--ref-border); border-radius:14px; padding:20px; }
+.refos-stats dt { color:var(--ref-muted); font-size:12px; font-weight:650; }
+.refos-stats dd { font-size:30px; font-weight:750; margin-top:8px; font-variant-numeric:tabular-nums; }
+.refos-stats dd span { font-size:12px; font-weight:500; color:var(--ref-muted); }
+.refos-desktop-nav { max-width:1056px; margin:auto; gap:6px; padding:0 16px; }
+.refos-desktop-nav button { min-height:48px; }
+.refos-desktop-nav button[aria-current='page'] { border-color:#60a5fa; background:#ffffff12; }
+.refos-team-list>li>button { min-height:80px; border-color:var(--ref-border); border-radius:14px; padding:20px; flex-wrap:wrap; gap:12px; background:var(--ref-surface); }
+.refos-team-list>li>button:hover { border-color:var(--ref-accent); box-shadow:0 3px 12px #0f172a0a; }
+.refos-team-list .text-slate-300 { color:var(--ref-muted); }
+.refos-workspace input:not([type=checkbox]):not([type=radio]),.refos-workspace select { min-height:46px; }
+.refos-shell main button { min-height:44px; }
+.refos-shell :is(button,input,select,textarea):focus-visible { outline:3px solid var(--ref-accent); outline-offset:3px; }
+.refos-header :is(button,a):focus-visible { outline-color:#93c5fd; }
+.refos-skip { position:fixed; left:16px; top:-100px; z-index:200; background:white; color:#17243a; padding:12px 20px; border-radius:8px; }
+.refos-skip:focus { top:16px; }
+#workspace { scroll-margin-top:180px; }
+@media(min-width:1100px) {
+ .refos-shell { padding-left:232px; }
+ .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav { position:fixed; left:0; top:0; bottom:0; width:232px; flex-direction:column; padding:126px 18px 24px; background:var(--ref-navy); border-right:1px solid #33425b; gap:8px; }
+ .refos-desktop-nav::before { content:'REF-OS'; position:absolute; top:34px; left:30px; font-size:24px; font-weight:800; letter-spacing:.04em; color:#fff; }
+ .refos-desktop-nav::after { content:'EVENT NAVIGATION'; position:absolute; top:91px; left:30px; font-size:10px; letter-spacing:.15em; color:#afbdd0; font-weight:650; }
+ .refos-desktop-nav button { border:0; border-radius:10px; padding:14px; gap:12px; text-align:left; color:#afbdd0; }
+ .refos-desktop-nav button[aria-current='page'] { color:white; background:#23406a; box-shadow:inset 3px 0 #93c5fd; }
+ .refos-shell:not(:has(.refos-desktop-nav)) { padding-left:0; }
+ .refos-workspace { padding-left:32px; padding-right:32px; }
 }
-
-/* Menus and modals use a restrained enterprise-style edge treatment. */
-.refos-menu-pop,
-.refos-modal-panel {
-  border-radius: 0.5rem !important;
+@media(max-width:639px) {
+ .refos-header-inner { min-height:76px; gap:8px; }
+ .refos-workspace { padding-top:24px; }
+ .refos-page-heading { margin-bottom:20px; }
+ .refos-description { font-size:13px; }
+ .refos-stats { gap:8px; margin-bottom:20px; }
+ .refos-stats>div { padding:12px; border-radius:12px; }
+ .refos-stats dd { font-size:24px; }
+ .refos-stats dd span { display:block; }
+ .refos-stats dt { font-size:11px; }
+ .refos-team-list>li>button { padding:16px; }
+ .refos-shell>button.fixed { bottom:calc(20px + env(safe-area-inset-bottom)); }
 }
-.refos-menu-pop {
-  box-shadow: 0 8px 20px rgb(15 23 42 / 0.14) !important;
-}
-
-/* Smaller motion footprint for an event operations tool. */
-@keyframes refosMenuIn {
-  from { opacity: 0; transform: translateY(-3px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes refosModalIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-button:active:not(:disabled) { transform: none; }
-
-/* Tighten helper copy so primary data has more visual weight. */
-.refos-menu-section {
-  font-size: 0.62rem;
-  letter-spacing: 0.075em;
-  font-weight: 700;
-}
+@media(prefers-reduced-motion:reduce) { .refos-shell *, .refos-shell *::before, .refos-shell *::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; } }
