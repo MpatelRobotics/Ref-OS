@@ -122,7 +122,3 @@ src/
 supabase/schema.sql   run once in the Supabase SQL editor
 .env.example          copy to .env and fill in
 ```
-
-## Release Freeze
-
-Ref OS 1.2.0 Highlander Release was frozen for event use on September 13, 2026. Feature changes should be deferred until after the event unless required to fix a critical reliability issue.

@@ -212,6 +212,3 @@ Before deploying Ref OS 1.2:
 7. Run `npm run build`.
 
 The permanent keypad Admin code `1A23` is seeded by the migration, so Admin access remains available while normal password hashes are being migrated.
-
-## Shared Field Reset migration
-Before deploying this build, run `supabase/field-reset-status.sql` once in the Supabase SQL Editor. It creates the shared per-match field reset table, RLS policies for all event roles, and realtime publication.

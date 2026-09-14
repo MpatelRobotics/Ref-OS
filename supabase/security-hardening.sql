@@ -387,13 +387,3 @@ begin
     alter publication supabase_realtime add table public.event_settings;
   end if;
 end $$;
-
-
--- Shared field reset status: visible and writable by every signed-in event role.
-drop policy if exists "members read field reset status" on public.field_reset_status;
-drop policy if exists "event roles write field reset status" on public.field_reset_status;
-create policy "members read field reset status" on public.field_reset_status for select
-  using (public.has_event_role(event_id,array['ref','judge','emcee','admin']));
-create policy "event roles write field reset status" on public.field_reset_status for all
-  using (public.has_event_role(event_id,array['ref','judge','emcee','admin']))
-  with check (public.has_event_role(event_id,array['ref','judge','emcee','admin']));

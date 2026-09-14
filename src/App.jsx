@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download, Save,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, QrCode, ScanLine, CheckCircle2, Bot, ArrowUp,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, PlayCircle, QrCode, ScanLine,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -11,14 +11,12 @@ import * as outbox from "./outbox";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { APP_VERSION } from "./appVersion";
 import CommandCenter from "./components/CommandCenter.jsx";
-import QuadrantFieldResetCheck from "./components/QuadrantFieldResetCheck.jsx";
 import EventContactDirectory from "./components/EventContactDirectory.jsx";
 import LoginScreen from "./auth/LoginScreen.jsx";
 import NameScreen from "./auth/NameScreen.jsx";
 import RoleAccessCodeManager from "./auth/RoleAccessCodeManager.jsx";
 import { latestRoleAccessConfig } from "./auth/accessConfig.js";
 import TeamScanner from "./features/teams/TeamScanner.jsx";
-import { preloadTeamScannerOcr } from "./features/teams/preloadTeamScannerOcr.js";
 import IdentityModal from "./components/modals/IdentityModal.jsx";
 import ShareModal from "./components/modals/ShareModal.jsx";
 import AdminPasswordModal from "./components/modals/AdminPasswordModal.jsx";
@@ -219,7 +217,7 @@ function parseMatchesFile(text, filename = "") {
   if (matchCol < 0) warnings.push("Couldn't find a 'Match' column.");
   if (!redCols.length || !blueCols.length) warnings.push("Couldn't find Red/Blue team columns — check the export includes team columns.");
   const clean = (v) => String(v == null ? "" : v).trim().toUpperCase();
-  const isTeam = (v) => /^[0-9]{1,6}[A-Z]{0,2}$/.test(clean(v)); // supports numeric demo/legacy teams (75) and standard VEX IDs (1234A)
+  const isTeam = (v) => /^[0-9]{1,6}[A-Z]{1,2}$/.test(clean(v)); // e.g. 1234A, 25335A, 119B — not "0"/"FALSE"/scores
   const rows = [];
   for (let i = 1; i < table.length; i++) {
     const r = table[i];
@@ -296,14 +294,7 @@ const availablePhases = (event) => MATCH_PHASES.filter((p) => {
   return p.key in elimCounts(event.bracket);
 });
 
-const splitRuleCodes = (code) => String(code || "").split("|").map((c) => c.trim().replace(/[<>]/g, "").toUpperCase()).filter(Boolean);
-const fmtRule = (code) => { const codes = splitRuleCodes(code); return codes.length ? codes.map((c) => `<${c}>`).join(" ") : "—"; };
-const splitRuleDescs = (desc) => String(desc || "").split("|").map((d) => d.trim());
-const ruleEntries = (v) => {
-  const codes = splitRuleCodes(v?.code);
-  const descs = splitRuleDescs(v?.desc);
-  return codes.length ? codes.map((code, i) => ({ code, desc: descs[i] || "" })) : [{ code: "", desc: String(v?.desc || "").trim() }];
-};
+const fmtRule = (code) => { const c = (code || "").trim().replace(/[<>]/g, "").toUpperCase(); return c ? `<${c}>` : "—"; };
 const fmtTime = (ts) => new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const ago = (ts) => {
   if (!ts) return "";
@@ -477,40 +468,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [rules, setRules] = useState([]);      // [{ code, desc, category }]
   const [presence, setPresence] = useState([]); // [{ name, ... }] currently online
   const [refRoster, setRefRoster] = useState([]); // refs seen at this event, including offline
-  const [deviceStatuses, setDeviceStatuses] = useState([]);
-  const presenceLeaveRef = useRef(null);
-  const deviceId = useMemo(() => {
-    try {
-      const key = `refosDeviceId:${eventId}`;
-      let id = localStorage.getItem(key);
-      if (!id) {
-        id = (crypto?.randomUUID?.() || Math.random().toString(36).slice(2));
-        localStorage.setItem(key, id);
-      }
-      return id;
-    } catch {
-      return Math.random().toString(36).slice(2);
-    }
-  }, [eventId]);
-  const deviceInfo = useMemo(() => {
-    const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
-    const platform = typeof navigator !== "undefined" ? (navigator.userAgentData?.platform || navigator.platform || "") : "";
-    let browser = "Browser";
-    if (/Edg\//.test(ua)) browser = "Edge";
-    else if (/CriOS\//.test(ua)) browser = "Chrome iOS";
-    else if (/Chrome\//.test(ua)) browser = "Chrome";
-    else if (/FxiOS\//.test(ua)) browser = "Firefox iOS";
-    else if (/Firefox\//.test(ua)) browser = "Firefox";
-    else if (/Safari\//.test(ua)) browser = "Safari";
-    let deviceLabel = "Desktop";
-    if (/iPad/i.test(ua) || (/Macintosh/i.test(ua) && typeof navigator !== "undefined" && navigator.maxTouchPoints > 1)) deviceLabel = "iPad";
-    else if (/iPhone/i.test(ua)) deviceLabel = "iPhone";
-    else if (/Android/i.test(ua) && /Mobile/i.test(ua)) deviceLabel = "Android phone";
-    else if (/Android/i.test(ua)) deviceLabel = "Android tablet";
-    else if (/Windows/i.test(ua)) deviceLabel = "Windows PC";
-    else if (/Macintosh/i.test(ua)) deviceLabel = "Mac";
-    return { browser, platform, deviceLabel };
-  }, []);
   const pendingCount = viols.filter((v) => v._pending).length;
 
   const [lastMatch, setLastMatch] = useState(() => {
@@ -519,59 +476,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   });
 
   const [view, setView] = useState(role === "judge" ? "judging" : "teams");
-  const initialMatchDefaultAppliedRef = useRef(false);
-
-  const [showScrollTop, setShowScrollTop] = useState(false);
-
-  const scrollPageToTop = () => {
-    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
-    document.scrollingElement?.scrollTo?.({ top: 0, left: 0, behavior: "smooth" });
-  };
-
-  // Matches load asynchronously. The first time this event reports matches,
-  // make Matches the landing tab for non-Judge users. This runs only once,
-  // so manually selecting Teams afterward will stay on Teams.
-  useEffect(() => {
-    if (role === "judge" || initialMatchDefaultAppliedRef.current) return;
-    if (Object.keys(matches).length === 0) return;
-
-    initialMatchDefaultAppliedRef.current = true;
-    setView("matches");
-  }, [matches, role]);
-
-  // Warm the OCR engine while the user is already on the Teams screen.
-  // Opening Scan can then go straight to camera + worker startup instead of
-  // waiting for the OCR library download first.
-  useEffect(() => {
-    if (view !== "teams") return;
-
-    const warmScanner = () => {
-      preloadTeamScannerOcr().catch(() => {
-        // Preloading is opportunistic. The scanner itself can retry later.
-      });
-    };
-
-    if ("requestIdleCallback" in window) {
-      const idleId = window.requestIdleCallback(warmScanner, { timeout: 1200 });
-      return () => window.cancelIdleCallback?.(idleId);
-    }
-
-    const timer = window.setTimeout(warmScanner, 250);
-    return () => window.clearTimeout(timer);
-  }, [view]);
   const [openTeam, setOpenTeam] = useState(null);
   const [openMatch, setOpenMatch] = useState(null);
   const [openRobot, setOpenRobot] = useState(null);
-
-  // Show a manual return-to-top control after the user has scrolled down.
-  // Keep this effect after the open* state declarations so its dependency
-  // array never touches a block-scoped variable before initialization.
-  useEffect(() => {
-    const updateScrollTopVisibility = () => setShowScrollTop(window.scrollY > 320);
-    updateScrollTopVisibility();
-    window.addEventListener("scroll", updateScrollTopVisibility, { passive: true });
-    return () => window.removeEventListener("scroll", updateScrollTopVisibility);
-  }, [view, openTeam, openMatch, openRobot]);
   const [query, setQuery] = useState("");
   const [showTeamScanner, setShowTeamScanner] = useState(false);
   const [lightbox, setLightbox] = useState(null);
@@ -641,13 +548,14 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showCountdownSetup, setShowCountdownSetup] = useState(false);
   const [showOfflineTest, setShowOfflineTest] = useState(false);
   const [showCommandCenter, setShowCommandCenter] = useState(false);
-  const [showQuadrantFieldResetCheck, setShowQuadrantFieldResetCheck] = useState(false);
   const [showContactDirectory, setShowContactDirectory] = useState(false);
+  const [showGuidedTour, setShowGuidedTour] = useState(false);
   const [showPreEventTest, setShowPreEventTest] = useState(false);
   const [showTwoDeviceSyncTest, setShowTwoDeviceSyncTest] = useState(false);
   const [showDiagnosticReport, setShowDiagnosticReport] = useState(false);
   const [showRoleCodeManager, setShowRoleCodeManager] = useState(false);
   const [lastSystemTest, setLastSystemTest] = useState(null);
+  const [tourStep, setTourStep] = useState(0);
 
   const contactDirectoryEntries = fieldLog.filter((e) => e.kind === "contact_directory").sort((a, b) => b.createdAt - a.createdAt);
   const contactDirectoryEntry = contactDirectoryEntries[0] || null;
@@ -668,11 +576,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     try { const parsed = JSON.parse(eventCountdownEntry.note); return parsed?.target ? parsed : null; }
     catch { return null; }
   })();
-  // If the shared setting exists, it is authoritative even when it is cleared.
-  // Only fall back to the legacy Field Log countdown when no shared setting exists at all.
-  const countdownSetting = eventSettings?.event_countdown;
-  const eventCountdown = countdownSetting
-    ? (countdownSetting.value?.target ? countdownSetting.value : null)
+  const eventCountdown = eventSettings?.event_countdown?.value?.target
+    ? eventSettings.event_countdown.value
     : legacyCountdown;
   const countdownRemaining = eventCountdown?.target ? Math.max(0, new Date(eventCountdown.target).getTime() - countdownNow) : 0;
   const countdownText = countdownRemaining > 0 ? (() => {
@@ -692,6 +597,54 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
   const [eventMembers, setEventMembers] = useState([]);
   const myRole = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
+  const deviceId = useMemo(() => {
+    try {
+      let id = localStorage.getItem("refosDeviceId");
+      if (!id) {
+        id = (globalThis.crypto?.randomUUID?.() || `device-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        localStorage.setItem("refosDeviceId", id);
+      }
+      return id;
+    } catch {
+      return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showGuidedTour) return;
+    setMenu(false);
+    setMobileNavOpen(false);
+    setShowFieldLog(false);
+    setShowContactDirectory(false);
+    setLogFor(null);
+    setLogMatch(null);
+    setOpenTeam(null);
+    setOpenRobot(null);
+    setOpenMatch(null);
+
+    if (isJudge) {
+      if (tourStep <= 1) setView("judging");
+      else setView("alliances");
+      return;
+    }
+
+    if (tourStep === 0 || tourStep === 1) setView("teams");
+    if (tourStep === 2) setView(Object.keys(matches).length ? "matches" : "teams");
+    if (tourStep === 3) {
+      setView(Object.keys(matches).length ? "matches" : "teams");
+      const first = Object.values(matches).sort((a,b) => Number(a.num || 0) - Number(b.num || 0))[0];
+      if (first?.id) setOpenMatch(first.id);
+    }
+    if (tourStep === 4 && !isEmcee) {
+      setView("teams");
+      setLogFor("");
+    }
+    if (tourStep === 5) setView(rules.length ? "rulebook" : "teams");
+    if (tourStep === 6) setShowFieldLog(true);
+    if (tourStep === 7) setView("alliances");
+    if (tourStep === 8) setShowContactDirectory(true);
+  }, [showGuidedTour, tourStep]);
+
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const pendingAdminAction = useRef(null);
 
@@ -896,72 +849,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     const name = meName || "Ref";
     const loadRoster = () => api.listRefRoster(eventId).then(setRefRoster);
     api.touchRefRoster(eventId, name, myRole).then(loadRoster);
-    const leave = api.joinPresence(eventId, {
-      name,
-      role: myRole,
-      online_at: Date.now(),
-      device_id: deviceId,
-      device_label: deviceInfo.deviceLabel,
-      browser: deviceInfo.browser,
-      platform: deviceInfo.platform,
-      app_version: APP_VERSION,
-    }, setPresence);
-    presenceLeaveRef.current = leave;
+    const leave = api.joinPresence(eventId, { name, role: myRole, online_at: Date.now() }, setPresence);
     const iv = setInterval(() => { api.touchRefRoster(eventId, name, myRole); loadRoster(); }, 60000);
-    return () => {
-      clearInterval(iv);
-      presenceLeaveRef.current = null;
-      leave();
-    };
-  }, [eventId, meName, myRole, deviceId, deviceInfo]);
-
-  const publishDeviceStatus = useCallback(() => {
-    const payload = {
-      name: meName || "Ref",
-      role: myRole,
-      device_id: deviceId,
-      device_label: deviceInfo.deviceLabel,
-      browser: deviceInfo.browser,
-      platform: deviceInfo.platform,
-      viewport: typeof window !== "undefined" ? `${window.innerWidth}×${window.innerHeight}` : "",
-      display_mode: typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone === true) ? "PWA" : "Browser",
-      app_version: APP_VERSION,
-      cloud_reachable: cloudReachable,
-      syncing,
-      queued_writes: queuedWrites,
-      failed_writes: failedSyncItems.length,
-      last_synced_at: syncedAt || null,
-      heartbeat_at: Date.now(),
-    };
-    presenceLeaveRef.current?.update?.(payload);
-    if (online && cloudReachable !== false) api.upsertDeviceStatus(eventId, payload).catch(() => {});
-  }, [eventId, meName, myRole, deviceId, deviceInfo, cloudReachable, syncing, queuedWrites, failedSyncItems.length, syncedAt, online]);
-
-  useEffect(() => {
-    const timer = setTimeout(publishDeviceStatus, 350);
-    const heartbeat = setInterval(publishDeviceStatus, 15000);
-    const resize = () => publishDeviceStatus();
-    window.addEventListener("resize", resize);
-    return () => {
-      clearTimeout(timer);
-      clearInterval(heartbeat);
-      window.removeEventListener("resize", resize);
-    };
-  }, [publishDeviceStatus]);
-
-  useEffect(() => {
-    if (!adminUnlocked) { setDeviceStatuses([]); return; }
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const rows = await api.listDeviceStatuses(eventId);
-        if (!cancelled) setDeviceStatuses(rows);
-      } catch {}
-    };
-    load();
-    const iv = setInterval(load, 15000);
-    return () => { cancelled = true; clearInterval(iv); };
-  }, [adminUnlocked, eventId]);
+    return () => { clearInterval(iv); leave(); };
+  }, [eventId, meName, myRole]);
 
   const saveEvent = async (data) => {
     const ev = await api.updateEvent(eventId, {
@@ -1763,15 +1654,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         for (const id of ids) await api.deleteFieldLog(id);
         setFieldLog((cur) => cur.filter((e) => e.kind !== "replay"));
       }
-      if (sel.awp) {
-        const ids = fieldLog.filter((e) => e.kind === "awp").map((e) => e.id);
-        for (const id of ids) await api.deleteFieldLog(id);
-        await api.clearAwpStatuses(eventId);
-        setFieldLog((cur) => cur.filter((e) => e.kind !== "awp"));
-      }
-      if (sel.fieldReset) {
-        await api.clearFieldResetStatuses(eventId);
-      }
       if (sel.teams) { await api.clearTeams(eventId); setTeams([]); }
       if (sel.schedule) { await api.clearMatches(eventId); setMatches({}); await api.clearRankings(eventId); setTeams((cur) => cur.map((t) => ({ ...t, rank: null }))); }
       if (sel.judging) { await api.clearJudging(eventId); setNoms([]); setFinalists(new Set()); }
@@ -1923,30 +1805,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   };
 
   const clearSharedCountdown = async () => {
-    try {
-      // Store an explicit cleared setting so older Field Log countdown records
-      // cannot reappear as a fallback.
-      const saved = await api.upsertEventSetting(
-        eventId,
-        "event_countdown",
-        { label: "", target: null, cleared: true },
-        meName
-      );
-
-      // Clean up any legacy countdown records from older Ref OS builds.
-      const legacyEntries = fieldLog.filter((e) => e.kind === "event_countdown");
-      if (legacyEntries.length) {
-        await Promise.allSettled(legacyEntries.map((e) => api.deleteFieldLog(e.id)));
-        setFieldLog((prev) => prev.filter((e) => e.kind !== "event_countdown"));
-      }
-
-      setEventSettings((cur) => ({ ...cur, event_countdown: saved }));
-      setShowCountdownSetup(false);
-    } catch (e) {
-      console.error("Could not remove Event Countdown", e);
-      alert(e?.message || "Could not remove the Event Countdown.");
-      throw e;
-    }
+    await api.deleteEventSetting(eventId, "event_countdown");
+    setEventSettings((cur) => {
+      const next = { ...cur };
+      delete next.event_countdown;
+      return next;
+    });
+    setShowCountdownSetup(false);
   };
 
   const exportEventReport = async () => {
@@ -2290,7 +2155,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
               <div className="leading-tight hidden sm:block">
                 <div className="flex items-center gap-1.5">
                   <div className="font-bold text-[13px] text-white">Ref-OS</div>
-                  <span className="rounded-sm border border-amber-300/40 bg-amber-400/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-200">Private Beta</span>
+                  <span className="rounded-full border border-amber-300/50 bg-amber-400/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-200">Private Beta</span>
                 </div>
                 <div className="text-[9px] text-slate-400">Referee Operating System</div>
               </div>
@@ -2302,7 +2167,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
               <button
                 onClick={() => adminUnlocked && setShowDiagnosticReport(true)}
                 title={adminUnlocked ? "Open Admin Diagnostics" : connectionHealth.label}
-                className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm shrink-0 mt-0.5 ${
+                className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${
                   connectionHealth.tone === "green" ? "text-emerald-300 bg-emerald-900/40" :
                   connectionHealth.tone === "blue" ? "text-sky-300 bg-sky-900/40" :
                   connectionHealth.tone === "red" ? "text-red-300 bg-red-900/40" :
@@ -2322,14 +2187,14 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           <OnlineCluster presence={presence} onClick={() => setShowOnline(true)} />
           {!isJudge && !isEmcee && <button onClick={() => setShowByRule(true)} title="By rule" className="p-1.5 rounded hover:bg-white/10"><BarChart3 size={18} /></button>}
           <button onClick={() => setShowIdentity(true)} title="Your full name"
-            className="flex items-center gap-1.5 border border-white/15 bg-white/5 hover:bg-white/10 rounded-md pl-1 pr-2.5 py-1">
+            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-full pl-1 pr-2.5 py-1">
             <span className="w-6 h-6 rounded-full bg-[#D7212B] text-white text-[11px] font-bold grid place-items-center">{meName ? initials(meName) : "?"}</span>
             <span className="text-xs font-medium max-w-[70px] truncate">{meName || "Set name"}</span>
           </button>
           <div className="relative">
             <button aria-label="Settings" onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
-              <div ref={menuRef} className="refos-menu-pop absolute right-0 mt-2 w-56 max-h-[75vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-md shadow-lg border border-slate-200 dark:border-slate-700 py-1 text-sm">
+              <div ref={menuRef} className="refos-menu-pop absolute right-0 mt-2 w-56 max-h-[75vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
                 {isJudge ? (
                   <>
                     <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><Trophy size={12} /> Judge Advisor</div>
@@ -2339,9 +2204,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                     <div className="border-t border-slate-100 my-1" />
                     <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field Log</button>
-                    <div className="refos-menu-section">Experimental</div>
-                    <button onClick={() => { setMenu(false); setShowQuadrantFieldResetCheck(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><CheckCircle2 size={16} /> Quadrant Field Reset Check <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400">TEST</span></button>
                 {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
+                <button onClick={() => { setMenu(false); setTourStep(0); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided Tour</button>
                     <div className="refos-menu-section">Help &amp; Display</div>
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; Help</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
@@ -2352,9 +2216,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                     <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
                     <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
                     <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
-                    <div className="refos-menu-section">Experimental</div>
-                    <button onClick={() => { setMenu(false); setShowQuadrantFieldResetCheck(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><CheckCircle2 size={16} /> Quadrant Field Reset Check <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400">TEST</span></button>
                     {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
+                    <button onClick={() => { setMenu(false); setTourStep(0); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided Tour</button>
                     <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
                     <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
                   </>
@@ -2366,19 +2229,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); if (adminUnlocked) loadEventMembers(); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Key Volunteer Status</button>
                 <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field Log</button>
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
+                <button onClick={() => { setMenu(false); setTourStep(0); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided Tour</button>
                 <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
-                <>
-                  <div className="refos-menu-section">Experimental</div>
-                  <button
-                    onClick={() => { setMenu(false); setShowQuadrantFieldResetCheck(true); }}
-                    className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"
-                  >
-                    <CheckCircle2 size={16} />
-                    Quadrant Field Reset Check
-                    <span className="ml-auto text-[10px] font-semibold text-amber-600 dark:text-amber-400">TEST</span>
-                  </button>
-                </>
                 <div className="refos-menu-section">Access</div>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
@@ -2402,8 +2255,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             { k: "judging", label: "Judging", Icon: Trophy },
             { k: "alliances", label: "Alliances", Icon: GitBranch }
           ] : [
-            ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
             { k: "teams", label: "Teams", Icon: Users },
+            ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
             ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
             { k: "robots", label: "Robots", Icon: Camera },
             { k: "alliances", label: "Alliances", Icon: GitBranch },
@@ -2439,8 +2292,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           { k: "judging", label: "Judging", Icon: Trophy },
           { k: "alliances", label: "Alliances", Icon: GitBranch }
         ] : [
-          ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
           { k: "teams", label: "Teams", Icon: Users },
+          ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
           ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
           { k: "robots", label: "Robots", Icon: Camera },
           { k: "alliances", label: "Alliances", Icon: GitBranch },
@@ -2542,14 +2395,14 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         ) : (
           <>
             {!event?.quals ? (
-              <button onClick={() => requireAdmin(() => setShowEvent(true))} className="w-full mb-4 bg-[#0D0F32] text-white rounded-md p-4 flex items-center gap-3 text-left hover:bg-[#171a45]">
+              <button onClick={() => requireAdmin(() => setShowEvent(true))} className="w-full mb-4 bg-[#0D0F32] text-white rounded-xl p-4 flex items-center gap-3 text-left hover:bg-[#171a45]">
                 <CalendarDays size={22} className="text-[#EBA622] shrink-0" />
                 <div className="flex-1"><p className="font-semibold leading-tight">Finish event setup</p>
                   <p className="text-xs text-slate-400 mt-0.5">Add how many matches so logging picks the match from a list.</p></div>
                 <ChevronRight size={18} className="text-slate-500 dark:text-slate-400" />
               </button>
             ) : (
-              <button onClick={() => requireAdmin(() => setShowEvent(true))} className="w-full mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md px-4 py-2.5 flex items-center gap-2 text-left hover:border-slate-300 dark:border-slate-600">
+              <button onClick={() => requireAdmin(() => setShowEvent(true))} className="w-full mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 flex items-center gap-2 text-left hover:border-slate-300 dark:border-slate-600">
                 <CalendarDays size={16} className="text-slate-400 shrink-0" />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate flex-1">{event.name || "Event"}</span>
                 <span className="text-xs text-slate-400">{event.quals} quals{event.bracket ? ` · top ${event.bracket}` : ""}</span>
@@ -2560,10 +2413,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
               <div className="relative flex-1">
                 <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search teams by number or name" placeholder="Search team #"
-                  className="w-full pl-9 pr-3 py-2.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
               </div>
-              <button onClick={() => setShowTeamScanner(true)} className="px-3 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Camera size={17} /> Scan</button>
-              {!isEmcee && <button onClick={() => setAddTeam(true)} className="px-3 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Plus size={17} /> Team</button>}
+              <button onClick={() => setShowTeamScanner(true)} className="px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Camera size={17} /> Scan</button>
+              {!isEmcee && <button onClick={() => setAddTeam(true)} className="px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-1 text-sm font-medium"><Plus size={17} /> Team</button>}
             </div>
             {filteredTeams.length === 0 ? (
               <Empty title={teams.length ? "No matches" : "No teams yet"} sub={teams.length ? "Try a different team number." : "Add a team, or just log a violation and the team is created for you."} />
@@ -2573,7 +2426,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                   const c = countsByTeam[t.number] || { total: 0 };
                   return (
                     <li key={t.number}>
-                      <button onClick={() => setOpenTeam(t.number)} className="w-full text-left bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
+                      <button onClick={() => setOpenTeam(t.number)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
                         <span className="font-mono font-bold text-lg text-slate-900 dark:text-slate-100">{t.number}</span>
                         {t.rank != null && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-200 dark:border-indigo-800 text-xs font-bold shrink-0">Rank {t.rank}</span>}
                         {!isEmcee && teamWatch[t.number]?.length > 0 && <span title={teamWatch[t.number].map((w) => `${w.by || "Ref"}: ${w.note}`).join("\n")} className="inline-flex items-center gap-1 text-amber-600 text-xs font-semibold shrink-0"><Star size={15} fill="currentColor" /> WATCH{teamWatch[t.number].length > 1 ? ` ${teamWatch[t.number].length}` : ""}</span>}
@@ -2599,25 +2452,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           <img src="/logo.svg" alt="Highlander Summit" className="h-10 w-10 object-contain opacity-90" />
           <p className="text-center text-xs text-slate-400">
             Made by Maharshi Patel ·{" "}
-            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 underline">@mpatel_ref</a>{" · "}v{APP_VERSION} · Highlander Release
+            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 underline">@mpatel_ref</a>{" · "}v{APP_VERSION} · Private Beta
           </p>
         </div>
       </main>
 
-      {showScrollTop && (
-        <button
-          type="button"
-          onClick={scrollPageToTop}
-          className={`fixed z-30 grid h-11 w-11 place-items-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-lg transition hover:bg-slate-50 active:scale-95 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 ${!openTeam && !openMatch && !openRobot && view !== "judging" && !isEmcee ? "bottom-20 right-5" : "bottom-5 right-5"}`}
-          aria-label="Scroll to top"
-          title="Scroll to top"
-        >
-          <ArrowUp size={20} />
-        </button>
-      )}
-
       {!openTeam && !openMatch && !openRobot && view !== "judging" && !isEmcee && (
-        <button onClick={() => setLogFor("")} className="fixed bottom-5 right-5 z-20 bg-[#D7212B] text-white px-4 py-3 rounded-md shadow-lg border border-red-800/20 flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
+        <button onClick={() => setLogFor("")} className="fixed bottom-5 left-1/2 -translate-x-1/2 z-20 bg-[#D7212B] text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
           <Plus size={20} /> Log violation
         </button>
       )}
@@ -2628,7 +2469,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onClose={() => setShowTeamScanner(false)}
       />}
       {logFor !== null && (
-        <LogModal teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules} onOpenPhoto={setLightbox}
+        <LogModal teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules} onOpenPhoto={setLightbox} tourMode={showGuidedTour && tourStep === 4}
           onSetName={() => setShowIdentity(true)} onClose={() => { setLogFor(null); setLogMatch(null); }}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await saveViolation({ ...form, team }); setLogFor(null); setLogMatch(null); }} />
       )}
@@ -2644,7 +2485,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       )}
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
       {showIdentity && <IdentityModal me={{ name: meName }} onSave={async (n) => { await onEditName(n); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
-      {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, awp: fieldLog.filter((e) => e.kind === "awp").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length }} onClear={clearSelected} onClose={() => setShowClear(false)} />}
+      {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length }} onClear={clearSelected} onClose={() => setShowClear(false)} />}
       {showOnline && (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
           <div className="bg-white dark:bg-slate-800 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -2726,6 +2567,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           </div></div>
         </div>
       )}
+      {showGuidedTour && <GuidedTour role={myRole} step={tourStep} hasMatches={Object.keys(matches).length > 0} hasRules={rules.length > 0}
+        onStep={setTourStep} onClose={() => { setShowGuidedTour(false); setShowFieldLog(false); setShowContactDirectory(false); setLogFor(null); setLogMatch(null); setOpenMatch(null); }} />}
       {showPreEventTest && adminUnlocked && <PreEventSystemTest eventId={eventId} adminUnlocked={adminUnlocked}
         onClose={() => setShowPreEventTest(false)} onComplete={setLastSystemTest} />}
       {showTwoDeviceSyncTest && adminUnlocked && <TwoDeviceSyncTest fieldLog={fieldLog} deviceId={deviceId} meName={meName}
@@ -2747,7 +2590,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => setShowOfflineTest(false)} />}
       {showCommandCenter && adminUnlocked && <CommandCenter matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
         eventMembers={eventMembers} meName={meName} onSetAdmin={setVolunteerAdmin}
-        deviceStatuses={deviceStatuses} currentDeviceId={deviceId}
         failedSyncItems={failedSyncItems} onRetryFailedSync={retryFailedSync} onDiscardFailedSync={discardFailedSync}
         countdown={eventCountdown} countdownText={countdownText}
         onCountdown={() => { setShowCommandCenter(false); setShowCountdownSetup(true); }}
@@ -2771,8 +2613,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onRankings={() => { setShowCommandCenter(false); setShowRankings(true); }}
         onClearData={() => { setShowCommandCenter(false); setShowClear(true); }}
         onClose={() => setShowCommandCenter(false)} />}
-      {showQuadrantFieldResetCheck && <QuadrantFieldResetCheck onClose={() => setShowQuadrantFieldResetCheck(false)} />}
-{showAnnouncement && adminUnlocked && <AnnouncementModal onClose={() => setShowAnnouncement(false)} onSend={sendAnnouncement} />}
+      {showAnnouncement && adminUnlocked && <AnnouncementModal onClose={() => setShowAnnouncement(false)} onSend={sendAnnouncement} />}
       {showFeatures && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
           <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
@@ -2852,12 +2693,10 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
   const byRule = useMemo(() => {
     const m = {};
     for (const v of viols) {
-      for (const entry of ruleEntries(v)) {
-        const key = entry.code || "—";
-        m[key] = m[key] || { code: entry.code, desc: entry.desc, count: 0, types: {} };
-        m[key].count++; m[key].types[v.type] = (m[key].types[v.type] || 0) + 1;
-        if (!m[key].desc && entry.desc) m[key].desc = entry.desc;
-      }
+      const key = v.code || "—";
+      m[key] = m[key] || { code: v.code, desc: v.desc, count: 0, types: {} };
+      m[key].count++; m[key].types[v.type] = (m[key].types[v.type] || 0) + 1;
+      if (!m[key].desc && v.desc) m[key].desc = v.desc;
     }
     return Object.values(m).sort((a, b) => b.count - a.count);
   }, [viols]);
@@ -2939,14 +2778,14 @@ function ViolationCard({ v, onDelete, onOpenPhoto, onEdit, showTeam }) {
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border ${T.badge}`}><T.Icon size={12} /> {T.label}</span>
         {showTeam && <span className="font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-200 dark:bg-slate-600 px-1.5 py-0.5 rounded-md text-sm">{v.team}</span>}
-        <div className="flex flex-wrap gap-1.5">{splitRuleCodes(v.code).map((code) => <span key={code} className="font-mono font-bold text-slate-900 dark:text-slate-100">{fmtRule(code)}</span>)}</div>
+        <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{fmtRule(v.code)}</span>
         {fmtMatch(v.match) && <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200">{fmtMatch(v.match)}</span>}
         {v._pending && <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-300"><RefreshCw size={9} className="animate-spin" /> Saving</span>}
         <span className="text-[11px] text-slate-400 ml-auto">{fmtTime(v.createdAt)}</span>
         {canEdit && <button onClick={() => onEdit(v)} className="text-slate-300 hover:text-slate-700 dark:text-slate-200" title="Edit"><Pencil size={15} /></button>}
         <button onClick={() => { if (confirm(v._pending ? "Discard this unsynced violation?" : "Delete this violation?")) onDelete(v); }} className="refos-destructive-icon" title="Delete"><Trash2 size={15} /></button>
       </div>
-      {ruleEntries(v).some((r) => r.desc) && <div className="mt-1.5 space-y-1">{ruleEntries(v).filter((r) => r.desc).map((r) => <div key={r.code || r.desc} className={`text-sm font-medium ${T.text}`}><span className="font-mono font-bold">{r.code ? fmtRule(r.code) : ""}</span>{r.code ? " " : ""}{r.desc}</div>)}</div>}
+      {v.desc && <p className={`text-sm mt-1.5 font-medium ${T.text}`}>{v.desc}</p>}
       {v.notes && <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{v.notes}</p>}
       {v._localPhotos?.length > 0 ? (
         <div className="flex gap-2 mt-2 overflow-x-auto">{v._localPhotos.map((src, i) => (
@@ -2965,13 +2804,11 @@ function ByRule({ viols, expandRule, setExpandRule }) {
   const rules = useMemo(() => {
     const m = {};
     for (const v of viols) {
-      for (const entry of ruleEntries(v)) {
-        const key = entry.code || "—";
-        m[key] = m[key] || { code: entry.code, desc: entry.desc, count: 0, types: {}, teams: {} };
-        m[key].count++; m[key].types[v.type] = (m[key].types[v.type] || 0) + 1;
-        m[key].teams[v.team] = (m[key].teams[v.team] || 0) + 1;
-        if (!m[key].desc && entry.desc) m[key].desc = entry.desc;
-      }
+      const key = v.code || "—";
+      m[key] = m[key] || { code: v.code, desc: v.desc, count: 0, types: {}, teams: {} };
+      m[key].count++; m[key].types[v.type] = (m[key].types[v.type] || 0) + 1;
+      m[key].teams[v.team] = (m[key].teams[v.team] || 0) + 1;
+      if (!m[key].desc && v.desc) m[key].desc = v.desc;
     }
     return Object.values(m).sort((a, b) => b.count - a.count);
   }, [viols]);
@@ -3014,7 +2851,7 @@ function ByRule({ viols, expandRule, setExpandRule }) {
 }
 
 /* ============================ LOG MODAL ============================ */
-function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, edit, onSetName, onClose, onSave }) {
+function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, edit, onSetName, onClose, onSave, tourMode = false }) {
   const ruleBook = useMemo(() => {
     const m = {}; for (const r of (rules || [])) m[r.code] = r.desc; return m;
   }, [rules]);
@@ -3025,13 +2862,8 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
   const [matchPhase, setMatchPhase] = useState((edit && edit.match?.phase) || (presetMatch?.phase) || (lastMatch?.phase || "qual"));
   const [matchNum, setMatchNum] = useState((edit && edit.match?.num) || (presetMatch && presetMatch.num != null ? String(presetMatch.num) : (lastMatch?.num || "")));
   const [type, setType] = useState((edit && edit.type) || "minor");
-  const [selectedRules, setSelectedRules] = useState(() => {
-    const codes = splitRuleCodes((edit && edit.code) || "");
-    const descriptions = String((edit && edit.desc) || "").split(" | ");
-    return codes.map((c, i) => ({ code: c, desc: descriptions[i] || ruleBook[c] || knownRules[c] || "" }));
-  });
-  const code = selectedRules.map((r) => r.code).join(" | ");
-  const desc = selectedRules.map((r) => r.desc).filter(Boolean).join(" | ");
+  const [code, setCode] = useState((edit && edit.code) || "");
+  const [desc, setDesc] = useState((edit && edit.desc) || "");
   const [notes, setNotes] = useState((edit && edit.notes) || "");
   const [photos, setPhotos] = useState([]);
   const [keepKeys, setKeepKeys] = useState((edit && edit.photoKeys) || []);
@@ -3040,6 +2872,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
   const fileRef = useRef(null);
   const T = TYPES[type];
 
+  const onCode = (val) => { setCode(val); const clean = normNum(val).replace(/[<>]/g, ""); const d = ruleBook[clean] || knownRules[clean]; if (d && !desc) setDesc(d); };
   const addPhotos = async (files) => { const list = Array.from(files).slice(0, 4); const out = []; for (const f of list) { try { out.push(await compress(f)); } catch {} } setPhotos((p) => [...p, ...out].slice(0, 6)); };
   const valid = (creatingNew ? newNumber.trim() : team) && (code.trim() || desc.trim());
   const doSave = async () => {
@@ -3052,21 +2885,22 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
     }
   };
   const submit = async () => {
+    if (tourMode) return;
     if (!valid || busy) return;
     const selectedTeam = normNum(creatingNew ? newNumber : team);
-    const selectedRuleCodes = splitRuleCodes(code);
-    // duplicate guard (all users): same team + any selected rule + match already logged
-    if (!edit && selectedTeam && selectedRuleCodes.length) {
+    const selectedRule = normNum(code).replace(/[<>]/g, "");
+    // duplicate guard (all users): same team + rule + match already logged
+    if (!edit && selectedTeam && selectedRule) {
       const myKey = matchPhase !== "none" && matchNum ? `${matchPhase}:${matchNum}` : "";
-      const duplicateCodes = selectedRuleCodes.filter((selectedRule) => (viols || []).some((v) => {
+      const dup = (viols || []).some((v) => {
         if (normNum(v.team) !== selectedTeam) return false;
-        if (!splitRuleCodes(v.code).includes(selectedRule)) return false;
+        if (normNum(v.code).replace(/[<>]/g, "") !== selectedRule) return false;
         const vKey = v.match && v.match.phase && v.match.phase !== "none" && v.match.num ? `${v.match.phase}:${v.match.num}` : "";
         return vKey === myKey;
-      }));
-      if (duplicateCodes.length) {
+      });
+      if (dup) {
         const where = myKey ? ` in ${fmtMatch({ phase: matchPhase, num: matchNum })}` : "";
-        if (!window.confirm(`Possible duplicate — ${selectedTeam} already has ${fmtRule(duplicateCodes.join(" | "))}${where} logged. Add it again anyway?`)) return;
+        if (!window.confirm(`Possible duplicate — ${selectedTeam} already has ${fmtRule(selectedRule)}${where} logged. Add it again anyway?`)) return;
       }
     }
     await doSave();
@@ -3080,6 +2914,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:text-slate-300"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-4">
+          {tourMode && <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800 px-3 py-2 text-sm text-blue-800 dark:text-blue-200"><b>Guided tour:</b> this is the real violation form, but saving is disabled while the tour is running.</div>}
           <button onClick={onSetName} className="w-full flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
             <UserCircle2 size={15} className="text-slate-400" />
             {me?.name ? <>Logging as <b className="text-slate-700 dark:text-slate-200">{me.name}</b></> : <span className="text-amber-600 font-medium">Tap to set your ref name (so entries are attributed)</span>}
@@ -3170,21 +3005,16 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
           </div>
 
           <div>
-            <Label>Rules cited</Label>
-            <div className="space-y-2">
-              {selectedRules.map((r) => (
-                <div key={r.code} className="flex items-start gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2">
-                  <span className="font-mono font-semibold text-slate-900 dark:text-slate-100 shrink-0">{fmtRule(r.code)}</span>
-                  <span className="text-sm text-slate-500 dark:text-slate-400 flex-1">{r.desc || "Custom rule"}</span>
-                  <button type="button" onClick={() => setSelectedRules((rs) => rs.filter((x) => x.code !== r.code))} className="text-slate-400 hover:text-red-600" title="Remove rule"><X size={16} /></button>
-                </div>
-              ))}
+            <Label>Rule cited</Label>
+            <div className="flex gap-2 items-start">
               <button type="button" onClick={() => setShowRulePicker(true)}
-                className="w-full px-3 py-2.5 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:border-slate-400">
-                {selectedRules.length ? "Change rule selection" : "Select rules"}
+                className="w-28 shrink-0 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono text-left hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                {code ? <span className="text-slate-900 dark:text-slate-100 font-semibold">{fmtRule(code)}</span> : <span className="text-slate-400 font-sans">Rule…</span>}
               </button>
+              <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What the rule covers" rows={2}
+                className="flex-1 min-w-0 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm leading-snug resize-y focus:outline-none focus:ring-2 focus:ring-slate-300" />
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">Select every rule that applies in one pass. Tap a selected rule again to unselect it, then tap Done.</p>
+            <p className="text-[11px] text-slate-400 mt-1">Tap the box to pick a rule — search by code or description.</p>
           </div>
 
           <div>
@@ -3215,14 +3045,13 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
         </div>
         <div className="sticky bottom-0 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 p-4 flex gap-2">
           <button onClick={onClose} className="px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
-          <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? `${T.solid} ${T.solidHover}` : "bg-slate-300"}`}>{busy ? "Saving…" : edit ? "Save changes" : "Save violation"}</button>
+          <button onClick={submit} disabled={tourMode || !valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${!tourMode && valid && !busy ? `${T.solid} ${T.solidHover}` : "bg-slate-300"}`}>{tourMode ? "Tour only · saving disabled" : busy ? "Saving…" : edit ? "Save changes" : "Save violation"}</button>
         </div>
       </div>
       {showRulePicker && (
         <RulePicker rules={rules} knownRules={knownRules}
-          selectedCodes={selectedRules.map((r) => r.code)}
-          onPickRule={(c, d) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs.filter((r) => r.code !== clean) : [...rs, { code: clean, desc: d || ruleBook[clean] || knownRules[clean] || "" }]); }}
-          onPickCustom={(c) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs.filter((r) => r.code !== clean) : [...rs, { code: clean, desc: ruleBook[clean] || knownRules[clean] || "" }]); }}
+          onPickRule={(c, d) => { setCode(c); setDesc(d || ""); setShowRulePicker(false); }}
+          onPickCustom={(c) => { setCode(c); setShowRulePicker(false); }}
           onClose={() => setShowRulePicker(false)} />
       )}
     </div>
@@ -3230,7 +3059,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
 }
 
 /* ============================ RULE PICKER ============================ */
-function RulePicker({ rules, knownRules, selectedCodes = [], onPickRule, onPickCustom, onClose }) {
+function RulePicker({ rules, knownRules, onPickRule, onPickCustom, onClose }) {
   const [q, setQ] = useState("");
   const [favoriteCodes, setFavoriteCodes] = useState(() => { try { return JSON.parse(localStorage.getItem("refosRuleFavorites") || "[]"); } catch { return []; } });
   const [recentCodes, setRecentCodes] = useState(() => { try { return JSON.parse(localStorage.getItem("refosRecentRules") || "[]"); } catch { return []; } });
@@ -3271,13 +3100,12 @@ function RulePicker({ rules, knownRules, selectedCodes = [], onPickRule, onPickC
     <div className="fixed inset-0 z-50 bg-white dark:bg-slate-800 flex flex-col font-sans">
       <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2 shrink-0">
         <button onClick={onClose} className="text-slate-500 dark:text-slate-400 p-1 -ml-1"><ChevronLeft size={22} /></button>
-        <h2 className="font-bold text-slate-900 dark:text-slate-100 flex-1">Cite rules</h2>
-        <button type="button" onClick={onClose} className="px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-semibold">Done{selectedCodes.length ? ` (${selectedCodes.length})` : ""}</button>
+        <h2 className="font-bold text-slate-900 dark:text-slate-100">Cite a rule</h2>
       </div>
       <div className="p-3 border-b border-slate-100 shrink-0">
         <div className="relative">
           <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search code or description"
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search code or description"
             className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
         </div>
       </div>
@@ -3294,8 +3122,7 @@ function RulePicker({ rules, knownRules, selectedCodes = [], onPickRule, onPickC
             <div className="sticky top-0 bg-slate-100 dark:bg-slate-700 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{g.cat}</div>
             {g.items.map((r) => (
               <div key={`${g.cat}-${r.code}`} className="flex border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700">
-                <button onClick={() => chooseRule(r)} className="flex-1 min-w-0 text-left px-4 py-2.5 flex gap-3 items-center">
-                  <span className={`w-5 h-5 shrink-0 rounded border grid place-items-center ${selectedCodes.includes(r.code) ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 dark:border-slate-600"}`}>{selectedCodes.includes(r.code) ? "✓" : ""}</span>
+                <button onClick={() => chooseRule(r)} className="flex-1 min-w-0 text-left px-4 py-2.5 flex gap-3 items-baseline">
                   <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
                   <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
                 </button>
@@ -3388,7 +3215,7 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search match # or team"
-          className="w-full pl-9 pr-3 py-2.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
       </div>
       {tab === "elim" && canAdd && (
         <button onClick={onAddMatch} className="w-full mb-3 py-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-medium flex items-center justify-center gap-2 hover:border-slate-400"><Plus size={16} /> Add elimination match</button>
@@ -3399,7 +3226,7 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
         <ul className="space-y-2">
           {filtered.map((m) => (
             <li key={m.id}>
-              <button onClick={() => onOpen(m.id)} className="w-full text-left bg-white dark:bg-slate-800 rounded-md border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
+              <button onClick={() => onOpen(m.id)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-14 shrink-0">{rowLabel(m)}</span>
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
                   <span className="text-red-700 font-semibold">{m.red.join("  ")}</span>
@@ -3469,67 +3296,13 @@ function AwpAlliance({ color, th, state, onChange }) {
 // alliances at once and this evaluates each against the v2.0 criteria.
 // Signature/Worlds-qualifying = 7 Pins / 3 Goals; standard events = 6 Pins / 2 Goals.
 // "Save to match log" writes the result to the field log so the match can be referenced later.
-function AwpChecker({ onSave, onSaved, matchId, matchRef, meName = "", onStatusChange }) {
+function AwpChecker({ onSave }) {
   const [sig, setSig] = useState(true);
   const [red, setRed] = useState({ pins: 0, goals: 0, perim: true, noViol: true });
   const [blue, setBlue] = useState({ pins: 0, goals: 0, perim: true, noViol: true });
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
-  const [remoteMeta, setRemoteMeta] = useState(null);
-  const syncingRef = useRef(false);
   const th = sig ? { pins: 7, goals: 3 } : { pins: 6, goals: 2 };
-
-  const applyRemote = useCallback((remote) => {
-    if (!remote?.state) return;
-    syncingRef.current = true;
-    if (typeof remote.state.sig === "boolean") setSig(remote.state.sig);
-    if (remote.state.red) setRed((v) => ({ ...v, ...remote.state.red }));
-    if (remote.state.blue) setBlue((v) => ({ ...v, ...remote.state.blue }));
-    setRemoteMeta(remote);
-    onStatusChange?.(remote);
-    queueMicrotask(() => { syncingRef.current = false; });
-  }, [onStatusChange]);
-
-  useEffect(() => {
-    if (!matchId) return undefined;
-    let alive = true;
-    api.getAwpStatus(EVENT_ID, matchId).then((r) => { if (alive && r) applyRemote(r); }).catch(() => {});
-    const unsub = api.subscribeAwpStatus(EVENT_ID, matchId, (r) => { if (alive && r) applyRemote(r); });
-    return () => { alive = false; unsub?.(); };
-  }, [matchId, applyRemote]);
-
-  const pushShared = useCallback(async (next = {}) => {
-    if (!matchId || syncingRef.current) return;
-    const state = {
-      sig: next.sig ?? sig,
-      red: next.red ?? red,
-      blue: next.blue ?? blue,
-    };
-    try {
-      const r = await api.upsertAwpStatus(EVENT_ID, matchId, {
-        matchRef,
-        state,
-        verifiedBy: null,
-        verifiedAt: null,
-        updatedBy: meName || "Ref",
-      });
-      setRemoteMeta(r);
-      onStatusChange?.(r);
-    } catch {}
-  }, [matchId, matchRef, sig, red, blue, meName, onStatusChange]);
-
-  const setSigShared = (v) => { setSig(v); pushShared({ sig: v }); };
-  const setRedShared = (patch) => {
-    const next = { ...red, ...patch };
-    setRed(next);
-    pushShared({ red: next });
-  };
-  const setBlueShared = (patch) => {
-    const next = { ...blue, ...patch };
-    setBlue(next);
-    pushShared({ blue: next });
-  };
-
   const summarize = (label, s) => {
     const ok = s.pins >= th.pins && s.goals >= th.goals && s.perim && s.noViol;
     const gaps = [];
@@ -3539,80 +3312,36 @@ function AwpChecker({ onSave, onSaved, matchId, matchRef, meName = "", onStatusC
     if (!s.noViol) gaps.push("auton violation");
     return `${label}: ${ok ? "MET" : "NOT met"} (${s.pins}P/${s.goals}G${!ok && gaps.length ? " — " + gaps.join(", ") : ""})`;
   };
-
   const doSave = async () => {
     if (!onSave) return;
     const note = `AWP ${sig ? "Sig 7/3" : "Std 6/2"} — ${summarize("Red", red)}; ${summarize("Blue", blue)}`;
     setSaving(true);
     try {
       await onSave(note);
-      const now = Date.now();
-      const status = await api.upsertAwpStatus(EVENT_ID, matchId, {
-        matchRef,
-        state: { sig, red, blue },
-        verifiedBy: meName || "Ref",
-        verifiedAt: now,
-        updatedBy: meName || "Ref",
-      });
-      setRemoteMeta(status);
-      onStatusChange?.(status);
-      setSavedMsg("Shared AWP check saved ✓");
-      onSaved?.();
+      setSavedMsg("Saved to the match log ✓");
+      setTimeout(() => setSavedMsg(""), 3000);
     } catch (e) {
       alert(e.message || "Couldn't save the AWP result.");
     } finally { setSaving(false); }
   };
-
-  const doReset = async () => {
-    const who = remoteMeta?.verifiedBy ? ` by ${remoteMeta.verifiedBy}` : "";
-    if (!confirm(`Reset the shared AWP check${who}? This clears the current shared checklist for this match but does not delete saved AWP history.`)) return;
-    const nextRed = { pins: 0, goals: 0, perim: true, noViol: true };
-    const nextBlue = { pins: 0, goals: 0, perim: true, noViol: true };
-    setSig(true); setRed(nextRed); setBlue(nextBlue);
-    try {
-      const status = await api.upsertAwpStatus(EVENT_ID, matchId, {
-        matchRef,
-        state: { sig: true, red: nextRed, blue: nextBlue },
-        verifiedBy: null,
-        verifiedAt: null,
-        updatedBy: meName || "Ref",
-      });
-      setRemoteMeta(status);
-      onStatusChange?.(status);
-    } catch (e) { alert(e.message || "Couldn't reset the shared AWP check."); }
-  };
-
-  const meta = remoteMeta?.verifiedAt
-    ? `Verified by ${remoteMeta.verifiedBy || "Ref"} • ${new Date(remoteMeta.verifiedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-    : remoteMeta?.updatedAt
-      ? `Shared progress • updated by ${remoteMeta.updatedBy || "Ref"}`
-      : "Shared across event devices";
-
   return (
     <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-xs font-bold text-emerald-700 dark:text-emerald-300">Shared AWP check</div>
-          <div className="text-[11px] text-slate-500 dark:text-slate-400">{meta}</div>
-        </div>
-        <button onClick={doReset} className="px-2 py-1 rounded-md text-xs font-semibold border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300">Reset</button>
-      </div>
       <div className="flex items-center justify-between">
         <span className="text-xs text-slate-500 dark:text-slate-400">Criteria (exclude anything across the auton line)</span>
         <div className="flex gap-1 shrink-0">
-          <button onClick={() => setSigShared(true)} className={`px-2 py-1 rounded-md text-xs font-semibold border ${sig ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>Signature 7/3</button>
-          <button onClick={() => setSigShared(false)} className={`px-2 py-1 rounded-md text-xs font-semibold border ${!sig ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>Standard 6/2</button>
+          <button onClick={() => setSig(true)} className={`px-2 py-1 rounded-md text-xs font-semibold border ${sig ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>Signature 7/3</button>
+          <button onClick={() => setSig(false)} className={`px-2 py-1 rounded-md text-xs font-semibold border ${!sig ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 border-slate-300 dark:border-slate-600"}`}>Standard 6/2</button>
         </div>
       </div>
       <div className="grid sm:grid-cols-2 gap-3">
-        <AwpAlliance color="red" th={th} state={red} onChange={setRedShared} />
-        <AwpAlliance color="blue" th={th} state={blue} onChange={setBlueShared} />
+        <AwpAlliance color="red" th={th} state={red} onChange={(patch) => setRed((s) => ({ ...s, ...patch }))} />
+        <AwpAlliance color="blue" th={th} state={blue} onChange={(patch) => setBlue((s) => ({ ...s, ...patch }))} />
       </div>
       {onSave && (
-        <button onClick={doSave} disabled={saving} className="w-full py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold flex items-center justify-center gap-2 disabled:bg-slate-300 hover:bg-[#171a45]"><Save size={16} /> {saving ? "Saving…" : "Save shared AWP result"}</button>
+        <button onClick={doSave} disabled={saving} className="w-full py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold flex items-center justify-center gap-2 disabled:bg-slate-300 hover:bg-[#171a45]"><Save size={16} /> {saving ? "Saving…" : "Save result to match log"}</button>
       )}
       {savedMsg && <p className="text-xs text-emerald-600 dark:text-emerald-400 text-center font-medium">{savedMsg}</p>}
-      <p className="text-[11px] text-slate-400">Manual aid only. Tournament Manager records the official AWP. Current checklist progress syncs across event devices. Saving records who verified the check and when, and also keeps the result in this match's AWP history.</p>
+      <p className="text-[11px] text-slate-400">Manual aid — enter what you saw at the end of auton. It changes no scores; Tournament Manager records the official AWP. Saving keeps a copy in this match's log for later reference. Every saved result is also collected in the <b>AWP tab</b>, where you can see the match and which criteria each alliance met.</p>
     </div>
   );
 }
@@ -3624,70 +3353,10 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
   const [faultOpen, setFaultOpen] = useState(false);
   const [faultNote, setFaultNote] = useState("");
   const [awpOpen, setAwpOpen] = useState(false);
-  const [awpStatus, setAwpStatus] = useState(null);
-  const [fieldResetOpen, setFieldResetOpen] = useState(false);
-  const [fieldResetReady, setFieldResetReady] = useState(false);
-  const [fieldResetStatus, setFieldResetStatus] = useState(null);
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!match?.id) {
-      setAwpStatus(null);
-      return undefined;
-    }
-    let alive = true;
-    const applyAwp = (remote) => { if (alive) setAwpStatus(remote || null); };
-    api.getAwpStatus(EVENT_ID, match.id).then(applyAwp).catch(() => applyAwp(null));
-    const unsub = api.subscribeAwpStatus(EVENT_ID, match.id, applyAwp);
-    return () => { alive = false; unsub?.(); };
-  }, [match?.id]);
-
-  useEffect(() => {
-    if (!match?.id) {
-      setFieldResetReady(false);
-      setFieldResetStatus(null);
-      return undefined;
-    }
-    let alive = true;
-    const applyStatus = (remote) => {
-      if (!alive) return;
-      if (remote?.state?.quadrants?.length === 4) {
-        const ready = remote.state.quadrants.every((q) => !!q?.verifiedAt);
-        setFieldResetReady(ready);
-        setFieldResetStatus(remote);
-        try { localStorage.setItem(`refos-quadrant-field-reset-v1:${match.id}`, JSON.stringify(remote.state)); } catch {}
-        return;
-      }
-      try {
-        const saved = JSON.parse(localStorage.getItem(`refos-quadrant-field-reset-v1:${match.id}`) || "null");
-        const ready = !!(saved?.quadrants?.length === 4 && saved.quadrants.every(q => !!q?.verifiedAt));
-        setFieldResetReady(ready);
-        if (!ready) setFieldResetStatus(null);
-      } catch {
-        setFieldResetReady(false);
-        setFieldResetStatus(null);
-      }
-    };
-    api.getFieldResetStatus(EVENT_ID, match.id).then(applyStatus).catch(() => applyStatus(null));
-    const unsub = api.subscribeFieldResetStatus(EVENT_ID, match.id, applyStatus);
-    return () => { alive = false; unsub?.(); };
-  }, [match?.id]);
-
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
   const m = match;
   const heading = m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`);
-  const awpVerified = !!awpStatus?.verifiedAt;
-  const awpMeta = awpVerified
-    ? `Verified by ${awpStatus.verifiedBy || "Ref"} • ${new Date(awpStatus.verifiedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-    : awpStatus?.updatedAt
-      ? `Shared progress • updated by ${awpStatus.updatedBy || "Ref"}`
-      : "";
-  const fieldResetMeta = fieldResetReady && fieldResetStatus?.verifiedAt
-    ? `Verified by ${fieldResetStatus.verifiedBy || "Ref"} • ${new Date(fieldResetStatus.verifiedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-    : "";
-  const fieldResetProgress = fieldResetStatus?.state?.quadrants?.length === 4
-    ? fieldResetStatus.state.quadrants.filter((q) => !!q?.verifiedAt).length
-    : 0;
   const matchEntries = fieldLog.filter((e) => e.matchId === m.id).sort((a, b) => b.createdAt - a.createdAt);
   const replayEntry = matchEntries.find((e) => e.kind === "replay");
   const allTimeouts = fieldLog.filter((e) => e.kind === "timeout");
@@ -3813,25 +3482,8 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
           <button onClick={() => { setFaultOpen((v) => !v); setToOpen(false); }} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${faultOpen ? "bg-red-600 text-white border-red-600" : "bg-white dark:bg-slate-800 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700"}`}><AlertTriangle size={15} /> Field fault</button>
           <button onClick={toggleReplay} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${replayEntry ? "bg-amber-500 text-white border-amber-500" : "bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"}`}><RefreshCw size={15} /> {replayEntry ? "For replay ✓" : "Replay"}</button>
         </div>
-        {!isElim && <div className="mt-2">
-          <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1 px-1">Autonomous Win Point</div>
-          <button onClick={() => { setAwpOpen((v) => !v); setToOpen(false); setFaultOpen(false); }} className={`w-full py-2.5 rounded-lg border text-sm font-semibold flex flex-col items-center justify-center gap-0.5 ${awpVerified ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : awpOpen ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"}`}>
-            <span className="flex items-center gap-1.5"><ClipboardCheck size={15} /> {awpVerified ? "AWP Checked ✓" : "AWP Check"}</span>
-            {awpMeta && <span className={`text-[10px] font-medium ${awpOpen && !awpVerified ? "text-white/80" : "text-emerald-700 dark:text-emerald-300"}`}>{awpMeta}</span>}
-          </button>
-        </div>}
-        {!isElim && awpOpen && <AwpChecker matchId={m.id} matchRef={heading} meName={meName} onStatusChange={setAwpStatus} onSaved={() => setAwpOpen(false)} onSave={(note) => onAddField({ kind: "awp", matchId: m.id, matchRef: heading, note })} />}
-        <div className="mt-2">
-          <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1 px-1">Field setup</div>
-          <button
-            onClick={() => setFieldResetOpen(true)}
-            className={`w-full py-2.5 rounded-lg border text-sm font-semibold flex flex-col items-center justify-center gap-0.5 ${fieldResetReady ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"}`}
-          >
-            <span className="flex items-center gap-1.5"><CheckCircle2 size={15} /> {fieldResetReady ? "Field Ready ✓" : "Field Reset Check"} {!fieldResetReady && <span className="text-[10px] font-bold text-amber-500">EXPERIMENTAL</span>}</span>
-            {fieldResetMeta && <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300">{fieldResetMeta}</span>}
-            {!fieldResetReady && fieldResetProgress > 0 && <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300">Shared progress • {fieldResetProgress}/4 quadrants verified</span>}
-          </button>
-        </div>
+        {!isElim && <button onClick={() => { setAwpOpen((v) => !v); setToOpen(false); setFaultOpen(false); }} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${awpOpen ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"}`}><ClipboardCheck size={15} /> AWP check</button>}
+        {!isElim && awpOpen && <AwpChecker onSave={(note) => onAddField({ kind: "awp", matchId: m.id, matchRef: heading, note })} />}
         {isElim && toOpen && (
           <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2">
             <div className="flex gap-2">
@@ -3867,19 +3519,6 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
           </ul>
         )}
       </div>)}
-      {emcee && (
-        <div className="mb-4">
-          <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1 px-1">Field setup</div>
-          <button
-            onClick={() => setFieldResetOpen(true)}
-            className={`w-full py-2.5 rounded-lg border text-sm font-semibold flex flex-col items-center justify-center gap-0.5 ${fieldResetReady ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"}`}
-          >
-            <span className="flex items-center gap-1.5"><CheckCircle2 size={15} /> {fieldResetReady ? "Field Ready ✓" : "Field Reset Check"} {!fieldResetReady && <span className="text-[10px] font-bold text-amber-500">EXPERIMENTAL</span>}</span>
-            {fieldResetMeta && <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300">{fieldResetMeta}</span>}
-            {!fieldResetReady && fieldResetProgress > 0 && <span className="text-[10px] font-medium text-amber-700 dark:text-amber-300">Shared progress • {fieldResetProgress}/4 quadrants verified</span>}
-          </button>
-        </div>
-      )}
       {(() => {
         const inMatch = [...(match.red || []), ...(match.blue || [])].flatMap((n) => teamWatch[n] || []);
         if (emcee || inMatch.length === 0) return null;
@@ -3902,27 +3541,61 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
         <ul className="space-y-2">{mv.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} showTeam />)}</ul>
       )}
       </>)}
-      {fieldResetOpen && (
-        <QuadrantFieldResetCheck
-          onClose={() => setFieldResetOpen(false)}
-          storageKey={`refos-quadrant-field-reset-v1:${m.id}`}
-          matchLabel={heading}
-          eventId={EVENT_ID}
-          matchId={m.id}
-          meName={meName}
-          onReadyChange={(ready, meta = {}) => {
-            setFieldResetReady(ready);
-            setFieldResetStatus((cur) => ({ ...(cur || {}), verifiedBy: meta.verifiedBy || "", verifiedAt: meta.verifiedAt || null }));
-          }}
-          autoCloseOnComplete
-        />
-      )}
     </>
   );
 }
 
 /* ============================ CLEAR MODAL ============================ */
 
+
+
+function GuidedTour({ role, step, hasMatches, hasRules, onStep, onClose }) {
+  const judge = role === "Judge Advisor";
+  const emcee = role === "Emcee";
+  const standard = [
+    { title: "Teams", text: "The tour has switched Ref OS to Teams. Use this section when you are starting with a team number, reviewing its history, or opening its record.", hint: "You are looking at the live Teams section behind this card." },
+    { title: "Finding a team", text: "Use the search box to find a team quickly. Opening a team shows its event information, violations, robot information, and team specific actions.", hint: "Try scrolling the Teams list behind the tour." },
+    { title: "Matches", text: hasMatches ? "Ref OS has now switched to Matches. This is the normal field workflow for finding the match you are working." : "This event does not currently have imported matches, so the tour cannot open the Matches section yet.", hint: hasMatches ? "The live Matches list is behind this card." : "Import a match schedule from TM Sync Center to enable this part." },
+    { title: "Opening a match", text: hasMatches ? "The tour has opened the first match in the event. A match page shows Red and Blue teams, team history, field tools, AWP controls for qualifications, and existing violations." : "Once matches are imported, tapping any match opens the full match detail screen.", hint: hasMatches ? "This is a real match screen. The tour is not changing it." : "No match data is available right now." },
+    { title: "Logging a violation", text: emcee ? "Emcee mode is view focused, so violation entry is not available in this role." : "The actual New Violation form is open behind this card. A referee selects the team and match, chooses Minor, Major, or Inspection, cites the rule, adds notes or photos, then saves.", hint: emcee ? "Switch to a Referee role to practice violation entry." : "Saving is disabled while the guided tour is active, so you can safely explore the real form." },
+    { title: "Rules", text: hasRules ? "The tour has switched to Rules. Search by rule code or description, and tap a rule when you need the exact event reference." : "No rulebook is loaded for this event yet, so the Rules section cannot be demonstrated.", hint: hasRules ? "The live rulebook is visible behind this card." : "Load rules to enable this step." },
+    { title: "Field Log", text: "The actual Field Log is open behind the tour. This is where operational entries such as replays, field faults, timeouts, and saved field information are reviewed.", hint: "Close the tour later and the Field Log works normally." },
+    { title: "Alliances", text: "The tour has moved to Alliances. This section is used to follow alliance selection and the elimination bracket. Editing depends on the current role and Admin permissions.", hint: "The live Alliances section is behind this card." },
+    { title: "Event contacts", text: "The Event Contact Directory is open behind the tour. Everyone can view event leadership and support contacts. Admin controls the shared directory.", hint: "Phone and email links are usable outside the tour." },
+    { title: "Done", text: "That is the core Ref OS workflow. You can run this guided tour again from the gear menu at any time.", hint: "Finish returns you to normal Ref OS operation." },
+  ];
+  const judgeSteps = [
+    { title: "Judging", text: "The tour has opened the live Judging section. This is the Judge Advisor's primary workspace for nominations and finalist information.", hint: "The Judging screen is behind this card." },
+    { title: "Judging workflow", text: "Use this area to review nomination information and finalists during deliberations. Official nomination export is handled through Admin tools.", hint: "Nothing in the tour changes judging data." },
+    { title: "Alliances", text: "The tour has switched to Alliances. Judge Advisors can see alliance selection and the bracket without editing it.", hint: "Judge Advisor bracket access remains view only." },
+    { title: "Done", text: "You can run the guided tour again from the gear menu whenever you need a refresher.", hint: "Finish returns to normal Ref OS operation." },
+  ];
+  const steps = judge ? judgeSteps : standard;
+  const safeStep = Math.min(step, steps.length - 1);
+  const cur = steps[safeStep];
+  return (
+    <div className="fixed inset-0 z-[90] pointer-events-none">
+      <div className="absolute inset-0 bg-black/20 pointer-events-none" />
+      <div className="absolute left-3 right-3 bottom-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[560px] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden pointer-events-auto">
+        <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2">
+          <PlayCircle size={19}/><div className="font-bold">Guided tour</div>
+          <div className="ml-2 text-xs text-slate-400">{safeStep + 1} of {steps.length}</div>
+          <button onClick={onClose} className="ml-auto"><X size={21}/></button>
+        </div>
+        <div className="p-4">
+          <div className="text-xs font-bold uppercase tracking-wide text-[#D7212B]">{cur.title}</div>
+          <p className="mt-1 text-sm leading-6 text-slate-700 dark:text-slate-200">{cur.text}</p>
+          <div className="mt-2 rounded-lg bg-slate-100 dark:bg-slate-900 px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{cur.hint}</div>
+          <div className="flex gap-1.5 mt-4">{steps.map((_,i)=><div key={i} className={`h-1.5 flex-1 rounded-full ${i <= safeStep ? "bg-[#D7212B]" : "bg-slate-200 dark:bg-slate-700"}`}/>)}</div>
+          <div className="grid grid-cols-2 gap-2 mt-4">
+            <button onClick={() => safeStep ? onStep(safeStep - 1) : onClose()} className="rounded-xl border px-4 py-2.5 font-semibold">{safeStep ? "Back" : "Exit"}</button>
+            <button onClick={() => safeStep < steps.length - 1 ? onStep(safeStep + 1) : onClose()} className="rounded-xl bg-[#0D0F32] text-white px-4 py-2.5 font-semibold">{safeStep < steps.length - 1 ? "Next" : "Finish"}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 
 function PreEventSystemTest({ eventId, adminUnlocked, onClose, onComplete }) {
@@ -4410,7 +4083,7 @@ function RobotList({ teams, query, setQuery, onOpen }) {
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search teams by number or name" placeholder="Search team #"
-          className="w-full pl-9 pr-3 py-2.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
+          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
       </div>
       {filtered.length === 0 ? (
         <Empty title="No teams" sub="Try a different team number." />
@@ -5292,158 +4965,172 @@ function FieldLogView({ entries, onAdd, onRemove, meName, canDelete }) {
 
 /* ============================ FEATURES & HELP ============================ */
 function FeaturesGuide() {
-  const [selectedFeature, setSelectedFeature] = useState(null);
-
-  const features = [
-    { icon: ListOrdered, title: "Match Tab", preview: "/feature-previews/match-tab.png", text: "Keep the active match and referee workflow together.", detail: "The Match tab gives referees a fast event day view of the schedule and the teams assigned to each match, with direct access to the actions they need while officiating.", bullets: ["Browse imported qualification and elimination matches", "See the teams assigned to each alliance", "Open match specific referee actions", "Flag matches for replay when needed", "Use the same match data across authorized devices"] },
-    { icon: ShieldAlert, title: "Violation Tracking", preview: "/feature-previews/violation-tracking.png", text: "Log violations with one or multiple rules and review them consistently across the referee crew.", detail: "Violation Tracking creates a shared record of Minor, Major, and Inspection violations so Head Referees and field crews can make more consistent decisions throughout the event. A single violation can cite multiple rules at once without combining those rules into one record for reporting.", bullets: ["Record the team, match, severity, notes, and one or multiple cited rules", "Select multiple rules directly in the violation form", "Display every cited rule separately in the violation log", "Count each cited rule separately in Violations by Rule", "Attach supported photos to a violation", "Review a team's prior violation history"] },
-    { icon: Clock, title: "AWP Checker", preview: "/feature-previews/awp-checker.png", text: "Record and share Autonomous Win Point checks without mixing them into violations.", detail: "The AWP Checker gives the referee crew a dedicated shared workflow for recording Autonomous Win Point observations during qualification matches. In-progress criteria sync across event devices, and a saved check records who verified it and when while keeping AWP separate from Field Ready and violations.", bullets: ["Share in-progress Red and Blue alliance AWP criteria across event devices", "Record the verifier name and time when an AWP check is saved", "Show AWP Checked status directly on the match", "Require confirmation before resetting shared AWP progress", "Keep AWP records separate from Field Ready and violations", "Review saved checks during the event", "Clear AWP history independently from Clear Data"] },
-    { icon: CheckCircle2, title: "Quadrant Field Reset Check", preview: "/feature-previews/quadrant-field-reset.png", text: "Verify the field reset quadrant by quadrant before the next match. Field is oriented from the Head Ref side.", detail: "The Quadrant Field Reset Check is oriented from the Head Ref side and gives the field crew a shared visual checklist for confirming that game objects are back in their correct starting positions. Match progress syncs across event devices, records who completed the final verification and when, and keeps Field Ready separate from the AWP workflow.", bullets: ["Verify Q1 through Q4 with position specific reference images", "Share partial quadrant progress across event devices in real time", "Record the verifier name and time when the field becomes ready", "Require confirmation before resetting shared field setup progress", "Keep Field Ready visibly separate from the AWP check", "Use Check All and automatically advance to the next quadrant", "Open and zoom the full field reference when needed"] },
-    { icon: Users, title: "Teams Tab", preview: "/feature-previews/teams-tab.png", text: "Search teams and review their Ref OS event history.", detail: "The Teams tab centralizes team information so referees can quickly find a team and review the records Ref OS has collected for it during the event.", bullets: ["Search the imported team roster", "Open individual team records", "Review violations associated with a team", "Use team information throughout referee workflows", "Keep the roster available to authorized devices"] },
-    { icon: Bot, title: "Robots Tab", preview: "/feature-previews/robots-tab.png", text: "Keep robot information and inspection context easy to find.", detail: "The Robots tab gives the event crew a dedicated place to review robot related information without burying it inside team or violation screens.", bullets: ["Review robot records by team", "Keep robot photos and notes where supported", "Surface robot information during event operations", "Separate robot context from violation history", "Use the same records across Ref OS devices"] },
-    { icon: BookOpen, title: "Rules", preview: "/feature-previews/rules.png", text: "Search the rules quickly during event day decisions.", detail: "The Rules workspace is built for fast lookup when a referee needs to verify a rule during a match, discussion, or Head Referee review.", bullets: ["Search by rule number or rule text", "Open relevant rules without leaving Ref OS", "Favorite frequently referenced rules", "Return to recently viewed rules quickly", "Keep supported rule content available during connectivity problems"] },
-    { icon: Flag, title: "Field Log", preview: "/feature-previews/field-log.png", text: "Maintain a shared operational record for the field crew.", detail: "Field Log is the event operations notebook for information that matters to the referee crew but does not belong in a team violation or judging record.", bullets: ["Record field faults and operational notes", "Document match replay information", "Track when entries were created", "Keep operational records separate from violations", "Share field information across authorized devices"] },
-    { icon: Trophy, title: "Judge Nominations", preview: "/feature-previews/judge-nominations.png", text: "Collect shared award nominations inside the Judge Advisor workflow.", detail: "Judge Nominations gives authorized judging users a shared workspace for collecting and reviewing event nominations while keeping judging access separated from referee permissions.", bullets: ["Create and review award nominations", "Maintain shared nomination lists", "Support finalist selection workflows", "Keep judging data role restricted", "Export supported nomination records"] },
-    { icon: GitBranch, title: "Alliance Selection", preview: "/feature-previews/alliance-selection.png", text: "Organize captains, picks, and elimination setup.", detail: "Alliance Selection helps event staff manage alliance information inside Ref OS while keeping Tournament Manager as the official event system.", bullets: ["Populate alliance captains from imported information", "Record alliance picks", "Handle captain movement during selection", "Review elimination setup information", "Clear alliance data independently when needed"] },
-    { icon: BarChart3, title: "TM Imports", preview: "/feature-previews/tm-imports.png", text: "Bring supported Tournament Manager exports into Ref OS.", detail: "TM Imports lets the event crew load the event data Ref OS needs without depending on a live Tournament Manager connection during the event.", bullets: ["Import team rosters", "Import match schedules", "Import supported rankings and alliance information", "Import supported score data", "Keep Tournament Manager as the official source of truth"] },
-    { icon: CloudOff, title: "Offline Ready", preview: "/feature-previews/offline-ready.png", text: "Keep Ref OS useful when venue internet becomes unreliable.", detail: "Ref OS is designed for event environments where WiFi can drop or become congested. Cached information and supported queued writes help the crew continue working through temporary connectivity problems.", bullets: ["Cache supported event data locally", "Queue supported writes while offline", "Retry queued writes after reconnection", "Show pending write information", "Run as an installable PWA on supported devices"] },
-    { icon: Wifi, title: "Live Sync", preview: "/feature-previews/live-sync.png", text: "Keep connected Ref OS devices aligned during the event.", detail: "When cloud connectivity is available, Ref OS synchronizes shared event information so volunteers are working from the same operational data.", bullets: ["Synchronize shared event updates", "Use realtime presence for connected volunteers", "Display connection health", "Track pending and failed writes", "Show the last successful cloud communication"] },
-    { icon: BarChart3, title: "Event Command Center", preview: "/feature-previews/event-command-center.png", text: "Give Admins one place for event operations tools.", detail: "The Event Command Center groups the administrative tools used to configure, monitor, and manage Ref OS during an event.", bullets: ["Manage event configuration", "Open volunteer and contact tools", "Control event announcements and countdowns", "Access diagnostics and feedback", "Open import, export, and other Admin tools"] },
-    { icon: Contact, title: "Event Contact Directory", preview: "/feature-previews/event-contact-directory.png", text: "Keep important event contacts available to the crew.", detail: "The Event Contact Directory gives authorized volunteers one shared place for the people and contact information they may need during the event.", bullets: ["Store names and event roles", "Add phone and email information", "Record locations and useful notes", "Reorder contacts by event priority", "Share the same directory across authorized devices"] },
-    { icon: Mail, title: "Feedback Inbox", preview: "/feature-previews/feedback-inbox.png", text: "Collect Private Beta feedback directly inside Ref OS.", detail: "Feedback Inbox keeps user submitted bugs, suggestions, and general feedback separate from Field Log and gives Admins a dedicated place to review it.", bullets: ["Collect Bug, Suggestion, and General Feedback submissions", "Attach Ref OS version and device context", "Keep feedback out of Field Log", "Review submissions from Event Command Center", "Delete feedback after it has been handled"] },
-    { icon: ShieldCheck, title: "Admin Diagnostics", preview: "/feature-previews/admin-diagnostics.png", text: "See the device and sync state that matters during troubleshooting.", detail: "Admin Diagnostics exposes the technical status an Admin needs when a device is having connectivity, synchronization, or PWA problems during an event.", bullets: ["Inspect cloud connectivity", "See queued and failed writes", "Review last successful synchronization", "Check service worker and offline cache state", "View app version, browser, device, and event information"] },
-    { icon: QrCode, title: "Volunteer Onboarding", preview: "/feature-previews/volunteer-onboarding.png", text: "Get key volunteers into the correct Ref OS role quickly.", detail: "Volunteer Onboarding combines event access codes and volunteer identification so event staff can join the correct role without a complicated account setup process.", bullets: ["Use role specific join codes", "Collect volunteer names for identification", "Separate Referee, Judge Advisor, and Emcee access", "Share event access information", "Let Admins manage active join credentials"] },
-  ];
-
-  const SelectedIcon = selectedFeature?.icon;
+  const Section = ({ icon: Ic, title, children }) => (
+    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-3">
+      <h3 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-2">{Ic && <Ic size={17} className="text-[#D7212B]" />}{title}</h3>
+      <div className="text-sm text-slate-600 dark:text-slate-300 space-y-2 leading-relaxed">{children}</div>
+    </div>
+  );
+  const Li = ({ children }) => <li className="flex gap-2"><span className="text-[#D7212B] mt-0.5">•</span><span>{children}</span></li>;
 
   return (
-    <div className="refos-features-page">
-      <section className="relative overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-950 text-white px-5 py-7 sm:px-8 sm:py-9 mb-6">
-        <div className="absolute -right-16 -top-20 w-56 h-56 rounded-full bg-[#D7212B]/20 blur-3xl" />
-        <div className="relative max-w-2xl">
-          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-red-300 mb-2">Ref OS 1.2.0 • Highlander Release</div>
-          <h2 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">Everything your event crew needs, in one place.</h2>
-          <p className="mt-3 text-sm sm:text-base text-slate-300 leading-relaxed max-w-xl">Built specifically for VEX event operations. Ref OS keeps referees, Judge Advisors, Emcees, and Admins working from the same event data across phones, tablets, and laptops.</p>
-          <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold">
-            <span className="px-3 py-1.5 rounded-md bg-white/10 border border-white/10">Offline capable</span>
-            <span className="px-3 py-1.5 rounded-md bg-white/10 border border-white/10">Role based</span>
-            <span className="px-3 py-1.5 rounded-md bg-white/10 border border-white/10">Realtime sync</span>
-            <span className="px-3 py-1.5 rounded-md bg-white/10 border border-white/10">Installable PWA</span>
-          </div>
-        </div>
-      </section>
+    <>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+        Ref-OS is the shared referee, event operations, alliance, and judging workspace for the Highlander Summit. This guide reflects Ref-OS v{APP_VERSION}.
+      </p>
 
-      <section className="mb-7">
-        <div className="mb-4">
-          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#D7212B]">Features</div>
-          <h3 className="text-xl sm:text-2xl font-black text-slate-950 dark:text-white mt-1">Built around the way an event actually runs</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">Select any feature for a closer look at what it does and how it fits into the event workflow.</p>
-        </div>
+      <Section icon={KeyRound} title="Login, access codes & roles">
+        <p>Ref-OS supports the normal role passwords plus event access codes and QR login. Role access is enforced by Supabase on the server, not only by hiding buttons in the interface.</p>
+        <ul className="space-y-1.5">
+          <Li><b>Referee / crew</b> — teams, matches, violations, robot photos, rules, watchlist, field operations, judging nominations, and bracket advancement.</Li>
+          <Li><b>Judge Advisor</b> — Judging plus view access to Alliances and the elimination bracket. Judge Advisors do not get referee violation tools or bracket editing.</Li>
+          <Li><b>Emcee / announcer</b> — teams, matches, scores, rules, alliances, bracket information, and judging nominations without exposing referee disciplinary information.</Li>
+          <Li><b>Admin</b> — all normal event access plus the Event Command Center, setup, imports, exports, role access code management, diagnostics, data clearing, and alliance selection controls.</Li>
+          <Li><b>Permanent Admin keypad code</b> — the fixed event Admin code can be entered directly on the keypad. Generated volunteer codes use the pattern number, letter A-D, number, number.</Li>
+          <Li><b>QR login</b> — admins can generate a QR login card for a role access code. QR creation and QR decoding are local to Ref-OS; the actual login still verifies access with Supabase.</Li>
+        </ul>
+        <p>After login, enter your <b>first and last name</b>. Your name is used to identify entries and volunteer presence across the event.</p>
+      </Section>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-          {features.map((feature) => {
-            const Icon = feature.icon;
-            return (
-              <button key={feature.title} type="button" onClick={() => setSelectedFeature(feature)} className="group text-left bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 sm:p-5 transition-all hover:border-slate-400 dark:hover:border-slate-500 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#D7212B]/40">
-                <div className="flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 text-[#D7212B] flex items-center justify-center shrink-0">
-                    <Icon size={20} strokeWidth={2} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-extrabold text-slate-950 dark:text-white text-[15px] sm:text-base">{feature.title}</h4>
-                      <ChevronRight size={16} className="ml-auto text-slate-400 group-hover:text-[#D7212B] transition-colors shrink-0" />
-                    </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mt-1">{feature.text}</p>
-                    <div className="mt-3 text-xs font-bold text-[#D7212B]">View details</div>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+      <Section icon={ShieldAlert} title="Security & permissions">
+        <ul className="space-y-1.5">
+          <Li><b>Database enforced permissions</b> — Supabase Row Level Security restricts event data reads and writes by the signed-in role.</Li>
+          <Li><b>Server validated credentials</b> — role passwords and access codes are verified by server-side RPCs instead of being compared in the browser.</Li>
+          <Li><b>Private robot photos</b> — robot images are stored privately and opened with signed URLs for authorized event members.</Li>
+          <Li><b>Disabled access codes</b> — disabling a generated code blocks future logins with that code. It does not automatically kick out volunteers who are already signed in.</Li>
+        </ul>
+      </Section>
 
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-7">
-        <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 bg-slate-50 dark:bg-slate-900/50">
-          <div className="font-black text-slate-950 dark:text-white">One shared workspace</div>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Keep event operations out of scattered chats, paper notes, and separate spreadsheets.</p>
-        </div>
-        <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 bg-slate-50 dark:bg-slate-900/50">
-          <div className="font-black text-slate-950 dark:text-white">Designed for bad Wi-Fi</div>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Cached event data and queued writes help Ref OS remain useful when venue connectivity is inconsistent.</p>
-        </div>
-        <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-4 bg-slate-50 dark:bg-slate-900/50">
-          <div className="font-black text-slate-950 dark:text-white">Private Beta</div>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Feedback from real event volunteers feeds directly into the Admin Feedback Inbox.</p>
-        </div>
-      </section>
+      <Section icon={BarChart3} title="Event Command Center (Admin)">
+        <p>The Event Command Center is the main Admin operations screen. Most event management tools that used to live directly in the gear menu are now organized here.</p>
+        <ul className="space-y-1.5">
+          <Li><b>Event overview</b> — quick counts for matches, violations, replays, field faults, volunteer presence, and event activity.</Li>
+          <Li><b>Key Volunteer Status</b> — see volunteers online now and the known volunteer roster with role and online or offline status.</Li>
+          <Li><b>Announcements</b> — send a shared Key Volunteer Announcement to connected Ref-OS devices. Each device can acknowledge it.</Li>
+          <Li><b>Shared countdown</b> — create or clear an event countdown that syncs across devices.</Li>
+          <Li><b>Event Contact Directory</b> — shared names, roles, phone numbers, email, locations, and notes for event contacts. Admins can edit and reorder it.</Li>
+          <Li><b>Role access codes</b> — generate, display, print, QR encode, or disable event role codes.</Li>
+          <Li><b>Pre Event System Test</b> — checks browser storage, service worker readiness, database read/write, realtime sync, Tournament Manager parsing, PDF generation, and other event-critical functions.</Li>
+          <Li><b>Two Device Sync Test</b> — verifies that two Ref-OS devices can exchange a live probe and acknowledgement through the event backend.</Li>
+          <Li><b>Event Diagnostic Report</b> — displays the app, device, event, storage, network, and sync snapshot and can copy or download the report as JSON.</Li>
+          <Li><b>Failed Sync Items</b> — permanent offline write failures are retained so an Admin can retry or discard them instead of silently losing the entry.</Li>
+          <Li><b>Event setup, TM Sync Center, exports, backup, Activity feed, Rankings, and Clear event data</b> are also accessed from the Command Center.</Li>
+        </ul>
+      </Section>
 
-      <section className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 sm:p-6 mb-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="text-lg font-black text-slate-950 dark:text-white">Need help using Ref OS?</div>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Open any feature above for a detailed walkthrough, or send feedback if something does not behave the way you expect.</p>
-          </div>
-          <div className="text-xs font-semibold text-slate-400 whitespace-nowrap">v{APP_VERSION} • Highlander Release</div>
-        </div>
-      </section>
+      <Section icon={CloudOff} title="Offline & live sync">
+        <p>If Wi-Fi drops, supported entries are queued on the device and automatically retried when connectivity returns. Pending items show their saving state so volunteers do not need to enter them twice.</p>
+        <ul className="space-y-1.5">
+          <Li><b>Offline queue</b> — temporary failures remain queued locally until they can sync.</Li>
+          <Li><b>Cached teams</b> — every successful team roster sync is saved on the device. If the network drops, Ref-OS keeps the last synced roster visible and searchable instead of replacing it with an empty list.</Li>
+          <Li><b>Cached matches</b> — every successful match schedule sync is saved on the device. Previously loaded qualification and elimination matches remain available while offline.</Li>
+          <Li><b>Permanent failures</b> — rejected writes are moved into Failed Sync Items for Admin review.</Li>
+          <Li><b>Realtime updates</b> — shared event data and event settings update across connected devices through Supabase realtime.</Li>
+        </ul>
+      </Section>
 
-      <p className="text-center text-xs text-slate-400 mt-4 mb-2">Made by Maharshi Patel · <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="underline">@mpatel_ref</a> · v{APP_VERSION} · Highlander Release</p>
+      <Section icon={ListOrdered} title="Matches & logging violations">
+        <p>The fastest referee workflow is <b>Matches</b>: open a match, tap the team involved, then complete the violation form.</p>
+        <ul className="space-y-1.5">
+          <Li>Choose <b>Minor</b>, <b>Major</b>, or <b>Inspection</b>, select the applicable rule, add notes, and attach robot photos when useful.</Li>
+          <Li><b>Duplicate protection</b> warns before adding the same team, rule, and match combination twice.</Li>
+          <Li><b>Field filters</b>, match jumping, replay flags, field faults, timeouts, watchlist information, and match violation history are available from the match workflow.</Li>
+          <Li><b>Elimination priority</b> — when elimination matches exist, the Matches view prioritizes them while qualifications remain available.</Li>
+          <Li><b>Timeouts</b> are available for elimination matches and are tracked by alliance across the elimination bracket.</Li>
+        </ul>
+      </Section>
 
-      {selectedFeature && (
-        <div className="refos-modal-backdrop fixed inset-0 z-[80] bg-black/50 flex items-end sm:items-center justify-center" onClick={() => setSelectedFeature(null)}>
-          <div className="refos-modal-panel bg-white dark:bg-slate-850 w-full sm:max-w-3xl rounded-t-2xl sm:rounded-2xl max-h-[88vh] overflow-y-auto border border-slate-200 dark:border-slate-700 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 z-10 bg-white/95 dark:bg-slate-850/95 backdrop-blur border-b border-slate-200 dark:border-slate-700 px-5 py-4 flex items-center gap-3">
-              <div className="w-11 h-11 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/50 text-[#D7212B] flex items-center justify-center shrink-0">
-                {SelectedIcon && <SelectedIcon size={22} strokeWidth={2} />}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#D7212B]">Ref OS Feature</div>
-                <h3 className="text-lg sm:text-xl font-black text-slate-950 dark:text-white leading-tight">{selectedFeature.title}</h3>
-              </div>
-              <button type="button" onClick={() => setSelectedFeature(null)} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Close feature details"><X size={20} /></button>
-            </div>
+      <Section icon={Clock} title="AWP checks & analytics">
+        <ul className="space-y-1.5">
+          <Li><b>Qualification AWP check</b> — record what was observed for Red and Blue at the end of autonomous. Ref-OS evaluates the event checklist but does not change the official Tournament Manager score.</Li>
+          <Li><b>AWP history</b> — open AWP history from the Matches area next to the field filters instead of from the main navigation.</Li>
+          <Li><b>AWP analytics</b> — review overall, Red, and Blue success rates and the success rate for Pins, Goals, Field Perimeter, and autonomous violation criteria.</Li>
+        </ul>
+      </Section>
 
-            <div className="p-5 sm:p-6">
-              <div className="mb-6 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 shadow-sm">
-                <img src={selectedFeature.preview} alt={`${selectedFeature.title} preview`} className="block w-full h-auto" loading="lazy" />
-              </div>
+      <Section icon={Users} title="Teams, watchlist & robot scanner">
+        <ul className="space-y-1.5">
+          <Li><b>Teams</b> — search teams, open their full history, add teams, review Tournament Manager rank, and start a new log from the team record.</Li>
+          <Li><b>Team scanner</b> — use the camera OCR scanner to recognize a team number and jump to the team record.</Li>
+          <Li><b>Watchlist</b> — add shared watch notes to teams. Watched teams are flagged and their notes appear during relevant matches.</Li>
+          <Li><b>Robot photos</b> — store inspection photos for teams so referees can identify and review robots later.</Li>
+        </ul>
+      </Section>
 
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 text-[#D7212B] flex items-center justify-center shrink-0">
-                  {SelectedIcon && <SelectedIcon size={21} strokeWidth={2} />}
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Feature overview</div>
-                  <div className="text-xl sm:text-2xl font-black text-slate-950 dark:text-white">{selectedFeature.title}</div>
-                </div>
-              </div>
-              <p className="text-base sm:text-lg font-semibold text-slate-800 dark:text-slate-100 leading-relaxed">{selectedFeature.text}</p>
-              <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 leading-relaxed mt-3">{selectedFeature.detail}</p>
+      <Section icon={BookOpen} title="Rules, favorites & recent rules">
+        <p>The Rules tab and violation rule picker use the same searchable rule reference.</p>
+        <ul className="space-y-1.5">
+          <Li><b>Favorites</b> — star frequently used rules so they appear in a Favorites group when no search is active.</Li>
+          <Li><b>Recently used</b> — recently selected rules are shown automatically for faster repeat access.</Li>
+          <Li><b>Offline rule index</b> — the event rule index is bundled with Ref-OS, so rule codes, descriptions, categories, favorites, recent rules, and referee notes remain available when Supabase or Wi-Fi is unavailable.</Li>
+          <Li><b>Referee guidance</b> — rules with supplemental guidance can be opened for violation notes, escalation guidance, and event-specific interpretation.</Li>
+        </ul>
+        <p>Favorites and recently used rules are stored on the local browser or device.</p>
+      </Section>
 
-              <div className="mt-6">
-                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400 mb-3">What it includes</div>
-                <div className="space-y-2.5">
-                  {selectedFeature.bullets.map((item) => (
-                    <div key={item} className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200">
-                      <CheckCircle2 size={17} className="text-[#D7212B] mt-0.5 shrink-0" />
-                      <span className="leading-relaxed">{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+      <Section icon={Flag} title="Field log">
+        <p>The Field Log is the referee-facing running list for operational entries such as timeouts, field faults, replays, and other field notes. Internal Ref-OS sync, announcement, access-code, diagnostic, and settings records are intentionally hidden from this view.</p>
+      </Section>
 
-              <div className="mt-7 pt-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
-                <div className="text-xs text-slate-400">Ref OS 1.2.0 • Highlander Release</div>
-                <button type="button" onClick={() => setSelectedFeature(null)} className="px-4 py-2 rounded-lg bg-slate-950 dark:bg-white text-white dark:text-slate-950 text-sm font-bold">Back to Features</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <Section icon={Trophy} title="Judging">
+        <ul className="space-y-1.5">
+          <Li><b>Sportsmanship and Energy nominations</b> — record the team, match, observed criteria, specific example, and supporting details.</Li>
+          <Li><b>Judge Advisor workflow</b> — Judge Advisors can manage judging information without receiving referee disciplinary views.</Li>
+          <Li><b>Official form export</b> — Ref-OS can generate a combined PDF using the supplied official nomination forms.</Li>
+          <Li><b>Alliance visibility</b> — Judge Advisors can view the Alliances section and bracket but cannot edit alliance selection or advance the bracket.</Li>
+        </ul>
+      </Section>
+
+      <Section icon={Trophy} title="Alliance selection & elimination bracket">
+        <ul className="space-y-1.5">
+          <Li><b>Ranking seeded captains</b> — uploaded Tournament Manager rankings automatically seed alliance captains before the official elimination bracket is imported.</Li>
+          <Li><b>Captain shifting</b> — if a higher seed selects a team that would have been a later captain, that team drops from the captain list and the remaining ranked teams move up.</Li>
+          <Li><b>Admin selection controls</b> — alliance captain and pick editing is Admin only.</Li>
+          <Li><b>Bracket permissions</b> — regular Referee and Emcee access can use their permitted bracket workflow; Judge Advisor access is view only.</Li>
+          <Li><b>Tournament Manager source of truth</b> — after a Round of 16 bracket is imported, Ref-OS preserves the imported alliances instead of overwriting them from rankings.</Li>
+        </ul>
+      </Section>
+
+      <Section icon={BarChart3} title="Tournament Manager Sync Center">
+        <ul className="space-y-1.5">
+          <Li><b>Teams</b> — import or update the event roster from Tournament Manager CSV.</Li>
+          <Li><b>Matches</b> — import the qualification and elimination schedule and update existing matches in place.</Li>
+          <Li><b>Rankings</b> — import qualification rankings using TeamNum and store the rank on each team.</Li>
+          <Li><b>Alliances</b> — import the official elimination bracket. Round 6 is treated as Round of 16 and its Instance value determines the R16 matchup.</Li>
+          <Li><b>Change preview</b> — before a Tournament Manager import writes anything, Ref-OS compares the file with the current event and shows what will be added, changed, or left untouched. If no differences are found, the import is blocked as unnecessary.</Li>
+          <Li><b>Scores</b> — when elimination scores are present, Ref-OS prioritizes elimination score updates and leaves qualification score importing alone. Qualification records update when qualification results are imported without elimination results.</Li>
+        </ul>
+      </Section>
+
+      <Section icon={BarChart3} title="Exports, analytics & backup">
+        <ul className="space-y-1.5">
+          <Li><b>Event Report PDF</b> — includes event overview, AWP analytics, field comparison, violation summary, alliance selections, and judging totals.</Li>
+          <Li><b>Violation export</b> — violation data can be exported and the official Match Anomaly Log PDF can be filled from Ref-OS data.</Li>
+          <Li><b>Judging export</b> — create the combined official Energy and Sportsmanship nomination PDF.</Li>
+          <Li><b>Field comparison</b> — Admin view comparing matches, violations, replays, and field faults by field.</Li>
+          <Li><b>Backup all JSON</b> — download a snapshot of the event data for event-day insurance.</Li>
+          <Li><b>Clear event data</b> — Admins can selectively clear supported event data, including judging, alliances, and watchlist data.</Li>
+        </ul>
+      </Section>
+
+      <Section icon={Info} title="Guided tour, install & device settings">
+        <ul className="space-y-1.5">
+          <Li><b>Interactive Guided Tour</b> — walks through the live role-specific Ref-OS interface and opens real sections such as Teams, Matches, a match, violation logging, Rules, Field Log, Alliances, and contacts.</Li>
+          <Li><b>Install Ref-OS</b> — add the deployed HTTPS site to the device home screen for an app-like PWA experience.</Li>
+          <Li><b>Dark / Light mode</b> and <b>Text size</b> are saved per device.</Li>
+          <Li><b>Mobile navigation</b> — phones use the compact Go to section menu instead of forcing the full desktop navigation across the screen.</Li>
+          <Li><b>Device readiness</b> — event staff can approve modern devices by running the Pre Event System Test before use.</Li>
+        </ul>
+      </Section>
+
+      <Section icon={Pencil} title="Editing & correcting records">
+        <p>Synced violations can be reopened, edited, and deleted according to the signed-in role. Editing keeps the existing record and reopens the form with its current information so corrections can be made without creating a second violation.</p>
+      </Section>
+
+      <p className="text-center text-xs text-slate-400 mt-4 mb-2">
+        Made by Maharshi Patel · <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="underline">@mpatel_ref</a> · v{APP_VERSION}
+      </p>
+    </>
   );
 }
 
@@ -5479,2679 +5166,6 @@ const RULE_NOTES = {
 function RuleBook({ rules }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(null); // rule object shown in the notes popup
-  const [showGameManual, setShowGameManual] = useState(false);
-  const [manualSearchIndex, setManualSearchIndex] = useState(null);
-  const [manualSearchQuery, setManualSearchQuery] = useState("");
-  const [manualSearchLoading, setManualSearchLoading] = useState(false);
-  const [manualSearchError, setManualSearchError] = useState("");
-  const [manualSearchExpanded, setManualSearchExpanded] = useState(false);
-  const MANUAL_PAGE_COUNT = 129;
-  const manualPageRefs = useRef({});
-  const manualPageSrc = (page) => `/game-manual-pages/page-${String(page).padStart(3, "0")}.jpg`;
-  const manualTocLinks = [
-  {
-    "sourcePage": 3,
-    "targetPage": 5,
-    "left": 5.71895,
-    "top": 13.64242,
-    "width": 9.28355,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 5,
-    "left": 7.18954,
-    "top": 16.67272,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 7,
-    "left": 7.18954,
-    "top": 19.70303,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 12,
-    "left": 5.71895,
-    "top": 26.9,
-    "width": 36.85212,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 17,
-    "left": 5.71895,
-    "top": 32.9606,
-    "width": 33.06683,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 17,
-    "left": 7.18954,
-    "top": 35.99091,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 22,
-    "left": 7.18954,
-    "top": 39.02121,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 24,
-    "left": 7.18954,
-    "top": 42.05152,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 29,
-    "left": 7.18954,
-    "top": 45.08182,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 37,
-    "left": 7.18954,
-    "top": 48.11212,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 38,
-    "left": 7.18954,
-    "top": 51.14242,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 40,
-    "left": 7.18954,
-    "top": 54.17273,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 49,
-    "left": 5.71895,
-    "top": 61.3697,
-    "width": 35.99052,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 49,
-    "left": 7.18954,
-    "top": 64.4,
-    "width": 77.94118,
-    "height": 3.72373
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 54,
-    "left": 5.71895,
-    "top": 71.59697,
-    "width": 33.43938,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 54,
-    "left": 16.19593,
-    "top": 74.62727,
-    "width": 68.93479,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 68,
-    "left": 5.71895,
-    "top": 81.82424,
-    "width": 42.84641,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 3,
-    "targetPage": 68,
-    "left": 7.18954,
-    "top": 84.85454,
-    "width": 77.94118,
-    "height": 3.7237
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 81,
-    "left": 5.71895,
-    "top": 8.97475,
-    "width": 26.99134,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 81,
-    "left": 7.18954,
-    "top": 12.00505,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 81,
-    "left": 7.18954,
-    "top": 15.03536,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 82,
-    "left": 7.18954,
-    "top": 18.06566,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 85,
-    "left": 7.18954,
-    "top": 21.09596,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 86,
-    "left": 7.18954,
-    "top": 24.12626,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 88,
-    "left": 7.18954,
-    "top": 27.15657,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 89,
-    "left": 7.18954,
-    "top": 30.18687,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 95,
-    "left": 7.18954,
-    "top": 33.21717,
-    "width": 77.94118,
-    "height": 3.72373
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 97,
-    "left": 5.71895,
-    "top": 40.41414,
-    "width": 43.93529,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 97,
-    "left": 7.18954,
-    "top": 43.44444,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 97,
-    "left": 7.18954,
-    "top": 46.47475,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 98,
-    "left": 7.18954,
-    "top": 49.50505,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 99,
-    "left": 7.18954,
-    "top": 52.53535,
-    "width": 77.94118,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 114,
-    "left": 5.71895,
-    "top": 59.73232,
-    "width": 48.93938,
-    "height": 3.72374
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 126,
-    "left": 5.71895,
-    "top": 65.79292,
-    "width": 44.09444,
-    "height": 3.72375
-  },
-  {
-    "sourcePage": 4,
-    "targetPage": 128,
-    "left": 5.71895,
-    "top": 71.85354,
-    "width": 82.31667,
-    "height": 3.72374
-  }
-];
-  const manualQuickReferenceLinks = [
-  {
-    "sourcePage": 7,
-    "targetPage": 24,
-    "left": 8.17026,
-    "top": 15.39065,
-    "width": 5.59575,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 24,
-    "left": 8.11031,
-    "top": 17.50656,
-    "width": 5.71565,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 120,
-    "left": 16.62582,
-    "top": 17.50656,
-    "width": 5.64395,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 122,
-    "left": 22.67059,
-    "top": 17.50656,
-    "width": 12.425,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 25,
-    "left": 8.09667,
-    "top": 19.50833,
-    "width": 5.74294,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 122,
-    "left": 16.62582,
-    "top": 19.50833,
-    "width": 6.02843,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 120,
-    "left": 23.0549,
-    "top": 19.50833,
-    "width": 2.57369,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 25,
-    "left": 8.09918,
-    "top": 21.5101,
-    "width": 5.73791,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 123,
-    "left": 18.23807,
-    "top": 21.5101,
-    "width": 5.63105,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 26,
-    "left": 8.11598,
-    "top": 23.51187,
-    "width": 5.70431,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 120,
-    "left": 22.27909,
-    "top": 23.51187,
-    "width": 2.57353,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 27,
-    "left": 8.10386,
-    "top": 25.51351,
-    "width": 5.72856,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 122,
-    "left": 16.62582,
-    "top": 25.51351,
-    "width": 5.02451,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 120,
-    "left": 22.05114,
-    "top": 25.51351,
-    "width": 6.60376,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 27,
-    "left": 8.13044,
-    "top": 27.51528,
-    "width": 5.67539,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 114,
-    "left": 16.62582,
-    "top": 27.51528,
-    "width": 16.3531,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 28,
-    "left": 8.09091,
-    "top": 29.51705,
-    "width": 5.75444,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 115,
-    "left": 16.62582,
-    "top": 29.51705,
-    "width": 18.93758,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 29,
-    "left": 8.16477,
-    "top": 35.54912,
-    "width": 5.60673,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 30,
-    "left": 8.10609,
-    "top": 37.66503,
-    "width": 5.72409,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 30,
-    "left": 8.09297,
-    "top": 39.66679,
-    "width": 5.75033,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 30,
-    "left": 8.09585,
-    "top": 41.66856,
-    "width": 5.74458,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 122,
-    "left": 21.3165,
-    "top": 41.66856,
-    "width": 13.38235,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 117,
-    "left": 40.0598,
-    "top": 41.66856,
-    "width": 3.95621,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 31,
-    "left": 8.10322,
-    "top": 43.67033,
-    "width": 5.72984,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 122,
-    "left": 21.1482,
-    "top": 43.67033,
-    "width": 5.02451,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 120,
-    "left": 34.23611,
-    "top": 43.67033,
-    "width": 2.57369,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 121,
-    "left": 40.9,
-    "top": 43.67033,
-    "width": 6.37892,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 31,
-    "left": 8.0901,
-    "top": 45.67209,
-    "width": 5.75608,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 121,
-    "left": 16.62582,
-    "top": 45.67209,
-    "width": 9.55507,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 120,
-    "left": 51.85719,
-    "top": 45.67209,
-    "width": 2.57369,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 115,
-    "left": 61.88497,
-    "top": 45.67209,
-    "width": 3.40621,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 31,
-    "left": 8.12451,
-    "top": 47.67386,
-    "width": 5.68725,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 114,
-    "left": 29.6366,
-    "top": 47.67386,
-    "width": 14.59199,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 33,
-    "left": 8.07913,
-    "top": 49.67563,
-    "width": 5.77801,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 120,
-    "left": 30.27647,
-    "top": 49.67563,
-    "width": 6.60376,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 114,
-    "left": 40.77892,
-    "top": 49.67563,
-    "width": 14.60523,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 114,
-    "left": 64.62092,
-    "top": 49.67563,
-    "width": 16.50294,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 33,
-    "left": 8.09172,
-    "top": 51.67727,
-    "width": 5.75284,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 114,
-    "left": 16.62582,
-    "top": 51.67727,
-    "width": 6.56634,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 117,
-    "left": 23.59298,
-    "top": 51.67727,
-    "width": 4.75131,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 34,
-    "left": 7.60922,
-    "top": 53.67904,
-    "width": 6.71784,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 122,
-    "left": 16.62582,
-    "top": 53.67904,
-    "width": 13.38219,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 117,
-    "left": 58.21324,
-    "top": 53.67904,
-    "width": 4.7513,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 34,
-    "left": 7.69603,
-    "top": 55.68081,
-    "width": 6.54422,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 119,
-    "left": 16.62582,
-    "top": 55.68081,
-    "width": 10.67108,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 35,
-    "left": 7.63384,
-    "top": 57.68258,
-    "width": 6.66859,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 116,
-    "left": 41.7951,
-    "top": 57.68258,
-    "width": 7.85735,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 36,
-    "left": 7.62126,
-    "top": 59.68434,
-    "width": 6.69376,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 118,
-    "left": 16.62582,
-    "top": 59.68434,
-    "width": 9.67304,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 116,
-    "left": 47.21307,
-    "top": 59.68434,
-    "width": 19.98285,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 118,
-    "left": 72.79248,
-    "top": 59.68434,
-    "width": 5.17843,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 37,
-    "left": 8.81678,
-    "top": 65.71641,
-    "width": 4.30271,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 37,
-    "left": 8.76034,
-    "top": 67.83232,
-    "width": 4.41559,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 123,
-    "left": 16.62582,
-    "top": 67.83232,
-    "width": 7.54722,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 114,
-    "left": 48.18105,
-    "top": 67.83232,
-    "width": 4.36879,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 37,
-    "left": 8.74533,
-    "top": 69.83409,
-    "width": 4.44562,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 123,
-    "left": 21.1482,
-    "top": 69.83409,
-    "width": 6.59003,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 37,
-    "left": 8.7483,
-    "top": 71.83586,
-    "width": 4.43967,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 117,
-    "left": 29.21471,
-    "top": 71.83586,
-    "width": 3.95605,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 37,
-    "left": 8.7616,
-    "top": 73.83763,
-    "width": 4.41307,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 38,
-    "left": 8.76392,
-    "top": 79.86957,
-    "width": 4.40843,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 38,
-    "left": 8.70525,
-    "top": 81.9856,
-    "width": 4.52578,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 38,
-    "left": 8.69212,
-    "top": 83.98725,
-    "width": 4.55203,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 39,
-    "left": 8.695,
-    "top": 85.98902,
-    "width": 4.54627,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 123,
-    "left": 16.62582,
-    "top": 85.98902,
-    "width": 7.54722,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 39,
-    "left": 8.70237,
-    "top": 87.99081,
-    "width": 4.53154,
-    "height": 2.04805
-  },
-  {
-    "sourcePage": 7,
-    "targetPage": 122,
-    "left": 70.74183,
-    "top": 87.99081,
-    "width": 5.02451,
-    "height": 2.04805
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 40,
-    "left": 8.10087,
-    "top": 12.18611,
-    "width": 5.73454,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 116,
-    "left": 20.84085,
-    "top": 12.18611,
-    "width": 17.54003,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 114,
-    "left": 51.5518,
-    "top": 12.18611,
-    "width": 12.91699,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 40,
-    "left": 8.04219,
-    "top": 14.30202,
-    "width": 5.8519,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 123,
-    "left": 18.23807,
-    "top": 14.30202,
-    "width": 5.85752,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 24.49641,
-    "top": 14.30202,
-    "width": 5.02451,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 41,
-    "left": 8.02907,
-    "top": 16.30378,
-    "width": 5.87814,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 16.62582,
-    "top": 16.30378,
-    "width": 5.98154,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 117,
-    "left": 28.64101,
-    "top": 16.30378,
-    "width": 3.95605,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 41,
-    "left": 8.03194,
-    "top": 18.30555,
-    "width": 5.87239,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 117,
-    "left": 30.70866,
-    "top": 18.30555,
-    "width": 3.95621,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 42,
-    "left": 8.03931,
-    "top": 20.30732,
-    "width": 5.85765,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 42,
-    "left": 8.02619,
-    "top": 22.30897,
-    "width": 5.88389,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 116,
-    "left": 16.62582,
-    "top": 22.30897,
-    "width": 13.77565,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 43,
-    "left": 8.0606,
-    "top": 24.31073,
-    "width": 5.81507,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 123,
-    "left": 16.62582,
-    "top": 24.31073,
-    "width": 8.5549,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 43,
-    "left": 8.01523,
-    "top": 26.3125,
-    "width": 5.90582,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 25.41994,
-    "top": 26.3125,
-    "width": 5.98154,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 43,
-    "left": 8.02781,
-    "top": 28.31427,
-    "width": 5.88065,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 30.13431,
-    "top": 28.31427,
-    "width": 5.02451,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 117,
-    "left": 40.77418,
-    "top": 28.31427,
-    "width": 3.94265,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 116,
-    "left": 56.79346,
-    "top": 28.31427,
-    "width": 8.37304,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 44,
-    "left": 7.54531,
-    "top": 30.31604,
-    "width": 6.84565,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 114,
-    "left": 23.35294,
-    "top": 30.31604,
-    "width": 6.56634,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 44,
-    "left": 7.63212,
-    "top": 32.3178,
-    "width": 6.67203,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 117,
-    "left": 49.43121,
-    "top": 32.3178,
-    "width": 3.95621,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 44,
-    "left": 7.56993,
-    "top": 34.31957,
-    "width": 6.7964,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 44,
-    "left": 7.55735,
-    "top": 36.32134,
-    "width": 6.82157,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 114,
-    "left": 36.73284,
-    "top": 36.32134,
-    "width": 16.50294,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 45,
-    "left": 7.57029,
-    "top": 38.32311,
-    "width": 6.79569,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 33.12647,
-    "top": 38.32311,
-    "width": 5.96896,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 45,
-    "left": 7.56948,
-    "top": 40.32475,
-    "width": 6.79732,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 120,
-    "left": 16.62582,
-    "top": 40.32475,
-    "width": 8.00474,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 25.03137,
-    "top": 40.32475,
-    "width": 5.98154,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 46,
-    "left": 7.55681,
-    "top": 42.32652,
-    "width": 6.82265,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 46,
-    "left": 7.58791,
-    "top": 44.32828,
-    "width": 6.76046,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 117,
-    "left": 19.38088,
-    "top": 44.32828,
-    "width": 6.4134,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 47,
-    "left": 7.54531,
-    "top": 46.33005,
-    "width": 6.84565,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 20.23382,
-    "top": 46.33005,
-    "width": 13.38219,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 49,
-    "left": 7.57694,
-    "top": 52.22753,
-    "width": 6.78239,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 49,
-    "left": 7.51701,
-    "top": 54.34343,
-    "width": 6.90226,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 37.13464,
-    "top": 54.34343,
-    "width": 17.33594,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 49,
-    "left": 7.50335,
-    "top": 56.3452,
-    "width": 6.92957,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 23.50621,
-    "top": 56.3452,
-    "width": 17.33595,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 50,
-    "left": 7.50587,
-    "top": 58.34697,
-    "width": 6.92454,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 117,
-    "left": 16.62582,
-    "top": 58.34697,
-    "width": 3.95621,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 28.84869,
-    "top": 58.34697,
-    "width": 17.33595,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 51,
-    "left": 7.52266,
-    "top": 60.34874,
-    "width": 6.89095,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 16.62582,
-    "top": 60.34874,
-    "width": 13.20784,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 54,
-    "left": 8.81802,
-    "top": 66.38068,
-    "width": 4.30023,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 20.48709,
-    "top": 66.38068,
-    "width": 5.02451,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 55,
-    "left": 8.74928,
-    "top": 68.49672,
-    "width": 4.43771,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 16.62582,
-    "top": 68.49672,
-    "width": 5.98154,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 56,
-    "left": 8.75503,
-    "top": 70.49836,
-    "width": 4.42621,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 16.62582,
-    "top": 70.49836,
-    "width": 5.98154,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 56,
-    "left": 8.76859,
-    "top": 72.50012,
-    "width": 4.39908,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 63.9103,
-    "top": 72.50012,
-    "width": 5.02451,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 57,
-    "left": 8.76662,
-    "top": 74.50189,
-    "width": 4.40304,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 24.34641,
-    "top": 74.50189,
-    "width": 13.38219,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 57,
-    "left": 8.75817,
-    "top": 76.50366,
-    "width": 4.41994,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 16.62582,
-    "top": 76.50366,
-    "width": 5.98154,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 58,
-    "left": 8.77642,
-    "top": 78.50543,
-    "width": 4.38343,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 58,
-    "left": 8.74523,
-    "top": 80.5072,
-    "width": 4.44582,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 58,
-    "left": 8.75404,
-    "top": 82.50897,
-    "width": 4.4282,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 59,
-    "left": 8.26247,
-    "top": 84.51073,
-    "width": 5.41134,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 59,
-    "left": 8.34926,
-    "top": 86.5125,
-    "width": 5.23774,
-    "height": 2.04799
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 59,
-    "left": 8.28708,
-    "top": 88.51419,
-    "width": 5.36212,
-    "height": 2.04805
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 60,
-    "left": 8.27451,
-    "top": 90.51595,
-    "width": 5.38726,
-    "height": 2.04805
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 122,
-    "left": 16.62582,
-    "top": 90.51595,
-    "width": 5.98154,
-    "height": 2.04805
-  },
-  {
-    "sourcePage": 8,
-    "targetPage": 60,
-    "left": 8.28745,
-    "top": 92.5177,
-    "width": 5.36137,
-    "height": 2.04806
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 60,
-    "left": 8.28663,
-    "top": 10.04975,
-    "width": 5.36301,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 122,
-    "left": 39.01209,
-    "top": 10.04975,
-    "width": 5.02451,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 60,
-    "left": 8.27397,
-    "top": 12.05151,
-    "width": 5.38833,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 122,
-    "left": 16.62582,
-    "top": 12.05151,
-    "width": 5.98154,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 60,
-    "left": 8.30507,
-    "top": 14.05328,
-    "width": 5.32614,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 61,
-    "left": 8.26247,
-    "top": 16.05493,
-    "width": 5.41134,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 61,
-    "left": 8.27127,
-    "top": 18.05669,
-    "width": 5.39374,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 62,
-    "left": 8.19685,
-    "top": 20.05846,
-    "width": 5.54258,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 62,
-    "left": 8.26884,
-    "top": 22.06022,
-    "width": 5.39859,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 62,
-    "left": 8.2124,
-    "top": 24.06199,
-    "width": 5.51147,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 63,
-    "left": 8.20459,
-    "top": 26.06376,
-    "width": 5.52709,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 63,
-    "left": 8.20971,
-    "top": 28.06553,
-    "width": 5.51686,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 64,
-    "left": 8.21717,
-    "top": 30.0673,
-    "width": 5.50194,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 65,
-    "left": 8.20827,
-    "top": 32.06907,
-    "width": 5.51974,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 122,
-    "left": 54.86797,
-    "top": 32.06907,
-    "width": 5.02451,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 65,
-    "left": 8.22686,
-    "top": 34.07071,
-    "width": 5.48255,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 65,
-    "left": 8.19533,
-    "top": 36.07247,
-    "width": 5.54562,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 68,
-    "left": 8.84023,
-    "top": 42.10454,
-    "width": 4.25582,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 117,
-    "left": 16.62582,
-    "top": 42.10454,
-    "width": 12.24935,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 122,
-    "left": 72.74837,
-    "top": 42.10454,
-    "width": 5.02451,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 69,
-    "left": 8.78605,
-    "top": 44.22046,
-    "width": 4.36418,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 117,
-    "left": 16.62582,
-    "top": 44.22046,
-    "width": 12.24935,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 69,
-    "left": 8.77814,
-    "top": 46.22222,
-    "width": 4.38,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 116,
-    "left": 16.62582,
-    "top": 46.22222,
-    "width": 17.54722,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 117,
-    "left": 66.19641,
-    "top": 46.22222,
-    "width": 12.62647,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 70,
-    "left": 8.86503,
-    "top": 48.22399,
-    "width": 4.20621,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 117,
-    "left": 20.19428,
-    "top": 48.22399,
-    "width": 11.27369,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 70,
-    "left": 8.80274,
-    "top": 50.22576,
-    "width": 4.33078,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 117,
-    "left": 35.13431,
-    "top": 50.22576,
-    "width": 3.95621,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 70,
-    "left": 8.79637,
-    "top": 52.22753,
-    "width": 4.34353,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 117,
-    "left": 16.62582,
-    "top": 52.22753,
-    "width": 4.91095,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 117,
-    "left": 40.77435,
-    "top": 52.22753,
-    "width": 12.66961,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 71,
-    "left": 8.78802,
-    "top": 54.22929,
-    "width": 4.36023,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 117,
-    "left": 16.62582,
-    "top": 54.22929,
-    "width": 4.91095,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 72,
-    "left": 8.77239,
-    "top": 56.23106,
-    "width": 4.3915,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 117,
-    "left": 36.94804,
-    "top": 56.23106,
-    "width": 3.95621,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 72,
-    "left": 8.77858,
-    "top": 58.2327,
-    "width": 4.37912,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 117,
-    "left": 35.62974,
-    "top": 58.2327,
-    "width": 12.50915,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 72,
-    "left": 8.28466,
-    "top": 60.23447,
-    "width": 5.36696,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 122,
-    "left": 16.62582,
-    "top": 60.23447,
-    "width": 18.02712,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 119,
-    "left": 43.48774,
-    "top": 60.23447,
-    "width": 13.39526,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 73,
-    "left": 8.37147,
-    "top": 62.23624,
-    "width": 5.19333,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 122,
-    "left": 42.52811,
-    "top": 62.23624,
-    "width": 18.02729,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 73,
-    "left": 8.30928,
-    "top": 64.23801,
-    "width": 5.31771,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 122,
-    "left": 16.62582,
-    "top": 64.23801,
-    "width": 18.02712,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 123,
-    "left": 47.58186,
-    "top": 64.23801,
-    "width": 5.85752,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 114,
-    "left": 63.18562,
-    "top": 64.23801,
-    "width": 14.80016,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 73,
-    "left": 8.2967,
-    "top": 66.23978,
-    "width": 5.34288,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 122,
-    "left": 16.62582,
-    "top": 66.23978,
-    "width": 18.02712,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 74,
-    "left": 8.30964,
-    "top": 68.24154,
-    "width": 5.31699,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 123,
-    "left": 21.57288,
-    "top": 68.24154,
-    "width": 10.95997,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 114,
-    "left": 42.33905,
-    "top": 68.24154,
-    "width": 7.51226,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 74,
-    "left": 8.30884,
-    "top": 70.24331,
-    "width": 5.31859,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 123,
-    "left": 22.71552,
-    "top": 70.24331,
-    "width": 6.59003,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 114,
-    "left": 44.36716,
-    "top": 70.24331,
-    "width": 14.80033,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 74,
-    "left": 8.29616,
-    "top": 72.24508,
-    "width": 5.34395,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 114,
-    "left": 55.89379,
-    "top": 72.24508,
-    "width": 6.56634,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 75,
-    "left": 8.32725,
-    "top": 74.24685,
-    "width": 5.28177,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 116,
-    "left": 16.62582,
-    "top": 74.24685,
-    "width": 16.68137,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 116,
-    "left": 42.14183,
-    "top": 74.24685,
-    "width": 15.92255,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 76,
-    "left": 8.28466,
-    "top": 76.24848,
-    "width": 5.36696,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 116,
-    "left": 16.62582,
-    "top": 76.24848,
-    "width": 16.68137,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 77,
-    "left": 8.29346,
-    "top": 78.25025,
-    "width": 5.34935,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 116,
-    "left": 22.36503,
-    "top": 78.25025,
-    "width": 16.68137,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 77,
-    "left": 8.23361,
-    "top": 80.25202,
-    "width": 5.46905,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 119,
-    "left": 21.36699,
-    "top": 80.25202,
-    "width": 13.39542,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 77,
-    "left": 8.3056,
-    "top": 82.25379,
-    "width": 5.32507,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 117,
-    "left": 30.09886,
-    "top": 82.25379,
-    "width": 4.91095,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 117,
-    "left": 84.92369,
-    "top": 82.25379,
-    "width": 4.91096,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 77,
-    "left": 8.24917,
-    "top": 84.25556,
-    "width": 5.43794,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 78,
-    "left": 8.24134,
-    "top": 86.25733,
-    "width": 5.4536,
-    "height": 2.04803
-  },
-  {
-    "sourcePage": 9,
-    "targetPage": 79,
-    "left": 8.24647,
-    "top": 88.25906,
-    "width": 5.44333,
-    "height": 2.04805
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 85,
-    "left": 7.16721,
-    "top": 12.18611,
-    "width": 6.94827,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 122,
-    "left": 24.02467,
-    "top": 12.18611,
-    "width": 5.02451,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 85,
-    "left": 7.10851,
-    "top": 14.30202,
-    "width": 7.06565,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 122,
-    "left": 24.02467,
-    "top": 14.30202,
-    "width": 5.02451,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 44,
-    "left": 46.31781,
-    "top": 14.30202,
-    "width": 6.71994,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 85,
-    "left": 7.09539,
-    "top": 16.30378,
-    "width": 7.0919,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 85,
-    "left": 7.09827,
-    "top": 18.30555,
-    "width": 7.08614,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 118,
-    "left": 35.19967,
-    "top": 18.30555,
-    "width": 6.80065,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 85,
-    "left": 7.10564,
-    "top": 20.30732,
-    "width": 7.0714,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 114,
-    "left": 39.51863,
-    "top": 20.30732,
-    "width": 16.50294,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 85,
-    "left": 7.09252,
-    "top": 22.30897,
-    "width": 7.09765,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 115,
-    "left": 24.02467,
-    "top": 22.30897,
-    "width": 18.93742,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 86,
-    "left": 6.62565,
-    "top": 28.34104,
-    "width": 8.03137,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 122,
-    "left": 21.81634,
-    "top": 28.34104,
-    "width": 17.33595,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 122,
-    "left": 66.19722,
-    "top": 28.34104,
-    "width": 17.33578,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 86,
-    "left": 6.56922,
-    "top": 30.45694,
-    "width": 8.14425,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 123,
-    "left": 16.29902,
-    "top": 30.45694,
-    "width": 5.46863,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 122,
-    "left": 43.5701,
-    "top": 30.45694,
-    "width": 5.98154,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 122,
-    "left": 61.51944,
-    "top": 30.45694,
-    "width": 17.33595,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 86,
-    "left": 6.55422,
-    "top": 32.45871,
-    "width": 8.17425,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 122,
-    "left": 20.61144,
-    "top": 32.45871,
-    "width": 5.98154,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 122,
-    "left": 39.04951,
-    "top": 32.45871,
-    "width": 15.35376,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 114,
-    "left": 84.9915,
-    "top": 32.45871,
-    "width": 6.56618,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 88,
-    "left": 7.24719,
-    "top": 38.49078,
-    "width": 6.7883,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 117,
-    "left": 21.58791,
-    "top": 38.49078,
-    "width": 19.4384,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 88,
-    "left": 7.19299,
-    "top": 40.60669,
-    "width": 6.8967,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 122,
-    "left": 16.29902,
-    "top": 40.60669,
-    "width": 18.02712,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 123,
-    "left": 76.85588,
-    "top": 40.60669,
-    "width": 10.00278,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 88,
-    "left": 7.18508,
-    "top": 42.60846,
-    "width": 6.91252,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 116,
-    "left": 16.29902,
-    "top": 42.60846,
-    "width": 16.68137,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 114,
-    "left": 77.36781,
-    "top": 42.60846,
-    "width": 14.80032,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 88,
-    "left": 7.27199,
-    "top": 44.61023,
-    "width": 6.73869,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 114,
-    "left": 19.86748,
-    "top": 44.61023,
-    "width": 16.50294,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 117,
-    "left": 57.06176,
-    "top": 44.61023,
-    "width": 17.45637,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 88,
-    "left": 7.20971,
-    "top": 46.61199,
-    "width": 6.86327,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 116,
-    "left": 19.86748,
-    "top": 46.61199,
-    "width": 19.98301,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 88,
-    "left": 7.20333,
-    "top": 48.61376,
-    "width": 6.87601,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 123,
-    "left": 21.58791,
-    "top": 48.61376,
-    "width": 10.95997,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 123,
-    "left": 42.35409,
-    "top": 48.61376,
-    "width": 5.46863,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 116,
-    "left": 50.06847,
-    "top": 48.61376,
-    "width": 16.68137,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 89,
-    "left": 7.22023,
-    "top": 54.64584,
-    "width": 6.84222,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 123,
-    "left": 16.29902,
-    "top": 54.64584,
-    "width": 5.46863,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 122,
-    "left": 35.30474,
-    "top": 54.64584,
-    "width": 5.9817,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 89,
-    "left": 7.15147,
-    "top": 56.76174,
-    "width": 6.97974,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 123,
-    "left": 16.29902,
-    "top": 56.76174,
-    "width": 5.46863,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 90,
-    "left": 7.15722,
-    "top": 58.76351,
-    "width": 6.96824,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 81,
-    "left": 16.29902,
-    "top": 58.76351,
-    "width": 13.68562,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 82,
-    "left": 73.95392,
-    "top": 58.76351,
-    "width": 8.68268,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 90,
-    "left": 7.1708,
-    "top": 60.76528,
-    "width": 6.94108,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 81,
-    "left": 16.29902,
-    "top": 60.76528,
-    "width": 13.68562,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 82,
-    "left": 51.16846,
-    "top": 60.76528,
-    "width": 8.68268,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 91,
-    "left": 7.16882,
-    "top": 62.76704,
-    "width": 6.94503,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 82,
-    "left": 55.95686,
-    "top": 62.76704,
-    "width": 8.68268,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 92,
-    "left": 7.16038,
-    "top": 64.76869,
-    "width": 6.96193,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 81,
-    "left": 16.29902,
-    "top": 64.76869,
-    "width": 13.68562,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 82,
-    "left": 48.46225,
-    "top": 64.76869,
-    "width": 8.68268,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 92,
-    "left": 7.17861,
-    "top": 66.77046,
-    "width": 6.92546,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 81,
-    "left": 16.29902,
-    "top": 66.77046,
-    "width": 13.68562,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 92,
-    "left": 7.14743,
-    "top": 68.77223,
-    "width": 6.98781,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 123,
-    "left": 16.29902,
-    "top": 68.77223,
-    "width": 5.46863,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 122,
-    "left": 62.24477,
-    "top": 68.77223,
-    "width": 5.9817,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 92,
-    "left": 7.15624,
-    "top": 70.77399,
-    "width": 6.9702,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 123,
-    "left": 16.29902,
-    "top": 70.77399,
-    "width": 5.46863,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 122,
-    "left": 70.87517,
-    "top": 70.77399,
-    "width": 5.02467,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 93,
-    "left": 6.66466,
-    "top": 72.77576,
-    "width": 7.95337,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 122,
-    "left": 20.82141,
-    "top": 72.77576,
-    "width": 5.02451,
-    "height": 2.0481
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 93,
-    "left": 6.75147,
-    "top": 74.77753,
-    "width": 7.77974,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 93,
-    "left": 6.68928,
-    "top": 76.77929,
-    "width": 7.90412,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 81,
-    "left": 45.02451,
-    "top": 76.77929,
-    "width": 16.71896,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 81,
-    "left": 64.69755,
-    "top": 76.77929,
-    "width": 18.13873,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 94,
-    "left": 6.6767,
-    "top": 78.78106,
-    "width": 7.92928,
-    "height": 2.04798
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 94,
-    "left": 6.68964,
-    "top": 80.7827,
-    "width": 7.9034,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 123,
-    "left": 16.29902,
-    "top": 80.7827,
-    "width": 5.46863,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 95,
-    "left": 6.68882,
-    "top": 82.78447,
-    "width": 7.90503,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 123,
-    "left": 16.29902,
-    "top": 82.78447,
-    "width": 5.46863,
-    "height": 2.04811
-  },
-  {
-    "sourcePage": 10,
-    "targetPage": 122,
-    "left": 63.01127,
-    "top": 82.78447,
-    "width": 5.02451,
-    "height": 2.04811
-  }
-];
-  const jumpToManualPage = (page) => {
-    const target = manualPageRefs.current[page];
-    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  const loadManualSearchIndex = useCallback(async () => {
-    if (manualSearchIndex || manualSearchLoading) return;
-    setManualSearchLoading(true);
-    setManualSearchError("");
-    try {
-      const response = await fetch("/game-manual-search.json", { cache: "force-cache" });
-      if (!response.ok) throw new Error(`Search index unavailable (${response.status})`);
-      const data = await response.json();
-      if (!Array.isArray(data?.pages)) throw new Error("Search index is invalid");
-      setManualSearchIndex(data);
-    } catch (error) {
-      console.warn("Game Manual search index unavailable", error);
-      setManualSearchError("Full manual search is unavailable on this device right now.");
-    } finally {
-      setManualSearchLoading(false);
-    }
-  }, [manualSearchIndex, manualSearchLoading]);
-
-  // Warm the small text index while the Rules screen is open so full-manual
-  // search is normally ready before the user opens the manual. The index is
-  // also pre-cached by the service worker for offline event use.
-  useEffect(() => {
-    if (manualSearchIndex || manualSearchLoading) return;
-    const warm = () => loadManualSearchIndex();
-    if ("requestIdleCallback" in window) {
-      const id = window.requestIdleCallback(warm, { timeout: 1500 });
-      return () => window.cancelIdleCallback?.(id);
-    }
-    const timer = window.setTimeout(warm, 350);
-    return () => window.clearTimeout(timer);
-  }, [manualSearchIndex, manualSearchLoading, loadManualSearchIndex]);
-
-  useEffect(() => {
-    if (showGameManual) loadManualSearchIndex();
-  }, [showGameManual, loadManualSearchIndex]);
-
-  const manualSearchResults = useMemo(() => {
-    const rawQuery = manualSearchQuery.trim();
-    if (!rawQuery || !manualSearchIndex?.pages) return [];
-
-    const queryLower = rawQuery.toLowerCase();
-    const tokens = [...new Set(queryLower.match(/[a-z0-9]+/g) || [])];
-    if (!tokens.length) return [];
-
-    const results = [];
-    for (const entry of manualSearchIndex.pages) {
-      const pageText = String(entry.text || "");
-      const lower = pageText.toLowerCase();
-      const exactPos = lower.indexOf(queryLower);
-      const tokenPositions = tokens.map((token) => lower.indexOf(token));
-      const allTokensPresent = tokenPositions.every((pos) => pos >= 0);
-
-      // Multi-word searches require every word unless the exact phrase itself
-      // is present. This keeps common words from flooding the results.
-      if (exactPos < 0 && !allTokensPresent) continue;
-
-      const exactMatches = exactPos >= 0
-        ? Math.max(1, lower.split(queryLower).length - 1)
-        : 0;
-      const tokenHits = tokens.reduce((sum, token) => {
-        let count = 0;
-        let from = 0;
-        while (count < 8) {
-          const pos = lower.indexOf(token, from);
-          if (pos < 0) break;
-          count += 1;
-          from = pos + token.length;
-        }
-        return sum + count;
-      }, 0);
-
-      const positions = tokenPositions.filter((pos) => pos >= 0);
-      const hitPos = exactPos >= 0 ? exactPos : (positions.length ? Math.min(...positions) : 0);
-      const snippetStart = Math.max(0, hitPos - 95);
-      const snippetEnd = Math.min(pageText.length, hitPos + Math.max(rawQuery.length, 20) + 170);
-      const snippet = `${snippetStart > 0 ? "…" : ""}${pageText.slice(snippetStart, snippetEnd).trim()}${snippetEnd < pageText.length ? "…" : ""}`;
-
-      results.push({
-        page: entry.page,
-        snippet,
-        score: (exactMatches * 100) + (tokenHits * 4) + (allTokensPresent ? 25 : 0),
-      });
-    }
-
-    return results.sort((a, b) => b.score - a.score || a.page - b.page);
-  }, [manualSearchIndex, manualSearchQuery]);
-
   if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
   const q = query.trim().toUpperCase();
   const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
@@ -8163,169 +5177,10 @@ function RuleBook({ rules }) {
   }
   return (
     <>
-      {showGameManual && (
-        <div className="fixed inset-0 z-[100] bg-slate-100 dark:bg-slate-950 flex flex-col">
-          <div className="shrink-0 bg-[#0D0F32] text-white border-b border-white/10 px-3 sm:px-4 py-3 flex items-center gap-3 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setShowGameManual(false)}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-white/20 bg-white/10 hover:bg-white/15 text-sm font-semibold"
-              aria-label="Back to Rules"
-            >
-              <ChevronLeft size={18} />
-              Back
-            </button>
-            <div className="min-w-0 flex-1">
-              <div className="font-bold text-sm sm:text-base truncate">Game Manual</div>
-              <div className="text-[11px] sm:text-xs text-slate-300 truncate">VEX V5 Robotics Competition Override • Version 2.0</div>
-            </div>
-          </div>
-
-          <div className="shrink-0 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2">
-            <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
-              <button
-                type="button"
-                onClick={() => jumpToManualPage(3)}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
-              >
-                Table of Contents
-              </button>
-              <button
-                type="button"
-                onClick={() => jumpToManualPage(7)}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
-              >
-                Quick Reference Guide
-              </button>
-            </div>
-
-            <div className="relative mx-auto max-w-4xl">
-              <Search size={17} className="absolute left-3 top-[18px] -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input
-                value={manualSearchQuery}
-                onChange={(e) => {
-                  setManualSearchQuery(e.target.value);
-                  setManualSearchExpanded(true);
-                }}
-                onFocus={() => {
-                  if (manualSearchQuery.trim()) setManualSearchExpanded(true);
-                  loadManualSearchIndex();
-                }}
-                placeholder="Search the entire Game Manual"
-                className="w-full pl-9 pr-10 py-2.5 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600"
-                aria-label="Search the entire Game Manual"
-              />
-              {manualSearchQuery && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setManualSearchQuery("");
-                    setManualSearchExpanded(false);
-                  }}
-                  className="absolute right-2 top-[18px] -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                  aria-label="Clear manual search"
-                >
-                  <X size={17} />
-                </button>
-              )}
-
-              {manualSearchLoading && !manualSearchIndex && (
-                <div className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Preparing offline manual search…</div>
-              )}
-              {manualSearchError && !manualSearchIndex && (
-                <div className="mt-1.5 text-xs text-red-600 dark:text-red-400">{manualSearchError}</div>
-              )}
-
-              {manualSearchExpanded && manualSearchQuery.trim() && manualSearchIndex && (
-                <div className="absolute z-30 left-0 right-0 top-full mt-1 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 shadow-xl overflow-hidden">
-                  <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                      {manualSearchResults.length} {manualSearchResults.length === 1 ? "page" : "pages"} found
-                    </span>
-                    <span className="ml-auto text-[11px] text-slate-400">Version 2.0 • offline index</span>
-                  </div>
-                  <div className="max-h-[38vh] overflow-y-auto overscroll-contain divide-y divide-slate-100 dark:divide-slate-800">
-                    {manualSearchResults.length > 0 ? manualSearchResults.map((result) => (
-                      <button
-                        key={`manual-search-${result.page}`}
-                        type="button"
-                        onClick={() => {
-                          setManualSearchExpanded(false);
-                          jumpToManualPage(result.page);
-                        }}
-                        className="w-full text-left px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800"
-                      >
-                        <div className="text-xs font-bold text-[#D7212B] mb-0.5">Page {result.page}</div>
-                        <div className="text-xs leading-5 text-slate-600 dark:text-slate-300 line-clamp-3">{result.snippet}</div>
-                      </button>
-                    )) : (
-                      <div className="px-3 py-4 text-sm text-slate-500 dark:text-slate-400 text-center">
-                        No pages contain all of those search terms.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain bg-slate-200 dark:bg-slate-900 px-2 py-2 sm:px-4 sm:py-4">
-            <div className="mx-auto max-w-4xl space-y-2 sm:space-y-3">
-              {Array.from({ length: MANUAL_PAGE_COUNT }, (_, i) => i + 1).map((page) => (
-                <div
-                  key={page}
-                  ref={(el) => {
-                    if (el) manualPageRefs.current[page] = el;
-                    else delete manualPageRefs.current[page];
-                  }}
-                  className="relative bg-white shadow-sm scroll-mt-2"
-                >
-                  <img
-                    src={manualPageSrc(page)}
-                    alt={`Game Manual page ${page}`}
-                    className="block w-full h-auto"
-                    loading={page <= 4 ? "eager" : "lazy"}
-                    draggable="false"
-                  />
-                  {[...manualTocLinks, ...manualQuickReferenceLinks]
-                    .filter((link) => link.sourcePage === page)
-                    .map((link, index) => (
-                      <button
-                        key={`${page}-${index}`}
-                        type="button"
-                        onClick={() => jumpToManualPage(link.targetPage)}
-                        className="absolute z-10 bg-transparent active:bg-sky-400/20 focus:outline-none focus:ring-2 focus:ring-sky-500/60"
-                        style={{
-                          left: `${link.left}%`,
-                          top: `${link.top}%`,
-                          width: `${link.width}%`,
-                          height: `${link.height}%`,
-                        }}
-                        aria-label={`Jump to Game Manual page ${link.targetPage}`}
-                        title={`Go to page ${link.targetPage}`}
-                      />
-                    ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-      <div className="relative mb-3">
+      <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search rules — code or wording"
-          className="w-full pl-9 pr-3 py-2.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
-      </div>
-      <div className="flex justify-end mb-4">
-        <button
-          type="button"
-          onClick={() => setShowGameManual(true)}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700"
-          title="Open the VEX V5RC Override Game Manual Version 2.0"
-        >
-          <BookOpen size={16} />
-          Open Game Manual
-        </button>
+          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300" />
       </div>
       {groups.length === 0 ? (
         <Empty title="No rules match" sub="Try a different word or code." />

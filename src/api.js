@@ -419,138 +419,6 @@ export async function deleteFieldLog(id) {
   if (error) throw error;
 }
 
-
-/* ================= shared field reset status ================= */
-const mapFieldResetStatus = (r) => r ? ({
-  eventId: r.event_id,
-  matchId: r.match_id || "",
-  matchRef: r.match_ref || "",
-  state: r.state || null,
-  verifiedBy: r.verified_by || "",
-  verifiedAt: r.verified_at ? new Date(r.verified_at).getTime() : null,
-  updatedBy: r.updated_by || "",
-  updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : 0,
-}) : null;
-
-export async function getFieldResetStatus(eventId, matchId) {
-  if (E2E_MOCK) return null;
-  const { data, error } = await supabase
-    .from("field_reset_status")
-    .select("*")
-    .eq("event_id", eventId)
-    .eq("match_id", String(matchId))
-    .maybeSingle();
-  if (error) throw error;
-  return mapFieldResetStatus(data);
-}
-
-export async function upsertFieldResetStatus(eventId, matchId, status = {}) {
-  if (E2E_MOCK) return { eventId, matchId: String(matchId), ...status, updatedAt: Date.now() };
-  const row = {
-    event_id: eventId,
-    match_id: String(matchId),
-    match_ref: status.matchRef || null,
-    state: status.state || {},
-    verified_by: status.verifiedBy || null,
-    verified_at: status.verifiedAt ? new Date(status.verifiedAt).toISOString() : null,
-    updated_by: status.updatedBy || "",
-    updated_at: new Date().toISOString(),
-  };
-  const { data, error } = await supabase
-    .from("field_reset_status")
-    .upsert(row, { onConflict: "event_id,match_id" })
-    .select()
-    .single();
-  if (error) throw error;
-  return mapFieldResetStatus(data);
-}
-
-export async function clearFieldResetStatuses(eventId) {
-  if (E2E_MOCK) return;
-  const { error } = await supabase.from("field_reset_status").delete().eq("event_id", eventId);
-  if (error) throw error;
-}
-
-export function subscribeFieldResetStatus(eventId, matchId, onChange) {
-  if (E2E_MOCK) return () => {};
-  const wanted = String(matchId);
-  const ch = supabase
-    .channel(`field-reset-${eventId}-${wanted}-${Math.random().toString(36).slice(2)}`)
-    .on("postgres_changes", { event: "*", schema: "public", table: "field_reset_status", filter: `event_id=eq.${eventId}` }, (payload) => {
-      const row = payload.new && Object.keys(payload.new).length ? payload.new : payload.old;
-      if (String(row?.match_id || "") !== wanted) return;
-      onChange?.(payload.eventType === "DELETE" ? null : mapFieldResetStatus(row));
-    })
-    .subscribe();
-  return () => supabase.removeChannel(ch);
-}
-
-
-/* ================= shared AWP status ================= */
-const mapAwpStatus = (r) => r ? ({
-  eventId: r.event_id,
-  matchId: r.match_id || "",
-  matchRef: r.match_ref || "",
-  state: r.state || null,
-  verifiedBy: r.verified_by || "",
-  verifiedAt: r.verified_at ? new Date(r.verified_at).getTime() : null,
-  updatedBy: r.updated_by || "",
-  updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : 0,
-}) : null;
-
-export async function getAwpStatus(eventId, matchId) {
-  if (E2E_MOCK) return null;
-  const { data, error } = await supabase
-    .from("awp_status")
-    .select("*")
-    .eq("event_id", eventId)
-    .eq("match_id", String(matchId))
-    .maybeSingle();
-  if (error) throw error;
-  return mapAwpStatus(data);
-}
-
-export async function upsertAwpStatus(eventId, matchId, status = {}) {
-  if (E2E_MOCK) return { eventId, matchId: String(matchId), ...status, updatedAt: Date.now() };
-  const row = {
-    event_id: eventId,
-    match_id: String(matchId),
-    match_ref: status.matchRef || null,
-    state: status.state || {},
-    verified_by: status.verifiedBy || null,
-    verified_at: status.verifiedAt ? new Date(status.verifiedAt).toISOString() : null,
-    updated_by: status.updatedBy || "",
-    updated_at: new Date().toISOString(),
-  };
-  const { data, error } = await supabase
-    .from("awp_status")
-    .upsert(row, { onConflict: "event_id,match_id" })
-    .select()
-    .single();
-  if (error) throw error;
-  return mapAwpStatus(data);
-}
-
-export function subscribeAwpStatus(eventId, matchId, onChange) {
-  if (E2E_MOCK) return () => {};
-  const wanted = String(matchId);
-  const ch = supabase
-    .channel(`awp-status-${eventId}-${wanted}-${Math.random().toString(36).slice(2)}`)
-    .on("postgres_changes", { event: "*", schema: "public", table: "awp_status", filter: `event_id=eq.${eventId}` }, (payload) => {
-      const row = payload.new && Object.keys(payload.new).length ? payload.new : payload.old;
-      if (String(row?.match_id || "") !== wanted) return;
-      onChange?.(payload.eventType === "DELETE" ? null : mapAwpStatus(row));
-    })
-    .subscribe();
-  return () => supabase.removeChannel(ch);
-}
-
-export async function clearAwpStatuses(eventId) {
-  if (E2E_MOCK) return;
-  const { error } = await supabase.from("awp_status").delete().eq("event_id", eventId);
-  if (error) throw error;
-}
-
 /* ================= elimination alliances ================= */
 const mapAlliance = (r) => ({ seed: r.seed, teams: r.teams || [] });
 export async function listAlliances(eventId) {
@@ -754,7 +622,6 @@ export function subscribeEvent(eventId, onChange) {
     .on("postgres_changes", { event: "*", schema: "public", table: "watch_notes", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "field_log", filter: `event_id=eq.${eventId}` }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "field_reset_status", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "event_settings", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "alliances", filter: `event_id=eq.${eventId}` }, onChange)
     .subscribe();
@@ -788,74 +655,19 @@ export async function deleteRefRoster(eventId, name) {
 }
 
 export function joinPresence(eventId, meta, onChange) {
-  if (E2E_MOCK) {
-    const leave = () => {};
-    leave.update = () => {};
-    onChange?.([]);
-    return leave;
-  }
+  if (E2E_MOCK) { onChange?.([]); return () => {}; }
   const key = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
   const ch = supabase.channel(`presence-${eventId}`, { config: { presence: { key } } });
-  let currentMeta = { ...meta };
-  let userId = null;
   ch.on("presence", { event: "sync" }, () => onChange(Object.values(ch.presenceState()).flat()));
   ch.subscribe(async (status) => {
     if (status === "SUBSCRIBED") {
+      let userId = null;
       try {
         const { data } = await supabase.auth.getSession();
         userId = data?.session?.user?.id || null;
       } catch {}
-      ch.track({ ...currentMeta, user_id: userId });
+      ch.track({ ...meta, user_id: userId });
     }
   });
-  const leave = () => supabase.removeChannel(ch);
-  leave.update = (nextMeta = {}) => {
-    currentMeta = { ...currentMeta, ...nextMeta };
-    ch.track({ ...currentMeta, user_id: userId }).catch(() => {});
-  };
-  return leave;
-}
-
-export async function upsertDeviceStatus(eventId, status = {}) {
-  if (E2E_MOCK) return null;
-  let userId = null;
-  try {
-    const { data } = await supabase.auth.getSession();
-    userId = data?.session?.user?.id || null;
-  } catch {}
-  if (!userId || !status.device_id) return null;
-  const row = {
-    event_id: eventId,
-    device_id: status.device_id,
-    user_id: userId,
-    name: status.name || "Ref",
-    role: status.role || "ref",
-    device_label: status.device_label || "Unknown device",
-    browser: status.browser || "",
-    platform: status.platform || "",
-    viewport: status.viewport || "",
-    display_mode: status.display_mode || "browser",
-    app_version: status.app_version || "",
-    cloud_reachable: status.cloud_reachable ?? null,
-    syncing: !!status.syncing,
-    queued_writes: Math.max(0, Number(status.queued_writes) || 0),
-    failed_writes: Math.max(0, Number(status.failed_writes) || 0),
-    last_synced_at: status.last_synced_at ? new Date(status.last_synced_at).toISOString() : null,
-    last_seen: new Date().toISOString(),
-  };
-  const { error } = await supabase.from("device_status").upsert(row, { onConflict: "event_id,device_id" });
-  if (error) throw error;
-  return row;
-}
-
-export async function listDeviceStatuses(eventId) {
-  if (E2E_MOCK) return [];
-  const cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
-  const { data, error } = await supabase.from("device_status").select("*").eq("event_id", eventId).gte("last_seen", cutoff).order("last_seen", { ascending: false });
-  if (error) throw error;
-  return (data || []).map((row) => ({
-    ...row,
-    lastSeen: row.last_seen ? new Date(row.last_seen).getTime() : 0,
-    lastSyncedAt: row.last_synced_at ? new Date(row.last_synced_at).getTime() : 0,
-  }));
+  return () => supabase.removeChannel(ch);
 }

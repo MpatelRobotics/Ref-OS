@@ -238,7 +238,7 @@ export default function LoginScreen({ eventId, onUnlock }) {
           <img src="/logo.svg" alt="Highlander Summit" className="h-12 w-12 object-contain" />
           <p className="text-center text-xs text-slate-400">
             Made by Maharshi Patel ·{" "}
-            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-white underline">@mpatel_ref</a>{" · "}v{APP_VERSION} · Highlander Release
+            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-white underline">@mpatel_ref</a>{" · "}v{APP_VERSION} · Private Beta
           </p>
         </div>
       </div>

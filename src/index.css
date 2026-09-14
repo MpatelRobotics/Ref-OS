@@ -128,7 +128,6 @@ button:active:not(:disabled) {
   }
 }
 
-
 /* Ref-OS workspace system: navy structure, neutral surfaces, semantic status. */
 :root { --ref-bg:#f3f5f8; --ref-surface:#fff; --ref-text:#17243a; --ref-muted:#526176; --ref-border:#d9e1eb; --ref-accent:#1d4ed8; --ref-navy:#101d33; }
 .dark { --ref-bg:#101827; --ref-surface:#1a2638; --ref-text:#eef3fb; --ref-muted:#afbdd0; --ref-border:#3d4d64; --ref-accent:#93c5fd; }
