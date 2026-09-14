@@ -1,4 +1,4 @@
-const CACHE = "refos-v10-1.2.0-ui-refresh-quadrant-recode";
+const CACHE = "refos-v10-1.2.0-ui-refresh-multi-rules";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {

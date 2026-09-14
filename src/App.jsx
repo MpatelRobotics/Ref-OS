@@ -295,7 +295,14 @@ const availablePhases = (event) => MATCH_PHASES.filter((p) => {
   return p.key in elimCounts(event.bracket);
 });
 
-const fmtRule = (code) => { const c = (code || "").trim().replace(/[<>]/g, "").toUpperCase(); return c ? `<${c}>` : "—"; };
+const splitRuleCodes = (code) => String(code || "").split("|").map((c) => c.trim().replace(/[<>]/g, "").toUpperCase()).filter(Boolean);
+const fmtRule = (code) => { const codes = splitRuleCodes(code); return codes.length ? codes.map((c) => `<${c}>`).join(" ") : "—"; };
+const splitRuleDescs = (desc) => String(desc || "").split("|").map((d) => d.trim());
+const ruleEntries = (v) => {
+  const codes = splitRuleCodes(v?.code);
+  const descs = splitRuleDescs(v?.desc);
+  return codes.length ? codes.map((code, i) => ({ code, desc: descs[i] || "" })) : [{ code: "", desc: String(v?.desc || "").trim() }];
+};
 const fmtTime = (ts) => new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const ago = (ts) => {
   if (!ts) return "";
@@ -1689,7 +1696,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     return m;
   }, [viols]);
   const knownRules = useMemo(() => {
-    const m = {}; for (const v of viols) if (v.code && !m[v.code]) m[v.code] = v.desc || ""; return m;
+    const m = {};
+    for (const v of viols) {
+      for (const entry of ruleEntries(v)) if (entry.code && !m[entry.code]) m[entry.code] = entry.desc || "";
+    }
+    return m;
   }, [viols]);
   const teamNameMap = useMemo(() => Object.fromEntries(teams.map((t) => [t.number, t.name])), [teams]);
   const teamRankMap = useMemo(() => Object.fromEntries(teams.filter((t) => t.rank != null).map((t) => [t.number, t.rank])), [teams]);
@@ -1903,7 +1914,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 
       section("Violation summary");
       const ruleCounts = {};
-      viols.forEach((v) => { const k = v.code ? fmtRule(v.code) : "No rule"; ruleCounts[k] = (ruleCounts[k] || 0) + 1; });
+      viols.forEach((v) => { const entries = ruleEntries(v); entries.forEach((entry) => { const k = entry.code ? fmtRule(entry.code) : "No rule"; ruleCounts[k] = (ruleCounts[k] || 0) + 1; }); });
       const rulesTop = Object.entries(ruleCounts).sort((a,b) => b[1]-a[1]);
       if (!rulesTop.length) line("No violations logged.");
       rulesTop.forEach(([rule,count]) => line(`${rule}: ${count}`, 10, false, 10));
@@ -2709,10 +2720,12 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
   const byRule = useMemo(() => {
     const m = {};
     for (const v of viols) {
-      const key = v.code || "—";
-      m[key] = m[key] || { code: v.code, desc: v.desc, count: 0, types: {} };
-      m[key].count++; m[key].types[v.type] = (m[key].types[v.type] || 0) + 1;
-      if (!m[key].desc && v.desc) m[key].desc = v.desc;
+      for (const entry of ruleEntries(v)) {
+        const key = entry.code || "—";
+        m[key] = m[key] || { code: entry.code, desc: entry.desc, count: 0, types: {} };
+        m[key].count++; m[key].types[v.type] = (m[key].types[v.type] || 0) + 1;
+        if (!m[key].desc && entry.desc) m[key].desc = entry.desc;
+      }
     }
     return Object.values(m).sort((a, b) => b.count - a.count);
   }, [viols]);
@@ -2794,14 +2807,14 @@ function ViolationCard({ v, onDelete, onOpenPhoto, onEdit, showTeam }) {
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border ${T.badge}`}><T.Icon size={12} /> {T.label}</span>
         {showTeam && <span className="font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-200 dark:bg-slate-600 px-1.5 py-0.5 rounded-md text-sm">{v.team}</span>}
-        <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{fmtRule(v.code)}</span>
+        <div className="flex flex-wrap gap-1.5">{splitRuleCodes(v.code).map((code) => <span key={code} className="font-mono font-bold text-slate-900 dark:text-slate-100">{fmtRule(code)}</span>)}</div>
         {fmtMatch(v.match) && <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200">{fmtMatch(v.match)}</span>}
         {v._pending && <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-300"><RefreshCw size={9} className="animate-spin" /> Saving</span>}
         <span className="text-[11px] text-slate-400 ml-auto">{fmtTime(v.createdAt)}</span>
         {canEdit && <button onClick={() => onEdit(v)} className="text-slate-300 hover:text-slate-700 dark:text-slate-200" title="Edit"><Pencil size={15} /></button>}
         <button onClick={() => { if (confirm(v._pending ? "Discard this unsynced violation?" : "Delete this violation?")) onDelete(v); }} className="refos-destructive-icon" title="Delete"><Trash2 size={15} /></button>
       </div>
-      {v.desc && <p className={`text-sm mt-1.5 font-medium ${T.text}`}>{v.desc}</p>}
+      {ruleEntries(v).some((r) => r.desc) && <div className="mt-1.5 space-y-1">{ruleEntries(v).filter((r) => r.desc).map((r) => <div key={r.code || r.desc} className={`text-sm font-medium ${T.text}`}><span className="font-mono font-bold">{r.code ? fmtRule(r.code) : ""}</span>{r.code ? " " : ""}{r.desc}</div>)}</div>}
       {v.notes && <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{v.notes}</p>}
       {v._localPhotos?.length > 0 ? (
         <div className="flex gap-2 mt-2 overflow-x-auto">{v._localPhotos.map((src, i) => (
@@ -2820,11 +2833,13 @@ function ByRule({ viols, expandRule, setExpandRule }) {
   const rules = useMemo(() => {
     const m = {};
     for (const v of viols) {
-      const key = v.code || "—";
-      m[key] = m[key] || { code: v.code, desc: v.desc, count: 0, types: {}, teams: {} };
-      m[key].count++; m[key].types[v.type] = (m[key].types[v.type] || 0) + 1;
-      m[key].teams[v.team] = (m[key].teams[v.team] || 0) + 1;
-      if (!m[key].desc && v.desc) m[key].desc = v.desc;
+      for (const entry of ruleEntries(v)) {
+        const key = entry.code || "—";
+        m[key] = m[key] || { code: entry.code, desc: entry.desc, count: 0, types: {}, teams: {} };
+        m[key].count++; m[key].types[v.type] = (m[key].types[v.type] || 0) + 1;
+        m[key].teams[v.team] = (m[key].teams[v.team] || 0) + 1;
+        if (!m[key].desc && entry.desc) m[key].desc = entry.desc;
+      }
     }
     return Object.values(m).sort((a, b) => b.count - a.count);
   }, [viols]);
@@ -2878,8 +2893,13 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
   const [matchPhase, setMatchPhase] = useState((edit && edit.match?.phase) || (presetMatch?.phase) || (lastMatch?.phase || "qual"));
   const [matchNum, setMatchNum] = useState((edit && edit.match?.num) || (presetMatch && presetMatch.num != null ? String(presetMatch.num) : (lastMatch?.num || "")));
   const [type, setType] = useState((edit && edit.type) || "minor");
-  const [code, setCode] = useState((edit && edit.code) || "");
-  const [desc, setDesc] = useState((edit && edit.desc) || "");
+  const [selectedRules, setSelectedRules] = useState(() => {
+    const codes = splitRuleCodes((edit && edit.code) || "");
+    const descriptions = splitRuleDescs((edit && edit.desc) || "");
+    return codes.map((c, i) => ({ code: c, desc: descriptions[i] || ruleBook[c] || knownRules[c] || "" }));
+  });
+  const code = selectedRules.map((r) => r.code).join(" | ");
+  const desc = selectedRules.map((r) => r.desc || "").join(" | ");
   const [notes, setNotes] = useState((edit && edit.notes) || "");
   const [photos, setPhotos] = useState([]);
   const [keepKeys, setKeepKeys] = useState((edit && edit.photoKeys) || []);
@@ -2888,7 +2908,6 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
   const fileRef = useRef(null);
   const T = TYPES[type];
 
-  const onCode = (val) => { setCode(val); const clean = normNum(val).replace(/[<>]/g, ""); const d = ruleBook[clean] || knownRules[clean]; if (d && !desc) setDesc(d); };
   const addPhotos = async (files) => { const list = Array.from(files).slice(0, 4); const out = []; for (const f of list) { try { out.push(await compress(f)); } catch {} } setPhotos((p) => [...p, ...out].slice(0, 6)); };
   const valid = (creatingNew ? newNumber.trim() : team) && (code.trim() || desc.trim());
   const doSave = async () => {
@@ -2904,19 +2923,19 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
     if (tourMode) return;
     if (!valid || busy) return;
     const selectedTeam = normNum(creatingNew ? newNumber : team);
-    const selectedRule = normNum(code).replace(/[<>]/g, "");
-    // duplicate guard (all users): same team + rule + match already logged
-    if (!edit && selectedTeam && selectedRule) {
+    const selectedRuleCodes = splitRuleCodes(code);
+    // duplicate guard (all users): same team + any selected rule + match already logged
+    if (!edit && selectedTeam && selectedRuleCodes.length) {
       const myKey = matchPhase !== "none" && matchNum ? `${matchPhase}:${matchNum}` : "";
-      const dup = (viols || []).some((v) => {
+      const duplicateCodes = selectedRuleCodes.filter((selectedRule) => (viols || []).some((v) => {
         if (normNum(v.team) !== selectedTeam) return false;
-        if (normNum(v.code).replace(/[<>]/g, "") !== selectedRule) return false;
+        if (!splitRuleCodes(v.code).includes(selectedRule)) return false;
         const vKey = v.match && v.match.phase && v.match.phase !== "none" && v.match.num ? `${v.match.phase}:${v.match.num}` : "";
         return vKey === myKey;
-      });
-      if (dup) {
+      }));
+      if (duplicateCodes.length) {
         const where = myKey ? ` in ${fmtMatch({ phase: matchPhase, num: matchNum })}` : "";
-        if (!window.confirm(`Possible duplicate — ${selectedTeam} already has ${fmtRule(selectedRule)}${where} logged. Add it again anyway?`)) return;
+        if (!window.confirm(`Possible duplicate — ${selectedTeam} already has ${fmtRule(duplicateCodes.join(" | "))}${where} logged. Add it again anyway?`)) return;
       }
     }
     await doSave();
@@ -3021,16 +3040,21 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
           </div>
 
           <div>
-            <Label>Rule cited</Label>
-            <div className="flex gap-2 items-start">
+            <Label>Rules cited</Label>
+            <div className="space-y-2">
+              {selectedRules.map((r) => (
+                <div key={r.code} className="flex items-start gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2">
+                  <span className="font-mono font-semibold text-slate-900 dark:text-slate-100 shrink-0">{fmtRule(r.code)}</span>
+                  <span className="text-sm text-slate-500 dark:text-slate-400 flex-1">{r.desc || "Custom rule"}</span>
+                  <button type="button" onClick={() => setSelectedRules((rs) => rs.filter((x) => x.code !== r.code))} className="text-slate-400 hover:text-red-600" title="Remove rule"><X size={16} /></button>
+                </div>
+              ))}
               <button type="button" onClick={() => setShowRulePicker(true)}
-                className="w-28 shrink-0 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono text-left hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-300">
-                {code ? <span className="text-slate-900 dark:text-slate-100 font-semibold">{fmtRule(code)}</span> : <span className="text-slate-400 font-sans">Rule…</span>}
+                className="w-full px-3 py-2.5 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:border-slate-400">
+                {selectedRules.length ? "Change rule selection" : "Select rules"}
               </button>
-              <textarea value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="What the rule covers" rows={2}
-                className="flex-1 min-w-0 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm leading-snug resize-y focus:outline-none focus:ring-2 focus:ring-slate-300" />
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">Tap the box to pick a rule — search by code or description.</p>
+            <p className="text-[11px] text-slate-400 mt-1">Select every rule that applies in one pass. Tap a selected rule again to unselect it, then tap Done.</p>
           </div>
 
           <div>
@@ -3066,8 +3090,9 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
       </div>
       {showRulePicker && (
         <RulePicker rules={rules} knownRules={knownRules}
-          onPickRule={(c, d) => { setCode(c); setDesc(d || ""); setShowRulePicker(false); }}
-          onPickCustom={(c) => { setCode(c); setShowRulePicker(false); }}
+          selectedCodes={selectedRules.map((r) => r.code)}
+          onPickRule={(c, d) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs.filter((r) => r.code !== clean) : [...rs, { code: clean, desc: d || ruleBook[clean] || knownRules[clean] || "" }]); }}
+          onPickCustom={(c) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs.filter((r) => r.code !== clean) : [...rs, { code: clean, desc: ruleBook[clean] || knownRules[clean] || "" }]); }}
           onClose={() => setShowRulePicker(false)} />
       )}
     </div>
@@ -3075,7 +3100,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
 }
 
 /* ============================ RULE PICKER ============================ */
-function RulePicker({ rules, knownRules, onPickRule, onPickCustom, onClose }) {
+function RulePicker({ rules, knownRules, selectedCodes = [], onPickRule, onPickCustom, onClose }) {
   const [q, setQ] = useState("");
   const [favoriteCodes, setFavoriteCodes] = useState(() => { try { return JSON.parse(localStorage.getItem("refosRuleFavorites") || "[]"); } catch { return []; } });
   const [recentCodes, setRecentCodes] = useState(() => { try { return JSON.parse(localStorage.getItem("refosRecentRules") || "[]"); } catch { return []; } });
@@ -3116,12 +3141,13 @@ function RulePicker({ rules, knownRules, onPickRule, onPickCustom, onClose }) {
     <div className="fixed inset-0 z-50 bg-white dark:bg-slate-800 flex flex-col font-sans">
       <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2 shrink-0">
         <button onClick={onClose} className="text-slate-500 dark:text-slate-400 p-1 -ml-1"><ChevronLeft size={22} /></button>
-        <h2 className="font-bold text-slate-900 dark:text-slate-100">Cite a rule</h2>
+        <h2 className="font-bold text-slate-900 dark:text-slate-100 flex-1">Cite rules</h2>
+        <button type="button" onClick={onClose} className="px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-semibold">Done{selectedCodes.length ? ` (${selectedCodes.length})` : ""}</button>
       </div>
       <div className="p-3 border-b border-slate-100 shrink-0">
         <div className="relative">
           <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search code or description"
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search code or description"
             className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
         </div>
       </div>
@@ -3138,7 +3164,8 @@ function RulePicker({ rules, knownRules, onPickRule, onPickCustom, onClose }) {
             <div className="sticky top-0 bg-slate-100 dark:bg-slate-700 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{g.cat}</div>
             {g.items.map((r) => (
               <div key={`${g.cat}-${r.code}`} className="flex border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700">
-                <button onClick={() => chooseRule(r)} className="flex-1 min-w-0 text-left px-4 py-2.5 flex gap-3 items-baseline">
+                <button onClick={() => chooseRule(r)} className="flex-1 min-w-0 text-left px-4 py-2.5 flex gap-3 items-center">
+                  <span className={`w-5 h-5 shrink-0 rounded border grid place-items-center ${selectedCodes.includes(r.code) ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 dark:border-slate-600"}`}>{selectedCodes.includes(r.code) ? "✓" : ""}</span>
                   <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
                   <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
                 </button>
@@ -3429,8 +3456,9 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
     const t = v.team;
     stat[t] = stat[t] || { total: 0, minor: 0, major: 0, inspection: 0, codes: {} };
     stat[t].total++; stat[t][v.type] = (stat[t][v.type] || 0) + 1;
-    const code = v.code || "—";
-    stat[t].codes[code] = (stat[t].codes[code] || 0) + 1;
+    const codes = splitRuleCodes(v.code);
+    if (codes.length) codes.forEach((code) => { stat[t].codes[code] = (stat[t].codes[code] || 0) + 1; });
+    else stat[t].codes["—"] = (stat[t].codes["—"] || 0) + 1;
   }
   const Alliance = ({ label, teams, color }) => (
     <div className={`rounded-xl border p-3 ${color === "red" ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"}`}>
@@ -4227,9 +4255,9 @@ function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNom
   // conduct flags: which G1–G5 rules each team has been cited for
   const gByTeam = {};
   for (const v of viols) {
-    if (G_RULE.test(v.code || "")) {
+    for (const c of splitRuleCodes(v.code)) {
+      if (!G_RULE.test(c)) continue;
       const t = v.team; (gByTeam[t] = gByTeam[t] || {});
-      const c = (v.code || "").toUpperCase();
       gByTeam[t][c] = (gByTeam[t][c] || 0) + 1;
     }
   }
