@@ -419,6 +419,68 @@ export async function deleteFieldLog(id) {
   if (error) throw error;
 }
 
+/* ================= shared quadrant field reset ================= */
+const mapFieldResetCheck = (r) => ({
+  eventId: r.event_id,
+  matchId: r.match_id,
+  matchRef: r.match_ref || "",
+  quadrant: Number(r.quadrant),
+  verifiedBy: r.verified_by || "",
+  verifiedAt: r.verified_at ? new Date(r.verified_at).getTime() : null,
+  updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : null,
+});
+
+export async function listFieldResetChecks(eventId) {
+  if (E2E_MOCK) return [];
+  const { data, error } = await supabase
+    .from("field_reset_checks")
+    .select("*")
+    .eq("event_id", eventId)
+    .order("match_id")
+    .order("quadrant");
+  if (error) throw error;
+  return (data || []).map(mapFieldResetCheck);
+}
+
+export async function verifyFieldResetQuadrant(eventId, matchId, matchRef, quadrant, verifiedBy = "") {
+  const q = Number(quadrant);
+  if (![1, 2, 3, 4].includes(q)) throw new Error("Invalid field reset quadrant.");
+  if (E2E_MOCK) return { eventId, matchId, matchRef, quadrant: q, verifiedBy, verifiedAt: Date.now(), updatedAt: Date.now() };
+  const now = new Date().toISOString();
+  const row = {
+    event_id: eventId,
+    match_id: String(matchId),
+    match_ref: matchRef || null,
+    quadrant: q,
+    verified_by: (verifiedBy || "").trim(),
+    verified_at: now,
+    updated_at: now,
+  };
+  const { data, error } = await supabase
+    .from("field_reset_checks")
+    .upsert(row, { onConflict: "event_id,match_id,quadrant" })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapFieldResetCheck(data);
+}
+
+export async function clearFieldResetMatch(eventId, matchId) {
+  if (E2E_MOCK) return;
+  const { error } = await supabase
+    .from("field_reset_checks")
+    .delete()
+    .eq("event_id", eventId)
+    .eq("match_id", String(matchId));
+  if (error) throw error;
+}
+
+export async function clearFieldResetChecks(eventId) {
+  if (E2E_MOCK) return;
+  const { error } = await supabase.from("field_reset_checks").delete().eq("event_id", eventId);
+  if (error) throw error;
+}
+
 /* ================= elimination alliances ================= */
 const mapAlliance = (r) => ({ seed: r.seed, teams: r.teams || [] });
 export async function listAlliances(eventId) {
@@ -622,6 +684,7 @@ export function subscribeEvent(eventId, onChange) {
     .on("postgres_changes", { event: "*", schema: "public", table: "watch_notes", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "field_log", filter: `event_id=eq.${eventId}` }, onChange)
+    .on("postgres_changes", { event: "*", schema: "public", table: "field_reset_checks", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "event_settings", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "alliances", filter: `event_id=eq.${eventId}` }, onChange)
     .subscribe();

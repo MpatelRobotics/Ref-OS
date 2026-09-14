@@ -27,6 +27,7 @@ import AnnouncementModal from "./components/modals/AnnouncementModal.jsx";
 import CountdownSetupModal from "./components/modals/CountdownSetupModal.jsx";
 import OfflineReadinessModal from "./components/modals/OfflineReadinessModal.jsx";
 import FeedbackModal from "./components/modals/FeedbackModal.jsx";
+import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
 
 /* This build is locked to one event: The Highlander Summit Signature Event.
    EVENT_ID must match supabase/seed.sql. A shared site password gates entry. */
@@ -515,6 +516,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [finalists, setFinalists] = useState(new Set()); // `${award}::${team}`
   const [watchNotes, setWatchNotes] = useState([]);
   const [fieldLog, setFieldLog] = useState([]);
+  const [fieldResetChecks, setFieldResetChecks] = useState([]);
   const [eventSettings, setEventSettings] = useState({});
   const [failedSyncItems, setFailedSyncItems] = useState([]);
   const announcements = fieldLog.filter((e) => e.kind === "announcement").sort((a,b) => b.createdAt - a.createdAt);
@@ -760,6 +762,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       setFinalists(new Set(sl.map((s) => `${s.award}::${s.team}`)));
       setWatchNotes(wn);
       api.listFieldLog(eventId).then(setFieldLog).catch(() => {});
+      api.listFieldResetChecks(eventId).then(setFieldResetChecks).catch(() => {});
       api.listEventSettings(eventId).then(setEventSettings).catch(() => {});
       outbox.loadFailed(eventId).then(setFailedSyncItems).catch(() => {});
       api.listAlliances(eventId).then((rows) => { const m = {}; for (const a of rows) m[a.seed] = a.teams; setAlliances(m); setAlliancesLoaded(true); }).catch(() => { setAlliancesLoaded(true); });
@@ -1646,6 +1649,17 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       alert("Could not export nomination PDF: " + (e.message || e));
     }
   };
+  const verifyFieldResetQuadrant = async (matchId, matchRef, quadrant) => {
+    const saved = await api.verifyFieldResetQuadrant(eventId, matchId, matchRef, quadrant, meName || "Ref");
+    setFieldResetChecks((cur) => [saved, ...cur.filter((x) => !(x.matchId === saved.matchId && Number(x.quadrant) === Number(saved.quadrant)))]);
+    return saved;
+  };
+
+  const resetFieldResetMatch = async (matchId) => {
+    await api.clearFieldResetMatch(eventId, matchId);
+    setFieldResetChecks((cur) => cur.filter((x) => x.matchId !== matchId));
+  };
+
   const clearSelected = async (sel) => {
     try {
       if (sel.violations) { await api.clearViolations(eventId); setViols([]); }
@@ -1659,6 +1673,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       if (sel.judging) { await api.clearJudging(eventId); setNoms([]); setFinalists(new Set()); }
       if (sel.alliances) { await api.clearAlliances(eventId); setAlliances({}); setAlliancesLoaded(true); }
       if (sel.watchlist) { await api.clearWatchNotes(eventId); setWatchNotes([]); }
+      if (sel.quadrants) { await api.clearFieldResetChecks(eventId); setFieldResetChecks([]); }
     } catch (e) {
       if (outbox.isOffline(e)) { alert("You're offline — reconnect to clear."); return; }
       throw e;
@@ -2373,7 +2388,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : openMatch ? (
           <MatchDetail match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch}
-            fieldLog={fieldLog} onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
+            fieldLog={fieldLog} fieldResetChecks={fieldResetChecks} onVerifyFieldReset={verifyFieldResetQuadrant} onResetFieldReset={resetFieldResetMatch}
+            onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={(n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} emcee={isEmcee} />
         ) : openRobot ? (
           <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onOpenPhoto={setLightbox} emcee={isEmcee} />
@@ -2485,7 +2501,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       )}
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
       {showIdentity && <IdentityModal me={{ name: meName }} onSave={async (n) => { await onEditName(n); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
-      {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length }} onClear={clearSelected} onClose={() => setShowClear(false)} />}
+      {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length, quadrantChecks: fieldResetChecks.length }} onClear={clearSelected} onClose={() => setShowClear(false)} />}
       {showOnline && (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
           <div className="bg-white dark:bg-slate-800 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
@@ -3346,13 +3362,14 @@ function AwpChecker({ onSave }) {
   );
 }
 
-function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, fieldLog = [], onAddField, onRemoveField, meName, canDelete, emcee }) {
+function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee }) {
   const [toOpen, setToOpen] = useState(false);
   const [toAlliance, setToAlliance] = useState("red");
   const [toTeam, setToTeam] = useState("");
   const [faultOpen, setFaultOpen] = useState(false);
   const [faultNote, setFaultNote] = useState("");
   const [awpOpen, setAwpOpen] = useState(false);
+  const [fieldResetOpen, setFieldResetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
   const m = match;
@@ -3360,13 +3377,10 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
   const matchEntries = fieldLog.filter((e) => e.matchId === m.id).sort((a, b) => b.createdAt - a.createdAt);
   const replayEntry = matchEntries.find((e) => e.kind === "replay");
   const awpEntry = matchEntries.find((e) => e.kind === "awp");
-  const fieldReadyEntry = matchEntries.find((e) => e.kind === "field_ready");
-  const verifiedQuadrants = new Set(
-    matchEntries
-      .filter((e) => /^field_reset_q[1-4]$/i.test(String(e.kind || "")))
-      .map((e) => String(e.kind).slice(-2).toUpperCase())
-  );
-  const fieldResetCount = fieldReadyEntry ? 4 : verifiedQuadrants.size;
+  const matchFieldResetChecks = fieldResetChecks
+    .filter((e) => e.matchId === m.id)
+    .sort((a, b) => Number(a.quadrant) - Number(b.quadrant));
+  const fieldResetCount = new Set(matchFieldResetChecks.map((e) => Number(e.quadrant))).size;
   const allTimeouts = fieldLog.filter((e) => e.kind === "timeout");
   const allianceTeams = toAlliance === "red" ? (m.red || []) : (m.blue || []);
   const isElim = m.phase && m.phase !== "qual" && m.phase !== "practice";
@@ -3524,6 +3538,8 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
         </div>
         {!isElim && <button onClick={() => { setAwpOpen((v) => !v); setToOpen(false); setFaultOpen(false); }} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${awpOpen ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"}`}><ClipboardCheck size={15} /> AWP check</button>}
         {!isElim && awpOpen && <AwpChecker onSave={(note) => onAddField({ kind: "awp", matchId: m.id, matchRef: heading, note })} />}
+        <button onClick={() => setFieldResetOpen((v) => !v)} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${fieldResetOpen ? "bg-blue-600 text-white border-blue-600" : fieldResetCount >= 4 ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700"}`}><ShieldCheck size={15} /> {fieldResetCount >= 4 ? "Field Ready ✓" : `Quadrant check ${fieldResetCount}/4`}</button>
+        {fieldResetOpen && <QuadrantFieldReset checks={matchFieldResetChecks} meName={meName} onVerify={(quadrant) => onVerifyFieldReset(m.id, heading, quadrant)} onReset={() => onResetFieldReset(m.id)} />}
         {isElim && toOpen && (
           <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2">
             <div className="flex gap-2">
