@@ -3359,6 +3359,14 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
   const heading = m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`);
   const matchEntries = fieldLog.filter((e) => e.matchId === m.id).sort((a, b) => b.createdAt - a.createdAt);
   const replayEntry = matchEntries.find((e) => e.kind === "replay");
+  const awpEntry = matchEntries.find((e) => e.kind === "awp");
+  const fieldReadyEntry = matchEntries.find((e) => e.kind === "field_ready");
+  const verifiedQuadrants = new Set(
+    matchEntries
+      .filter((e) => /^field_reset_q[1-4]$/i.test(String(e.kind || "")))
+      .map((e) => String(e.kind).slice(-2).toUpperCase())
+  );
+  const fieldResetCount = fieldReadyEntry ? 4 : verifiedQuadrants.size;
   const allTimeouts = fieldLog.filter((e) => e.kind === "timeout");
   const allianceTeams = toAlliance === "red" ? (m.red || []) : (m.blue || []);
   const isElim = m.phase && m.phase !== "qual" && m.phase !== "practice";
@@ -3472,6 +3480,38 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
           </select>
         )}
       </div>
+
+      {/* Match readiness: one-glance operational status for the Head Ref. */}
+      <div className="mb-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
+        <div className="flex items-center justify-between gap-2 mb-2.5">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Match readiness</h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">Quick status before moving on from {heading}.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          <div className={`rounded-lg border px-3 py-2.5 ${isElim ? "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40" : awpEntry ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30" : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"}`}>
+            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400"><ClipboardCheck size={13} /> AWP</div>
+            <div className={`mt-1 text-sm font-bold ${isElim ? "text-slate-500 dark:text-slate-400" : awpEntry ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}>{isElim ? "N/A" : awpEntry ? "Checked" : "Unchecked"}</div>
+          </div>
+
+          <div className={`rounded-lg border px-3 py-2.5 ${fieldResetCount >= 4 ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30" : "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30"}`}>
+            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400"><Check size={13} /> Field reset</div>
+            <div className={`mt-1 text-sm font-bold ${fieldResetCount >= 4 ? "text-emerald-700 dark:text-emerald-300" : "text-blue-700 dark:text-blue-300"}`}>{fieldResetCount >= 4 ? "Ready" : `${fieldResetCount}/4`}</div>
+          </div>
+
+          <div className={`rounded-lg border px-3 py-2.5 ${mv.length > 0 ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30" : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40"}`}>
+            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400"><ShieldAlert size={13} /> Violations</div>
+            <div className={`mt-1 text-sm font-bold ${mv.length > 0 ? "text-red-700 dark:text-red-300" : "text-slate-700 dark:text-slate-300"}`}>{mv.length > 0 ? `${mv.length} logged` : "None logged"}</div>
+          </div>
+
+          <div className={`rounded-lg border px-3 py-2.5 ${replayEntry ? "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30" : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40"}`}>
+            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400"><RefreshCw size={13} /> Replay</div>
+            <div className={`mt-1 text-sm font-bold ${replayEntry ? "text-amber-700 dark:text-amber-300" : "text-slate-700 dark:text-slate-300"}`}>{replayEntry ? "Flagged" : "Not flagged"}</div>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
         <Alliance label="Red alliance" teams={match.red} color="red" />
         <Alliance label="Blue alliance" teams={match.blue} color="blue" />
