@@ -476,7 +476,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     catch { return { phase: "qual", num: "" }; }
   });
 
-  const [view, setView] = useState(role === "judge" ? "judging" : "teams");
+  const [view, setView] = useState(role === "judge" ? "judging" : "matches");
   const [openTeam, setOpenTeam] = useState(null);
   const [openMatch, setOpenMatch] = useState(null);
   const [openRobot, setOpenRobot] = useState(null);
