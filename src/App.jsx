@@ -569,6 +569,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showTwoDeviceSyncTest, setShowTwoDeviceSyncTest] = useState(false);
   const [showDiagnosticReport, setShowDiagnosticReport] = useState(false);
   const [showRoleCodeManager, setShowRoleCodeManager] = useState(false);
+  const [requestedRoleForManager, setRequestedRoleForManager] = useState("");
   const [lastSystemTest, setLastSystemTest] = useState(null);
 
   const contactDirectoryEntries = fieldLog.filter((e) => e.kind === "contact_directory").sort((a, b) => b.createdAt - a.createdAt);
@@ -581,6 +582,20 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const eventContacts = Array.isArray(eventSettings?.contact_directory?.value)
     ? eventSettings.contact_directory.value
     : legacyContacts;
+  const sharedRoleCodeConfig = eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config;
+  const roleCodeLabels = { ref: "Referee", judge: "Judge Advisor", emcee: "Emcee" };
+  const pendingRoleCodeRequests = (() => {
+    const latest = {};
+    for (const entry of fieldLog.filter((item) => item.kind === "role_code_request")) {
+      try {
+        const value = JSON.parse(entry.note || "{}");
+        const requestRole = ["ref", "judge", "emcee"].includes(value.role) ? value.role : "";
+        if (requestRole && (!latest[requestRole] || entry.createdAt > latest[requestRole].createdAt)) latest[requestRole] = { ...entry, requester: value.requester || entry.by || "Volunteer" };
+      } catch {}
+    }
+    return Object.entries(latest).map(([requestRole, request]) => ({ role: requestRole, ...request }))
+      .filter((request) => Number(sharedRoleCodeConfig?.codes?.[request.role]?.updatedAt || 0) <= Number(request.createdAt || 0));
+  })();
 
   const [countdownNow, setCountdownNow] = useState(Date.now());
   const countdownEntries = fieldLog.filter((e) => e.kind === "event_countdown").sort((a, b) => b.createdAt - a.createdAt);
@@ -1003,6 +1018,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       if (outbox.isOffline(e)) throw new Error("Reconnect before changing event access codes.");
       throw e;
     }
+  };
+  const requestRoleCodeRegeneration = async (requestRole) => {
+    const saved = await addFieldLog({ kind: "role_code_request", note: JSON.stringify({ role: requestRole, requester: meName }) });
+    return saved;
   };
 
   const addElimMatch = async (m) => {
@@ -2346,6 +2365,19 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         );
       })()}
 
+      {adminUnlocked && pendingRoleCodeRequests.length > 0 && (
+        <div className="refos-desktop-strip max-w-2xl mx-auto px-4 pt-3">
+          <div className="rounded-xl border-2 border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/35 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+            <KeyRound size={20} className="text-[#D7212B] shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold uppercase tracking-wide text-red-700 dark:text-red-300">Code regeneration requested</div>
+              <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{pendingRoleCodeRequests.map((request) => `${roleCodeLabels[request.role]} · ${request.requester}`).join("  •  ")}</div>
+            </div>
+            <button onClick={() => { setRequestedRoleForManager(pendingRoleCodeRequests[0].role); setShowRoleCodeManager(true); }} className="px-4 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-bold shrink-0">Regenerate code</button>
+          </div>
+        </div>
+      )}
+
       {(pendingCount > 0 || !online) && (
         <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-xs">
           <div className="refos-desktop-strip max-w-2xl mx-auto px-4 py-2 flex items-center gap-2">
@@ -2589,7 +2621,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Flag size={18} /> Field log</h2>
           </div>
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4">
-            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","feedback"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
+            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","feedback"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
           </div></div>
         </div>
       )}
@@ -2603,8 +2635,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         queuedWrites={queuedWrites} failedSyncCount={failedSyncItems.length} cloudReachable={cloudReachable}
         lastCloudError={lastCloudError} syncedAt={syncedAt} syncing={syncing}
         lastSystemTest={lastSystemTest} onClose={() => setShowDiagnosticReport(false)} />}
-      {showRoleCodeManager && adminUnlocked && <RoleAccessCodeManager eventId={eventId} config={eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config}
-        onSave={saveRoleAccessConfig} onClose={() => setShowRoleCodeManager(false)} />}
+      {showRoleCodeManager && adminUnlocked && <RoleAccessCodeManager eventId={eventId} config={sharedRoleCodeConfig} requestedRole={requestedRoleForManager}
+        onSave={saveRoleAccessConfig} onClose={() => { setShowRoleCodeManager(false); setRequestedRoleForManager(""); }} />}
       {showContactDirectory && <EventContactDirectory contacts={eventContacts} canEdit={adminUnlocked}
         onSave={saveEventContacts} onClose={() => setShowContactDirectory(false)} />}
       {showCountdownSetup && adminUnlocked && <CountdownSetupModal current={eventCountdown}
@@ -2682,7 +2714,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         event={event}
         role={role}
         adminUnlocked={adminUnlocked}
-        roleCodeConfig={eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config}
+        roleCodeConfig={sharedRoleCodeConfig}
+        codeRequestPending={pendingRoleCodeRequests.some((request) => request.role === (isJudge ? "judge" : isEmcee ? "emcee" : "ref"))}
+        onRequestCode={requestRoleCodeRegeneration}
         onManageCodes={() => { setShowShare(false); setShowRoleCodeManager(true); }}
         onClose={() => setShowShare(false)}
       />}
@@ -3880,7 +3914,7 @@ function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, f
     })();
   }, []);
 
-  const internalKinds = new Set(["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","feedback"]);
+  const internalKinds = new Set(["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","feedback"]);
   const operationalFieldLog = (fieldLog || []).filter((e) => !internalKinds.has(e.kind));
   const report = {
     generatedAt: new Date().toISOString(),

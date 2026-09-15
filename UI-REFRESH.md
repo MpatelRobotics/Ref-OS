@@ -28,4 +28,6 @@ Role names are normalized when a session is restored so referee aliases always m
 
 Successful volunteer sign in remembers the entered four character role code on that device. Older hashed only codes are displayed in Invite Other Key Volunteers after the volunteer signs out and signs in once, replacing the unhelpful ACTIVE badge with the actual code.
 
+Volunteers can request regeneration of their own role code. Admins receive a live in app request with the role and requester, and the open volunteer invite panel receives and displays the regenerated code through realtime event sync without being closed or refreshed.
+
 Phone and tablet layouts remain unchanged.

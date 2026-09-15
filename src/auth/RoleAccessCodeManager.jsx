@@ -8,7 +8,7 @@ async function hashAccessCode(code) {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export default function RoleAccessCodeManager({ eventId, config: sharedConfig, onSave, onClose }) {
+export default function RoleAccessCodeManager({ eventId, config: sharedConfig, requestedRole = "", onSave, onClose }) {
   const [config, setConfig] = useState(() => sharedConfig || { version: 1, codes: {} });
   const [revealed, setRevealed] = useState(() => {
     try {
@@ -163,6 +163,7 @@ export default function RoleAccessCodeManager({ eventId, config: sharedConfig, o
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto p-4 space-y-3">
+          {requestedRole && <div className="rounded-xl border border-red-200 bg-red-50 dark:bg-red-950/30 p-3 text-sm text-red-800 dark:text-red-200 font-semibold">Regeneration requested for {roleRows.find((row) => row.key === requestedRole)?.label || requestedRole}</div>}
           <div className="rounded-xl border bg-white dark:bg-slate-800 p-4">
             <div className="font-bold">Event day access</div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">

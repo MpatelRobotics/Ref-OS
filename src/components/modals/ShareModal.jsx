@@ -2,8 +2,9 @@ import React, { useEffect, useState } from "react";
 import { AlertTriangle, Check, Copy, KeyRound, Share2, X } from "lucide-react";
 import Label from "./FormLabel.jsx";
 
-export default function ShareModal({ event, role = "ref", adminUnlocked = false, roleCodeConfig, onManageCodes, onClose }) {
+export default function ShareModal({ event, role = "ref", adminUnlocked = false, roleCodeConfig, codeRequestPending = false, onRequestCode, onManageCodes, onClose }) {
   const [copied, setCopied] = useState("");
+  const [requesting, setRequesting] = useState(false);
   const [sessionCodes, setSessionCodes] = useState({});
   const url = window.location.origin;
   const eventId = event?.id;
@@ -99,6 +100,19 @@ export default function ShareModal({ event, role = "ref", adminUnlocked = false,
                   );
                 })}
               </div>
+
+              {!adminUnlocked && onRequestCode && (
+                <button
+                  disabled={requesting || codeRequestPending}
+                  onClick={async () => {
+                    setRequesting(true);
+                    try { await onRequestCode(currentRoleKey); } finally { setRequesting(false); }
+                  }}
+                  className="w-full px-4 py-3 border-t border-slate-200 dark:border-slate-700 text-[#D7212B] dark:text-red-300 font-semibold hover:bg-red-50 dark:hover:bg-red-950/20 disabled:text-slate-400 disabled:bg-slate-50 dark:disabled:bg-slate-900"
+                >
+                  {codeRequestPending ? "Admin notified · Waiting for new code" : requesting ? "Notifying admin…" : "Ask an admin to regenerate this code"}
+                </button>
+              )}
 
               {adminUnlocked && onManageCodes && (
                 <button
