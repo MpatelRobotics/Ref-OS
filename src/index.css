@@ -219,3 +219,25 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
  .refos-workspace,.refos-team-list>li,.refos-header .bg-emerald-950\/40,.refos-header .bg-green-950\/40 { animation:none!important; }
  .refos-stats>div:hover,.refos-team-list>li>button:hover,.refos-desktop-nav button:hover { transform:none!important; }
 }
+
+/* 1.2 UX pass: faster navigation, thumb-friendly mobile controls, clearer context */
+.refos-mobile-context { display:flex; align-items:center; gap:7px; padding:0 16px 10px; color:#cbd5e1; font-size:12px; font-weight:650; }
+.refos-mobile-bottom { position:fixed; left:0; right:0; bottom:0; z-index:48; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); min-height:66px; padding:5px 6px calc(5px + env(safe-area-inset-bottom)); background:rgb(15 29 51 / .98); border-top:1px solid #33425b; box-shadow:0 -8px 24px rgb(15 23 42 / .14); backdrop-filter:blur(14px); }
+.refos-mobile-bottom button { min-width:0; min-height:54px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border-radius:8px; color:#94a3b8; font-size:10px; font-weight:650; }
+.refos-mobile-bottom button[aria-current='page'] { color:white; background:#ffffff10; }
+.refos-mobile-bottom button[aria-current='page'] svg { color:#93c5fd; transform:translateY(-1px); }
+.refos-mobile-bottom button:active { transform:scale(.94); }
+.refos-mobile-sheet { animation:refosSheetUp 210ms cubic-bezier(.2,.8,.2,1) both; padding-bottom:env(safe-area-inset-bottom); }
+.refos-mobile-sheet-backdrop { animation:refosBackdropIn 160ms ease-out both; }
+@keyframes refosSheetUp { from { transform:translateY(24px); opacity:.6; } to { transform:none; opacity:1; } }
+@media(max-width:639px) {
+  .refos-workspace { padding-bottom:104px !important; }
+  .refos-shell>button.fixed { bottom:calc(78px + env(safe-area-inset-bottom)); }
+  .refos-page-heading { align-items:center; }
+  .refos-page-heading h2 { font-size:1.55rem; }
+  .refos-role { padding:5px 8px; font-size:10px; }
+  .refos-stats { overflow-x:auto; grid-template-columns:repeat(3,minmax(132px,1fr)); scrollbar-width:none; scroll-snap-type:x proximity; }
+  .refos-stats::-webkit-scrollbar { display:none; }
+  .refos-stats>div { scroll-snap-align:start; }
+}
+@media(prefers-reduced-motion:reduce) { .refos-mobile-sheet,.refos-mobile-sheet-backdrop { animation:none!important; } }

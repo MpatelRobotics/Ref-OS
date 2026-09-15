@@ -2265,18 +2265,36 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                   </button>
                 ))}
               </nav>
-              <div className="sm:hidden max-w-2xl mx-auto px-4 pb-2">
-                <button onClick={() => setMobileNavOpen(true)}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/60 px-3 py-2.5 flex items-center gap-2 text-white">
-                  <ActiveIcon size={18} />
-                  <span className="font-semibold">{active?.label || "Navigation"}</span>
-                  <span className="ml-auto flex items-center gap-1 text-xs text-slate-400">Sections <Menu size={18}/></span>
-                </button>
+              <div className="sm:hidden refos-mobile-context">
+                <ActiveIcon size={16} />
+                <span>{active?.label || "Workspace"}</span>
               </div>
             </>
           );
         })()}
       </header>
+
+      {!openTeam && !openMatch && !openRobot && (() => {
+        const primary = isJudge ? [
+          { k: "judging", label: "Judging", Icon: Trophy },
+          { k: "alliances", label: "Alliances", Icon: GitBranch }
+        ] : [
+          { k: "matches", label: "Matches", Icon: ListOrdered },
+          { k: "teams", label: "Teams", Icon: Users },
+          ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
+          { k: "robots", label: "Robots", Icon: Camera }
+        ];
+        return (
+          <nav className="refos-mobile-bottom sm:hidden" aria-label="Mobile navigation">
+            {primary.map(({ k, label, Icon }) => (
+              <button key={k} aria-current={view === k ? "page" : undefined} onClick={() => { setView(k); setQuery(""); }}>
+                <Icon size={19}/><span>{label}</span>
+              </button>
+            ))}
+            {!isJudge && <button aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}><Menu size={19}/><span>More</span></button>}
+          </nav>
+        );
+      })()}
 
       {mobileNavOpen && !openTeam && !openMatch && !openRobot && (() => {
         const navItems = isJudge ? [
@@ -2291,10 +2309,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           { k: "judging", label: "Judging", Icon: Trophy }
         ];
         return (
-          <div className="fixed inset-0 z-[60] bg-black/50 sm:hidden" onClick={() => setMobileNavOpen(false)}>
-            <div className="absolute left-3 right-3 top-20 rounded-2xl bg-white dark:bg-slate-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-[60] bg-black/50 sm:hidden refos-mobile-sheet-backdrop" onClick={() => setMobileNavOpen(false)}>
+            <div className="absolute left-0 right-0 bottom-0 rounded-t-2xl bg-white dark:bg-slate-800 shadow-2xl overflow-hidden refos-mobile-sheet" onClick={(e) => e.stopPropagation()}>
               <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center">
-                <div className="font-bold text-slate-900 dark:text-slate-100">Go to section</div>
+                <div><div className="font-bold text-slate-900 dark:text-slate-100">More sections</div><div className="text-xs text-slate-500 mt-0.5">Jump anywhere in Ref-OS</div></div>
                 <button onClick={() => setMobileNavOpen(false)} className="ml-auto p-1 text-slate-500"><X size={20}/></button>
               </div>
               <div className="p-2">
