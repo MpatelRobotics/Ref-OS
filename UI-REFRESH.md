@@ -14,4 +14,6 @@ The desktop experience now combines an operations dashboard with a clean, wide w
 
 The desktop navigation rail scrolls independently when its contents exceed the available screen height.
 
+The desktop sidebar and header use a lighter medium navy palette with brighter navigation and status text for improved contrast.
+
 Phone and tablet layouts remain unchanged.
