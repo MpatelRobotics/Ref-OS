@@ -31,3 +31,5 @@ self.addEventListener("fetch", (event) => {
       .catch(() => caches.match(req).then((cached) => cached || (req.mode === "navigate" ? caches.match("/") : undefined)))
   );
 });
+
+// sidebar-subtitle
