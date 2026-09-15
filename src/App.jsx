@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download, Save,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, PlayCircle, QrCode, ScanLine,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, QrCode, ScanLine,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -559,13 +559,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showOfflineTest, setShowOfflineTest] = useState(false);
   const [showCommandCenter, setShowCommandCenter] = useState(false);
   const [showContactDirectory, setShowContactDirectory] = useState(false);
-  const [showGuidedTour, setShowGuidedTour] = useState(false);
   const [showPreEventTest, setShowPreEventTest] = useState(false);
   const [showTwoDeviceSyncTest, setShowTwoDeviceSyncTest] = useState(false);
   const [showDiagnosticReport, setShowDiagnosticReport] = useState(false);
   const [showRoleCodeManager, setShowRoleCodeManager] = useState(false);
   const [lastSystemTest, setLastSystemTest] = useState(null);
-  const [tourStep, setTourStep] = useState(0);
 
   const contactDirectoryEntries = fieldLog.filter((e) => e.kind === "contact_directory").sort((a, b) => b.createdAt - a.createdAt);
   const contactDirectoryEntry = contactDirectoryEntries[0] || null;
@@ -620,40 +618,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     }
   }, []);
 
-  useEffect(() => {
-    if (!showGuidedTour) return;
-    setMenu(false);
-    setMobileNavOpen(false);
-    setShowFieldLog(false);
-    setShowContactDirectory(false);
-    setLogFor(null);
-    setLogMatch(null);
-    setOpenTeam(null);
-    setOpenRobot(null);
-    setOpenMatch(null);
 
-    if (isJudge) {
-      if (tourStep <= 1) setView("judging");
-      else setView("alliances");
-      return;
-    }
-
-    if (tourStep === 0 || tourStep === 1) setView("teams");
-    if (tourStep === 2) setView(Object.keys(matches).length ? "matches" : "teams");
-    if (tourStep === 3) {
-      setView(Object.keys(matches).length ? "matches" : "teams");
-      const first = Object.values(matches).sort((a,b) => Number(a.num || 0) - Number(b.num || 0))[0];
-      if (first?.id) setOpenMatch(first.id);
-    }
-    if (tourStep === 4 && !isEmcee) {
-      setView("teams");
-      setLogFor("");
-    }
-    if (tourStep === 5) setView(rules.length ? "rulebook" : "teams");
-    if (tourStep === 6) setShowFieldLog(true);
-    if (tourStep === 7) setView("alliances");
-    if (tourStep === 8) setShowContactDirectory(true);
-  }, [showGuidedTour, tourStep]);
 
   const [showAdminPassword, setShowAdminPassword] = useState(false);
   const pendingAdminAction = useRef(null);
@@ -2232,7 +2197,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                     <div className="border-t border-slate-100 my-1" />
                     <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field Log</button>
                 {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
-                <button onClick={() => { setMenu(false); setTourStep(0); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided Tour</button>
                     <div className="refos-menu-section">Help &amp; Display</div>
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; Help</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
@@ -2244,7 +2208,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                     <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
                     <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                     {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
-                    <button onClick={() => { setMenu(false); setTourStep(0); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided Tour</button>
                     <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
                     <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
                   </>
@@ -2256,7 +2219,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); if (adminUnlocked) loadEventMembers(); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Key Volunteer Status</button>
                 <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field Log</button>
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
-                <button onClick={() => { setMenu(false); setTourStep(0); setShowGuidedTour(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><PlayCircle size={16} /> Guided Tour</button>
                 <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
                 <div className="refos-menu-section">Access</div>
@@ -2294,6 +2256,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           return (
             <>
               <nav aria-label="Main navigation" className="refos-desktop-nav hidden sm:flex">
+                <div className="refos-sidebar-subtitle" aria-hidden="true">Referee Operating System</div>
+                <div className="refos-sidebar-section-label" aria-hidden="true">Event Navigation</div>
                 {navItems.map(({ k, label, Icon }) => (
                   <button key={k} aria-current={view === k ? "page" : undefined} onClick={() => { setView(k); setQuery(""); }}
                     className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
@@ -2497,7 +2461,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onClose={() => setShowTeamScanner(false)}
       />}
       {logFor !== null && (
-        <LogModal teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules} onOpenPhoto={setLightbox} tourMode={showGuidedTour && tourStep === 4}
+        <LogModal teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules} onOpenPhoto={setLightbox}
           onSetName={() => setShowIdentity(true)} onClose={() => { setLogFor(null); setLogMatch(null); }}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await saveViolation({ ...form, team }); setLogFor(null); setLogMatch(null); }} />
       )}
@@ -2595,8 +2559,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           </div></div>
         </div>
       )}
-      {showGuidedTour && <GuidedTour role={myRole} step={tourStep} hasMatches={Object.keys(matches).length > 0} hasRules={rules.length > 0}
-        onStep={setTourStep} onClose={() => { setShowGuidedTour(false); setShowFieldLog(false); setShowContactDirectory(false); setLogFor(null); setLogMatch(null); setOpenMatch(null); }} />}
       {showPreEventTest && adminUnlocked && <PreEventSystemTest eventId={eventId} adminUnlocked={adminUnlocked}
         onClose={() => setShowPreEventTest(false)} onComplete={setLastSystemTest} />}
       {showTwoDeviceSyncTest && adminUnlocked && <TwoDeviceSyncTest fieldLog={fieldLog} deviceId={deviceId} meName={meName}
@@ -2883,7 +2845,7 @@ function ByRule({ viols, expandRule, setExpandRule }) {
 }
 
 /* ============================ LOG MODAL ============================ */
-function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, edit, onSetName, onClose, onSave, tourMode = false }) {
+function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, edit, onSetName, onClose, onSave }) {
   const ruleBook = useMemo(() => {
     const m = {}; for (const r of (rules || [])) m[r.code] = r.desc; return m;
   }, [rules]);
@@ -2921,7 +2883,6 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
     }
   };
   const submit = async () => {
-    if (tourMode) return;
     if (!valid || busy) return;
     const selectedTeam = normNum(creatingNew ? newNumber : team);
     const selectedRuleCodes = splitRuleCodes(code);
@@ -2950,7 +2911,6 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:text-slate-300"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-4">
-          {tourMode && <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800 px-3 py-2 text-sm text-blue-800 dark:text-blue-200"><b>Guided tour:</b> this is the real violation form, but saving is disabled while the tour is running.</div>}
           <button onClick={onSetName} className="w-full flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
             <UserCircle2 size={15} className="text-slate-400" />
             {me?.name ? <>Logging as <b className="text-slate-700 dark:text-slate-200">{me.name}</b></> : <span className="text-amber-600 font-medium">Tap to set your ref name (so entries are attributed)</span>}
@@ -3086,7 +3046,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
         </div>
         <div className="sticky bottom-0 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 p-4 flex gap-2">
           <button onClick={onClose} className="px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
-          <button onClick={submit} disabled={tourMode || !valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${!tourMode && valid && !busy ? `${T.solid} ${T.solidHover}` : "bg-slate-300"}`}>{tourMode ? "Tour only · saving disabled" : busy ? "Saving…" : edit ? "Save changes" : "Save violation"}</button>
+          <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? `${T.solid} ${T.solidHover}` : "bg-slate-300"}`}>{busy ? "Saving…" : edit ? "Save changes" : "Save violation"}</button>
         </div>
       </div>
       {showRulePicker && (
@@ -3632,55 +3592,6 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
 
 /* ============================ CLEAR MODAL ============================ */
 
-
-
-function GuidedTour({ role, step, hasMatches, hasRules, onStep, onClose }) {
-  const judge = role === "Judge Advisor";
-  const emcee = role === "Emcee";
-  const standard = [
-    { title: "Teams", text: "The tour has switched Ref OS to Teams. Use this section when you are starting with a team number, reviewing its history, or opening its record.", hint: "You are looking at the live Teams section behind this card." },
-    { title: "Finding a team", text: "Use the search box to find a team quickly. Opening a team shows its event information, violations, robot information, and team specific actions.", hint: "Try scrolling the Teams list behind the tour." },
-    { title: "Matches", text: hasMatches ? "Ref OS has now switched to Matches. This is the normal field workflow for finding the match you are working." : "This event does not currently have imported matches, so the tour cannot open the Matches section yet.", hint: hasMatches ? "The live Matches list is behind this card." : "Import a match schedule from TM Sync Center to enable this part." },
-    { title: "Opening a match", text: hasMatches ? "The tour has opened the first match in the event. A match page shows Red and Blue teams, team history, field tools, AWP controls for qualifications, and existing violations." : "Once matches are imported, tapping any match opens the full match detail screen.", hint: hasMatches ? "This is a real match screen. The tour is not changing it." : "No match data is available right now." },
-    { title: "Logging a violation", text: emcee ? "Emcee mode is view focused, so violation entry is not available in this role." : "The actual New Violation form is open behind this card. A referee selects the team and match, chooses Minor, Major, or Inspection, cites the rule, adds notes or photos, then saves.", hint: emcee ? "Switch to a Referee role to practice violation entry." : "Saving is disabled while the guided tour is active, so you can safely explore the real form." },
-    { title: "Rules", text: hasRules ? "The tour has switched to Rules. Search by rule code or description, and tap a rule when you need the exact event reference." : "No rulebook is loaded for this event yet, so the Rules section cannot be demonstrated.", hint: hasRules ? "The live rulebook is visible behind this card." : "Load rules to enable this step." },
-    { title: "Field Log", text: "The actual Field Log is open behind the tour. This is where operational entries such as replays, field faults, timeouts, and saved field information are reviewed.", hint: "Close the tour later and the Field Log works normally." },
-    { title: "Alliances", text: "The tour has moved to Alliances. This section is used to follow alliance selection and the elimination bracket. Editing depends on the current role and Admin permissions.", hint: "The live Alliances section is behind this card." },
-    { title: "Event contacts", text: "The Event Contact Directory is open behind the tour. Everyone can view event leadership and support contacts. Admin controls the shared directory.", hint: "Phone and email links are usable outside the tour." },
-    { title: "Done", text: "That is the core Ref OS workflow. You can run this guided tour again from the gear menu at any time.", hint: "Finish returns you to normal Ref OS operation." },
-  ];
-  const judgeSteps = [
-    { title: "Judging", text: "The tour has opened the live Judging section. This is the Judge Advisor's primary workspace for nominations and finalist information.", hint: "The Judging screen is behind this card." },
-    { title: "Judging workflow", text: "Use this area to review nomination information and finalists during deliberations. Official nomination export is handled through Admin tools.", hint: "Nothing in the tour changes judging data." },
-    { title: "Alliances", text: "The tour has switched to Alliances. Judge Advisors can see alliance selection and the bracket without editing it.", hint: "Judge Advisor bracket access remains view only." },
-    { title: "Done", text: "You can run the guided tour again from the gear menu whenever you need a refresher.", hint: "Finish returns to normal Ref OS operation." },
-  ];
-  const steps = judge ? judgeSteps : standard;
-  const safeStep = Math.min(step, steps.length - 1);
-  const cur = steps[safeStep];
-  return (
-    <div className="fixed inset-0 z-[90] pointer-events-none">
-      <div className="absolute inset-0 bg-black/20 pointer-events-none" />
-      <div className="absolute left-3 right-3 bottom-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[560px] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden pointer-events-auto">
-        <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2">
-          <PlayCircle size={19}/><div className="font-bold">Guided tour</div>
-          <div className="ml-2 text-xs text-slate-400">{safeStep + 1} of {steps.length}</div>
-          <button onClick={onClose} className="ml-auto"><X size={21}/></button>
-        </div>
-        <div className="p-4">
-          <div className="text-xs font-bold uppercase tracking-wide text-[#D7212B]">{cur.title}</div>
-          <p className="mt-1 text-sm leading-6 text-slate-700 dark:text-slate-200">{cur.text}</p>
-          <div className="mt-2 rounded-lg bg-slate-100 dark:bg-slate-900 px-3 py-2 text-xs text-slate-500 dark:text-slate-400">{cur.hint}</div>
-          <div className="flex gap-1.5 mt-4">{steps.map((_,i)=><div key={i} className={`h-1.5 flex-1 rounded-full ${i <= safeStep ? "bg-[#D7212B]" : "bg-slate-200 dark:bg-slate-700"}`}/>)}</div>
-          <div className="grid grid-cols-2 gap-2 mt-4">
-            <button onClick={() => safeStep ? onStep(safeStep - 1) : onClose()} className="rounded-xl border px-4 py-2.5 font-semibold">{safeStep ? "Back" : "Exit"}</button>
-            <button onClick={() => safeStep < steps.length - 1 ? onStep(safeStep + 1) : onClose()} className="rounded-xl bg-[#0D0F32] text-white px-4 py-2.5 font-semibold">{safeStep < steps.length - 1 ? "Next" : "Finish"}</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 
 function PreEventSystemTest({ eventId, adminUnlocked, onClose, onComplete }) {
@@ -5198,9 +5109,8 @@ function FeaturesGuide() {
         </ul>
       </Section>
 
-      <Section icon={Info} title="Guided tour, install & device settings">
+      <Section icon={Info} title="Install & device settings">
         <ul className="space-y-1.5">
-          <Li><b>Interactive Guided Tour</b> — walks through the live role-specific Ref-OS interface and opens real sections such as Teams, Matches, a match, violation logging, Rules, Field Log, Alliances, and contacts.</Li>
           <Li><b>Install Ref-OS</b> — add the deployed HTTPS site to the device home screen for an app-like PWA experience.</Li>
           <Li><b>Dark / Light mode</b> and <b>Text size</b> are saved per device.</Li>
           <Li><b>Mobile navigation</b> — phones use the compact Go to section menu instead of forcing the full desktop navigation across the screen.</Li>
