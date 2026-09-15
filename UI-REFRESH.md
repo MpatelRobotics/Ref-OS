@@ -26,4 +26,6 @@ Signed in volunteers can share only their own role code from Invite Other Key Vo
 
 Role names are normalized when a session is restored so referee aliases always map to the referee invite code. The service worker cache version is advanced so installed mobile apps receive this fix.
 
+Successful volunteer sign in remembers the entered four character role code on that device. Older hashed only codes are displayed in Invite Other Key Volunteers after the volunteer signs out and signs in once, replacing the unhelpful ACTIVE badge with the actual code.
+
 Phone and tablet layouts remain unchanged.

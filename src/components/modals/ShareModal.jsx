@@ -69,13 +69,17 @@ export default function ShareModal({ event, role = "ref", adminUnlocked = false,
               <div className="divide-y divide-slate-200 dark:divide-slate-700">
                 {visibleRoles.map((roleRow) => {
                   const active = !!roleCodeConfig?.codes?.[roleRow.key]?.enabled;
-                  const code = active ? (roleCodeConfig?.codes?.[roleRow.key]?.code || sessionCodes[roleRow.key]) : "";
+                  let rememberedCode = "";
+                  if (!adminUnlocked && roleRow.key === currentRoleKey) {
+                    try { rememberedCode = localStorage.getItem(`refosVisibleRoleCode:${eventId}:${roleRow.key}`) || ""; } catch {}
+                  }
+                  const code = active ? (roleCodeConfig?.codes?.[roleRow.key]?.code || sessionCodes[roleRow.key] || rememberedCode) : "";
                   return (
                     <div key={roleRow.key} className="px-4 py-3 flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-slate-800 dark:text-slate-100">{roleRow.label}</div>
                         {!active && <div className="text-xs text-slate-400">No active code</div>}
-                        {active && !code && <div className="text-xs text-slate-400">Generate a new code once to make it visible here</div>}
+                        {active && !code && <div className="text-xs text-slate-400">Sign out and sign in once to display the code</div>}
                       </div>
                       {code ? (
                         <button
@@ -88,7 +92,7 @@ export default function ShareModal({ event, role = "ref", adminUnlocked = false,
                         </button>
                       ) : (
                         <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"}`}>
-                          {active ? "ACTIVE" : "OFF"}
+                          {active ? "SIGN IN AGAIN" : "OFF"}
                         </span>
                       )}
                     </div>

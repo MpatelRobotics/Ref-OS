@@ -402,9 +402,13 @@ export default function App() {
     return () => { live = false; };
   }, [unlocked, meName]);
 
-  const unlock = (r, admin, serverRole) => {
+  const unlock = (r, admin, serverRole, credential = "") => {
     const roleText = String(r || serverRole || "").trim().toLowerCase();
     const uiRole = roleText.includes("judge") ? "judge" : roleText.includes("emcee") ? "emcee" : "ref";
+    const enteredCode = String(credential || "").trim().toUpperCase();
+    if (!admin && serverRole !== "admin" && /^\d[A-D]\d\d$/.test(enteredCode)) {
+      localStorage.setItem(`refosVisibleRoleCode:${EVENT_ID}:${uiRole}`, enteredCode);
+    }
     localStorage.setItem("unlocked", "1");
     localStorage.setItem("refosRole", uiRole);
     if (admin || serverRole === "admin") sessionStorage.setItem("refosAdmin", "1");
