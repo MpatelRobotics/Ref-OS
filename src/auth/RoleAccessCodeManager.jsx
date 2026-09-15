@@ -60,6 +60,7 @@ export default function RoleAccessCodeManager({ eventId, config: sharedConfig, o
         codes: {
           ...(config?.codes || {}),
           [role]: {
+            code,
             hash,
             format: "N-L-N-N",
             enabled: true,
@@ -135,7 +136,7 @@ export default function RoleAccessCodeManager({ eventId, config: sharedConfig, o
   };
 
   const copyCode = async (role) => {
-    const code = revealed[role];
+    const code = config?.codes?.[role]?.code || revealed[role];
     if (!code) return;
     try {
       await navigator.clipboard.writeText(code);
@@ -143,8 +144,9 @@ export default function RoleAccessCodeManager({ eventId, config: sharedConfig, o
   };
 
   const loginQrPayload=(role,code)=>JSON.stringify({type:"refos-login",eventId,role,code});
-  const showLoginQr=async(role)=>{const code=revealed[role];if(!code)return;const row=roleRows.find(r=>r.key===role);const dataUrl=await QRCode.toDataURL(loginQrPayload(role,code),{width:700,margin:2});const win=window.open("","_blank");if(!win){setError("Allow popups to open the QR code.");return;}win.document.write(`<title>Ref OS Login QR</title><body style="font-family:Arial;text-align:center;padding:32px"><h1>Ref OS</h1><h2>${row?.label||role}</h2><img src="${dataUrl}" style="width:min(80vw,500px)"><div style="font-size:38px;font-weight:800;letter-spacing:8px">${code}</div><p>Scan from the Ref OS login screen</p></body>`);win.document.close();};
-  const printLoginCards=async()=>{const available=roleRows.filter(r=>revealed[r.key]);if(!available.length){setError("Generate new role codes first. Ref OS does not store the readable code after generation.");return;}const cards=await Promise.all(available.map(async r=>({...r,code:revealed[r.key],qr:await QRCode.toDataURL(loginQrPayload(r.key,revealed[r.key]),{width:500,margin:2})})));const win=window.open("","_blank");if(!win){setError("Allow popups to print volunteer login cards.");return;}win.document.write(`<title>Ref OS Volunteer Login Cards</title><style>@page{size:letter;margin:.35in}body{font-family:Arial}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{border:2px solid #0D0F32;border-radius:18px;padding:22px;text-align:center;break-inside:avoid}.card img{width:210px;max-width:80%}.code{font-size:34px;font-weight:900;letter-spacing:7px}.role{font-size:22px;font-weight:800}.small{font-size:12px;color:#555}@media print{button{display:none}}</style><button onclick="window.print()">Print</button><div class="grid">${cards.map(c=>`<div class="card"><h2>Highlander Summit</h2><div class="role">${c.label}</div><img src="${c.qr}"><div class="code">${c.code}</div><p class="small">Open Ref OS and tap Scan QR code</p></div>`).join("")}</div>`);win.document.close();};
+  const readableCode=(role)=>config?.codes?.[role]?.code||revealed[role];
+  const showLoginQr=async(role)=>{const code=readableCode(role);if(!code)return;const row=roleRows.find(r=>r.key===role);const dataUrl=await QRCode.toDataURL(loginQrPayload(role,code),{width:700,margin:2});const win=window.open("","_blank");if(!win){setError("Allow popups to open the QR code.");return;}win.document.write(`<title>Ref OS Login QR</title><body style="font-family:Arial;text-align:center;padding:32px"><h1>Ref OS</h1><h2>${row?.label||role}</h2><img src="${dataUrl}" style="width:min(80vw,500px)"><div style="font-size:38px;font-weight:800;letter-spacing:8px">${code}</div><p>Scan from the Ref OS login screen</p></body>`);win.document.close();};
+  const printLoginCards=async()=>{const available=roleRows.filter(r=>readableCode(r.key));if(!available.length){setError("Generate new role codes first.");return;}const cards=await Promise.all(available.map(async r=>{const code=readableCode(r.key);return {...r,code,qr:await QRCode.toDataURL(loginQrPayload(r.key,code),{width:500,margin:2})};}));const win=window.open("","_blank");if(!win){setError("Allow popups to print volunteer login cards.");return;}win.document.write(`<title>Ref OS Volunteer Login Cards</title><style>@page{size:letter;margin:.35in}body{font-family:Arial}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.card{border:2px solid #0D0F32;border-radius:18px;padding:22px;text-align:center;break-inside:avoid}.card img{width:210px;max-width:80%}.code{font-size:34px;font-weight:900;letter-spacing:7px}.role{font-size:22px;font-weight:800}.small{font-size:12px;color:#555}@media print{button{display:none}}</style><button onclick="window.print()">Print</button><div class="grid">${cards.map(c=>`<div class="card"><h2>Highlander Summit</h2><div class="role">${c.label}</div><img src="${c.qr}"><div class="code">${c.code}</div><p class="small">Open Ref OS and tap Scan QR code</p></div>`).join("")}</div>`);win.document.close();};
 
   const activeCount = roleRows.filter((r) => config?.codes?.[r.key]?.enabled).length;
 
@@ -172,7 +174,7 @@ export default function RoleAccessCodeManager({ eventId, config: sharedConfig, o
           {roleRows.map((role) => {
             const saved = config?.codes?.[role.key];
             const active = !!saved?.enabled;
-            const visibleCode = revealed[role.key];
+            const visibleCode = saved?.code || revealed[role.key];
             return (
               <div key={role.key} className="rounded-xl border bg-white dark:bg-slate-800 p-4">
                 <div className="flex items-start gap-3">
@@ -193,7 +195,7 @@ export default function RoleAccessCodeManager({ eventId, config: sharedConfig, o
                   </div>
                 ) : active ? (
                   <div className="mt-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-dashed p-3 text-sm text-slate-500 dark:text-slate-400">
-                    A code is active. For security, the existing code cannot be revealed after generation. Generate a new one if it needs to be shared again.
+                    This older active code was created before visible code storage was enabled. Generate a new code once to display it on every admin device.
                   </div>
                 ) : null}
 
@@ -221,11 +223,10 @@ export default function RoleAccessCodeManager({ eventId, config: sharedConfig, o
           </button>
 
           <div className="text-xs text-slate-500 dark:text-slate-400">
-            Codes are shared for this event and work across devices. Ref OS stores only a one way hash of each code in shared event data.
+            Codes are shared for this event and remain visible to administrators while Admin mode is active.
           </div>
         </div>
       </div>
     </div>
   );
 }
-

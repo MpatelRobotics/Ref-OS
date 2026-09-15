@@ -66,13 +66,13 @@ export default function ShareModal({ event, adminUnlocked = false, roleCodeConfi
               <div className="divide-y divide-slate-200 dark:divide-slate-700">
                 {roles.map((role) => {
                   const active = !!roleCodeConfig?.codes?.[role.key]?.enabled;
-                  const code = sessionCodes[role.key];
+                  const code = roleCodeConfig?.codes?.[role.key]?.code || sessionCodes[role.key];
                   return (
                     <div key={role.key} className="px-4 py-3 flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-slate-800 dark:text-slate-100">{role.label}</div>
                         {!active && <div className="text-xs text-slate-400">No active code</div>}
-                        {active && !code && <div className="text-xs text-slate-400">Active code is hidden on this device</div>}
+                        {active && !code && <div className="text-xs text-slate-400">Generate a new code once to make it visible here</div>}
                       </div>
                       {code ? (
                         <button

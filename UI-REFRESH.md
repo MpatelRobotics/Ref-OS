@@ -20,4 +20,6 @@ The panel palette follows Highlander Summit branding with lighter navy surfaces,
 
 The Highlander navy surfaces use a deeper medium navy while preserving the red active navigation and high contrast text.
 
+New volunteer join codes remain visible to administrators across devices instead of being hidden after generation. Codes created by older builds must be regenerated once because their readable value was never stored.
+
 Phone and tablet layouts remain unchanged.
