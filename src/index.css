@@ -186,3 +186,36 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
  .refos-shell>button.fixed { bottom:calc(20px + env(safe-area-inset-bottom)); }
 }
 @media(prefers-reduced-motion:reduce) { .refos-shell *, .refos-shell *::before, .refos-shell *::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; } }
+
+/* 1.2 event-day motion pass: restrained, tactile, less template-like */
+@keyframes refosPageEnter { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+@keyframes refosListEnter { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+@keyframes refosStatusPulse { 0%,100% { box-shadow:0 0 0 0 rgb(34 197 94 / 0); } 50% { box-shadow:0 0 0 4px rgb(34 197 94 / .08); } }
+
+.refos-workspace { animation:refosPageEnter 240ms cubic-bezier(.2,.8,.2,1) both; }
+.refos-page-heading h2 { letter-spacing:-.025em; }
+.refos-stats>div { border-radius:10px; box-shadow:0 1px 2px rgb(15 23 42 / .035); transition:transform 180ms ease,border-color 180ms ease,box-shadow 180ms ease; }
+.refos-stats>div:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgb(15 23 42 / .07); }
+.refos-team-list>li { animation:refosListEnter 220ms ease-out both; }
+.refos-team-list>li:nth-child(2){animation-delay:25ms}.refos-team-list>li:nth-child(3){animation-delay:50ms}.refos-team-list>li:nth-child(4){animation-delay:75ms}.refos-team-list>li:nth-child(5){animation-delay:100ms}.refos-team-list>li:nth-child(n+6){animation-delay:125ms}
+.refos-team-list>li>button { border-radius:9px; box-shadow:none; transition:transform 150ms ease,border-color 150ms ease,background-color 150ms ease,box-shadow 150ms ease; }
+.refos-team-list>li>button:hover { transform:translateX(3px); box-shadow:0 2px 8px rgb(15 23 42 / .06); }
+.refos-team-list>li>button:active { transform:translateX(1px) scale(.995); }
+.refos-desktop-nav button { transition:background-color 150ms ease,color 150ms ease,transform 150ms ease; }
+.refos-desktop-nav button:hover { transform:translateX(2px); }
+.refos-desktop-nav button[aria-current='page'] { box-shadow:inset 3px 0 #93c5fd; }
+.refos-role { border-radius:6px; }
+.refos-shell main :is(.rounded-2xl,.rounded-xl) { transition:border-color 170ms ease,box-shadow 170ms ease,transform 170ms ease; }
+.refos-shell main button:hover:not(:disabled) { filter:brightness(.985); }
+.refos-shell main button:active:not(:disabled) { transform:scale(.975); }
+.refos-header { transition:box-shadow 180ms ease; }
+.refos-header .bg-emerald-950\/40,.refos-header .bg-green-950\/40 { animation:refosStatusPulse 2.8s ease-in-out infinite; }
+
+/* Keep utilitarian controls flatter than generic dashboard cards. */
+.refos-workspace .shadow-lg { box-shadow:0 8px 24px rgb(15 23 42 / .12); }
+.refos-workspace .shadow-xl { box-shadow:0 12px 32px rgb(15 23 42 / .14); }
+
+@media (prefers-reduced-motion: reduce) {
+ .refos-workspace,.refos-team-list>li,.refos-header .bg-emerald-950\/40,.refos-header .bg-green-950\/40 { animation:none!important; }
+ .refos-stats>div:hover,.refos-team-list>li>button:hover,.refos-desktop-nav button:hover { transform:none!important; }
+}
