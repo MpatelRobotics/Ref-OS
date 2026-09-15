@@ -18,4 +18,6 @@ The desktop sidebar and header use a lighter medium navy palette with brighter n
 
 The panel palette follows Highlander Summit branding with lighter navy surfaces, red active navigation, white highlights, and cool blue gray secondary accents. Gold is intentionally excluded from the panel treatment.
 
+The Highlander navy surfaces use a deeper medium navy while preserving the red active navigation and high contrast text.
+
 Phone and tablet layouts remain unchanged.
