@@ -12,4 +12,6 @@ Validation: production build and schema contract passed. Existing browser suite:
 
 The desktop experience now combines an operations dashboard with a clean, wide workspace. At 1100 pixels and above, Ref OS uses a 272 pixel persistent navigation rail, prioritizes Matches when match data exists, exposes Command Center, Field Log, and Contacts as quick event tools, and expands content to a 1440 pixel canvas. Team cards use a two column desktop grid and event notices align with the main workspace.
 
+The desktop navigation rail scrolls independently when its contents exceed the available screen height.
+
 Phone and tablet layouts remain unchanged.
