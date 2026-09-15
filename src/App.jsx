@@ -367,7 +367,8 @@ export default function App() {
         const serverRole = await api.getMyEventRole(EVENT_ID);
         if (!live) return;
         if (serverRole) {
-          const uiRole = serverRole === "admin" ? "ref" : serverRole;
+          const roleText = String(serverRole || "").trim().toLowerCase();
+          const uiRole = serverRole === "admin" ? "ref" : roleText.includes("judge") ? "judge" : roleText.includes("emcee") ? "emcee" : "ref";
           setRole(uiRole);
           setUnlocked(true);
           localStorage.setItem("unlocked", "1");
@@ -402,7 +403,8 @@ export default function App() {
   }, [unlocked, meName]);
 
   const unlock = (r, admin, serverRole) => {
-    const uiRole = r || "ref";
+    const roleText = String(r || serverRole || "").trim().toLowerCase();
+    const uiRole = roleText.includes("judge") ? "judge" : roleText.includes("emcee") ? "emcee" : "ref";
     localStorage.setItem("unlocked", "1");
     localStorage.setItem("refosRole", uiRole);
     if (admin || serverRole === "admin") sessionStorage.setItem("refosAdmin", "1");
@@ -2674,6 +2676,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       )}
       {showShare && <ShareModal
         event={event}
+        role={role}
         adminUnlocked={adminUnlocked}
         roleCodeConfig={eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config}
         onManageCodes={() => { setShowShare(false); setShowRoleCodeManager(true); }}

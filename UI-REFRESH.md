@@ -22,4 +22,8 @@ The Highlander navy surfaces use a deeper medium navy while preserving the red a
 
 New volunteer join codes remain visible to administrators across devices instead of being hidden after generation. Codes created by older builds must be regenerated once because their readable value was never stored.
 
+Signed in volunteers can share only their own role code from Invite Other Key Volunteers. Referees see the referee code, Judge Advisors see the Judge Advisor code, and Emcees see the emcee code. Admin mode retains access to all codes and code management.
+
+Role names are normalized when a session is restored so referee aliases always map to the referee invite code. The service worker cache version is advanced so installed mobile apps receive this fix.
+
 Phone and tablet layouts remain unchanged.

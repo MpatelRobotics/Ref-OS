@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { AlertTriangle, Check, Copy, KeyRound, Share2, X } from "lucide-react";
 import Label from "./FormLabel.jsx";
 
-export default function ShareModal({ event, adminUnlocked = false, roleCodeConfig, onManageCodes, onClose }) {
+export default function ShareModal({ event, role = "ref", adminUnlocked = false, roleCodeConfig, onManageCodes, onClose }) {
   const [copied, setCopied] = useState("");
   const [sessionCodes, setSessionCodes] = useState({});
   const url = window.location.origin;
@@ -28,6 +28,9 @@ export default function ShareModal({ event, adminUnlocked = false, roleCodeConfi
     { key: "judge", label: "Judge Advisor" },
     { key: "emcee", label: "Emcee" },
   ];
+  const roleText = String(role || "").trim().toLowerCase();
+  const currentRoleKey = roleText.includes("judge") ? "judge" : roleText.includes("emcee") ? "emcee" : "ref";
+  const visibleRoles = adminUnlocked ? roles : roles.filter((item) => item.key === currentRoleKey);
 
   return (
     <div className="refos-modal-backdrop fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
@@ -53,35 +56,35 @@ export default function ShareModal({ event, adminUnlocked = false, roleCodeConfi
             <p className="text-[13px] text-slate-500 dark:text-slate-400">They open the link, choose their volunteer role, enter the role join code, set their name, and they're in.</p>
           </div>
 
-          {adminUnlocked && (
+          {(adminUnlocked || visibleRoles.length > 0) && (
             <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
               <div className="px-4 py-3 bg-slate-50 dark:bg-slate-900 flex items-center gap-2">
                 <KeyRound size={16} />
                 <div>
                   <div className="font-bold text-slate-800 dark:text-slate-100">Volunteer Join Codes</div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400">Visible only while Admin mode is active</div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">{adminUnlocked ? "All event role codes" : "Share your role code with another volunteer"}</div>
                 </div>
               </div>
 
               <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                {roles.map((role) => {
-                  const active = !!roleCodeConfig?.codes?.[role.key]?.enabled;
-                  const code = roleCodeConfig?.codes?.[role.key]?.code || sessionCodes[role.key];
+                {visibleRoles.map((roleRow) => {
+                  const active = !!roleCodeConfig?.codes?.[roleRow.key]?.enabled;
+                  const code = active ? (roleCodeConfig?.codes?.[roleRow.key]?.code || sessionCodes[roleRow.key]) : "";
                   return (
-                    <div key={role.key} className="px-4 py-3 flex items-center gap-3">
+                    <div key={roleRow.key} className="px-4 py-3 flex items-center gap-3">
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-slate-800 dark:text-slate-100">{role.label}</div>
+                        <div className="font-semibold text-slate-800 dark:text-slate-100">{roleRow.label}</div>
                         {!active && <div className="text-xs text-slate-400">No active code</div>}
                         {active && !code && <div className="text-xs text-slate-400">Generate a new code once to make it visible here</div>}
                       </div>
                       {code ? (
                         <button
-                          onClick={() => copy(code, role.key)}
+                          onClick={() => copy(code, roleRow.key)}
                           className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-black tracking-[0.16em] text-slate-900 dark:text-white flex items-center gap-2"
-                          title={`Copy ${role.label} join code`}
+                          title={`Copy ${roleRow.label} join code`}
                         >
                           {code}
-                          {copied === role.key ? <Check size={14} /> : <Copy size={14} />}
+                          {copied === roleRow.key ? <Check size={14} /> : <Copy size={14} />}
                         </button>
                       ) : (
                         <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"}`}>
@@ -93,7 +96,7 @@ export default function ShareModal({ event, adminUnlocked = false, roleCodeConfi
                 })}
               </div>
 
-              {onManageCodes && (
+              {adminUnlocked && onManageCodes && (
                 <button
                   onClick={onManageCodes}
                   className="w-full px-4 py-3 border-t border-slate-200 dark:border-slate-700 text-[#0D0F32] dark:text-indigo-300 font-semibold hover:bg-slate-50 dark:hover:bg-slate-900"
