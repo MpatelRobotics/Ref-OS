@@ -316,21 +316,22 @@ const ago = (ts) => {
 };
 
 /* ---------- lazy photo thumbnail (signed URL from Supabase Storage) ---------- */
-function Thumb({ pkey, onOpen }) {
+function Thumb({ pkey, onOpen, full = false }) {
   const [src, setSrc] = useState(null);
   const [gone, setGone] = useState(false);
   useEffect(() => {
     let live = true;
+    setSrc(null);
+    setGone(false);
     api.photoUrl(pkey).then((u) => { if (live) { u ? setSrc(u) : setGone(true); } });
     return () => { live = false; };
   }, [pkey]);
-  if (gone) return <div className="w-16 h-16 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 grid place-items-center text-slate-300"><ImageOff size={18} /></div>;
-  if (!src) return <div className="w-16 h-16 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 animate-pulse" />;
-  return (
-    <button onClick={() => onOpen(src)} className="shrink-0">
-      <img src={src} alt="robot" className="w-16 h-16 rounded-lg object-cover border border-slate-200 dark:border-slate-700" />
-    </button>
-  );
+  const size = full ? "w-full h-full" : "w-16 h-16";
+  if (gone) return <div className={`${size} rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 grid place-items-center text-slate-300`}><ImageOff size={18} /></div>;
+  if (!src) return <div className={`${size} rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 animate-pulse`} />;
+  const image = <img src={src} alt="robot" className={`${size} rounded-lg object-cover border border-slate-200 dark:border-slate-700`} />;
+  if (!onOpen) return image;
+  return <button type="button" onClick={() => onOpen(src)} className={`${size} shrink-0`}>{image}</button>;
 }
 
 /* ==================================================================== */
@@ -4226,7 +4227,7 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onOpenPhoto, emcee }) {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {photos.map((p) => (
             <div key={p} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700">
-              <button onClick={() => onOpenPhoto(p)} className="w-full h-full"><Thumb pkey={p} /></button>
+              <Thumb pkey={p} onOpen={onOpenPhoto} full />
               {!emcee && <button onClick={() => { if (confirm("Delete this robot photo?")) onRemovePhoto(team.number, p); }}
                 className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1"><Trash2 size={13} /></button>}
             </div>
