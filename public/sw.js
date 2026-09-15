@@ -32,4 +32,4 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// sidebar-subtitle
+// login-light
