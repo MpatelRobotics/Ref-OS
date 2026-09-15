@@ -163,24 +163,24 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 #workspace { scroll-margin-top:180px; }
 @media(min-width:1100px) {
  .refos-shell { padding-left:272px; }
- .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav { position:fixed; left:0; top:0; bottom:0; width:272px; flex-direction:column; padding:142px 18px 24px; background:linear-gradient(180deg,#294d78 0%,#203f68 100%); border-right:1px solid #42658d; gap:6px; box-shadow:8px 0 28px rgb(15 23 42 / .08); overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#9bb3cf transparent; }
+ .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav { position:fixed; left:0; top:0; bottom:0; width:272px; flex-direction:column; padding:142px 18px 24px; background:linear-gradient(180deg,#30336f 0%,#24275f 100%); border-right:1px solid #555896; gap:6px; box-shadow:8px 0 28px rgb(13 15 50 / .13); overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#EBA622 transparent; }
  .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar { width:7px; }
  .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar-track { background:transparent; }
- .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar-thumb { background:#9bb3cf; border-radius:999px; border:2px solid #294d78; }
- .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar-thumb:hover { background:#c6d6e8; }
+ .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar-thumb { background:#EBA622; border-radius:999px; border:2px solid #30336f; }
+ .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar-thumb:hover { background:#ffd166; }
  .refos-desktop-nav::before { content:'REF-OS'; position:absolute; top:34px; left:28px; font-size:26px; line-height:1; font-weight:800; letter-spacing:.04em; color:#fff; }
  .refos-sidebar-subtitle { position:absolute; top:67px; left:28px; font-size:10px; line-height:1.2; font-weight:600; letter-spacing:.025em; color:#d7e3f1; white-space:nowrap; }
- .refos-sidebar-section-label { position:absolute; top:108px; left:28px; font-size:10px; line-height:1.2; letter-spacing:.16em; text-transform:uppercase; color:#c7d7e9; font-weight:750; }
+ .refos-sidebar-section-label { position:absolute; top:108px; left:28px; font-size:10px; line-height:1.2; letter-spacing:.16em; text-transform:uppercase; color:#f2c45b; font-weight:750; }
  .refos-desktop-nav button { width:100%; border:0; border-radius:8px; padding:12px 13px; gap:12px; text-align:left; color:#e0e9f4; font-weight:650; }
  .refos-desktop-nav button svg { width:17px; height:17px; }
- .refos-desktop-nav button[aria-current='page'] { color:white; background:#17385f; box-shadow:inset 3px 0 #9dcbff,0 5px 14px rgb(2 6 23 / .14); }
+ .refos-desktop-nav button[aria-current='page'] { color:white; background:#D7212B; box-shadow:inset 3px 0 #EBA622,0 5px 14px rgb(13 15 50 / .18); }
  .refos-desktop-nav button:not([aria-current='page']):hover { color:white; background:#ffffff18; }
  .refos-desktop-utilities { display:flex; flex-direction:column; gap:4px; margin-top:14px; padding-top:40px; border-top:1px solid #ffffff12; position:relative; }
  .refos-sidebar-tools-label { top:15px; left:10px; }
  .refos-desktop-nav .refos-sidebar-tool { min-height:40px; padding:9px 13px; color:#d5e2f0; font-size:12px; }
  .refos-sidebar-footer { position:static; margin:18px 10px 0; padding:14px 0 2px; border-top:1px solid #ffffff2b; display:flex; flex-direction:column; gap:4px; color:#c1d1e3; font-size:10px; flex-shrink:0; }
  .refos-sidebar-footer span:first-child { color:#f4f8fc; font-size:11px; font-weight:700; }
- .refos-header { background:#315b87; border-bottom-color:#52769b; box-shadow:0 1px 0 rgb(82 118 155 / .85); }
+ .refos-header { background:#343777; border-bottom-color:#5a5d99; box-shadow:0 1px 0 rgb(13 15 50 / .28); }
  .refos-header .text-slate-400 { color:#dce7f3; }
  .refos-header .text-slate-300 { color:#eef5fb; }
  .refos-header-inner { max-width:1440px; min-height:72px; padding-left:36px; padding-right:36px; }

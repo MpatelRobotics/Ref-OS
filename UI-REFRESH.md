@@ -16,4 +16,6 @@ The desktop navigation rail scrolls independently when its contents exceed the a
 
 The desktop sidebar and header use a lighter medium navy palette with brighter navigation and status text for improved contrast.
 
+The panel palette now follows Highlander Summit branding: lighter Highlander navy surfaces, red active navigation, and gold section and scrollbar accents.
+
 Phone and tablet layouts remain unchanged.
