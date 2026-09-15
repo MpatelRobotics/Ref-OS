@@ -2142,7 +2142,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           {(openTeam || openMatch || openRobot) ? (
             <button onClick={() => { setOpenTeam(null); setOpenMatch(null); setOpenRobot(null); }} aria-label="Back to workspace" className="p-1 -ml-1 rounded hover:bg-white/10"><ChevronLeft size={22} /></button>
           ) : (
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="refos-header-brand flex items-center gap-2 shrink-0">
               <img src="/logo.svg" alt="Highlander Summit" className="h-9 w-9 object-contain" />
               <div className="leading-tight hidden sm:block">
                 <div className="flex items-center gap-1.5">
@@ -2244,8 +2244,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             { k: "judging", label: "Judging", Icon: Trophy },
             { k: "alliances", label: "Alliances", Icon: GitBranch }
           ] : [
-            { k: "teams", label: "Teams", Icon: Users },
             ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
+            { k: "teams", label: "Teams", Icon: Users },
             ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
             { k: "robots", label: "Robots", Icon: Camera },
             { k: "alliances", label: "Alliances", Icon: GitBranch },
@@ -2264,6 +2264,16 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                     <Icon size={15} /> {label}
                   </button>
                 ))}
+                <div className="refos-desktop-utilities">
+                  <div className="refos-sidebar-section-label refos-sidebar-tools-label" aria-hidden="true">Event Tools</div>
+                  {adminUnlocked && <button onClick={() => { loadEventMembers(); setShowCommandCenter(true); }} className="refos-sidebar-tool"><BarChart3 size={16} /> Command Center</button>}
+                  <button onClick={() => setShowFieldLog(true)} className="refos-sidebar-tool"><Flag size={16} /> Field Log</button>
+                  <button onClick={() => setShowContactDirectory(true)} className="refos-sidebar-tool"><Contact size={16} /> Contacts</button>
+                </div>
+                <div className="refos-sidebar-footer">
+                  <span>{adminUnlocked ? "Admin" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
+                  <span>v{APP_VERSION} · Private Beta</span>
+                </div>
               </nav>
               <div className="sm:hidden refos-mobile-context">
                 <ActiveIcon size={16} />
@@ -2332,7 +2342,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
 
       {(pendingCount > 0 || !online) && (
         <div className="bg-amber-50 border-b border-amber-200 text-amber-800 text-xs">
-          <div className="max-w-2xl mx-auto px-4 py-2 flex items-center gap-2">
+          <div className="refos-desktop-strip max-w-2xl mx-auto px-4 py-2 flex items-center gap-2">
             {online ? <RefreshCw size={13} className="animate-spin shrink-0" /> : <CloudOff size={13} className="shrink-0" />}
             {pendingCount > 0
               ? <span>{pendingCount} {pendingCount === 1 ? "entry" : "entries"} saved on this device{online ? " — syncing now…" : " — will sync when you're back online."}</span>
@@ -2342,7 +2352,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       )}
 
       {eventCountdown && countdownRemaining > 0 && (
-        <div className="max-w-2xl mx-auto px-4 pt-3">
+        <div className="refos-desktop-strip max-w-2xl mx-auto px-4 pt-3">
           <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-3 flex items-center gap-3">
             <Clock size={20} className="text-indigo-700 dark:text-indigo-300 shrink-0" />
             <div className="flex-1 min-w-0">
@@ -2354,7 +2364,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         </div>
       )}
       {activeAnnouncement && (
-        <div className="max-w-2xl mx-auto px-4 pt-3">
+        <div className="refos-desktop-strip max-w-2xl mx-auto px-4 pt-3">
           <div className="rounded-xl border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-3 flex gap-3 items-start">
             <Flag size={20} className="text-amber-700 dark:text-amber-300 shrink-0 mt-0.5"/>
             <div className="flex-1 min-w-0">
