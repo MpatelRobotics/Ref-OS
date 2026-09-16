@@ -1,4 +1,4 @@
-const CACHE = "refos-v19-1.2.0-admin-web-push";
+const CACHE = "refos-v20-1.2.0-admin-web-push-startup-fix";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {

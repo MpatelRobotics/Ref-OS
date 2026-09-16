@@ -572,6 +572,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [requestedRoleForManager, setRequestedRoleForManager] = useState("");
   const [lastSystemTest, setLastSystemTest] = useState(null);
   const [pushState, setPushState] = useState("checking");
+  const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
 
   const contactDirectoryEntries = fieldLog.filter((e) => e.kind === "contact_directory").sort((a, b) => b.createdAt - a.createdAt);
   const contactDirectoryEntry = contactDirectoryEntries[0] || null;
@@ -710,7 +711,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     catch { return {}; }
   });
   const [showRankings, setShowRankings] = useState(false);
-  const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
   const [eventMembers, setEventMembers] = useState([]);
   const myRole = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
   const deviceId = useMemo(() => {
