@@ -258,6 +258,10 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 .refos-mobile-sheet-backdrop { animation:refosBackdropIn 160ms ease-out both; }
 @keyframes refosSheetUp { from { transform:translateY(24px); opacity:.6; } to { transform:none; opacity:1; } }
 @media(max-width:639px) {
+  .refos-header-inner { gap:6px; padding-left:10px; padding-right:10px; }
+  .refos-online-cluster { padding-left:0; padding-right:0; }
+  .refos-user-chip { padding-right:4px; }
+  .refos-user-name { display:none; }
   .refos-workspace { padding-bottom:104px !important; }
   .refos-shell>button.fixed { bottom:calc(78px + env(safe-area-inset-bottom)); }
   .refos-page-heading { align-items:center; }

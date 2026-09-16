@@ -1,4 +1,4 @@
-const CACHE = "refos-v17-1.2.0-judge-code-request-permission";
+const CACHE = "refos-v18-1.2.0-compact-mobile-header";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {

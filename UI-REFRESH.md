@@ -38,4 +38,6 @@ Invite Other Key Volunteers is available from the settings menu for Referees, Ju
 
 Judge Advisors receive a narrow database permission to create role code regeneration requests without receiving general Field Log write access. The request button confirms success and displays database or network failures instead of failing silently.
 
-Phone and tablet layouts remain unchanged.
+The phone header now shows one compact online volunteer count instead of an expanding avatar stack. Connection text is shortened, the duplicate signed in name is hidden, and the event title stays on one line on phones. Tapping the count still opens the complete online volunteer list, while tablet and desktop retain the full avatar stack.
+
+Tablet and desktop online presence retain the full avatar stack.

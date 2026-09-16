@@ -2223,7 +2223,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-start gap-1.5 flex-wrap">
-              <h1 className="font-bold tracking-tight leading-tight text-[15px] sm:text-base line-clamp-2">{event?.name || "Violation Log"}</h1>
+              <h1 className="font-bold tracking-tight leading-tight text-[15px] sm:text-base line-clamp-1 sm:line-clamp-2">{event?.name || "Violation Log"}</h1>
               <button
                 onClick={() => adminUnlocked && setShowDiagnosticReport(true)}
                 title={adminUnlocked ? "Open Admin Diagnostics" : connectionHealth.label}
@@ -2236,7 +2236,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 } ${adminUnlocked ? "hover:ring-1 hover:ring-white/30" : "cursor-default"}`}
               >
                 {connectionHealth.icon === "cloud" ? <Cloud size={10} /> : connectionHealth.icon === "sync" ? <RefreshCw size={10} className={syncing ? "animate-spin" : ""} /> : <CloudOff size={10} />}
-                {connectionHealth.label}
+                <span className="hidden sm:inline">{connectionHealth.label}</span>
+                <span className="sm:hidden">
+                  {connectionHealth.tone === "green" ? "Online" :
+                    connectionHealth.tone === "blue" ? "Syncing" :
+                    connectionHealth.tone === "red" ? "Offline" :
+                    connectionHealth.tone === "amber" ? `${queuedWrites} queued` : "Checking"}
+                </span>
               </button>
             </div>
             <button onClick={() => { refresh(); doFlush(); }} className="text-[11px] text-slate-400 leading-tight mt-0.5 flex items-center gap-1 hover:text-slate-200">
@@ -2247,9 +2253,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           <OnlineCluster presence={presence} onClick={() => setShowOnline(true)} />
           {!isJudge && !isEmcee && <button onClick={() => setShowByRule(true)} title="By rule" className="p-1.5 rounded hover:bg-white/10"><BarChart3 size={18} /></button>}
           <button onClick={() => setShowIdentity(true)} title="Your full name"
-            className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-full pl-1 pr-2.5 py-1">
+            className="refos-user-chip flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-full pl-1 pr-2.5 py-1">
             <span className="w-6 h-6 rounded-full bg-[#D7212B] text-white text-[11px] font-bold grid place-items-center">{meName ? initials(meName) : "?"}</span>
-            <span className="text-xs font-medium max-w-[70px] truncate">{meName || "Set name"}</span>
+            <span className="refos-user-name text-xs font-medium max-w-[70px] truncate">{meName || "Set name"}</span>
           </button>
           <div className="relative">
             <button aria-label="Settings" onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
@@ -4098,13 +4104,17 @@ function OnlineCluster({ presence, onClick }) {
   const shown = names.slice(0, 3);
   const extra = names.length - shown.length;
   return (
-    <button onClick={onClick} title={`${names.length} online`} className="flex items-center gap-1 pl-1 pr-1.5 py-1 rounded-full hover:bg-white/10">
-      <div className="flex -space-x-2">
+    <button onClick={onClick} title={`${names.length} online`} aria-label={`${names.length} volunteers online`} className="refos-online-cluster flex items-center gap-1 pl-1 pr-1.5 py-1 rounded-full hover:bg-white/10">
+      <div className="hidden sm:flex -space-x-2">
         {shown.map((n) => (
           <span key={n} className="w-6 h-6 rounded-full bg-[#D7212B] text-white text-[10px] font-bold grid place-items-center ring-2 ring-emerald-400">{initials(n)}</span>
         ))}
         {extra > 0 && <span className="w-6 h-6 rounded-full bg-white/20 text-white text-[10px] font-bold grid place-items-center ring-2 ring-[#0D0F32]">+{extra}</span>}
       </div>
+      <span className="sm:hidden inline-flex h-7 min-w-9 items-center justify-center gap-1 rounded-full border border-emerald-400/50 bg-emerald-950/45 px-2 text-[11px] font-bold text-emerald-200">
+        <Users size={13} aria-hidden="true" />
+        {names.length}
+      </span>
     </button>
   );
 }
