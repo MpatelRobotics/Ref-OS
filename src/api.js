@@ -56,6 +56,18 @@ export async function getMyEventRole(eventId) {
   return data?.role || null;
 }
 
+// Returns ONLY the caller's own role join code (server enforces this via the
+// get_my_role_access_code SECURITY DEFINER function). Non-admins use this because
+// the role_access_codes setting itself is admin-only at the row level.
+export async function getMyRoleAccessCode(eventId) {
+  if (E2E_MOCK) return null;
+  const { data, error } = await supabase.rpc("get_my_role_access_code", { p_event: eventId });
+  if (error) { console.warn("get_my_role_access_code failed", error); return null; }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || !row.role) return null;
+  return { role: row.role, code: row.code || "", enabled: !!row.enabled, updatedAt: Number(row.updated_at || 0) };
+}
+
 export async function setEventMemberName(eventId, name) {
   if (E2E_MOCK) return;
   const { error } = await supabase.rpc("set_my_event_member_name", {

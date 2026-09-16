@@ -532,6 +532,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [fieldLog, setFieldLog] = useState([]);
   const [fieldResetChecks, setFieldResetChecks] = useState([]);
   const [eventSettings, setEventSettings] = useState({});
+  const [myRoleCode, setMyRoleCode] = useState(null); // caller's own role code (non-admins) via server RPC
   const [failedSyncItems, setFailedSyncItems] = useState([]);
   const announcements = fieldLog.filter((e) => e.kind === "announcement").sort((a,b) => b.createdAt - a.createdAt);
   const activeAnnouncement = announcements.find((e) => {
@@ -582,19 +583,26 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const eventContacts = Array.isArray(eventSettings?.contact_directory?.value)
     ? eventSettings.contact_directory.value
     : legacyContacts;
-  const sharedRoleCodeConfig = eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config;
+  const sharedRoleCodeConfig = adminUnlocked
+    ? (eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config)
+    : { version: 1, codes: (myRoleCode && myRoleCode.role) ? { [myRoleCode.role]: { code: myRoleCode.code, enabled: myRoleCode.enabled, updatedAt: myRoleCode.updatedAt } } : {} };
   const roleCodeLabels = { ref: "Referee", judge: "Judge Advisor", emcee: "Emcee" };
   const pendingRoleCodeRequests = (() => {
-    const latest = {};
-    for (const entry of fieldLog.filter((item) => item.kind === "role_code_request")) {
-      try {
-        const value = JSON.parse(entry.note || "{}");
-        const requestRole = ["ref", "judge", "emcee"].includes(value.role) ? value.role : "";
-        if (requestRole && (!latest[requestRole] || entry.createdAt > latest[requestRole].createdAt)) latest[requestRole] = { ...entry, requester: value.requester || entry.by || "Volunteer" };
-      } catch {}
+    const latestReq = {};
+    const latestBump = {}; // server-timestamped "this role's code changed" markers
+    for (const entry of fieldLog) {
+      let value = {};
+      try { value = JSON.parse(entry.note || "{}"); } catch {}
+      const entryRole = ["ref", "judge", "emcee"].includes(value.role) ? value.role : "";
+      if (!entryRole) continue;
+      if (entry.kind === "role_code_request") {
+        if (!latestReq[entryRole] || entry.createdAt > latestReq[entryRole].createdAt) latestReq[entryRole] = { ...entry, requester: value.requester || entry.by || "Volunteer" };
+      } else if (entry.kind === "role_code_bump") {
+        if (entry.createdAt > (latestBump[entryRole] || 0)) latestBump[entryRole] = entry.createdAt;
+      }
     }
-    return Object.entries(latest).map(([requestRole, request]) => ({ role: requestRole, ...request }))
-      .filter((request) => Number(sharedRoleCodeConfig?.codes?.[request.role]?.updatedAt || 0) <= Number(request.createdAt || 0));
+    return Object.entries(latestReq).map(([requestRole, request]) => ({ role: requestRole, ...request }))
+      .filter((request) => Number(latestBump[request.role] || 0) <= Number(request.createdAt || 0));
   })();
 
   const [countdownNow, setCountdownNow] = useState(Date.now());
@@ -758,6 +766,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       api.listFieldLog(eventId).then(setFieldLog).catch(() => {});
       api.listFieldResetChecks(eventId).then(setFieldResetChecks).catch(() => {});
       api.listEventSettings(eventId).then(setEventSettings).catch(() => {});
+      api.getMyRoleAccessCode(eventId).then(setMyRoleCode).catch(() => {});
       outbox.loadFailed(eventId).then(setFailedSyncItems).catch(() => {});
       api.listAlliances(eventId).then((rows) => { const m = {}; for (const a of rows) m[a.seed] = a.teams; setAlliances(m); setAlliancesLoaded(true); }).catch(() => { setAlliancesLoaded(true); });
       const now = Date.now();
@@ -999,7 +1008,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       alert("Could not save contact directory: " + (e.message || e));
     }
   };
-  const saveRoleAccessConfig = async (config) => {
+  const saveRoleAccessConfig = async (config, changedRoles = ["ref", "judge", "emcee"]) => {
     try {
       const saved = await api.upsertEventSetting(eventId, "role_access_codes", config, meName);
       const roleMap = { ref: "ref", judge: "judge", emcee: "emcee" };
@@ -1013,6 +1022,14 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         }
       }));
       setEventSettings((cur) => ({ ...cur, role_access_codes: saved }));
+      // Nudge the affected roles' devices to re-fetch their own code (no code in the note).
+      // role_access_codes is admin-only, so this readable, server-timestamped marker is how
+      // non-admins learn their code changed and how their "waiting" state clears.
+      for (const changedRole of (changedRoles || [])) {
+        if (["ref", "judge", "emcee"].includes(changedRole)) {
+          await addFieldLog({ kind: "role_code_bump", note: JSON.stringify({ role: changedRole }) }).catch(() => {});
+        }
+      }
       return saved;
     } catch (e) {
       if (outbox.isOffline(e)) throw new Error("Reconnect before changing event access codes.");
@@ -2621,7 +2638,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Flag size={18} /> Field log</h2>
           </div>
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4">
-            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","feedback"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
+            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","role_code_bump","feedback"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
           </div></div>
         </div>
       )}

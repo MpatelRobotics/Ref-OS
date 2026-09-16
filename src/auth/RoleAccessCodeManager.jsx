@@ -68,7 +68,7 @@ export default function RoleAccessCodeManager({ eventId, config: sharedConfig, r
           },
         },
       };
-      await onSave(next);
+      await onSave(next, [role]);
       setConfig(next);
       setRevealed((cur) => {
         const nextRevealed = { ...cur, [role]: code };
@@ -100,7 +100,7 @@ export default function RoleAccessCodeManager({ eventId, config: sharedConfig, r
           },
         },
       };
-      await onSave(next);
+      await onSave(next, [role]);
       setConfig(next);
       setRevealed((cur) => {
         const copy = { ...cur };
@@ -124,7 +124,7 @@ export default function RoleAccessCodeManager({ eventId, config: sharedConfig, r
         codes[key] = { ...value, enabled: false, updatedAt: Date.now() };
       }
       const next = { ...config, version: 1, updatedAt: Date.now(), codes };
-      await onSave(next);
+      await onSave(next, ["ref", "judge", "emcee"]);
       setConfig(next);
       setRevealed({});
       try { sessionStorage.removeItem(`refosRoleCodes:${eventId}`); } catch {}
