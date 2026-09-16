@@ -30,4 +30,6 @@ Successful volunteer sign in remembers the entered four character role code on t
 
 Volunteers can request regeneration of their own role code. Admins receive a live in app request with the role and requester, and the open volunteer invite panel receives and displays the regenerated code through realtime event sync without being closed or refreshed.
 
+Regenerated codes are also published as internal role code update events with server timestamps. The invite panel overlays the latest published code over any older locally remembered code and polls every three seconds while open as a fallback when mobile realtime is interrupted.
+
 Phone and tablet layouts remain unchanged.

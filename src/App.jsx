@@ -532,7 +532,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [fieldLog, setFieldLog] = useState([]);
   const [fieldResetChecks, setFieldResetChecks] = useState([]);
   const [eventSettings, setEventSettings] = useState({});
-  const [myRoleCode, setMyRoleCode] = useState(null); // caller's own role code (non-admins) via server RPC
   const [failedSyncItems, setFailedSyncItems] = useState([]);
   const announcements = fieldLog.filter((e) => e.kind === "announcement").sort((a,b) => b.createdAt - a.createdAt);
   const activeAnnouncement = announcements.find((e) => {
@@ -583,29 +582,55 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const eventContacts = Array.isArray(eventSettings?.contact_directory?.value)
     ? eventSettings.contact_directory.value
     : legacyContacts;
+  const baseRoleCodeConfig = eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config;
   const roleCodeLabels = { ref: "Referee", judge: "Judge Advisor", emcee: "Emcee" };
-  // Current code updatedAt for a role, from whichever source this device can read:
-  // admins read the full config; a non-admin only has their own role's code (via RPC).
-  const roleCurrentUpdatedAt = (role) => Math.max(
-    Number(eventSettings?.role_access_codes?.value?.codes?.[role]?.updatedAt || 0),
-    (myRoleCode && myRoleCode.role === role) ? Number(myRoleCode.updatedAt || 0) : 0
-  );
-  const pendingRoleCodeRequests = (() => {
-    const latestReq = {};
-    for (const entry of fieldLog) {
-      if (entry.kind !== "role_code_request") continue;
-      let value = {};
-      try { value = JSON.parse(entry.note || "{}"); } catch {}
-      const entryRole = ["ref", "judge", "emcee"].includes(value.role) ? value.role : "";
-      if (!entryRole) continue;
-      if (!latestReq[entryRole] || entry.createdAt > latestReq[entryRole].createdAt) {
-        latestReq[entryRole] = { ...entry, requester: value.requester || entry.by || "Volunteer", baselineUpdatedAt: Number(value.baselineUpdatedAt || 0) };
-      }
+  const latestRoleCodeUpdates = (() => {
+    const latest = {};
+    for (const entry of fieldLog.filter((item) => item.kind === "role_code_update")) {
+      try {
+        const value = JSON.parse(entry.note || "{}");
+        const updateRole = ["ref", "judge", "emcee"].includes(value.role) ? value.role : "";
+        if (updateRole && value.code && (!latest[updateRole] || entry.createdAt > latest[updateRole].createdAt)) latest[updateRole] = { ...entry, code: value.code };
+      } catch {}
     }
-    // Still pending until this role's code updatedAt advances past the value it had when requested.
-    return Object.entries(latestReq).map(([requestRole, request]) => ({ role: requestRole, ...request }))
-      .filter((request) => roleCurrentUpdatedAt(request.role) <= Number(request.baselineUpdatedAt || 0));
+    return latest;
   })();
+  const sharedRoleCodeConfig = {
+    ...(baseRoleCodeConfig || { version: 1 }),
+    codes: { ...(baseRoleCodeConfig?.codes || {}) },
+  };
+  for (const [updateRole, update] of Object.entries(latestRoleCodeUpdates)) {
+    sharedRoleCodeConfig.codes[updateRole] = { ...(sharedRoleCodeConfig.codes[updateRole] || {}), code: update.code, enabled: true, updatedAt: update.createdAt };
+  }
+  const pendingRoleCodeRequests = (() => {
+    const latest = {};
+    for (const entry of fieldLog.filter((item) => item.kind === "role_code_request")) {
+      try {
+        const value = JSON.parse(entry.note || "{}");
+        const requestRole = ["ref", "judge", "emcee"].includes(value.role) ? value.role : "";
+        if (requestRole && (!latest[requestRole] || entry.createdAt > latest[requestRole].createdAt)) latest[requestRole] = { ...entry, requester: value.requester || entry.by || "Volunteer" };
+      } catch {}
+    }
+    return Object.entries(latest).map(([requestRole, request]) => ({ role: requestRole, ...request }))
+      .filter((request) => Number(latestRoleCodeUpdates[request.role]?.createdAt || 0) <= Number(request.createdAt || 0));
+  })();
+  const hasPendingRoleCodeRequests = pendingRoleCodeRequests.length > 0;
+
+  useEffect(() => {
+    if (!showShare && !hasPendingRoleCodeRequests) return undefined;
+    let live = true;
+    const syncCodes = async () => {
+      try {
+        const [settings, entries] = await Promise.all([api.listEventSettings(eventId), api.listFieldLog(eventId)]);
+        if (!live) return;
+        setEventSettings(settings);
+        setFieldLog(entries);
+      } catch {}
+    };
+    syncCodes();
+    const interval = setInterval(syncCodes, 3000);
+    return () => { live = false; clearInterval(interval); };
+  }, [eventId, showShare, hasPendingRoleCodeRequests]);
 
   const [countdownNow, setCountdownNow] = useState(Date.now());
   const countdownEntries = fieldLog.filter((e) => e.kind === "event_countdown").sort((a, b) => b.createdAt - a.createdAt);
@@ -634,20 +659,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   });
   const [showRankings, setShowRankings] = useState(false);
   const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
-  const sharedRoleCodeConfig = adminUnlocked
-    ? (eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config)
-    : { version: 1, codes: (myRoleCode && myRoleCode.role) ? { [myRoleCode.role]: { code: myRoleCode.code, enabled: myRoleCode.enabled, updatedAt: myRoleCode.updatedAt } } : {} };
-  // Non-admins can't read the role_access_codes row (RLS) and so get no realtime for it.
-  // While the invite sheet is open, poll our own code so a regenerated code appears within
-  // a few seconds without depending on realtime reaching this device.
-  useEffect(() => {
-    if (adminUnlocked || !showShare) return;
-    let alive = true;
-    const tick = () => api.getMyRoleAccessCode(eventId).then((c) => { if (alive) setMyRoleCode(c); }).catch(() => {});
-    tick();
-    const iv = setInterval(tick, 4000);
-    return () => { alive = false; clearInterval(iv); };
-  }, [adminUnlocked, showShare, eventId]);
   const [eventMembers, setEventMembers] = useState([]);
   const myRole = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
   const deviceId = useMemo(() => {
@@ -782,7 +793,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       api.listFieldLog(eventId).then(setFieldLog).catch(() => {});
       api.listFieldResetChecks(eventId).then(setFieldResetChecks).catch(() => {});
       api.listEventSettings(eventId).then(setEventSettings).catch(() => {});
-      api.getMyRoleAccessCode(eventId).then(setMyRoleCode).catch(() => {});
       outbox.loadFailed(eventId).then(setFailedSyncItems).catch(() => {});
       api.listAlliances(eventId).then((rows) => { const m = {}; for (const a of rows) m[a.seed] = a.teams; setAlliances(m); setAlliancesLoaded(true); }).catch(() => { setAlliancesLoaded(true); });
       const now = Date.now();
@@ -1024,8 +1034,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       alert("Could not save contact directory: " + (e.message || e));
     }
   };
-  const saveRoleAccessConfig = async (config, changedRoles = ["ref", "judge", "emcee"]) => {
+  const saveRoleAccessConfig = async (config) => {
     try {
+      const changedRoles = ["ref", "judge", "emcee"].filter((key) => {
+        const next = config?.codes?.[key];
+        const previous = baseRoleCodeConfig?.codes?.[key];
+        return !!next?.enabled && !!next?.code && (next.code !== previous?.code || next.updatedAt !== previous?.updatedAt);
+      });
       const saved = await api.upsertEventSetting(eventId, "role_access_codes", config, meName);
       const roleMap = { ref: "ref", judge: "judge", emcee: "emcee" };
       await Promise.all(Object.entries(roleMap).map(async ([key, serverRole]) => {
@@ -1038,13 +1053,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         }
       }));
       setEventSettings((cur) => ({ ...cur, role_access_codes: saved }));
-      // Nudge the affected roles' devices to re-fetch their own code (no code in the note).
-      // role_access_codes is admin-only, so this readable, server-timestamped marker is how
-      // non-admins learn their code changed and how their "waiting" state clears.
-      for (const changedRole of (changedRoles || [])) {
-        if (["ref", "judge", "emcee"].includes(changedRole)) {
-          await addFieldLog({ kind: "role_code_bump", note: JSON.stringify({ role: changedRole }) }).catch(() => {});
-        }
+      for (const changedRole of changedRoles) {
+        await addFieldLog({ kind: "role_code_update", note: JSON.stringify({ role: changedRole, code: config.codes[changedRole].code }) });
       }
       return saved;
     } catch (e) {
@@ -1053,8 +1063,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     }
   };
   const requestRoleCodeRegeneration = async (requestRole) => {
-    const baselineUpdatedAt = roleCurrentUpdatedAt(requestRole);
-    const saved = await addFieldLog({ kind: "role_code_request", note: JSON.stringify({ role: requestRole, requester: meName, baselineUpdatedAt }) });
+    const saved = await addFieldLog({ kind: "role_code_request", note: JSON.stringify({ role: requestRole, requester: meName }) });
     return saved;
   };
 
@@ -2655,7 +2664,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Flag size={18} /> Field log</h2>
           </div>
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4">
-            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","role_code_bump","feedback"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
+            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","role_code_update","feedback"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
           </div></div>
         </div>
       )}
@@ -3948,7 +3957,7 @@ function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, f
     })();
   }, []);
 
-  const internalKinds = new Set(["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","feedback"]);
+  const internalKinds = new Set(["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","role_code_update","feedback"]);
   const operationalFieldLog = (fieldLog || []).filter((e) => !internalKinds.has(e.kind));
   const report = {
     generatedAt: new Date().toISOString(),
