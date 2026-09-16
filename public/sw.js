@@ -1,4 +1,4 @@
-const CACHE = "refos-v16-1.2.0-all-role-invite-menu";
+const CACHE = "refos-v17-1.2.0-judge-code-request-permission";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {

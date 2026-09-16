@@ -298,6 +298,9 @@ create policy "members read field log" on public.field_log for select
 create policy "event roles write field log" on public.field_log for all
   using (public.has_event_role(event_id,array['ref','emcee','admin']))
   with check (public.has_event_role(event_id,array['ref','emcee','admin']));
+drop policy if exists "judges request role code regeneration" on public.field_log;
+create policy "judges request role code regeneration" on public.field_log for insert
+  with check (public.has_event_role(event_id,array['judge']) and kind='role_code_request');
 
 drop policy if exists "open rw alliances" on public.alliances;
 drop policy if exists "members read alliances" on public.alliances;

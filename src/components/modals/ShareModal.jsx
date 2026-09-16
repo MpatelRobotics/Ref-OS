@@ -5,6 +5,8 @@ import Label from "./FormLabel.jsx";
 export default function ShareModal({ event, role = "ref", adminUnlocked = false, roleCodeConfig, codeRequestPending = false, onRequestCode, onManageCodes, onClose }) {
   const [copied, setCopied] = useState("");
   const [requesting, setRequesting] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
+  const [requestError, setRequestError] = useState("");
   const [sessionCodes, setSessionCodes] = useState({});
   const url = window.location.origin;
   const eventId = event?.id;
@@ -103,16 +105,23 @@ export default function ShareModal({ event, role = "ref", adminUnlocked = false,
 
               {!adminUnlocked && onRequestCode && (
                 <button
-                  disabled={requesting || codeRequestPending}
+                  disabled={requesting || codeRequestPending || requestSent}
                   onClick={async () => {
                     setRequesting(true);
-                    try { await onRequestCode(currentRoleKey); } finally { setRequesting(false); }
+                    setRequestError("");
+                    try {
+                      await onRequestCode(currentRoleKey);
+                      setRequestSent(true);
+                    } catch (error) {
+                      setRequestError(error?.message || "Could not notify an admin. Try again.");
+                    } finally { setRequesting(false); }
                   }}
                   className="w-full px-4 py-3 border-t border-slate-200 dark:border-slate-700 text-[#D7212B] dark:text-red-300 font-semibold hover:bg-red-50 dark:hover:bg-red-950/20 disabled:text-slate-400 disabled:bg-slate-50 dark:disabled:bg-slate-900"
                 >
-                  {codeRequestPending ? "Admin notified · Waiting for new code" : requesting ? "Notifying admin…" : "Ask an admin to regenerate this code"}
+                  {codeRequestPending || requestSent ? "Admin notified · Waiting for new code" : requesting ? "Notifying admin…" : "Ask an admin to regenerate this code"}
                 </button>
               )}
+              {requestError && <div className="px-4 py-2 border-t border-red-200 bg-red-50 dark:bg-red-950/30 text-xs font-semibold text-red-700 dark:text-red-300">{requestError}</div>}
 
               {adminUnlocked && onManageCodes && (
                 <button

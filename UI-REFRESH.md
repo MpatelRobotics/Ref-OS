@@ -36,4 +36,6 @@ The Invite Other Key Volunteers panel uses mobile viewport height, touch scrolli
 
 Invite Other Key Volunteers is available from the settings menu for Referees, Judge Advisors, and Emcees. Each volunteer still sees only the join code for their signed in role.
 
+Judge Advisors receive a narrow database permission to create role code regeneration requests without receiving general Field Log write access. The request button confirms success and displays database or network failures instead of failing silently.
+
 Phone and tablet layouts remain unchanged.
