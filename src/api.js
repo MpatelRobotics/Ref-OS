@@ -121,6 +121,38 @@ export async function downgradeMyEventRole(eventId, role = "ref") {
   if (error) throw error;
 }
 
+/* ================= admin web push notifications ================= */
+export async function saveAdminPushSubscription(eventId, subscription) {
+  if (E2E_MOCK) return;
+  const session = await ensureAnonymousSession();
+  const json = subscription?.toJSON?.() || subscription;
+  const { error } = await supabase.from("push_subscriptions").upsert({
+    endpoint: json.endpoint,
+    event_id: eventId,
+    user_id: session.user.id,
+    p256dh: json.keys?.p256dh,
+    auth: json.keys?.auth,
+    user_agent: navigator.userAgent,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "endpoint" });
+  if (error) throw error;
+}
+
+export async function removeAdminPushSubscription(endpoint) {
+  if (E2E_MOCK || !endpoint) return;
+  const { error } = await supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
+  if (error) throw error;
+}
+
+export async function sendRoleCodeRequestPush(requestId) {
+  if (E2E_MOCK || !requestId) return { sent: 0 };
+  const { data, error } = await supabase.functions.invoke("send-code-request-push", {
+    body: { requestId },
+  });
+  if (error) throw error;
+  return data;
+}
+
 
 /* ================= auth ================= */
 export const signIn = (email) =>

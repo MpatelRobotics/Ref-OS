@@ -40,4 +40,6 @@ Judge Advisors receive a narrow database permission to create role code regenera
 
 The phone header now shows one compact online volunteer count instead of an expanding avatar stack. Connection text is shortened, the duplicate signed in name is hidden, and the event title stays on one line on phones. Tapping the count still opens the complete online volunteer list, while tablet and desktop retain the full avatar stack.
 
+Admins can enable true web push alerts per device. A role code regeneration request calls a secured Supabase Edge Function, which verifies the saved request, sends a high priority notification only to current event admins, removes expired subscriptions, and opens the requested role directly in code management when tapped. The existing live in app request remains available as a fallback.
+
 Tablet and desktop online presence retain the full avatar stack.

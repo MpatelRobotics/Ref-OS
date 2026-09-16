@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download, Save,
-  Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check,
+  Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check, Bell, BellOff,
   CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, QrCode, ScanLine,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
@@ -571,6 +571,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showRoleCodeManager, setShowRoleCodeManager] = useState(false);
   const [requestedRoleForManager, setRequestedRoleForManager] = useState("");
   const [lastSystemTest, setLastSystemTest] = useState(null);
+  const [pushState, setPushState] = useState("checking");
 
   const contactDirectoryEntries = fieldLog.filter((e) => e.kind === "contact_directory").sort((a, b) => b.createdAt - a.createdAt);
   const contactDirectoryEntry = contactDirectoryEntries[0] || null;
@@ -615,6 +616,57 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       .filter((request) => Number(latestRoleCodeUpdates[request.role]?.createdAt || 0) <= Number(request.createdAt || 0));
   })();
   const hasPendingRoleCodeRequests = pendingRoleCodeRequests.length > 0;
+
+  const pushSupported = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  const refreshPushState = useCallback(async () => {
+    if (!pushSupported) { setPushState("unsupported"); return; }
+    if (Notification.permission === "denied") { setPushState("blocked"); return; }
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      setPushState(subscription ? "enabled" : "disabled");
+    } catch { setPushState("disabled"); }
+  }, [pushSupported]);
+
+  useEffect(() => { if (adminUnlocked) refreshPushState(); }, [adminUnlocked, refreshPushState]);
+
+  useEffect(() => {
+    if (!adminUnlocked || new URLSearchParams(window.location.search).get("open") !== "code-requests") return;
+    const role = new URLSearchParams(window.location.search).get("role");
+    setRequestedRoleForManager(["ref", "judge", "emcee"].includes(role) ? role : "");
+    setShowRoleCodeManager(true);
+    history.replaceState({}, "", window.location.pathname);
+  }, [adminUnlocked]);
+
+  const togglePushNotifications = async () => {
+    setMenu(false);
+    if (!pushSupported) { alert("This browser does not support push notifications."); return; }
+    if (!import.meta.env.VITE_VAPID_PUBLIC_KEY) { alert("Push notifications are not configured yet. Add VITE_VAPID_PUBLIC_KEY to Vercel."); return; }
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const existing = await registration.pushManager.getSubscription();
+      if (existing) {
+        await api.removeAdminPushSubscription(existing.endpoint);
+        await existing.unsubscribe();
+        setPushState("disabled");
+        alert("Admin push alerts are off on this device.");
+        return;
+      }
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") { setPushState(permission === "denied" ? "blocked" : "disabled"); return; }
+      const value = import.meta.env.VITE_VAPID_PUBLIC_KEY.replace(/-/g, "+").replace(/_/g, "/");
+      const padded = value.padEnd(value.length + (4 - value.length % 4) % 4, "=");
+      const raw = atob(padded);
+      const applicationServerKey = Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
+      const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
+      await api.saveAdminPushSubscription(eventId, subscription);
+      setPushState("enabled");
+      alert("Admin push alerts are on for this device.");
+    } catch (error) {
+      await refreshPushState();
+      alert(`Could not enable push alerts: ${error?.message || "Unknown error"}`);
+    }
+  };
 
   useEffect(() => {
     if (!showShare && !hasPendingRoleCodeRequests) return undefined;
@@ -1064,6 +1116,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   };
   const requestRoleCodeRegeneration = async (requestRole) => {
     const saved = await addFieldLog({ kind: "role_code_request", note: JSON.stringify({ role: requestRole, requester: meName }) });
+    api.sendRoleCodeRequestPush(saved?.id).catch((error) => console.warn("Push alert could not be sent", error));
     return saved;
   };
 
@@ -2291,6 +2344,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 <>
                 <div className="refos-menu-section">Event</div>
                 {adminUnlocked && <button onClick={() => { setMenu(false); loadEventMembers(); setShowCommandCenter(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Event Command Center</button>}
+                {adminUnlocked && <button onClick={togglePushNotifications} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{pushState === "enabled" ? <Bell size={16} /> : <BellOff size={16} />} {pushState === "enabled" ? "Push alerts on" : pushState === "blocked" ? "Push alerts blocked" : "Enable push alerts"}</button>}
                 <button onClick={() => { setMenu(false); setShowContactDirectory(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Contact size={16} /> Event Contact Directory</button>
                 <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); if (adminUnlocked) loadEventMembers(); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Key Volunteer Status</button>
                 <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field Log</button>
