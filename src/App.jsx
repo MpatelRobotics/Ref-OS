@@ -584,22 +584,27 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     ? eventSettings.contact_directory.value
     : legacyContacts;
   const roleCodeLabels = { ref: "Referee", judge: "Judge Advisor", emcee: "Emcee" };
+  // Current code updatedAt for a role, from whichever source this device can read:
+  // admins read the full config; a non-admin only has their own role's code (via RPC).
+  const roleCurrentUpdatedAt = (role) => Math.max(
+    Number(eventSettings?.role_access_codes?.value?.codes?.[role]?.updatedAt || 0),
+    (myRoleCode && myRoleCode.role === role) ? Number(myRoleCode.updatedAt || 0) : 0
+  );
   const pendingRoleCodeRequests = (() => {
     const latestReq = {};
-    const latestBump = {}; // server-timestamped "this role's code changed" markers
     for (const entry of fieldLog) {
+      if (entry.kind !== "role_code_request") continue;
       let value = {};
       try { value = JSON.parse(entry.note || "{}"); } catch {}
       const entryRole = ["ref", "judge", "emcee"].includes(value.role) ? value.role : "";
       if (!entryRole) continue;
-      if (entry.kind === "role_code_request") {
-        if (!latestReq[entryRole] || entry.createdAt > latestReq[entryRole].createdAt) latestReq[entryRole] = { ...entry, requester: value.requester || entry.by || "Volunteer" };
-      } else if (entry.kind === "role_code_bump") {
-        if (entry.createdAt > (latestBump[entryRole] || 0)) latestBump[entryRole] = entry.createdAt;
+      if (!latestReq[entryRole] || entry.createdAt > latestReq[entryRole].createdAt) {
+        latestReq[entryRole] = { ...entry, requester: value.requester || entry.by || "Volunteer", baselineUpdatedAt: Number(value.baselineUpdatedAt || 0) };
       }
     }
+    // Still pending until this role's code updatedAt advances past the value it had when requested.
     return Object.entries(latestReq).map(([requestRole, request]) => ({ role: requestRole, ...request }))
-      .filter((request) => Number(latestBump[request.role] || 0) <= Number(request.createdAt || 0));
+      .filter((request) => roleCurrentUpdatedAt(request.role) <= Number(request.baselineUpdatedAt || 0));
   })();
 
   const [countdownNow, setCountdownNow] = useState(Date.now());
@@ -632,6 +637,17 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const sharedRoleCodeConfig = adminUnlocked
     ? (eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config)
     : { version: 1, codes: (myRoleCode && myRoleCode.role) ? { [myRoleCode.role]: { code: myRoleCode.code, enabled: myRoleCode.enabled, updatedAt: myRoleCode.updatedAt } } : {} };
+  // Non-admins can't read the role_access_codes row (RLS) and so get no realtime for it.
+  // While the invite sheet is open, poll our own code so a regenerated code appears within
+  // a few seconds without depending on realtime reaching this device.
+  useEffect(() => {
+    if (adminUnlocked || !showShare) return;
+    let alive = true;
+    const tick = () => api.getMyRoleAccessCode(eventId).then((c) => { if (alive) setMyRoleCode(c); }).catch(() => {});
+    tick();
+    const iv = setInterval(tick, 4000);
+    return () => { alive = false; clearInterval(iv); };
+  }, [adminUnlocked, showShare, eventId]);
   const [eventMembers, setEventMembers] = useState([]);
   const myRole = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
   const deviceId = useMemo(() => {
@@ -1037,7 +1053,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     }
   };
   const requestRoleCodeRegeneration = async (requestRole) => {
-    const saved = await addFieldLog({ kind: "role_code_request", note: JSON.stringify({ role: requestRole, requester: meName }) });
+    const baselineUpdatedAt = roleCurrentUpdatedAt(requestRole);
+    const saved = await addFieldLog({ kind: "role_code_request", note: JSON.stringify({ role: requestRole, requester: meName, baselineUpdatedAt }) });
     return saved;
   };
 
