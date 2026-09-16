@@ -2267,6 +2267,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
                     <div className="refos-menu-section">Help &amp; Display</div>
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; Help</button>
+                <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
                   </>
                 ) : isEmcee ? (
@@ -2277,6 +2278,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                     <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                     {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
                     <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
+                    <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
                     <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
                   </>
                 ) : (

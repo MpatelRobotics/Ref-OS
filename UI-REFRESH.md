@@ -34,4 +34,6 @@ Regenerated codes are also published as internal role code update events with se
 
 The Invite Other Key Volunteers panel uses mobile viewport height, touch scrolling, safe area padding, and a higher layer than the bottom navigation. Its title and Done action remain visible while the content scrolls.
 
+Invite Other Key Volunteers is available from the settings menu for Referees, Judge Advisors, and Emcees. Each volunteer still sees only the join code for their signed in role.
+
 Phone and tablet layouts remain unchanged.
