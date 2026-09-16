@@ -1,4 +1,4 @@
-const CACHE = "refos-v14-1.2.0-live-role-code-delivery";
+const CACHE = "refos-v15-1.2.0-scrollable-invite-panel";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {

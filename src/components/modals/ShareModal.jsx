@@ -34,9 +34,9 @@ export default function ShareModal({ event, role = "ref", adminUnlocked = false,
   const visibleRoles = adminUnlocked ? roles : roles.filter((item) => item.key === currentRoleKey);
 
   return (
-    <div className="refos-modal-backdrop fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="refos-modal-panel bg-white dark:bg-slate-800 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
-        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+    <div className="refos-modal-backdrop fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center">
+      <div className="refos-modal-panel bg-white dark:bg-slate-800 w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto overscroll-contain touch-pan-y" style={{ maxHeight: "calc(100dvh - env(safe-area-inset-top) - 8px)" }}>
+        <div className="sticky top-0 z-10 bg-white dark:bg-slate-800 px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
           <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Share2 size={18} /> Invite Other Key Volunteers</h2>
           <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
         </div>
@@ -131,7 +131,7 @@ export default function ShareModal({ event, role = "ref", adminUnlocked = false,
           </div>
         </div>
 
-        <div className="p-4 pt-0">
+        <div className="sticky bottom-0 z-10 bg-white dark:bg-slate-800 p-4 pt-2 border-t border-slate-100 dark:border-slate-700" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
           <button onClick={onClose} className="w-full py-2.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 flex items-center justify-center gap-2"><Check size={16} /> Done</button>
         </div>
       </div>

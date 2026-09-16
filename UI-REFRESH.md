@@ -32,4 +32,6 @@ Volunteers can request regeneration of their own role code. Admins receive a liv
 
 Regenerated codes are also published as internal role code update events with server timestamps. The invite panel overlays the latest published code over any older locally remembered code and polls every three seconds while open as a fallback when mobile realtime is interrupted.
 
+The Invite Other Key Volunteers panel uses mobile viewport height, touch scrolling, safe area padding, and a higher layer than the bottom navigation. Its title and Done action remain visible while the content scrolls.
+
 Phone and tablet layouts remain unchanged.
