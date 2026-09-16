@@ -583,9 +583,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const eventContacts = Array.isArray(eventSettings?.contact_directory?.value)
     ? eventSettings.contact_directory.value
     : legacyContacts;
-  const sharedRoleCodeConfig = adminUnlocked
-    ? (eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config)
-    : { version: 1, codes: (myRoleCode && myRoleCode.role) ? { [myRoleCode.role]: { code: myRoleCode.code, enabled: myRoleCode.enabled, updatedAt: myRoleCode.updatedAt } } : {} };
   const roleCodeLabels = { ref: "Referee", judge: "Judge Advisor", emcee: "Emcee" };
   const pendingRoleCodeRequests = (() => {
     const latestReq = {};
@@ -632,6 +629,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   });
   const [showRankings, setShowRankings] = useState(false);
   const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
+  const sharedRoleCodeConfig = adminUnlocked
+    ? (eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config)
+    : { version: 1, codes: (myRoleCode && myRoleCode.role) ? { [myRoleCode.role]: { code: myRoleCode.code, enabled: myRoleCode.enabled, updatedAt: myRoleCode.updatedAt } } : {} };
   const [eventMembers, setEventMembers] = useState([]);
   const myRole = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
   const deviceId = useMemo(() => {
