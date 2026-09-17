@@ -23,17 +23,16 @@ Deno.serve(async (request) => {
     const serviceClient = createClient(supabaseUrl, serviceKey);
 
     // The caller must be able to read this real request through normal event RLS.
-    const { data: codeRequest, error: requestError } = await userClient
+    const { data: eventRequest, error: requestError } = await userClient
       .from("field_log")
       .select("id,event_id,kind,note")
       .eq("id", requestId)
-      .eq("kind", "role_code_request")
       .single();
-    if (requestError || !codeRequest) return json({ error: "Request not found" }, 404);
+    if (requestError || !eventRequest || !["role_code_request", "help_request"].includes(eventRequest.kind)) return json({ error: "Request not found" }, 404);
 
     const { error: claimError } = await serviceClient.from("push_dispatches").insert({
-      request_id: codeRequest.id,
-      event_id: codeRequest.event_id,
+      request_id: eventRequest.id,
+      event_id: eventRequest.event_id,
     });
     if (claimError?.code === "23505") return json({ sent: 0, duplicate: true });
     if (claimError) throw claimError;
@@ -41,16 +40,15 @@ Deno.serve(async (request) => {
     const { data: subscriptions, error: subscriptionError } = await serviceClient
       .from("push_subscriptions")
       .select("endpoint,user_id,p256dh,auth")
-      .eq("event_id", codeRequest.event_id);
+      .eq("event_id", eventRequest.event_id);
     if (subscriptionError) throw subscriptionError;
-    const { data: admins, error: adminError } = await serviceClient
+    const { data: members, error: memberError } = await serviceClient
       .from("event_members")
       .select("user_id")
-      .eq("event_id", codeRequest.event_id)
-      .eq("role", "admin");
-    if (adminError) throw adminError;
-    const adminIds = new Set((admins || []).map((admin) => admin.user_id));
-    const adminSubscriptions = (subscriptions || []).filter((subscription) => adminIds.has(subscription.user_id));
+      .eq("event_id", eventRequest.event_id);
+    if (memberError) throw memberError;
+    const memberIds = new Set((members || []).map((member) => member.user_id));
+    const memberSubscriptions = (subscriptions || []).filter((subscription) => memberIds.has(subscription.user_id));
 
     const publicKey = Deno.env.get("VAPID_PUBLIC_KEY");
     const privateKey = Deno.env.get("VAPID_PRIVATE_KEY");
@@ -58,12 +56,20 @@ Deno.serve(async (request) => {
     if (!publicKey || !privateKey) throw new Error("VAPID secrets are not configured");
     webpush.setVapidDetails(subject, publicKey, privateKey);
 
-    let details: { role?: string; requester?: string } = {};
-    try { details = JSON.parse(codeRequest.note || "{}"); } catch { /* use defaults */ }
+    let details: { role?: string; requester?: string; category?: string; details?: string } = {};
+    try { details = JSON.parse(eventRequest.note || "{}"); } catch { /* use defaults */ }
     const labels: Record<string, string> = { ref: "Referee", judge: "Judge Advisor", emcee: "Emcee" };
     const role = labels[details.role || ""] || "Volunteer";
     const requester = String(details.requester || "A volunteer").slice(0, 80);
-    const payload = JSON.stringify({
+    const isHelp = eventRequest.kind === "help_request";
+    const category = String(details.category || "Need an Admin").slice(0, 80);
+    const extra = String(details.details || "").trim().slice(0, 140);
+    const payload = JSON.stringify(isHelp ? {
+      title: `Ref OS help request · ${category}`,
+      body: `${requester}${extra ? `: ${extra}` : " requested assistance."}`,
+      tag: `refos-help-${eventRequest.id}`,
+      url: "/?open=help-request",
+    } : {
       title: "Ref OS code request",
       body: `${requester} requested a new ${role} join code.`,
       tag: `refos-code-request-${details.role || "volunteer"}`,
@@ -72,7 +78,7 @@ Deno.serve(async (request) => {
 
     let sent = 0;
     const expired: string[] = [];
-    await Promise.all(adminSubscriptions.map(async (subscription) => {
+    await Promise.all(memberSubscriptions.map(async (subscription) => {
       try {
         await webpush.sendNotification({
           endpoint: subscription.endpoint,
@@ -87,7 +93,7 @@ Deno.serve(async (request) => {
     }));
 
     if (expired.length) await serviceClient.from("push_subscriptions").delete().in("endpoint", expired);
-    await serviceClient.from("push_dispatches").update({ sent_count: sent }).eq("request_id", codeRequest.id);
+    await serviceClient.from("push_dispatches").update({ sent_count: sent }).eq("request_id", eventRequest.id);
     return json({ sent, expired: expired.length });
   } catch (error) {
     console.error(error);

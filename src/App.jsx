@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download, Save,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check, Bell, BellOff,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, QrCode, ScanLine,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, QrCode, ScanLine, LifeBuoy,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -28,6 +28,7 @@ import CountdownSetupModal from "./components/modals/CountdownSetupModal.jsx";
 import OfflineReadinessModal from "./components/modals/OfflineReadinessModal.jsx";
 import FeedbackModal from "./components/modals/FeedbackModal.jsx";
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
+import HelpRequestModal from "./components/modals/HelpRequestModal.jsx";
 
 /* This build is locked to one event: The Highlander Summit Signature Event.
    EVENT_ID must match supabase/seed.sql. A shared site password gates entry. */
@@ -569,6 +570,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showTwoDeviceSyncTest, setShowTwoDeviceSyncTest] = useState(false);
   const [showDiagnosticReport, setShowDiagnosticReport] = useState(false);
   const [showRoleCodeManager, setShowRoleCodeManager] = useState(false);
+  const [showHelpRequest, setShowHelpRequest] = useState(false);
   const [requestedRoleForManager, setRequestedRoleForManager] = useState("");
   const [lastSystemTest, setLastSystemTest] = useState(null);
   const [pushState, setPushState] = useState("checking");
@@ -617,6 +619,23 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       .filter((request) => Number(latestRoleCodeUpdates[request.role]?.createdAt || 0) <= Number(request.createdAt || 0));
   })();
   const hasPendingRoleCodeRequests = pendingRoleCodeRequests.length > 0;
+  const helpAcknowledgments = new Map();
+  for (const entry of fieldLog.filter((item) => item.kind === "help_ack")) {
+    try {
+      const value = JSON.parse(entry.note || "{}");
+      if (value.requestId) helpAcknowledgments.set(value.requestId, { ...entry, admin: value.admin || entry.by || "Admin" });
+    } catch {}
+  }
+  const latestHelpRequest = fieldLog
+    .filter((item) => item.kind === "help_request")
+    .map((entry) => {
+      try { return { ...entry, ...JSON.parse(entry.note || "{}"), acknowledgment: helpAcknowledgments.get(entry.id) || null }; }
+      catch { return { ...entry, category: "Help requested", requester: entry.by || "Volunteer", details: "", acknowledgment: helpAcknowledgments.get(entry.id) || null }; }
+    })
+    .sort((a, b) => b.createdAt - a.createdAt)[0] || null;
+  const visibleHelpRequest = latestHelpRequest && (!latestHelpRequest.acknowledgment || Date.now() - latestHelpRequest.acknowledgment.createdAt < 15000)
+    ? latestHelpRequest
+    : null;
 
   const pushSupported = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
   const refreshPushState = useCallback(async () => {
@@ -629,7 +648,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     } catch { setPushState("disabled"); }
   }, [pushSupported]);
 
-  useEffect(() => { if (adminUnlocked) refreshPushState(); }, [adminUnlocked, refreshPushState]);
+  useEffect(() => { refreshPushState(); }, [refreshPushState, role]);
 
   useEffect(() => {
     if (!adminUnlocked || new URLSearchParams(window.location.search).get("open") !== "code-requests") return;
@@ -650,7 +669,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         await api.removeAdminPushSubscription(existing.endpoint);
         await existing.unsubscribe();
         setPushState("disabled");
-        alert("Admin push alerts are off on this device.");
+      alert("Push alerts are off on this device.");
         return;
       }
       const permission = await Notification.requestPermission();
@@ -662,7 +681,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
       await api.saveAdminPushSubscription(eventId, subscription);
       setPushState("enabled");
-      alert("Admin push alerts are on for this device.");
+      alert("Push alerts are on for this device.");
     } catch (error) {
       await refreshPushState();
       alert(`Could not enable push alerts: ${error?.message || "Unknown error"}`);
@@ -1118,6 +1137,16 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     const saved = await addFieldLog({ kind: "role_code_request", note: JSON.stringify({ role: requestRole, requester: meName }) });
     api.sendRoleCodeRequestPush(saved?.id).catch((error) => console.warn("Push alert could not be sent", error));
     return saved;
+  };
+
+  const sendHelpRequest = async ({ category, details }) => {
+    const saved = await addFieldLog({ kind: "help_request", note: JSON.stringify({ category, details, requester: meName, role: myRole }) });
+    api.sendRoleCodeRequestPush(saved?.id).catch((error) => console.warn("Help push alert could not be sent", error));
+    return saved;
+  };
+
+  const acknowledgeHelpRequest = async (request) => {
+    await addFieldLog({ kind: "help_ack", note: JSON.stringify({ requestId: request.id, admin: meName }) });
   };
 
   const addElimMatch = async (m) => {
@@ -2326,6 +2355,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
                     <div className="refos-menu-section">Help &amp; Display</div>
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; Help</button>
+                <div className="refos-menu-section">Access</div>
+                <button onClick={togglePushNotifications} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{pushState === "enabled" ? <Bell size={16} /> : <BellOff size={16} />} {pushState === "enabled" ? "Push alerts on" : pushState === "blocked" ? "Push alerts blocked" : "Enable push alerts"}</button>
+                <button onClick={() => { setMenu(false); setShowHelpRequest(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LifeBuoy size={16} /> Request Help</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
                   </>
@@ -2337,6 +2369,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                     <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                     {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
                     <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
+                    <div className="refos-menu-section">Access</div>
+                    <button onClick={togglePushNotifications} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{pushState === "enabled" ? <Bell size={16} /> : <BellOff size={16} />} {pushState === "enabled" ? "Push alerts on" : pushState === "blocked" ? "Push alerts blocked" : "Enable push alerts"}</button>
+                    <button onClick={() => { setMenu(false); setShowHelpRequest(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LifeBuoy size={16} /> Request Help</button>
                     <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
                     <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
                   </>
@@ -2351,7 +2386,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
                 <div className="refos-menu-section">Access</div>
-                {adminUnlocked && <button onClick={togglePushNotifications} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{pushState === "enabled" ? <Bell size={16} /> : <BellOff size={16} />} {pushState === "enabled" ? "Push alerts on" : pushState === "blocked" ? "Push alerts blocked" : "Enable push alerts"}</button>}
+                <button onClick={togglePushNotifications} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{pushState === "enabled" ? <Bell size={16} /> : <BellOff size={16} />} {pushState === "enabled" ? "Push alerts on" : pushState === "blocked" ? "Push alerts blocked" : "Enable push alerts"}</button>
+                <button onClick={() => { setMenu(false); setShowHelpRequest(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LifeBuoy size={16} /> Request Help</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
                 <div className="border-t border-slate-100 my-1" />
@@ -2479,6 +2515,21 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
               <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{pendingRoleCodeRequests.map((request) => `${roleCodeLabels[request.role]} · ${request.requester}`).join("  •  ")}</div>
             </div>
             <button onClick={() => { setRequestedRoleForManager(pendingRoleCodeRequests[0].role); setShowRoleCodeManager(true); }} className="px-4 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-bold shrink-0">Regenerate code</button>
+          </div>
+        </div>
+      )}
+
+      {visibleHelpRequest && (
+        <div className="refos-desktop-strip max-w-2xl mx-auto px-4 pt-3">
+          <div className={`rounded-xl border-2 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3 ${visibleHelpRequest.acknowledgment ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/35" : "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/35"}`}>
+            {visibleHelpRequest.acknowledgment ? <Check size={21} className="text-emerald-700 shrink-0" /> : <LifeBuoy size={21} className="text-[#D7212B] shrink-0" />}
+            <div className="flex-1 min-w-0">
+              <div className={`text-xs font-bold uppercase tracking-wide ${visibleHelpRequest.acknowledgment ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}`}>{visibleHelpRequest.acknowledgment ? `Acknowledged by ${visibleHelpRequest.acknowledgment.admin}` : "Help requested"}</div>
+              <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{visibleHelpRequest.category || "Need an Admin"} · {visibleHelpRequest.requester || visibleHelpRequest.by || "Volunteer"}</div>
+              {visibleHelpRequest.details && <div className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">{visibleHelpRequest.details}</div>}
+            </div>
+            {adminUnlocked && !visibleHelpRequest.acknowledgment && <button onClick={() => acknowledgeHelpRequest(visibleHelpRequest)} className="px-4 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-bold shrink-0">Acknowledge</button>}
+            {!adminUnlocked && !visibleHelpRequest.acknowledgment && <span className="text-xs font-semibold text-red-700 dark:text-red-300">Waiting for Admin</span>}
           </div>
         </div>
       )}
@@ -2648,6 +2699,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       )}
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
       {showIdentity && <IdentityModal me={{ name: meName }} onSave={async (n) => { await onEditName(n); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
+      {showHelpRequest && <HelpRequestModal onSend={sendHelpRequest} onClose={() => setShowHelpRequest(false)} />}
       {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length, quadrantChecks: fieldResetChecks.length }} onClear={clearSelected} onClose={() => setShowClear(false)} />}
       {showOnline && (
         <div className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
@@ -2726,7 +2778,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Flag size={18} /> Field log</h2>
           </div>
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4">
-            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","role_code_update","feedback"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
+            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","role_code_update","help_request","help_ack","feedback"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
           </div></div>
         </div>
       )}
@@ -4019,7 +4071,7 @@ function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, f
     })();
   }, []);
 
-  const internalKinds = new Set(["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","role_code_update","feedback"]);
+  const internalKinds = new Set(["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","role_code_update","help_request","help_ack","feedback"]);
   const operationalFieldLog = (fieldLog || []).filter((e) => !internalKinds.has(e.kind));
   const report = {
     generatedAt: new Date().toISOString(),

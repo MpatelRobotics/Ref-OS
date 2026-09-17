@@ -50,10 +50,10 @@ VITE_VAPID_PUBLIC_KEY=YOUR_PUBLIC_KEY
 
 Use the same public key from step 1 and redeploy Ref OS.
 
-## 6. Enable alerts on each admin device
+## 6. Enable alerts on each volunteer device
 
-Sign in as an admin, open Settings, and tap **Enable push alerts**. Accept the device notification prompt.
+Sign in as a Referee, Judge Advisor, Emcee, or Admin, open Settings, and tap **Enable push alerts**. Accept the device notification prompt.
 
 On iPhone or iPad, Ref OS must first be installed with Safari's **Add to Home Screen** action. Open the installed Ref OS app and enable push alerts there.
 
-Each admin phone, tablet, or computer must enable alerts once. Locking Admin Access removes that account's admin role, so its saved subscription will no longer receive code request alerts.
+Each phone, tablet, or computer must enable alerts once. All subscribed event roles receive code and help request alerts so nearby volunteers can notify an Admin if needed.

@@ -1,4 +1,4 @@
--- Ref OS admin web push subscriptions
+-- Ref OS event volunteer web push subscriptions
 -- Run this file once in the Supabase SQL Editor.
 
 create table if not exists public.push_subscriptions (
@@ -18,21 +18,25 @@ create index if not exists push_subscriptions_user_idx on public.push_subscripti
 alter table public.push_subscriptions enable row level security;
 
 drop policy if exists "admins read own push subscriptions" on public.push_subscriptions;
-create policy "admins read own push subscriptions" on public.push_subscriptions for select
-  using (auth.uid() = user_id and public.has_event_role(event_id, array['admin']));
+drop policy if exists "members read own push subscriptions" on public.push_subscriptions;
+create policy "members read own push subscriptions" on public.push_subscriptions for select
+  using (auth.uid() = user_id and public.has_event_role(event_id, array['ref','judge','emcee','admin']));
 
 drop policy if exists "admins create own push subscriptions" on public.push_subscriptions;
-create policy "admins create own push subscriptions" on public.push_subscriptions for insert
-  with check (auth.uid() = user_id and public.has_event_role(event_id, array['admin']));
+drop policy if exists "members create own push subscriptions" on public.push_subscriptions;
+create policy "members create own push subscriptions" on public.push_subscriptions for insert
+  with check (auth.uid() = user_id and public.has_event_role(event_id, array['ref','judge','emcee','admin']));
 
 drop policy if exists "admins update own push subscriptions" on public.push_subscriptions;
-create policy "admins update own push subscriptions" on public.push_subscriptions for update
-  using (auth.uid() = user_id and public.has_event_role(event_id, array['admin']))
-  with check (auth.uid() = user_id and public.has_event_role(event_id, array['admin']));
+drop policy if exists "members update own push subscriptions" on public.push_subscriptions;
+create policy "members update own push subscriptions" on public.push_subscriptions for update
+  using (auth.uid() = user_id and public.has_event_role(event_id, array['ref','judge','emcee','admin']))
+  with check (auth.uid() = user_id and public.has_event_role(event_id, array['ref','judge','emcee','admin']));
 
 drop policy if exists "admins delete own push subscriptions" on public.push_subscriptions;
-create policy "admins delete own push subscriptions" on public.push_subscriptions for delete
-  using (auth.uid() = user_id and public.has_event_role(event_id, array['admin']));
+drop policy if exists "members delete own push subscriptions" on public.push_subscriptions;
+create policy "members delete own push subscriptions" on public.push_subscriptions for delete
+  using (auth.uid() = user_id and public.has_event_role(event_id, array['ref','judge','emcee','admin']));
 
 create table if not exists public.push_dispatches (
   request_id uuid primary key references public.field_log(id) on delete cascade,

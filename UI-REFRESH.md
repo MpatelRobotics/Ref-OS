@@ -48,4 +48,6 @@ Key Volunteer Status now uses the same mobile safe sheet behavior. Its roster sc
 
 The admin push alert control is grouped under Access in the settings menu with the other login, invitation, and permission controls.
 
+Push alert enrollment is now available to Referees, Judge Advisors, Emcees, and Admins. Every role can send a categorized help request, all subscribed event members receive the notification, and an Admin acknowledgment updates live for the entire crew.
+
 Tablet and desktop online presence retain the full avatar stack.

@@ -97,13 +97,19 @@ Signed in volunteers can view and share only the code for their own role. Admini
 
 If a volunteer needs a replacement code, they can request regeneration from inside the app. The request appears for administrators in real time.
 
-## Admin push notifications
+## Push notifications
 
-Administrators can enable device push alerts from the Access section of Settings. When a volunteer requests a new role code, subscribed admin phones, tablets, and computers receive a notification even when Ref OS is not open.
+Referees, Judge Advisors, Emcees, and Administrators can enable device push alerts from the Access section of Settings. When a volunteer requests a new role code or sends a help request, subscribed phones, tablets, and computers receive a notification even when Ref OS is not open.
 
 Tapping the notification opens Ref OS directly to role code management. The normal live in-app request remains available as a fallback.
 
 On iPhone and iPad, Ref OS must be installed through Add to Home Screen before push notifications can be enabled.
+
+## Request Help and acknowledgment
+
+Every role can send a help request for an Admin, field issue, rules question, medical assistance, or volunteer replacement. The request appears live across the event workspace and is delivered to every subscribed volunteer device.
+
+An Admin can acknowledge the request once. Everyone then sees who acknowledged it, preventing multiple volunteers from responding to the same issue unnecessarily.
 
 ## Announcements and event countdown
 
@@ -161,4 +167,3 @@ Volunteer names, event records, device subscriptions, and operational data are s
 Private Beta
 
 Created by Maharshi Patel for Highlander Summit event operations.
-
