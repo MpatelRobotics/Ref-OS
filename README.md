@@ -2,15 +2,15 @@
 
 **Referee Operating System for live VEX Robotics events**
 
-Ref OS is a shared event operations workspace built for The Highlander Summit Signature Event 2026. It gives Referees, Judge Advisors, Emcees, and Event Administrators one live place to coordinate match activity, record violations, monitor field readiness, share role information, and respond to event-day issues.
+Ref OS is a shared event operations workspace built for the Highlander Summit Signature Event. It gives referees, Judge Advisors, Emcees, and event administrators one live place to coordinate match activity, record violations, monitor field readiness, share role information, and respond to event day issues.
 
 Ref OS 1.2.0 is a private beta created by Maharshi Patel.
 
 ## One live event workspace
 
-Everyone works from the same event record. Updates one volunteer makes appear for the rest of the staff within seconds, helping field and judging teams stay aligned without passing around separate spreadsheets, paper logs, or chat messages.
+Everyone works from the same event record. Updates made by one volunteer appear for the rest of the crew within seconds, helping field and judging teams stay aligned without passing around separate spreadsheets, paper logs, or chat messages.
 
-The interface adapts to phones, tablets, and desktop devices. Mobile devices use quick bottom navigation and touch-friendly sheets. Desktop devices use a wider operations layout with persistent navigation and event tools.
+The interface adapts to phones, tablets, and desktop operations stations. Mobile devices use quick bottom navigation and touch friendly sheets. Desktop devices use a wider operations layout with persistent navigation and event tools.
 
 ## Volunteer roles
 
@@ -24,11 +24,11 @@ Judge Advisors receive a focused judging workspace for award nominations, finali
 
 ### Emcee
 
-Emcees receive the event information and match views they need without referee-only editing controls. They can share only the Emcee join code.
+Emcees receive the event information and match views they need without referee only editing controls. They can share only the Emcee join code.
 
 ### Admin
 
-Admins manage event-wide tools, volunteer access, announcements, countdowns, data imports, exports, role codes, system checks, field logs, and event cleanup. Admin access is enforced separately from normal volunteer roles.
+Admins manage event wide tools, volunteer access, announcements, countdowns, data imports, exports, role codes, system checks, field logs, and event cleanup. Admin access is enforced separately from normal volunteer roles.
 
 ## Match Center
 
@@ -41,7 +41,7 @@ Volunteers can:
 * View red and blue alliance teams
 * Open individual match details
 * Track replays and field faults
-* Record match-related violations
+* Record match related violations
 * Review qualification and elimination activity
 
 When match data is available, Match Center becomes the default event workspace.
@@ -101,7 +101,7 @@ If a volunteer needs a replacement code, they can request regeneration from insi
 
 Referees, Judge Advisors, Emcees, and Administrators can enable device push alerts from the Access section of Settings. When a volunteer requests a new role code or sends a help request, subscribed phones, tablets, and computers receive a notification even when Ref OS is not open.
 
-Tapping the notification opens Ref OS directly to role code management. The normal live in-app request remains available as a fallback.
+Tapping the notification opens Ref OS directly to role code management. The normal live in app request remains available as a fallback.
 
 On iPhone and iPad, Ref OS must be installed through Add to Home Screen before push notifications can be enabled.
 
@@ -113,15 +113,15 @@ An Admin can acknowledge the request once. Everyone then sees who acknowledged i
 
 ## Announcements and event countdown
 
-Admins can publish key volunteer announcements that appear across connected devices. Admins can also configure an event countdown for the next major event milestone, and it stays synchronized across every role.
+Admins can publish key volunteer announcements that appear across connected devices. An event countdown can also be configured for the next major event milestone and remains synchronized for every role.
 
 ## Event contact directory
 
-The shared contact directory keeps important event contacts available inside Ref OS. This reduces the need to search through separate messages when a volunteer needs quick operational help.
+The shared contact directory keeps important event contacts available inside Ref OS. This reduces the need to search through separate messages when a volunteer needs operational help quickly.
 
 ## Rules and reference material
 
-The Rules workspace provides searchable rule information and favorites for quick access on event day. Ref OS also includes offline-friendly access to the game manual and Quick Reference Guide with navigation controls for important sections.
+The Rules workspace provides searchable rule information and favorites for quick event day access. Ref OS also includes offline friendly access to the game manual and Quick Reference Guide with navigation controls for important sections.
 
 ## Offline resilience
 
@@ -131,32 +131,32 @@ New violation entries are saved on the device immediately and queued for upload 
 
 Offline support protects new entries created on that device. Viewing brand new information entered by other volunteers still requires a connection.
 
-## Real-time synchronization
+## Realtime synchronization
 
 Connected devices receive event changes through the shared cloud workspace. Important role code updates also use a short polling fallback so mobile devices can recover when realtime delivery is interrupted.
 
 ## Reports and exports
 
-Administrators can export event information for review and record-keeping, including violation data, field activity, judging information, match anomalies, and event summaries.
+Administrators can export event information for review and record keeping, including violation data, field activity, judging information, match anomalies, and event summaries.
 
 ## Event day safety
 
 Ref OS includes safeguards intended to reduce accidental event disruption:
 
-* Admin-protected destructive controls
+* Admin protected destructive controls
 * Selective Clear Data options
 * Confirmation before permanent deletion
-* Server-enforced event roles
-* Role-limited join code visibility
+* Server enforced event roles
+* Role limited join code visibility
 * Offline write queues
 * Live synchronization indicators
-* Pre-event system test
+* Pre Event System Test
 * Diagnostic reporting
 * Service worker update notifications
 
 ## Privacy and access
 
-Ref OS is intended for authorized Highlander Summit volunteers. Share join codes and Admin credentials only with people assigned to the corresponding event role.
+Ref OS is intended for authorized Highlander Summit volunteers. Join codes and Admin credentials should be shared only with people assigned to the corresponding event role.
 
 Volunteer names, event records, device subscriptions, and operational data are stored only for running the shared event workspace. Push notification private keys remain on the server and are never exposed to the browser.
 
