@@ -50,4 +50,6 @@ The admin push alert control is grouped under Access in the settings menu with t
 
 Push alert enrollment is now available to Referees, Judge Advisors, Emcees, and Admins. Every role can send a categorized help request, all subscribed event members receive the notification, and an Admin acknowledgment updates live for the entire crew.
 
+Help requests require a location so responders know where to go. Field 1, Field 2, Field 3, Pit Floor, Competition Floor, Skills, Judging, and Other are available, and the selected location appears in both the shared banner and push alert.
+
 Tablet and desktop online presence retain the full avatar stack.

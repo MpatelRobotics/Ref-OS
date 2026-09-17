@@ -107,7 +107,7 @@ On iPhone and iPad, Ref OS must be installed through Add to Home Screen before p
 
 ## Request Help and acknowledgment
 
-Every role can send a help request for an Admin, field issue, rules question, medical assistance, or volunteer replacement. The request appears live across the event workspace and is delivered to every subscribed volunteer device.
+Every role can send a help request for an Admin, field issue, rules question, medical assistance, or volunteer replacement. Each request identifies Field 1, Field 2, Field 3, Pit Floor, Competition Floor, Skills, Judging, or another location. The request appears live across the event workspace and is delivered to every subscribed volunteer device.
 
 An Admin can acknowledge the request once. Everyone then sees who acknowledged it, preventing multiple volunteers from responding to the same issue unnecessarily.
 

@@ -9,8 +9,20 @@ const CATEGORIES = [
   "Volunteer replacement needed",
 ];
 
+const LOCATIONS = [
+  "Field 1",
+  "Field 2",
+  "Field 3",
+  "Pit Floor",
+  "Competition Floor",
+  "Skills",
+  "Judging",
+  "Other",
+];
+
 export default function HelpRequestModal({ onSend, onClose }) {
   const [category, setCategory] = useState("Need an Admin");
+  const [location, setLocation] = useState("");
   const [details, setDetails] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
@@ -19,7 +31,8 @@ export default function HelpRequestModal({ onSend, onClose }) {
     setSending(true);
     setError("");
     try {
-      await onSend({ category, details: details.trim() });
+      if (!location) { setError("Choose where help is needed."); setSending(false); return; }
+      await onSend({ category, location, details: details.trim() });
       onClose();
     } catch (requestError) {
       setError(requestError?.message || "Could not send the help request.");
@@ -44,15 +57,23 @@ export default function HelpRequestModal({ onSend, onClose }) {
               </button>
             ))}
           </div>
+          <div className="mt-4 text-xs font-bold uppercase tracking-wide text-slate-500">Where is help needed?</div>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {LOCATIONS.map((item) => (
+              <button key={item} onClick={() => setLocation(item)} className={`min-h-11 px-3 py-2 rounded-xl border-2 text-left text-sm font-semibold ${location === item ? "border-[#D7212B] bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-200" : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"}`}>
+                {item}
+              </button>
+            ))}
+          </div>
           <label className="block mt-4 text-xs font-bold uppercase tracking-wide text-slate-500">Details optional</label>
-          <textarea value={details} onChange={(event) => setDetails(event.target.value)} maxLength={240} rows={3} placeholder="Field, match, location, or what you need"
+          <textarea value={details} onChange={(event) => setDetails(event.target.value)} maxLength={240} rows={3} placeholder="Match number, nearby landmark, or what you need"
             className="mt-1 w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-100" />
           {category === "Medical assistance" && <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 flex gap-2"><AlertTriangle size={16} className="shrink-0" />For an emergency, contact venue emergency services immediately. Do not rely only on Ref OS.</div>}
           {error && <div className="mt-3 text-sm font-semibold text-red-700 dark:text-red-300">{error}</div>}
         </div>
         <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex gap-2 shrink-0" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
           <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-semibold">Cancel</button>
-          <button onClick={submit} disabled={sending} className="flex-1 rounded-lg bg-[#D7212B] text-white py-2.5 font-bold disabled:opacity-60">{sending ? "Sending…" : "Send Help Request"}</button>
+          <button onClick={submit} disabled={sending || !location} className="flex-1 rounded-lg bg-[#D7212B] text-white py-2.5 font-bold disabled:opacity-60">{sending ? "Sending…" : "Send Help Request"}</button>
         </div>
       </div>
     </div>

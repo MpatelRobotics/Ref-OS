@@ -1139,8 +1139,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     return saved;
   };
 
-  const sendHelpRequest = async ({ category, details }) => {
-    const saved = await addFieldLog({ kind: "help_request", note: JSON.stringify({ category, details, requester: meName, role: myRole }) });
+  const sendHelpRequest = async ({ category, location, details }) => {
+    const saved = await addFieldLog({ kind: "help_request", note: JSON.stringify({ category, location, details, requester: meName, role: myRole }) });
     api.sendRoleCodeRequestPush(saved?.id).catch((error) => console.warn("Help push alert could not be sent", error));
     return saved;
   };
@@ -2525,7 +2525,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             {visibleHelpRequest.acknowledgment ? <Check size={21} className="text-emerald-700 shrink-0" /> : <LifeBuoy size={21} className="text-[#D7212B] shrink-0" />}
             <div className="flex-1 min-w-0">
               <div className={`text-xs font-bold uppercase tracking-wide ${visibleHelpRequest.acknowledgment ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}`}>{visibleHelpRequest.acknowledgment ? `Acknowledged by ${visibleHelpRequest.acknowledgment.admin}` : "Help requested"}</div>
-              <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{visibleHelpRequest.category || "Need an Admin"} · {visibleHelpRequest.requester || visibleHelpRequest.by || "Volunteer"}</div>
+              <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{visibleHelpRequest.category || "Need an Admin"} · {visibleHelpRequest.location || "Location not provided"}</div>
+              <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">Requested by {visibleHelpRequest.requester || visibleHelpRequest.by || "Volunteer"}</div>
               {visibleHelpRequest.details && <div className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">{visibleHelpRequest.details}</div>}
             </div>
             {adminUnlocked && !visibleHelpRequest.acknowledgment && <button onClick={() => acknowledgeHelpRequest(visibleHelpRequest)} className="px-4 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-bold shrink-0">Acknowledge</button>}

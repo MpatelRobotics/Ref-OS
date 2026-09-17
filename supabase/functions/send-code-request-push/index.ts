@@ -56,17 +56,18 @@ Deno.serve(async (request) => {
     if (!publicKey || !privateKey) throw new Error("VAPID secrets are not configured");
     webpush.setVapidDetails(subject, publicKey, privateKey);
 
-    let details: { role?: string; requester?: string; category?: string; details?: string } = {};
+    let details: { role?: string; requester?: string; category?: string; location?: string; details?: string } = {};
     try { details = JSON.parse(eventRequest.note || "{}"); } catch { /* use defaults */ }
     const labels: Record<string, string> = { ref: "Referee", judge: "Judge Advisor", emcee: "Emcee" };
     const role = labels[details.role || ""] || "Volunteer";
     const requester = String(details.requester || "A volunteer").slice(0, 80);
     const isHelp = eventRequest.kind === "help_request";
     const category = String(details.category || "Need an Admin").slice(0, 80);
+    const location = String(details.location || "Location not provided").slice(0, 80);
     const extra = String(details.details || "").trim().slice(0, 140);
     const payload = JSON.stringify(isHelp ? {
       title: `Ref OS help request · ${category}`,
-      body: `${requester}${extra ? `: ${extra}` : " requested assistance."}`,
+      body: `${location} · ${requester}${extra ? `: ${extra}` : " requested assistance."}`,
       tag: `refos-help-${eventRequest.id}`,
       url: "/?open=help-request",
     } : {
