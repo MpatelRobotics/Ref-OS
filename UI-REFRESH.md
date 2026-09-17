@@ -46,6 +46,8 @@ The Clear Data panel now scrolls independently on phones, renders above the fixe
 
 Key Volunteer Status now uses the same mobile safe sheet behavior. Its roster scrolls independently above the bottom navigation while the title and close control remain visible.
 
+Admins can assign signed in volunteers to Field 1, Field 2, Field 3, Pit Floor, Competition Floor, Skills, or Judging from Key Volunteer Status. Volunteers see their own assignment in a live workspace card, and assignment changes synchronize across devices through shared event settings.
+
 The admin push alert control is grouped under Access in the settings menu with the other login, invitation, and permission controls.
 
 Push alert enrollment is now available to Referees, Judge Advisors, Emcees, and Admins. Every role can send a categorized help request, all subscribed event members receive the notification, and an Admin acknowledgment updates live for the entire crew.

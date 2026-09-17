@@ -3,7 +3,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download, Save,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check, Bell, BellOff,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, QrCode, ScanLine, LifeBuoy,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, QrCode, ScanLine, LifeBuoy, MapPin,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -484,6 +484,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [rules, setRules] = useState([]);      // [{ code, desc, category }]
   const [presence, setPresence] = useState([]); // [{ name, ... }] currently online
   const [refRoster, setRefRoster] = useState([]); // refs seen at this event, including offline
+  const [currentUserId, setCurrentUserId] = useState(null);
   const pendingCount = viols.filter((v) => v._pending).length;
 
   const [lastMatch, setLastMatch] = useState(() => {
@@ -533,6 +534,10 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [fieldLog, setFieldLog] = useState([]);
   const [fieldResetChecks, setFieldResetChecks] = useState([]);
   const [eventSettings, setEventSettings] = useState({});
+  const volunteerAssignments = eventSettings?.volunteer_assignments?.value || {};
+  const myAssignment = volunteerAssignments[currentUserId]?.location || Object.values(volunteerAssignments).find((assignment) =>
+    (assignment?.name || "").trim().toLowerCase() === (meName || "").trim().toLowerCase()
+  )?.location || "";
   const [failedSyncItems, setFailedSyncItems] = useState([]);
   const announcements = fieldLog.filter((e) => e.kind === "announcement").sort((a,b) => b.createdAt - a.createdAt);
   const activeAnnouncement = announcements.find((e) => {
@@ -826,6 +831,29 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     try { setEventMembers(await api.listEventMembersForAdmin(eventId)); }
     catch { setEventMembers([]); }
   }, [adminUnlocked, eventId]);
+
+  useEffect(() => {
+    api.getCurrentUserId().then(setCurrentUserId).catch(() => setCurrentUserId(null));
+  }, [eventId]);
+
+  const openVolunteerStatus = () => {
+    api.listRefRoster(eventId).then(setRefRoster);
+    if (adminUnlocked) loadEventMembers();
+    setShowOnline(true);
+  };
+
+  const setVolunteerAssignment = async (member, location) => {
+    if (!member?.user_id || !adminUnlocked) return;
+    const next = { ...volunteerAssignments };
+    if (!location) delete next[member.user_id];
+    else next[member.user_id] = { location, name: member.name || "Volunteer", updatedAt: Date.now() };
+    try {
+      const saved = await api.upsertEventSetting(eventId, "volunteer_assignments", next, meName);
+      setEventSettings((current) => ({ ...current, volunteer_assignments: saved }));
+    } catch (error) {
+      alert(error?.message || "Could not update the volunteer assignment.");
+    }
+  };
 
   const setVolunteerAdmin = async (member, makeAdmin) => {
     if (!member?.user_id) return;
@@ -2332,7 +2360,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
               {teams.length} teams · {viols.length} violations · synced {ago(syncedAt)}
             </button>
           </div>
-          <OnlineCluster presence={presence} onClick={() => setShowOnline(true)} />
+          <OnlineCluster presence={presence} onClick={openVolunteerStatus} />
           {!isJudge && !isEmcee && <button onClick={() => setShowByRule(true)} title="By rule" className="p-1.5 rounded hover:bg-white/10"><BarChart3 size={18} /></button>}
           <button onClick={() => setShowIdentity(true)} title="Your full name"
             className="refos-user-chip flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-full pl-1 pr-2.5 py-1">
@@ -2380,7 +2408,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
                 <div className="refos-menu-section">Event</div>
                 {adminUnlocked && <button onClick={() => { setMenu(false); loadEventMembers(); setShowCommandCenter(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Event Command Center</button>}
                 <button onClick={() => { setMenu(false); setShowContactDirectory(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Contact size={16} /> Event Contact Directory</button>
-                <button onClick={() => { setMenu(false); api.listRefRoster(eventId).then(setRefRoster); if (adminUnlocked) loadEventMembers(); setShowOnline(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Key Volunteer Status</button>
+                <button onClick={() => { setMenu(false); openVolunteerStatus(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Key Volunteer Status</button>
                 <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field Log</button>
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; help</button>
                 <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
@@ -2516,6 +2544,18 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             </div>
             <button onClick={() => { setRequestedRoleForManager(pendingRoleCodeRequests[0].role); setShowRoleCodeManager(true); }} className="px-4 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-bold shrink-0">Regenerate code</button>
           </div>
+        </div>
+      )}
+      {myAssignment && !openTeam && !openMatch && !openRobot && (
+        <div className="refos-desktop-strip max-w-2xl mx-auto px-4 pt-3">
+          <button onClick={openVolunteerStatus} className="w-full rounded-xl border border-sky-300 dark:border-sky-700 bg-sky-50 dark:bg-sky-950/35 px-4 py-3 flex items-center gap-3 text-left">
+            <MapPin size={20} className="text-sky-700 dark:text-sky-300 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-[11px] uppercase tracking-wide font-bold text-sky-700 dark:text-sky-300">Your assignment</div>
+              <div className="font-bold text-slate-900 dark:text-slate-100">{myAssignment}</div>
+            </div>
+            <span className="text-xs font-semibold text-sky-700 dark:text-sky-300">View crew</span>
+          </button>
         </div>
       )}
 
@@ -2709,7 +2749,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
               <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Users size={18} /> Key Volunteer Status</h2>
               <button onClick={() => setShowOnline(false)} className="text-slate-400"><X size={22} /></button>
             </div>
-            <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}><OnlineList presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} eventMembers={eventMembers} onSetAdmin={adminUnlocked ? setVolunteerAdmin : undefined} /></div>
+            <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}><OnlineList presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} eventMembers={eventMembers} onSetAdmin={adminUnlocked ? setVolunteerAdmin : undefined} assignments={volunteerAssignments} onSetAssignment={adminUnlocked ? setVolunteerAssignment : undefined} /></div>
           </div>
         </div>
       )}
@@ -4235,7 +4275,9 @@ function roleChip(role) {
   }
 }
 
-function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onSetAdmin }) {
+const VOLUNTEER_LOCATIONS = ["Field 1", "Field 2", "Field 3", "Pit Floor", "Competition Floor", "Skills", "Judging"];
+
+function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onSetAdmin, assignments = {}, onSetAssignment }) {
   const onlineCounts = {};
   const roleByName = {};
   const userIdByName = {};
@@ -4265,8 +4307,9 @@ function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onS
           );
           const adminTarget = member || (presenceUserId ? { user_id: presenceUserId, role: String(roleByName[r.name] || r.role || "").toLowerCase() } : null);
           const role = member?.role === "admin" ? "Admin" : (roleByName[r.name] || r.role || "");
+          const assignment = member?.user_id ? assignments[member.user_id]?.location || "" : "";
           return (
-            <li key={r.name} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3">
+            <li key={r.name} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex flex-wrap items-center gap-3">
               <span className={`w-8 h-8 rounded-full text-white text-xs font-bold grid place-items-center shrink-0 ${isOnline ? "bg-[#D7212B]" : "bg-slate-400"}`}>{initials(r.name)}</span>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -4274,6 +4317,7 @@ function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onS
                   {role && <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md border shrink-0 ${roleChip(role)}`}>{role}</span>}
                 </div>
                 {!isOnline && r.lastSeen > 0 && <div className="text-[11px] text-slate-400">last seen {ago(r.lastSeen)}</div>}
+                {assignment && <div className="text-[11px] font-semibold text-sky-700 dark:text-sky-300 flex items-center gap-1 mt-0.5"><MapPin size={11}/>{assignment}</div>}
               </div>
               <span className={`ml-auto inline-flex items-center gap-1 text-xs shrink-0 ${isOnline ? "text-emerald-600" : "text-slate-400"}`}>
                 <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500" : "bg-slate-300"}`} />
@@ -4288,6 +4332,16 @@ function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onS
               )}
               {onRemove && !isOnline && (
                 <button onClick={() => { if (confirm(`Remove ${r.name} from the volunteer list?`)) onRemove(r.name); }} className="refos-destructive-icon shrink-0" title="Remove volunteer"><Trash2 size={15} /></button>
+              )}
+              {onSetAssignment && member?.user_id && (
+                <label className="w-full flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+                  <MapPin size={15} className="text-slate-400 shrink-0" />
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-300 shrink-0">Assignment</span>
+                  <select value={assignment} onChange={(event) => onSetAssignment(member, event.target.value)} className="ml-auto min-w-0 flex-1 max-w-[190px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-100">
+                    <option value="">Unassigned</option>
+                    {VOLUNTEER_LOCATIONS.map((location) => <option key={location} value={location}>{location}</option>)}
+                  </select>
+                </label>
               )}
             </li>
           );

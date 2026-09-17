@@ -85,7 +85,9 @@ The Event Command Center centralizes administrator tools and event health inform
 
 ## Key Volunteer Status
 
-The live volunteer view shows who is online, who has previously joined, their role, device presence, and last seen status. Administrators can promote an eligible online volunteer to Admin without sharing the Admin password.
+The live volunteer view shows who is online, who has previously joined, their role, device presence, last seen status, and current event assignment. Administrators can assign volunteers to Field 1, Field 2, Field 3, Pit Floor, Competition Floor, Skills, or Judging. They can also promote an eligible online volunteer to Admin without sharing the Admin password.
+
+Each volunteer receives a synchronized assignment card in their workspace. Assignment changes appear automatically without requiring the volunteer to close or restart Ref OS.
 
 On phones, the header uses a compact online volunteer count. Tapping it opens the complete scrollable status list.
 

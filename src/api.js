@@ -56,6 +56,12 @@ export async function getMyEventRole(eventId) {
   return data?.role || null;
 }
 
+export async function getCurrentUserId() {
+  if (E2E_MOCK) return "e2e-user";
+  const { data } = await supabase.auth.getSession();
+  return data?.session?.user?.id || null;
+}
+
 export async function setEventMemberName(eventId, name) {
   if (E2E_MOCK) return;
   const { error } = await supabase.rpc("set_my_event_member_name", {
