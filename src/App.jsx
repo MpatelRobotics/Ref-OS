@@ -3460,9 +3460,9 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
               <button onClick={() => onOpen(m.id)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-14 shrink-0">{rowLabel(m)}</span>
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
-                  <span className="text-red-700 font-semibold">{m.red.join("  ")}</span>
-                  <span className="text-slate-300 font-sans">vs</span>
-                  <span className="text-blue-700 font-semibold">{m.blue.join("  ")}</span>
+                  <span className="text-red-700 dark:text-red-300 font-semibold">{m.red.join("  ")}</span>
+                  <span className="text-slate-300 dark:text-slate-400 font-sans">vs</span>
+                  <span className="text-blue-700 dark:text-blue-300 font-semibold">{m.blue.join("  ")}</span>
                 </div>
                 {m.field && <span className="text-[11px] text-slate-400 shrink-0">{m.field.replace("Field ", "F")}</span>}
                 {m.redScore != null && m.blueScore != null && (
@@ -3649,8 +3649,8 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
     else stat[t].codes["—"] = (stat[t].codes["—"] || 0) + 1;
   }
   const Alliance = ({ label, teams, color }) => (
-    <div className={`rounded-xl border p-3 ${color === "red" ? "bg-red-50 border-red-200" : "bg-blue-50 border-blue-200"}`}>
-      <p className={`text-xs font-bold uppercase tracking-wide mb-2 ${color === "red" ? "text-red-700" : "text-blue-700"}`}>{label}</p>
+    <div className={`rounded-xl border p-3 ${color === "red" ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800" : "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"}`}>
+      <p className={`text-xs font-bold uppercase tracking-wide mb-2 ${color === "red" ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}>{label}</p>
       <div className="space-y-2">
         {teams.map((n) => {
           const s = stat[n];

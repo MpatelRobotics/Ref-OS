@@ -1,4 +1,4 @@
-const CACHE = "refos-v25-1.2.0-help-request-locations";
+const CACHE = "refos-v26-1.2.0-dark-alliance-colors";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
