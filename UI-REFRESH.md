@@ -42,4 +42,10 @@ The phone header now shows one compact online volunteer count instead of an expa
 
 Admins can enable true web push alerts per device. A role code regeneration request calls a secured Supabase Edge Function, which verifies the saved request, sends a high priority notification only to current event admins, removes expired subscriptions, and opens the requested role directly in code management when tapped. The existing live in app request remains available as a fallback.
 
+The Clear Data panel now scrolls independently on phones, renders above the fixed bottom navigation, respects the device safe area, and keeps its header and Delete Selected controls accessible while the option list scrolls.
+
+Key Volunteer Status now uses the same mobile safe sheet behavior. Its roster scrolls independently above the bottom navigation while the title and close control remain visible.
+
+The admin push alert control is grouped under Access in the settings menu with the other login, invitation, and permission controls.
+
 Tablet and desktop online presence retain the full avatar stack.
