@@ -56,7 +56,9 @@ Violation history is available by team, match, rule, and event activity. Repeate
 
 The Teams workspace combines the event roster with violation totals, rankings, watch information, and quick access to team history.
 
-The Robots workspace supports inspection and event documentation photos. Images are compressed on the device before upload to reduce transfer time and storage use.
+The Robots workspace requires three labeled inspection pictures for every team: Front, Back, and Side. Each team card shows picture completion, and the team view provides a dedicated capture slot for every required angle. Earlier unlabeled pictures remain available for reference.
+
+Images are compressed on the device before upload to reduce transfer time and storage use. Pictures captured without a connection are saved in the device outbox, shown immediately as queued, and uploaded automatically after connectivity returns.
 
 ## Field operations
 
@@ -129,7 +131,7 @@ The Rules workspace provides searchable rule information and favorites for quick
 
 Ref OS is designed for competition venues where WiFi and cellular service may be inconsistent.
 
-New violation entries are saved on the device immediately and queued for upload when a connection is unavailable. Pending entries synchronize automatically after connectivity returns. The interface shows connection health, pending activity, and the most recent successful synchronization.
+New violation entries and required inspection pictures are saved on the device immediately and queued for upload when a connection is unavailable. Pending entries synchronize automatically after connectivity returns. The interface shows connection health, pending activity, and the most recent successful synchronization.
 
 Offline support protects new entries created on that device. Viewing brand new information entered by other volunteers still requires a connection.
 

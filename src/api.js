@@ -339,14 +339,16 @@ export async function deleteTeam(eventId, number) {
 }
 
 /* ---- robot inspection photos (stored on the team) ---- */
-export async function addTeamPhoto(eventId, number, dataUrl) {
+export async function addTeamPhoto(eventId, number, dataUrl, angle = "other", uploadId = "") {
   const num = (number || "").trim().toUpperCase();
-  const id = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
-  const path = `${eventId}/team/${num}/${id}.jpg`;
+  const safeAngle = ["front", "back", "side"].includes(String(angle).toLowerCase()) ? String(angle).toLowerCase() : "other";
+  const id = uploadId || ((self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2));
+  const path = `${eventId}/team/${num}/${safeAngle}-${id}.jpg`;
   const up = await supabase.storage.from("robot-photos").upload(path, dataURLtoBlob(dataUrl), { contentType: "image/jpeg", upsert: true });
   if (up.error) throw up.error;
   const { data: t } = await supabase.from("teams").select("photo_paths").eq("event_id", eventId).eq("number", num).single();
-  const paths = [...((t && t.photo_paths) || []), path];
+  const current = ((t && t.photo_paths) || []);
+  const paths = current.includes(path) ? current : [...current, path];
   const { error } = await supabase.from("teams").update({ photo_paths: paths }).eq("event_id", eventId).eq("number", num);
   if (error) throw error;
   return paths;

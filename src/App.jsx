@@ -879,11 +879,15 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     setSyncing(true);
     setAlliancesLoaded(false);
     try {
-      const [ev, t, v, nm, sl, wn] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), api.listViolations(eventId), api.listNominations(eventId), api.listShortlist(eventId), api.listWatchNotes(eventId)]);
+      const [ev, t, v, nm, sl, wn, queuedOps] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), api.listViolations(eventId), api.listNominations(eventId), api.listShortlist(eventId), api.listWatchNotes(eventId), outbox.loadQueue(eventId)]);
       if (ev) setEvent(ev);
       setTeams((cur) => {
         const pending = cur.filter((x) => x._pending && !t.some((s) => s.number === x.number));
-        return [...t, ...pending];
+        const queuedPhotos = (queuedOps || []).filter((op) => op.kind === "robot_photo");
+        return [...t, ...pending].map((team) => ({
+          ...team,
+          _pendingRobotPhotos: queuedPhotos.filter((op) => op.number === team.number).map((op) => ({ id: op.id, angle: op.angle, dataUrl: op.dataUrl })),
+        }));
       });
       setViols((cur) => { const pend = cur.filter((x) => x._pending && !v.some((s) => s.id === x.id)); return [...pend, ...v]; });
       setNoms(nm);
@@ -912,6 +916,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     await outbox.flush(eventId, {
       onSynced: (saved) => setViols((cur) => cur.map((x) => (x.id === saved.id ? saved : x))),
       onTeamSynced: (number) => setTeams((cur) => cur.map((x) => x.number === number ? { ...x, _pending: false } : x)),
+      onRobotPhotoSynced: (op, paths) => setTeams((cur) => cur.map((team) => team.number === op.number ? {
+        ...team,
+        photoKeys: paths,
+        _pendingRobotPhotos: (team._pendingRobotPhotos || []).filter((photo) => photo.id !== op.id),
+      } : team)),
       onFailed: (op, e) => {
         console.error("outbox op retained as failed", op, e);
         outbox.loadFailed(eventId).then(setFailedSyncItems).catch(() => {});
@@ -1080,9 +1089,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to remove this note."); return; } throw e; }
   };
 
-  const addRobotPhoto = async (number, dataUrl) => {
-    const paths = await api.addTeamPhoto(eventId, number, dataUrl);
-    setTeams((cur) => cur.map((t) => (t.number === number ? { ...t, photoKeys: paths } : t)));
+  const addRobotPhoto = async (number, dataUrl, angle) => {
+    const id = api.uid();
+    const pendingPhoto = { id, angle, dataUrl };
+    setTeams((cur) => cur.map((team) => team.number === number ? { ...team, _pendingRobotPhotos: [...(team._pendingRobotPhotos || []), pendingPhoto] } : team));
+    await outbox.enqueue(eventId, { id, kind: "robot_photo", eventId, number, angle, dataUrl, createdAt: Date.now() });
+    await refreshQueueHealth();
+    doFlush();
   };
   const removeRobotPhoto = async (number, path) => {
     try {
@@ -1092,6 +1105,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       if (outbox.isOffline(e)) { alert("You're offline — reconnect to delete this photo."); return; }
       throw e;
     }
+  };
+  const removePendingRobotPhoto = async (number, id) => {
+    await outbox.removeOp(eventId, id);
+    setTeams((cur) => cur.map((team) => team.number === number ? { ...team, _pendingRobotPhotos: (team._pendingRobotPhotos || []).filter((photo) => photo.id !== id) } : team));
+    refreshQueueHealth();
   };
   const addNomination = async (form) => {
     try {
@@ -2631,7 +2649,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={(n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} emcee={isEmcee} />
         ) : openRobot ? (
-          <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onOpenPhoto={setLightbox} emcee={isEmcee} />
+          <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : view === "matches" ? (
           <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} onOpenAwp={() => setView("awp")} />
         ) : view === "robots" ? (
@@ -4353,14 +4371,31 @@ function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onS
 }
 
 /* ============================ ROBOTS (inspection photos) ============================ */
+const REQUIRED_ROBOT_ANGLES = [
+  { key: "front", label: "Front" },
+  { key: "back", label: "Back" },
+  { key: "side", label: "Side" },
+];
+
+function robotPhotoAngle(path) {
+  const match = String(path || "").match(/\/(front|back|side)-[^/]+\.jpg$/i);
+  return match ? match[1].toLowerCase() : "";
+}
+
+function robotAngleCount(team) {
+  const angles = new Set((team?.photoKeys || []).map(robotPhotoAngle).filter(Boolean));
+  (team?._pendingRobotPhotos || []).forEach((photo) => angles.add(photo.angle));
+  return REQUIRED_ROBOT_ANGLES.filter((angle) => angles.has(angle.key)).length;
+}
+
 function RobotList({ teams, query, setQuery, onOpen }) {
   const q = query.trim().toUpperCase();
   const list = [...teams].sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
   const filtered = q ? list.filter((t) => t.number.toUpperCase().includes(q) || (t.name || "").toUpperCase().includes(q)) : list;
-  const withPhotos = teams.filter((t) => (t.photoKeys || []).length > 0).length;
+  const complete = teams.filter((team) => robotAngleCount(team) === REQUIRED_ROBOT_ANGLES.length).length;
   return (
     <>
-      <p className="text-xs text-slate-400 mb-3">{withPhotos} of {teams.length} teams have a robot photo. Tap a team to add inspection photos.</p>
+      <p className="text-xs text-slate-400 mb-3">{complete} of {teams.length} teams have all three required inspection pictures. Every team needs Front, Back, and Side.</p>
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search teams by number or name" placeholder="Search team #"
@@ -4372,6 +4407,8 @@ function RobotList({ teams, query, setQuery, onOpen }) {
         <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {filtered.map((t) => {
             const key = (t.photoKeys || [])[0];
+            const angleCount = robotAngleCount(t);
+            const pendingCount = (t._pendingRobotPhotos || []).length;
             return (
               <li key={t.number}>
                 <button onClick={() => onOpen(t.number)} className="w-full bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition text-left">
@@ -4380,7 +4417,8 @@ function RobotList({ teams, query, setQuery, onOpen }) {
                   </div>
                   <div className="px-2.5 py-2 flex items-center gap-1.5">
                     <span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm truncate">{t.number}</span>
-                    {(t.photoKeys || []).length > 0 && <span className="ml-auto text-[10px] font-semibold text-slate-400">{t.photoKeys.length}</span>}
+                    <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${angleCount === 3 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"}`}>{angleCount}/3</span>
+                    {pendingCount > 0 && <span className="text-[9px] font-bold text-sky-600 dark:text-sky-300">{pendingCount} queued</span>}
                   </div>
                 </button>
               </li>
@@ -4392,44 +4430,64 @@ function RobotList({ teams, query, setQuery, onOpen }) {
   );
 }
 
-function RobotDetail({ team, onAddPhoto, onRemovePhoto, onOpenPhoto, emcee }) {
+function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, emcee }) {
   const [busy, setBusy] = useState(false);
+  const [captureAngle, setCaptureAngle] = useState("");
   const fileRef = useRef(null);
   if (!team) return <Empty title="Team not found" sub="" />;
   const photos = team.photoKeys || [];
+  const pendingPhotos = team._pendingRobotPhotos || [];
+  const slotData = REQUIRED_ROBOT_ANGLES.map((angle) => ({
+    ...angle,
+    remote: [...photos].reverse().find((path) => robotPhotoAngle(path) === angle.key) || "",
+    pending: [...pendingPhotos].reverse().find((photo) => photo.angle === angle.key) || null,
+  }));
+  const featuredKeys = new Set(slotData.map((slot) => slot.remote).filter(Boolean));
+  const extraPhotos = photos.filter((path) => !featuredKeys.has(path));
+  const completed = slotData.filter((slot) => slot.remote || slot.pending).length;
+  const chooseAngle = (angle) => {
+    setCaptureAngle(angle);
+    fileRef.current?.click();
+  };
   const add = async (files) => {
-    const list = Array.from(files).slice(0, 6);
+    const file = Array.from(files)[0];
+    if (!file || !captureAngle) return;
     setBusy(true);
-    for (const f of list) {
-      try { const d = await compress(f); await onAddPhoto(team.number, d); }
-      catch (e) { alert("Couldn't save that photo — check your connection."); break; }
-    }
+    try { const dataUrl = await compress(file); await onAddPhoto(team.number, dataUrl, captureAngle); }
+    catch (error) { alert(error?.message || "Could not save that inspection picture."); }
     setBusy(false);
+    setCaptureAngle("");
   };
   return (
     <>
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">{team.number}</div>
         {team.name && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{team.name}</div>}
-      </div>
-      {!emcee && <button onClick={() => fileRef.current?.click()} disabled={busy}
-        className="w-full mb-4 bg-[#D7212B] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-[#B42024] disabled:bg-slate-300">
-        <Camera size={18} /> {busy ? "Saving…" : photos.length ? "Add another photo" : "Add robot photo"}
-      </button>}
-      {!emcee && <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => { add(e.target.files); e.target.value = ""; }} />}
-      {photos.length === 0 ? (
-        <Empty title="No robot photos yet" sub={emcee ? "No inspection photos have been added for this team." : "Snap the robot during inspection so refs can reference it later."} />
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {photos.map((p) => (
-            <div key={p} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700">
-              <Thumb pkey={p} onOpen={onOpenPhoto} full />
-              {!emcee && <button onClick={() => { if (confirm("Delete this robot photo?")) onRemovePhoto(team.number, p); }}
-                className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1"><Trash2 size={13} /></button>}
-            </div>
-          ))}
+        <div className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${completed === 3 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"}`}>
+          <Camera size={13}/>{completed === 3 ? "Required pictures complete" : `${completed} of 3 required pictures`}
         </div>
-      )}
+      </div>
+      {!emcee && <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(event) => { add(event.target.files); event.target.value = ""; }} />}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {slotData.map((slot) => (
+          <section key={slot.key} className={`rounded-xl border-2 overflow-hidden ${slot.remote || slot.pending ? "border-emerald-300 dark:border-emerald-800" : "border-dashed border-amber-300 dark:border-amber-700"}`}>
+            <div className="px-3 py-2 flex items-center gap-2 bg-white dark:bg-slate-800">
+              <span className="font-bold text-slate-900 dark:text-slate-100">{slot.label}</span>
+              <span className={`ml-auto text-[10px] font-bold uppercase ${slot.remote || slot.pending ? "text-emerald-600 dark:text-emerald-300" : "text-amber-600 dark:text-amber-300"}`}>{slot.pending ? "Queued" : slot.remote ? "Saved" : "Required"}</span>
+            </div>
+            <div className="relative aspect-[4/3] bg-slate-100 dark:bg-slate-700 grid place-items-center">
+              {slot.pending ? <button onClick={() => onOpenPhoto(slot.pending.dataUrl)} className="w-full h-full"><img src={slot.pending.dataUrl} alt={`${slot.label} robot view queued for upload`} className="w-full h-full object-cover" /></button>
+                : slot.remote ? <Thumb pkey={slot.remote} onOpen={onOpenPhoto} full />
+                : <div className="text-center text-slate-400"><Camera size={28} className="mx-auto mb-1"/><span className="text-xs">No {slot.label.toLowerCase()} picture</span></div>}
+              {!emcee && slot.pending && <button onClick={() => onRemovePendingPhoto(team.number, slot.pending.id)} className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1" title="Remove queued picture"><Trash2 size={13}/></button>}
+              {!emcee && !slot.pending && slot.remote && <button onClick={() => { if (confirm(`Delete the ${slot.label.toLowerCase()} robot picture?`)) onRemovePhoto(team.number, slot.remote); }} className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1"><Trash2 size={13}/></button>}
+            </div>
+            {!emcee && <button onClick={() => chooseAngle(slot.key)} disabled={busy} className="w-full px-3 py-2.5 bg-[#D7212B] text-white text-sm font-bold disabled:bg-slate-400"><Camera size={15} className="inline mr-1.5"/>{busy && captureAngle === slot.key ? "Saving…" : slot.remote || slot.pending ? `Retake ${slot.label}` : `Take ${slot.label}`}</button>}
+          </section>
+        ))}
+      </div>
+      {pendingPhotos.length > 0 && <div className="mt-4 rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 px-3 py-2 text-xs font-semibold text-sky-800 dark:text-sky-200">{pendingPhotos.length} inspection {pendingPhotos.length === 1 ? "picture is" : "pictures are"} saved on this device and will upload automatically when connected.</div>}
+      {extraPhotos.length > 0 && <section className="mt-5"><h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2">Earlier and unlabeled pictures</h3><div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{extraPhotos.map((path) => <div key={path} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700"><Thumb pkey={path} onOpen={onOpenPhoto} full />{!emcee && <button onClick={() => { if (confirm("Delete this robot picture?")) onRemovePhoto(team.number, path); }} className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1"><Trash2 size={13}/></button>}</div>)}</div></section>}
     </>
   );
 }

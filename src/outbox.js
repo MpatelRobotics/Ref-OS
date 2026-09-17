@@ -104,6 +104,9 @@ export async function flush(eventId, handlers = {}) {
         } else if (op.kind === "violation") {
           const saved = await api.addViolationRow(op.eventId, op.row, op.photos || []);
           handlers.onSynced && handlers.onSynced(saved);
+        } else if (op.kind === "robot_photo") {
+          const paths = await api.addTeamPhoto(op.eventId, op.number, op.dataUrl, op.angle, op.id);
+          handlers.onRobotPhotoSynced && handlers.onRobotPhotoSynced(op, paths);
         }
         q = await removeOp(eventId, op.id);           // success -> drop it
       } catch (e) {

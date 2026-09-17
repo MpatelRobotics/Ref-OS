@@ -48,6 +48,8 @@ Key Volunteer Status now uses the same mobile safe sheet behavior. Its roster sc
 
 Admins can assign signed in volunteers to Field 1, Field 2, Field 3, Pit Floor, Competition Floor, Skills, or Judging from Key Volunteer Status. Volunteers see their own assignment in a live workspace card, and assignment changes synchronize across devices through shared event settings.
 
+Robot inspection now requires labeled Front, Back, and Side pictures. Each team shows a three picture completion count, and every required angle has its own capture or retake control. Pictures taken while offline are retained in the device outbox, remain visible with a queued label, survive an app restart, and upload automatically after reconnection.
+
 The admin push alert control is grouped under Access in the settings menu with the other login, invitation, and permission controls.
 
 Push alert enrollment is now available to Referees, Judge Advisors, Emcees, and Admins. Every role can send a categorized help request, all subscribed event members receive the notification, and an Admin acknowledgment updates live for the entire crew.
