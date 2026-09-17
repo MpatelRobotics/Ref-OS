@@ -1,124 +1,164 @@
-# VEX Violation Tracker
+# Ref OS
 
-A shared, multi-referee violation log for VEX robotics events. Refs sign in,
-join an event, and log **minor / major / inspection** violations against teams —
-citing the rule, attaching robot photos, and tagging the match. Everyone on the
-crew sees each other's entries live.
+**Referee Operating System for live VEX Robotics events**
 
-Built with **Vite + React + Tailwind**, backed by **Supabase** (Postgres +
-Auth + Storage + Realtime).
+Ref OS is a shared event operations workspace built for the Highlander Summit Signature Event. It gives referees, Judge Advisors, Emcees, and event administrators one live place to coordinate match activity, record violations, monitor field readiness, share role information, and respond to event day issues.
 
----
+Ref OS 1.2.0 is a private beta created by Maharshi Patel.
 
-## What you need
-- A free [Supabase](https://supabase.com) account
-- [Node.js](https://nodejs.org) 18+ installed
-- A host for the built site (Vercel, Netlify, or Cloudflare Pages — all free tiers)
-- Optional: a domain (e.g. a `.fyi`) to point at the host
+## One live event workspace
 
----
+Everyone works from the same event record. Updates made by one volunteer appear for the rest of the crew within seconds, helping field and judging teams stay aligned without passing around separate spreadsheets, paper logs, or chat messages.
 
-## 1. Set up Supabase (one time)
-1. Create a new project at supabase.com. Set a database password and pick a region near your events.
-2. Open **SQL Editor**, paste the entire contents of `supabase/schema.sql`, and click **Run**. This creates the tables, security rules, the photo storage bucket, and realtime.
-3. In the SQL Editor, paste `supabase/seed.sql` and **Run** it too. This creates the single locked event (The Highlander Summit Signature Event) and preloads your teams.
-4. (Optional) Paste `supabase/seed_rules.sql` and **Run** it to preload the game rulebook. Then the **Rule cited** box autocompletes every rule code and auto-fills its description.
-5. (Optional, once the schedule exists) Paste `supabase/seed_matches.sql` and **Run** it to load the qualification match schedule. Then, when logging, picking a qual match shows that match's 4 teams as red/blue tap-chips so refs tap the offender instead of scrolling the full roster. Re-run any time the schedule changes.
-3. Open **Authentication → Providers → Email** and make sure **Email** is enabled (magic-link / OTP sign-in is on by default).
-4. Under **Authentication → URL Configuration**, set **Site URL** to where the app will live. For local testing use `http://localhost:5173`; add your real domain once deployed.
-5. Open **Project Settings → API** and copy the **Project URL** and the **anon public** key.
+The interface adapts to phones, tablets, and desktop operations stations. Mobile devices use quick bottom navigation and touch friendly sheets. Desktop devices use a wider operations layout with persistent navigation and event tools.
 
-## 2. Configure the app
-```bash
-cp .env.example .env
-```
-Edit `.env` and paste your two values:
-```
-VITE_SUPABASE_URL=https://your-project-ref.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-public-key
-VITE_SITE_PASSWORD=Highlander2026
-```
-`VITE_SITE_PASSWORD` is the single shared password refs type to open the site — change it to whatever you want to give your crew, and set the same value in your host's environment variables when you deploy. Note: this password gates the app UI, not the database itself (the anon key ships in the browser), so it's practical "keep strangers out" protection rather than hardened security — fine for a private ref crew on an obscure URL.
-The anon key is safe to expose in the browser — the database is protected by
-row-level security, so only members of an event can read or write its data.
+## Volunteer roles
 
-## 3. Run it locally
-```bash
-npm install
-npm run dev
-```
-Open the printed URL (usually http://localhost:5173). Sign in with your email,
-create an event, and you're logging.
+### Referee
 
-## 4. Build for production
-```bash
-npm run build
-```
-Produces a static site in `dist/`.
+Referees can review the match schedule, search teams, record violations, document robot concerns, complete field reset checks, review rules, and share the active Referee join code with another referee.
 
-## 5. Deploy
-Any static host works:
+### Judge Advisor
 
-- **Vercel / Netlify** — connect the repo (or drag-and-drop the project). Build
-  command `npm run build`, output directory `dist`. Add the two environment
-  variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) in the host dashboard.
-- **Cloudflare Pages** — framework preset "Vite", build `npm run build`, output
-  `dist`, add the same two env vars.
+Judge Advisors receive a focused judging workspace for award nominations, finalist review, alliance information, and Judge Advisor role access. They can share only the Judge Advisor join code.
 
-After deploying, return to Supabase → Authentication → URL Configuration and add
-your live URL to **Site URL** and **Redirect URLs** so magic-link emails return
-people to the right place.
+### Emcee
 
-## 6. Point your domain
-Buy a domain from any registrar (Dynadot, Porkbun, Namecheap, Cloudflare…). In
-your host's project settings, add the custom domain and follow its DNS
-instructions (usually a `CNAME`, or switch nameservers to the host). SSL is
-issued automatically.
+Emcees receive the event information and match views they need without referee only editing controls. They can share only the Emcee join code.
 
----
+### Admin
 
-## How refs use it
-- **Sign in** with email (one-tap link, no password).
-- **Open the site** by entering the shared crew password, then set a ref name. The app is locked to the one Highlander Summit event.
-- **Robots tab:** tap a team to add robot photos during inspection (stored on the team, viewable any time).
-- **Everyone in** has the same tools from the menu: event setup (match counts), invite (share the link), export CSV, lock the device, and clear-event.
-- **Invite crew** — menu → *Invite other refs* → share the site link and the 6-character event code.
-- **Log a violation** — pick the team (or type a new one), pick the match from the dropdown, choose minor/major/inspection, cite the rule, snap robot photos, add notes.
-- **Review** — per-team rule breakdowns, plus a global *By Rule* view showing which teams broke what and how often.
-- **Export CSV** anytime from the menu.
+Admins manage event wide tools, volunteer access, announcements, countdowns, data imports, exports, role codes, system checks, field logs, and event cleanup. Admin access is enforced separately from normal volunteer roles.
 
-## Works through network dropouts
-Referee tables often sit in venue dead zones. When you log a violation, it's
-saved to the device immediately (in the browser's IndexedDB) and shown in the
-log right away with a **Saving** marker — no spinner, no lost call. It uploads to
-Supabase automatically when the connection returns (on reconnect, on focus, and
-on a periodic retry). The header shows an **offline** pill and a **pending**
-count so refs can see nothing is lost, and photos display from the device until
-they finish uploading. Because each violation gets its own ID before it's saved,
-two refs logging offline never collide. (This is write durability, not full
-offline browsing — reading brand-new data from other refs still needs a
-connection.)
+## Match Center
 
-## Notes & limits
-- Photos are compressed in the browser and stored in the private `robot-photos`
-  bucket, served via short-lived signed URLs. While offline, queued photos live
-  on the device until they sync, so avoid piling up hundreds of un-synced photos.
-- On Supabase's free tier a project **pauses after ~1 week of inactivity** — open
-  the Supabase dashboard to wake it before an event.
-- Anyone with an event's join code can add and delete that event's data, so share
-  codes only with your officiating crew.
-- Change match structure (e.g. a different bracket) any time in *Event setup* — it
-  updates the dropdowns for everyone.
+Match Center places the event schedule, field assignments, team information, and match activity in one view.
 
-## Project layout
-```
-index.html            app shell
-src/
-  main.jsx            entry
-  App.jsx             all UI (auth gate, event picker, tracker)
-  api.js              Supabase data layer (auth, events, teams, violations, photos, realtime)
-  supabaseClient.js   Supabase client from env vars
-  index.css           Tailwind
-supabase/schema.sql   run once in the Supabase SQL editor
-.env.example          copy to .env and fill in
-```
+Volunteers can:
+
+* Filter matches by field
+* Search by match number or team number
+* View red and blue alliance teams
+* Open individual match details
+* Track replays and field faults
+* Record match related violations
+* Review qualification and elimination activity
+
+When match data is available, Match Center becomes the default event workspace.
+
+## Violation tracking
+
+Referees can record minor, major, and inspection violations against a team while citing the applicable rule and match. Notes and supporting robot photos can be attached when additional context is needed.
+
+Violation history is available by team, match, rule, and event activity. Repeated minor violations of the same rule are surfaced to help the referee crew identify escalation patterns.
+
+## Teams and robot documentation
+
+The Teams workspace combines the event roster with violation totals, rankings, watch information, and quick access to team history.
+
+The Robots workspace supports inspection and event documentation photos. Images are compressed on the device before upload to reduce transfer time and storage use.
+
+## Field operations
+
+Ref OS includes shared tools for event floor coordination:
+
+* Field reset quadrant checks
+* Field Ready status
+* AWP checks and history
+* Match replay records
+* Field fault records
+* Timeout tracking
+* Match anomaly documentation
+* Field comparison for administrators
+
+Updates are shared across devices so the event crew can see current field status without relying on verbal relays alone.
+
+## Judging and alliance selection
+
+The judging workspace supports award nominations and finalist review. Alliance selection information can be viewed by key volunteers, while editing permissions remain limited to the appropriate roles.
+
+The alliance tools support captain and pick assignments, elimination bracket preparation, and match progression information.
+
+## Event Command Center
+
+The Event Command Center centralizes administrator tools and event health information. It includes access to operational summaries, event settings, announcements, countdown management, data controls, volunteer information, exports, and readiness checks.
+
+## Key Volunteer Status
+
+The live volunteer view shows who is online, who has previously joined, their role, device presence, and last seen status. Administrators can promote an eligible online volunteer to Admin without sharing the Admin password.
+
+On phones, the header uses a compact online volunteer count. Tapping it opens the complete scrollable status list.
+
+## Volunteer access and join codes
+
+Ref OS uses separate join codes for Referees, Judge Advisors, and Emcees.
+
+Signed in volunteers can view and share only the code for their own role. Administrators can manage all role codes, generate replacements, disable codes, print login cards, and open QR codes.
+
+If a volunteer needs a replacement code, they can request regeneration from inside the app. The request appears for administrators in real time.
+
+## Admin push notifications
+
+Administrators can enable device push alerts from the Access section of Settings. When a volunteer requests a new role code, subscribed admin phones, tablets, and computers receive a notification even when Ref OS is not open.
+
+Tapping the notification opens Ref OS directly to role code management. The normal live in app request remains available as a fallback.
+
+On iPhone and iPad, Ref OS must be installed through Add to Home Screen before push notifications can be enabled.
+
+## Announcements and event countdown
+
+Admins can publish key volunteer announcements that appear across connected devices. An event countdown can also be configured for the next major event milestone and remains synchronized for every role.
+
+## Event contact directory
+
+The shared contact directory keeps important event contacts available inside Ref OS. This reduces the need to search through separate messages when a volunteer needs operational help quickly.
+
+## Rules and reference material
+
+The Rules workspace provides searchable rule information and favorites for quick event day access. Ref OS also includes offline friendly access to the game manual and Quick Reference Guide with navigation controls for important sections.
+
+## Offline resilience
+
+Ref OS is designed for competition venues where WiFi and cellular service may be inconsistent.
+
+New violation entries are saved on the device immediately and queued for upload when a connection is unavailable. Pending entries synchronize automatically after connectivity returns. The interface shows connection health, pending activity, and the most recent successful synchronization.
+
+Offline support protects new entries created on that device. Viewing brand new information entered by other volunteers still requires a connection.
+
+## Realtime synchronization
+
+Connected devices receive event changes through the shared cloud workspace. Important role code updates also use a short polling fallback so mobile devices can recover when realtime delivery is interrupted.
+
+## Reports and exports
+
+Administrators can export event information for review and record keeping, including violation data, field activity, judging information, match anomalies, and event summaries.
+
+## Event day safety
+
+Ref OS includes safeguards intended to reduce accidental event disruption:
+
+* Admin protected destructive controls
+* Selective Clear Data options
+* Confirmation before permanent deletion
+* Server enforced event roles
+* Role limited join code visibility
+* Offline write queues
+* Live synchronization indicators
+* Pre Event System Test
+* Diagnostic reporting
+* Service worker update notifications
+
+## Privacy and access
+
+Ref OS is intended for authorized Highlander Summit volunteers. Join codes and Admin credentials should be shared only with people assigned to the corresponding event role.
+
+Volunteer names, event records, device subscriptions, and operational data are stored only for running the shared event workspace. Push notification private keys remain on the server and are never exposed to the browser.
+
+## Release
+
+**Ref OS 1.2.0 Highlander Release**
+
+Private Beta
+
+Created by Maharshi Patel for Highlander Summit event operations.
+
