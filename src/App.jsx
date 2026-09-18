@@ -2713,7 +2713,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       <main id="workspace" tabIndex={-1} className="refos-workspace mx-auto px-4 pb-28 pt-4">
         {!openTeam && !openMatch && !openRobot && <section className="refos-page-heading" aria-label="Workspace overview">
           <div>
-          {view === "awp" && !commandCenterChildOpen && <button onClick={() => { setView("matches"); setQuery(""); }} className="refos-back-button mb-3" aria-label="Back to Matches">
+          {view === "awp" && <button onClick={() => { if (commandCenterChildOpen) return returnToCommandCenter(); setView("matches"); setQuery(""); }} className="refos-back-button mb-3" aria-label={commandCenterChildOpen ? "Back to Command Center" : "Back to Matches"}>
             <ChevronLeft size={18} /> Back
           </button>}
           <p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: "Alliance selection"}[view] || "Event workspace"}</h2>

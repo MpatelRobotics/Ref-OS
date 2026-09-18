@@ -10,13 +10,13 @@ export default function IdentityModal({ me, onSave, onClose }) {
   const valid = !!firstName.trim() && !!lastName.trim();
   const submit = () => valid && onSave(fullName);
   return (
-    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-white dark:bg-slate-800 w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
-        <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
-          <h2 className="font-bold text-slate-900 dark:text-slate-100">Your name</h2>
-          <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
+    <div className="fixed inset-0 z-[150] bg-black/40 flex items-stretch sm:items-center justify-center">
+      <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-white dark:bg-slate-800 sm:h-auto sm:max-h-[90dvh] sm:max-w-sm sm:rounded-2xl">
+        <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] dark:border-slate-700">
+          <h2 className="min-w-0 flex-1 truncate font-bold text-slate-900 dark:text-slate-100">Edit name</h2>
+          <button onClick={onClose} className="shrink-0 rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Close edit name"><X size={22} /></button>
         </div>
-        <div className="p-4 space-y-3">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
           <div>
             <Label>First name</Label>
             <input autoFocus value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="e.g. Alex"
@@ -29,7 +29,7 @@ export default function IdentityModal({ me, onSave, onClose }) {
               className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
           </div>
         </div>
-        <div className="p-4 pt-0"><button onClick={submit} disabled={!valid} className={`w-full py-2.5 rounded-lg font-semibold text-white ${valid ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Save</button></div>
+        <div className="shrink-0 border-t border-slate-200 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 dark:border-slate-700"><button onClick={submit} disabled={!valid} className={`w-full py-2.5 rounded-lg font-semibold text-white ${valid ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Save</button></div>
       </div>
     </div>
   );
