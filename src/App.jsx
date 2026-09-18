@@ -2412,7 +2412,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       <header className="refos-header sticky top-0 z-20 text-white">
         <div className="refos-header-inner mx-auto px-4 py-3 flex items-center gap-3">
           {(openTeam || openMatch || openRobot) ? (
-            <button onClick={() => { setOpenTeam(null); setOpenMatch(null); setOpenRobot(null); }} aria-label="Back to workspace" className="p-1 -ml-1 rounded hover:bg-white/10"><ChevronLeft size={22} /></button>
+            <button onClick={() => { setOpenTeam(null); setOpenMatch(null); setOpenRobot(null); }} aria-label={`Back to ${openTeam ? "Teams" : openRobot ? "Robots" : "Matches"}`} className="-ml-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-sm font-bold hover:bg-white/10">
+              <ChevronLeft size={22} /><span className="hidden sm:inline">Back to {openTeam ? "Teams" : openRobot ? "Robots" : "Matches"}</span>
+            </button>
           ) : (
             <div className="refos-header-brand flex items-center gap-2 shrink-0">
               <img src="/logo.svg" alt="Highlander Summit" className="h-9 w-9 object-contain" />
@@ -2707,7 +2709,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       )}
       <main id="workspace" tabIndex={-1} className="refos-workspace mx-auto px-4 pb-28 pt-4">
         {!openTeam && !openMatch && !openRobot && <section className="refos-page-heading" aria-label="Workspace overview">
-          <div><p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: "Alliance selection"}[view] || "Event workspace"}</h2>
+          <div>
+          {view === "awp" && <button onClick={() => { setView("matches"); setQuery(""); }} className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800" aria-label="Back to Matches">
+            <ChevronLeft size={18} /> Back to Matches
+          </button>}
+          <p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: "Alliance selection"}[view] || "Event workspace"}</h2>
           <p className="refos-description">{{teams: "Find a team. Review its history. Keep your crew informed.", matches: "Your schedule, field activity, and match details in one place.", robots: "A shared visual reference for every robot.", judging: "Capture the moments that deserve recognition.", rulebook: "Find the right rule when you need it.", awp: "Review autonomous observations across the event.", alliances: "Follow the path from selection to the final."}[view]}</p></div>
           <span className="refos-role">{adminUnlocked ? "Admin" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
         </section>}
