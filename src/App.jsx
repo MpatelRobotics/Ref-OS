@@ -30,6 +30,7 @@ import OfflineReadinessModal from "./components/modals/OfflineReadinessModal.jsx
 import FeedbackModal from "./components/modals/FeedbackModal.jsx";
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
 import HelpRequestModal from "./components/modals/HelpRequestModal.jsx";
+import manualQuickLinks from "./manualQuickLinks.json";
 
 /* This build is locked to one event: The Highlander Summit Signature Event.
    EVENT_ID must match supabase/seed.sql. A shared site password gates entry. */
@@ -5698,6 +5699,8 @@ function RuleBook({ rules }) {
     goToManualPage(page);
     setManualOpen(true);
   };
+  const manualImage = `/manual-pages/page-${String(manualPage).padStart(3, "0")}.jpg`;
+  const manualPageLinks = manualQuickLinks[String(manualPage)] || [];
   if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
   const q = query.trim().toUpperCase();
   const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
@@ -5784,7 +5787,27 @@ function RuleBook({ rules }) {
             <button onClick={() => goToManualPage(7)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">Jump to Quick Reference Guide</button>
             <span className="self-center text-xs text-slate-500 dark:text-slate-400">Page {manualPage}</span>
           </div>
-          <iframe key={manualNavigation} src={`/manuals/override-2.0.pdf?navigation=${manualNavigation}#page=${manualPage}&view=FitH`} title={`Override 2.0 Game Manual page ${manualPage}`} className="min-h-0 w-full flex-1 bg-white" />
+          <div className="min-h-0 flex-1 overflow-y-auto bg-slate-200 p-2 md:hidden dark:bg-slate-950">
+            <div className="relative mx-auto max-w-3xl bg-white shadow-lg">
+              <img src={manualImage} alt={`Override 2.0 Game Manual page ${manualPage}`} className="block h-auto w-full" />
+              {manualPageLinks.map((link, index) => (
+                <button
+                  key={`${manualPage}-${index}`}
+                  type="button"
+                  onClick={() => goToManualPage(link.page)}
+                  aria-label={`Jump to manual page ${link.page}`}
+                  className="absolute rounded-sm bg-transparent hover:bg-blue-400/15 focus:bg-blue-400/20 focus:outline-none"
+                  style={{ left: `${link.x}%`, top: `${link.y}%`, width: `${link.w}%`, height: `${link.h}%` }}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="shrink-0 items-center justify-between gap-2 border-t border-slate-200 bg-white px-3 py-2 md:hidden dark:border-slate-800 dark:bg-slate-900 flex">
+            <button type="button" onClick={() => goToManualPage(Math.max(1, manualPage - 1))} disabled={manualPage <= 1} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold disabled:opacity-40 dark:border-slate-700">Previous</button>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Page {manualPage} of 129</span>
+            <button type="button" onClick={() => goToManualPage(Math.min(129, manualPage + 1))} disabled={manualPage >= 129} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold disabled:opacity-40 dark:border-slate-700">Next</button>
+          </div>
+          <iframe key={manualNavigation} src={`/manuals/override-2.0.pdf?navigation=${manualNavigation}#page=${manualPage}&view=FitH`} title={`Override 2.0 Game Manual page ${manualPage}`} className="hidden min-h-0 w-full flex-1 bg-white md:block" />
         </div>,
         document.body
       )}
