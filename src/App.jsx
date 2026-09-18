@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download, Save,
@@ -5667,10 +5668,28 @@ const RULE_NOTES = {
   "GG17": "No holding an opponent longer than a 3-count in driver control. Head refs count out loud; the count pauses/ends when the robots separate (~2 ft / one tile), when the held robot gets trapped or pinned by a different robot, or when an escape route opens. After a count ends you can't immediately re-hold the same robot \u2014 that resumes at a 5-count.\nWhen judging if a hold was match-affecting, weigh the full context: the first 3 seconds are legal, so only the extra time counts; how much extra time; how far/long they separated before returning; and what both robots were doing overall. Holding is inherently defensive, so GG15 may also apply on judgment calls.",
 };
 
+const RULE_MANUAL_PAGES = Object.fromEntries([
+  [24, ["SC1", "SC2"]], [25, ["SC3", "SC4"]], [26, ["SC5"]], [27, ["SC6", "SC7"]], [28, ["SC8"]],
+  [29, ["SG1"]], [30, ["SG2", "SG3", "SG4"]], [31, ["SG5", "SG6", "SG7"]], [33, ["SG8", "SG9"]],
+  [34, ["SG10", "SG11"]], [35, ["SG12"]], [36, ["SG13"]], [37, ["S1", "S2", "S3", "S4", "S5"]],
+  [38, ["G1", "G2", "G3"]], [39, ["G4", "G5"]], [40, ["GG1", "GG2"]], [41, ["GG3", "GG4"]],
+  [42, ["GG5", "GG6"]], [43, ["GG7", "GG8", "GG9"]], [44, ["GG10", "GG11", "GG12", "GG13"]],
+  [45, ["GG14", "GG15"]], [46, ["GG16", "GG17"]], [47, ["GG18"]], [49, ["RSC1", "RSC2", "RSC3"]],
+  [50, ["RSC4"]], [51, ["RSC5"]], [54, ["R1"]], [55, ["R2"]], [56, ["R3", "R4"]],
+  [57, ["R5", "R6"]], [58, ["R7", "R8", "R9"]], [59, ["R10", "R11", "R12"]],
+  [60, ["R13", "R14", "R15", "R16", "R17"]], [61, ["R18", "R19"]], [62, ["R20", "R21", "R22"]],
+  [63, ["R23", "R24"]], [64, ["R25"]], [65, ["R26", "R27", "R28"]], [68, ["T1"]],
+  [69, ["T2", "T3"]], [70, ["T4", "T5", "T6"]], [71, ["T7"]], [72, ["T8", "T9", "T10"]],
+  [73, ["T11", "T12", "T13"]], [74, ["T14", "T15", "T16"]], [75, ["T17"]], [76, ["T18"]],
+  [77, ["T19", "T20", "T21", "T22"]], [78, ["T23"]], [79, ["T24"]],
+].flatMap(([page, codes]) => codes.map((code) => [code, page])));
+
 function RuleBook({ rules }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(null); // rule object shown in the notes popup
   const [manualOpen, setManualOpen] = useState(false);
+  const [manualPage, setManualPage] = useState(1);
+  const openManualAt = (page = 1) => { setManualPage(page); setManualOpen(true); };
   if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
   const q = query.trim().toUpperCase();
   const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
@@ -5682,7 +5701,7 @@ function RuleBook({ rules }) {
   }
   return (
     <>
-      <button onClick={() => setManualOpen(true)} className="mb-4 w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
+      <button onClick={() => openManualAt(1)} className="mb-4 w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
         <div className="flex items-center gap-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#0D0F32] text-white dark:bg-slate-950"><BookOpen size={21} /></span>
           <span className="min-w-0 flex-1">
@@ -5707,16 +5726,15 @@ function RuleBook({ rules }) {
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
                 {g.items.map((r) => {
                   const note = RULE_NOTES[r.code];
-                  return note ? (
-                    <button key={r.code} onClick={() => setSelected(r)} className="w-full text-left px-4 py-2.5 flex gap-3 items-baseline hover:bg-slate-50 dark:hover:bg-slate-700">
+                  const manualPageForRule = RULE_MANUAL_PAGES[r.code];
+                  return (
+                    <div key={r.code} className="flex items-stretch hover:bg-slate-50 dark:hover:bg-slate-700">
+                    <button onClick={() => manualPageForRule && openManualAt(manualPageForRule)} disabled={!manualPageForRule} className="min-w-0 flex-1 text-left px-4 py-2.5 flex gap-3 items-baseline disabled:cursor-default">
                       <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
                       <span className="text-sm text-slate-600 dark:text-slate-300 flex-1">{r.desc}</span>
-                      <span className="text-[10px] font-semibold text-[#D7212B] shrink-0 self-center flex items-center gap-1">Notes <ChevronRight size={14} /></span>
+                      {manualPageForRule && <span className="text-[10px] font-semibold text-[#D7212B] shrink-0 self-center flex items-center gap-1">Manual <ChevronRight size={14} /></span>}
                     </button>
-                  ) : (
-                    <div key={r.code} className="px-4 py-2.5 flex gap-3 items-baseline">
-                      <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
-                      <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
+                    {note && <button onClick={() => setSelected(r)} className="shrink-0 border-l border-slate-100 px-3 text-[10px] font-bold text-slate-500 hover:text-[#D7212B] dark:border-slate-700 dark:text-slate-400" aria-label={`Open notes for ${r.code}`}>Notes</button>}
                     </div>
                   );
                 })}
@@ -5725,9 +5743,9 @@ function RuleBook({ rules }) {
           ))}
         </div>
       )}
-      {selected && (
-        <div className="fixed inset-0 z-[55] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setSelected(null)}>
-          <div className="bg-white dark:bg-slate-800 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      {selected && createPortal(
+        <div className="fixed inset-0 z-[155] bg-black/40 flex items-start sm:items-center justify-center p-0 sm:p-4" onClick={() => setSelected(null)}>
+          <div className="bg-white dark:bg-slate-800 w-full h-full sm:h-auto sm:max-w-lg sm:rounded-2xl sm:max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-white dark:bg-slate-800 px-4 py-3 flex items-center gap-2 border-b border-slate-200 dark:border-slate-700">
               <button onClick={() => setSelected(null)} className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-sm font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700" aria-label="Back to Rules"><ChevronLeft size={19} /> Back</button>
               <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{fmtRule(selected.code)}</span>
@@ -5742,7 +5760,8 @@ function RuleBook({ rules }) {
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       {manualOpen && (
         <div className="fixed inset-0 z-[70] flex flex-col bg-slate-100 dark:bg-slate-950">
@@ -5752,9 +5771,14 @@ function RuleBook({ rules }) {
               <div className="truncate font-bold text-slate-900 dark:text-white">Override 2.0 Game Manual</div>
               <div className="text-[11px] text-slate-500 dark:text-slate-400">Available offline after the app updates</div>
             </div>
-            <a href="/manuals/override-2.0.pdf" target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:text-slate-100">Open separately</a>
+            <a href={`/manuals/override-2.0.pdf#page=${manualPage}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:text-slate-100">Open separately</a>
           </div>
-          <iframe src="/manuals/override-2.0.pdf" title="Override 2.0 Game Manual" className="min-h-0 w-full flex-1 bg-white" />
+          <div className="flex shrink-0 flex-wrap gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
+            <button onClick={() => setManualPage(3)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">Jump to Table of Contents</button>
+            <button onClick={() => setManualPage(7)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">Jump to Quick Reference Guide</button>
+            <span className="self-center text-xs text-slate-500 dark:text-slate-400">Page {manualPage}</span>
+          </div>
+          <iframe key={manualPage} src={`/manuals/override-2.0.pdf#page=${manualPage}&view=FitH`} title={`Override 2.0 Game Manual page ${manualPage}`} className="min-h-0 w-full flex-1 bg-white" />
         </div>
       )}
     </>

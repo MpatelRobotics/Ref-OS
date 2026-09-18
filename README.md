@@ -54,6 +54,8 @@ Marking a match for replay requires a reason. Volunteers can select Field fault,
 
 The Match Readiness cards are interactive. Selecting AWP opens the AWP check, Field Reset opens the quadrant check, Violations jumps to the match violation history, and Replay opens the reason selector or removes an existing replay flag after confirmation.
 
+AWP History and Analytics is kept inside Event Command Center so the field filter row stays focused on match locations. The AWP check remains available inside every qualification match.
+
 ## Violation tracking
 
 Referees can record minor, major, and inspection violations against a team while citing the applicable rule and match. Notes and supporting robot photos can be attached when additional context is needed.
@@ -83,6 +85,8 @@ Ref OS includes shared tools for event floor coordination:
 
 Updates are shared across devices so the event crew can see current field status without relying on verbal relays alone.
 
+Quadrant field reset screens keep the Verify control above the checklist so it remains visible on phones. Each quadrant records who verified it and contributes to the shared Field Ready status.
+
 ## Judging and alliance selection
 
 The judging workspace supports award nominations and finalist review. Alliance selection information can be viewed by key volunteers, while editing permissions remain limited to the appropriate roles.
@@ -91,9 +95,9 @@ The alliance tools support captain and pick assignments, elimination bracket pre
 
 ## Event Command Center
 
-The Event Command Center centralizes administrator tools and event health information. It includes access to operational summaries, event settings, announcements, countdown management, data controls, volunteer information, exports, and readiness checks.
+The Event Command Center centralizes administrator tools and event health information. It includes access to operational summaries, AWP History and Analytics, event settings, announcements, countdown management, data controls, volunteer information, exports, and readiness checks.
 
-Tools opened from the Event Command Center include a persistent Back to Command Center button. Closing or saving a Command Center tool returns the Admin to the Command Center instead of the main workspace.
+Tools opened from Event Command Center include a compact Back button placed at the lower left so it does not cover page titles or close controls. Closing, saving, or selecting Back returns the Admin to Event Command Center instead of the main workspace.
 
 ## Key Volunteer Status
 
@@ -133,9 +137,11 @@ Admins can publish key volunteer announcements that appear across connected devi
 
 The shared contact directory keeps important event contacts available inside Ref OS. This reduces the need to search through separate messages when a volunteer needs operational help quickly.
 
-## Rules and reference material
+## Rules and Game Manual
 
-The Rules workspace provides searchable rule information and favorites for quick event day access. Ref OS also includes offline friendly access to the game manual and Quick Reference Guide with navigation controls for important sections.
+The Rules workspace provides searchable Override rule summaries for quick event day access. The complete Override 2.0 Game Manual is stored with Ref OS for offline use.
+
+The manual viewer includes Jump to Table of Contents and Jump to Quick Reference Guide controls. Selecting a rule in the Rules list opens the Game Manual at that rule's actual page. Rules with referee guidance also include a separate Notes control. Rule notes open at the top of a full screen phone view, so volunteers do not need to scroll down the Rules list to read them.
 
 ## Offline resilience
 
