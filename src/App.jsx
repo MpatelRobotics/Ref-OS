@@ -494,6 +494,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const [presence, setPresence] = useState([]); // [{ name, ... }] currently online
   const [refRoster, setRefRoster] = useState([]); // refs seen at this event, including offline
   const [currentUserId, setCurrentUserId] = useState(null);
+  const undoneViolationIdsRef = useRef(new Set());
   const pendingCount = viols.filter((v) => v._pending).length;
 
   const [lastMatch, setLastMatch] = useState(() => {
@@ -1007,7 +1008,11 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
           _pendingRobotPhotos: queuedPhotos.filter((op) => op.number === team.number).map((op) => ({ id: op.id, angle: op.angle, dataUrl: op.dataUrl })),
         }));
       });
-      setViols((cur) => { const pend = cur.filter((x) => x._pending && !v.some((s) => s.id === x.id)); return [...pend, ...v]; });
+      setViols((cur) => {
+        const visible = v.filter((item) => !undoneViolationIdsRef.current.has(item.id));
+        const pend = cur.filter((x) => x._pending && !undoneViolationIdsRef.current.has(x.id) && !visible.some((s) => s.id === x.id));
+        return [...pend, ...visible];
+      });
       setNoms(nm);
       setFinalists(new Set(sl.map((s) => `${s.award}::${s.team}`)));
       setWatchNotes(wn);
@@ -1032,7 +1037,10 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
 
   const doFlush = useCallback(async () => {
     await outbox.flush(eventId, {
-      onSynced: (saved) => setViols((cur) => cur.map((x) => (x.id === saved.id ? saved : x))),
+      onSynced: (saved) => {
+        if (undoneViolationIdsRef.current.has(saved.id)) return;
+        setViols((cur) => cur.map((x) => (x.id === saved.id ? saved : x)));
+      },
       onTeamSynced: (number) => setTeams((cur) => cur.map((x) => x.number === number ? { ...x, _pending: false } : x)),
       onRobotPhotoSynced: (op, paths) => setTeams((cur) => cur.map((team) => team.number === op.number ? {
         ...team,
@@ -1163,10 +1171,14 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     await outbox.enqueue(eventId, { id: row.id, kind: "violation", eventId, row, photos, createdAt });
     doFlush();
     offerUndo(`Violation saved for ${row.team}`, async () => {
+      undoneViolationIdsRef.current.add(row.id);
       await outbox.cancelOp(eventId, row.id);
       setViols((cur) => cur.filter((violation) => violation.id !== row.id));
       await api.deleteViolation({ id: row.id, photoKeys: [] });
+      setViols((cur) => cur.filter((violation) => violation.id !== row.id));
+      await refresh().catch(() => {});
       refreshQueueHealth();
+      window.setTimeout(() => undoneViolationIdsRef.current.delete(row.id), 120000);
     });
   };
 
