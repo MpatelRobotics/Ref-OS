@@ -63,7 +63,7 @@ export default function LoginScreen({ eventId, onUnlock }) {
         <div className="flex flex-col items-center text-center mb-6">
           <img src="/logo.svg" alt="Highlander Summit" className="h-40 sm:h-48 w-40 sm:w-48 object-contain mb-2" />
           <span className="font-bold text-xl text-[#11172F]">Highlander Summit — Violation Log</span>
-          <span className="mt-2 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700">Private Beta</span>
+          <span className="mt-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-700">Highlander Summit Release</span>
         </div>
 
         {mode === "code" ? (
@@ -130,7 +130,7 @@ export default function LoginScreen({ eventId, onUnlock }) {
           <img src="/logo.svg" alt="Highlander Summit" className="h-12 w-12 object-contain" />
           <p className="text-center text-xs text-slate-500">
             Made by Maharshi Patel ·{" "}
-            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-[#11172F] underline">@mpatel_ref</a>{" · "}v{APP_VERSION} · Private Beta
+            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-[#11172F] underline">@mpatel_ref</a>{" · "}v{APP_VERSION} · Highlander Summit Release
           </p>
         </div>
       </div>

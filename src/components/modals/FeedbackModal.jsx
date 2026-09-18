@@ -56,7 +56,7 @@ export default function FeedbackModal({ meName, myRole, onSubmit, onClose }) {
         <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <div>
             <h2 className="font-bold text-slate-900 dark:text-slate-100">Send Feedback</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Ref OS Private Beta</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Ref OS Highlander Summit Release</p>
           </div>
           <button onClick={onClose} className="text-slate-400 p-1"><X size={22} /></button>
         </div>

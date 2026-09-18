@@ -4,7 +4,7 @@
 
 Ref OS is a shared event operations workspace built for the Highlander Summit Signature Event. It gives referees, Judge Advisors, Emcees, and event administrators one live place to coordinate match activity, record violations, monitor field readiness, share role information, and respond to event day issues.
 
-Ref OS 1.2.0 is a private beta created by Maharshi Patel.
+Ref OS 1.0.0 is the Highlander Summit Release created by Maharshi Patel.
 
 ## One live event workspace
 
@@ -16,7 +16,7 @@ Each volunteer creates a required identity profile with a nickname plus first an
 
 New volunteers receive a three screen Quick Start covering assignments, help requests, and offline saving. It appears once per role on each device and can be reopened from Features and Help.
 
-After saving a new violation or inspection picture, volunteers receive an eight second Undo option. Ref OS asks for confirmation before completing the undo.
+After saving a new violation or inspection picture, volunteers receive an eight second Undo option. Ref OS asks for confirmation before completing the undo. A violation undo cancels any pending upload, removes the cloud record, and synchronizes the removal across every connected device.
 
 ## Volunteer roles
 
@@ -137,7 +137,9 @@ Admins can publish key volunteer announcements that appear across connected devi
 
 ## Event contact directory
 
-The shared contact directory keeps important event contacts available inside Ref OS. This reduces the need to search through separate messages when a volunteer needs operational help quickly.
+The shared contact directory keeps important event contacts available inside Ref OS. Every volunteer profile contributes the person's full name, nickname, and current role. Volunteers may optionally add a phone number so event staff can contact them quickly. Administrators can also add event leadership and support contacts, include email, location, and notes, and arrange the directory order.
+
+The nickname is used throughout the live app. Required first and last names identify the volunteer in the Event Contact Directory and on official violation and judging exports.
 
 ## Rules and Game Manual
 
@@ -159,7 +161,11 @@ Connected devices receive event changes through the shared cloud workspace. Impo
 
 ## Reports and exports
 
-Administrators can export event information for review and record keeping, including violation data, field activity, judging information, match anomalies, and event summaries.
+Administrators can export event information for review and record keeping, including violation data, field activity, judging information, match anomalies, and event summaries. Official violation and judging exports use the volunteer's required first and last name, while normal app screens continue to use their nickname.
+
+## Features and Help
+
+The in app Features and Help guide documents role access, volunteer profiles, push alerts, help requests, offline behavior, violation Undo, match readiness, required robot pictures, the offline Game Manual, Event Command Center tools, Tournament Manager imports, exports, and device settings. It displays the installed Ref OS version so event staff can confirm that every device is using the Highlander Summit Release.
 
 ## Event day safety
 
@@ -184,8 +190,6 @@ Volunteer names, event records, device subscriptions, and operational data are s
 
 ## Release
 
-**Ref OS 1.2.0 Highlander Release**
-
-Private Beta
+**Ref OS 1.0.0 Highlander Summit Release**
 
 Created by Maharshi Patel for Highlander Summit event operations.

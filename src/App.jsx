@@ -2494,7 +2494,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
               <div className="leading-tight hidden sm:block">
                 <div className="flex items-center gap-1.5">
                   <div className="font-bold text-[13px] text-white">Ref-OS</div>
-                  <span className="rounded-full border border-amber-300/50 bg-amber-400/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-amber-200">Private Beta</span>
+                  <span className="rounded-full border border-red-300/50 bg-red-400/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-red-100">Highlander Summit Release</span>
                 </div>
                 <div className="text-[9px] text-slate-400">Referee Operating System</div>
               </div>
@@ -2635,7 +2635,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                 </div>
                 <div className="refos-sidebar-footer">
                   <span>{adminUnlocked ? "Admin" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
-                  <span>v{APP_VERSION} · Private Beta</span>
+                  <span>v{APP_VERSION} · Highlander Summit Release</span>
                 </div>
               </nav>
               <div className="sm:hidden refos-mobile-context">
@@ -2880,7 +2880,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
           <img src="/logo.svg" alt="Highlander Summit" className="h-10 w-10 object-contain opacity-90" />
           <p className="text-center text-xs text-slate-400">
             Made by Maharshi Patel ·{" "}
-            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 underline">@mpatel_ref</a>{" · "}v{APP_VERSION} · Private Beta
+            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 underline">@mpatel_ref</a>{" · "}v{APP_VERSION} · Highlander Summit Release
           </p>
         </div>
       </main>
@@ -5548,7 +5548,7 @@ function FeaturesGuide() {
   return (
     <>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-        Ref-OS is the shared referee, event operations, alliance, and judging workspace for the Highlander Summit. This guide reflects Ref-OS v{APP_VERSION}.
+        Ref OS is the shared referee, event operations, alliance, and judging workspace for the Highlander Summit. This guide reflects Ref OS v{APP_VERSION} Highlander Summit Release.
       </p>
 
       <Section icon={KeyRound} title="Login, access codes & roles">
@@ -5561,7 +5561,27 @@ function FeaturesGuide() {
           <Li><b>Permanent Admin keypad code</b> — the fixed event Admin code can be entered directly on the keypad. Generated volunteer codes use the pattern number, letter A-D, number, number.</Li>
           <Li><b>QR login</b> — admins can generate a QR login card for a role access code. QR creation and QR decoding are local to Ref-OS; the actual login still verifies access with Supabase.</Li>
         </ul>
-        <p>After login, enter your <b>first and last name</b>. Your name is used to identify entries and volunteer presence across the event.</p>
+        <p>After login, create a profile with a <b>nickname</b> plus required first and last name. Ref OS uses the nickname throughout the live app. The full name appears in the Event Contact Directory and on official violation and judging exports.</p>
+      </Section>
+
+      <Section icon={Contact} title="Volunteer profiles & contact directory">
+        <ul className="space-y-1.5">
+          <Li><b>Nickname</b> — the short name shown throughout matches, teams, activity, presence, and normal event workflows.</Li>
+          <Li><b>First and last name</b> — required for the shared Event Contact Directory and official violation and judging exports.</Li>
+          <Li><b>Phone number</b> — optional. When provided, it is added to the volunteer's directory entry.</Li>
+          <Li><b>Automatic updates</b> — editing a profile updates the volunteer's full name, nickname, role, and optional phone number in the shared directory.</Li>
+          <Li><b>Admin contacts</b> — Admins can add other event contacts with email, location, notes, and a custom display order.</Li>
+        </ul>
+      </Section>
+
+      <Section icon={Bell} title="Push alerts & help requests">
+        <ul className="space-y-1.5">
+          <Li><b>Enable push alerts</b> — every role can subscribe from the Access section. Installed iPhone and iPad devices, Android devices, tablets, and computers can receive alerts when Ref OS is not open.</Li>
+          <Li><b>Request Help</b> — alert the event crew for an Admin, field issue, rules question, medical assistance, or volunteer replacement.</Li>
+          <Li><b>Locations</b> — identify Field 1, Field 2, Field 3, Pit Floor, Competition Floor, Skills, Judging, or another location.</Li>
+          <Li><b>Acknowledgment</b> — one Admin can acknowledge a request for the crew so everyone knows it is being handled.</Li>
+          <Li><b>Code requests</b> — volunteers can ask an Admin to regenerate their own role code, and the replacement appears without closing the app.</Li>
+        </ul>
       </Section>
 
       <Section icon={ShieldAlert} title="Security & permissions">
@@ -5598,6 +5618,7 @@ function FeaturesGuide() {
           <Li><b>Cached matches</b> — every successful match schedule sync is saved on the device. Previously loaded qualification and elimination matches remain available while offline.</Li>
           <Li><b>Permanent failures</b> — rejected writes are moved into Failed Sync Items for Admin review.</Li>
           <Li><b>Realtime updates</b> — shared event data and event settings update across connected devices through Supabase realtime.</Li>
+          <Li><b>Cross device Undo</b> — undoing a new violation cancels its pending upload, removes the cloud record, and removes it from every connected device.</Li>
         </ul>
       </Section>
 
@@ -5606,6 +5627,8 @@ function FeaturesGuide() {
         <ul className="space-y-1.5">
           <Li>Choose <b>Minor</b>, <b>Major</b>, or <b>Inspection</b>, select the applicable rule, add notes, and attach robot photos when useful.</Li>
           <Li><b>Duplicate protection</b> warns before adding the same team, rule, and match combination twice.</Li>
+          <Li><b>Undo</b> appears for eight seconds after a new violation is saved. Ref OS confirms the action before removing it everywhere.</Li>
+          <Li><b>Mobile form controls</b> keep Save and Cancel visible while the violation details scroll above them.</Li>
           <Li><b>Field filters</b>, match jumping, replay flags, field faults, timeouts, watchlist information, and match violation history are available from the match workflow.</Li>
           <Li><b>Elimination priority</b> — when elimination matches exist, the Matches view prioritizes them while qualifications remain available.</Li>
           <Li><b>Timeouts</b> are available for elimination matches and are tracked by alliance across the elimination bracket.</Li>
@@ -5625,7 +5648,8 @@ function FeaturesGuide() {
           <Li><b>Teams</b> — search teams, open their full history, add teams, review Tournament Manager rank, and start a new log from the team record.</Li>
           <Li><b>Team scanner</b> — use the camera OCR scanner to recognize a team number and jump to the team record.</Li>
           <Li><b>Watchlist</b> — add shared watch notes to teams. Watched teams are flagged and their notes appear during relevant matches.</Li>
-          <Li><b>Robot photos</b> — store inspection photos for teams so referees can identify and review robots later.</Li>
+          <Li><b>Required inspection pictures</b> — capture Front, Back, and Side views for every robot. Completion appears on each team card.</Li>
+          <Li><b>Offline picture queue</b> — required pictures remain visible as queued and upload automatically after connectivity returns.</Li>
         </ul>
       </Section>
 
@@ -5636,6 +5660,8 @@ function FeaturesGuide() {
           <Li><b>Recently used</b> — recently selected rules are shown automatically for faster repeat access.</Li>
           <Li><b>Offline rule index</b> — the event rule index is bundled with Ref-OS, so rule codes, descriptions, categories, favorites, recent rules, and referee notes remain available when Supabase or Wi-Fi is unavailable.</Li>
           <Li><b>Referee guidance</b> — rules with supplemental guidance can be opened for violation notes, escalation guidance, and event-specific interpretation.</Li>
+          <Li><b>Offline Game Manual</b> — open the complete manual with Back, Jump to Table of Contents, and Jump to Quick Reference Guide controls on desktop and mobile.</Li>
+          <Li><b>Quick Reference links</b> — select a rule inside the manual's Quick Reference Guide to jump directly to that rule in the manual.</Li>
         </ul>
         <p>Favorites and recently used rules are stored on the local browser or device.</p>
       </Section>
@@ -5677,8 +5703,8 @@ function FeaturesGuide() {
       <Section icon={BarChart3} title="Exports, analytics & backup">
         <ul className="space-y-1.5">
           <Li><b>Event Report PDF</b> — includes event overview, AWP analytics, field comparison, violation summary, alliance selections, and judging totals.</Li>
-          <Li><b>Violation export</b> — violation data can be exported and the official Match Anomaly Log PDF can be filled from Ref-OS data.</Li>
-          <Li><b>Judging export</b> — create the combined official Energy and Sportsmanship nomination PDF.</Li>
+          <Li><b>Violation export</b> — violation data can be exported and the official Match Anomaly Log PDF can be filled from Ref OS data using the submitter's full name.</Li>
+          <Li><b>Judging export</b> — create the combined official Energy and Sportsmanship nomination PDF using the submitter's full name.</Li>
           <Li><b>Field comparison</b> — Admin view comparing matches, violations, replays, and field faults by field.</Li>
           <Li><b>Backup all JSON</b> — download a snapshot of the event data for event-day insurance.</Li>
           <Li><b>Clear event data</b> — Admins can selectively clear supported event data, including judging, alliances, and watchlist data.</Li>
@@ -5689,13 +5715,14 @@ function FeaturesGuide() {
         <ul className="space-y-1.5">
           <Li><b>Install Ref-OS</b> — add the deployed HTTPS site to the device home screen for an app-like PWA experience.</Li>
           <Li><b>Dark / Light mode</b> and <b>Text size</b> are saved per device.</Li>
+          <Li><b>Release identification</b> — login, settings, diagnostics, and this guide display v{APP_VERSION} Highlander Summit Release.</Li>
           <Li><b>Mobile navigation</b> — phones use the compact Go to section menu instead of forcing the full desktop navigation across the screen.</Li>
           <Li><b>Device readiness</b> — event staff can approve modern devices by running the Pre Event System Test before use.</Li>
         </ul>
       </Section>
 
       <Section icon={Pencil} title="Editing & correcting records">
-        <p>Synced violations can be reopened, edited, and deleted according to the signed-in role. Editing keeps the existing record and reopens the form with its current information so corrections can be made without creating a second violation.</p>
+        <p>Synced violations can be reopened, edited, and deleted according to the signed in role. Editing keeps the existing record and reopens the form with its current information so corrections can be made without creating a second violation. Newly saved violations also include a confirmed Undo action that removes the entry across connected devices.</p>
       </Section>
 
       <p className="text-center text-xs text-slate-400 mt-4 mb-2">
