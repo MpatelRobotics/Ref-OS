@@ -160,6 +160,7 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 .refos-header :is(button,a):focus-visible { outline-color:#93c5fd; }
 .refos-skip { position:fixed; left:16px; top:-100px; z-index:200; background:white; color:#17243a; padding:12px 20px; border-radius:8px; }
 .refos-skip:focus { top:16px; }
+.refos-shell>.refos-command-center-back { bottom:auto !important; width:auto; height:auto; min-height:0; }
 #workspace { scroll-margin-top:180px; }
 @media(min-width:1100px) {
  .refos-shell { padding-left:272px; }

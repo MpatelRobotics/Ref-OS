@@ -2944,7 +2944,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowCountdownSetup(false)} />}
       {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowOfflineTest(false)} />}
       {commandCenterChildOpen && !showCommandCenter && (
-        <button onClick={returnToCommandCenter} className="fixed top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-[130] rounded-xl bg-[#101d33] text-white shadow-xl border border-white/20 px-3 py-2 flex items-center gap-1.5 text-sm font-bold">
+        <button onClick={returnToCommandCenter} className="refos-command-center-back fixed top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-[130] rounded-xl bg-[#101d33] text-white shadow-xl border border-white/20 px-3 py-2 flex items-center gap-1.5 text-sm font-bold">
           <ChevronLeft size={18}/> Back to Command Center
         </button>
       )}
