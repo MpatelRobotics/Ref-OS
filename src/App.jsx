@@ -570,16 +570,73 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [showCountdownSetup, setShowCountdownSetup] = useState(false);
   const [showOfflineTest, setShowOfflineTest] = useState(false);
   const [showCommandCenter, setShowCommandCenter] = useState(false);
+  const [commandCenterChildOpen, setCommandCenterChildOpen] = useState(false);
   const [showContactDirectory, setShowContactDirectory] = useState(false);
   const [showPreEventTest, setShowPreEventTest] = useState(false);
   const [showTwoDeviceSyncTest, setShowTwoDeviceSyncTest] = useState(false);
   const [showDiagnosticReport, setShowDiagnosticReport] = useState(false);
   const [showRoleCodeManager, setShowRoleCodeManager] = useState(false);
   const [showHelpRequest, setShowHelpRequest] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try { return localStorage.getItem(`refosQuickStart:${eventId}:${role}`) !== "1"; }
+    catch { return true; }
+  });
+  const [onboardingStep, setOnboardingStep] = useState(0);
+  const [undoPrompt, setUndoPrompt] = useState(null);
+  const undoTimerRef = useRef(null);
   const [requestedRoleForManager, setRequestedRoleForManager] = useState("");
   const [lastSystemTest, setLastSystemTest] = useState(null);
   const [pushState, setPushState] = useState("checking");
   const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
+
+  const openCommandCenterTool = (openTool) => {
+    setShowCommandCenter(false);
+    setCommandCenterChildOpen(true);
+    openTool();
+  };
+
+  const returnToCommandCenter = () => {
+    setShowCountdownSetup(false);
+    setShowOfflineTest(false);
+    setShowAnnouncement(false);
+    setShowContactDirectory(false);
+    setShowRoleCodeManager(false);
+    setShowPreEventTest(false);
+    setShowTwoDeviceSyncTest(false);
+    setShowDiagnosticReport(false);
+    setShowEvent(false);
+    setShowTMSync(false);
+    setShowActivity(false);
+    setShowRankings(false);
+    setShowClear(false);
+    setCommandCenterChildOpen(false);
+    loadEventMembers();
+    setShowCommandCenter(true);
+  };
+
+  const offerUndo = useCallback((message, action) => {
+    clearTimeout(undoTimerRef.current);
+    setUndoPrompt({ message, action });
+    undoTimerRef.current = setTimeout(() => setUndoPrompt(null), 8000);
+  }, []);
+
+  useEffect(() => () => clearTimeout(undoTimerRef.current), []);
+
+  const runUndo = async () => {
+    const prompt = undoPrompt;
+    if (!confirm("Are you sure you want to undo this action?")) return;
+    clearTimeout(undoTimerRef.current);
+    setUndoPrompt(null);
+    if (!prompt?.action) return;
+    try { await prompt.action(); }
+    catch (error) { alert(error?.message || "Could not undo that action."); }
+  };
+
+  const closeOnboarding = () => {
+    try { localStorage.setItem(`refosQuickStart:${eventId}:${role}`, "1"); } catch {}
+    setShowOnboarding(false);
+    setOnboardingStep(0);
+  };
 
   const contactDirectoryEntries = fieldLog.filter((e) => e.kind === "contact_directory").sort((a, b) => b.createdAt - a.createdAt);
   const contactDirectoryEntry = contactDirectoryEntries[0] || null;
@@ -1001,7 +1058,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       practice: Math.max(0, parseInt(data.practice, 10) || 0),
       bracket: Number(data.bracket) || 0, finalsBestOf: Number(data.finalsBestOf) || 1,
     });
-    setEvent(ev); setShowEvent(false);
+    setEvent(ev);
+    if (commandCenterChildOpen) returnToCommandCenter();
+    else setShowEvent(false);
   };
 
   const upsertTeam = async (number, name) => {
@@ -1042,6 +1101,12 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     if (cleanMatch) { setLastMatch(cleanMatch); localStorage.setItem("lastMatch", JSON.stringify(cleanMatch)); }
     await outbox.enqueue(eventId, { id: row.id, kind: "violation", eventId, row, photos, createdAt });
     doFlush();
+    offerUndo(`Violation saved for ${row.team}`, async () => {
+      await outbox.removeOp(eventId, row.id);
+      setViols((cur) => cur.filter((violation) => violation.id !== row.id));
+      await api.deleteViolation({ id: row.id, photoKeys: [] });
+      refreshQueueHealth();
+    });
   };
 
   const deleteViolation = async (v) => {
@@ -1096,6 +1161,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     await outbox.enqueue(eventId, { id, kind: "robot_photo", eventId, number, angle, dataUrl, createdAt: Date.now() });
     await refreshQueueHealth();
     doFlush();
+    offerUndo(`${angle.charAt(0).toUpperCase() + angle.slice(1)} inspection picture saved`, async () => {
+      await outbox.removeOp(eventId, id);
+      setTeams((cur) => cur.map((team) => team.number === number ? { ...team, _pendingRobotPhotos: (team._pendingRobotPhotos || []).filter((photo) => photo.id !== id), photoKeys: (team.photoKeys || []).filter((path) => !path.endsWith(`/${angle}-${id}.jpg`)) } : team));
+      try { await api.removeTeamPhoto(eventId, number, `${eventId}/team/${number}/${angle}-${id}.jpg`); }
+      catch (error) { if (!outbox.isOffline(error)) throw error; }
+      refreshQueueHealth();
+    });
   };
   const removeRobotPhoto = async (number, path) => {
     try {
@@ -1849,7 +1921,9 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     }
     if (sel.teams) setOpenTeam(null);
     if (sel.schedule) setOpenMatch(null);
-    setShowClear(false); setMenu(false);
+    if (commandCenterChildOpen) returnToCommandCenter();
+    else setShowClear(false);
+    setMenu(false);
   };
 
   const countsByTeam = useMemo(() => {
@@ -1989,7 +2063,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const saveSharedCountdown = async (value) => {
     const saved = await api.upsertEventSetting(eventId, "event_countdown", value, meName);
     setEventSettings((cur) => ({ ...cur, event_countdown: saved }));
-    setShowCountdownSetup(false);
+    if (commandCenterChildOpen) returnToCommandCenter();
+    else setShowCountdownSetup(false);
   };
 
   const clearSharedCountdown = async () => {
@@ -1999,7 +2074,8 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       delete next.event_countdown;
       return next;
     });
-    setShowCountdownSetup(false);
+    if (commandCenterChildOpen) returnToCommandCenter();
+    else setShowCountdownSetup(false);
   };
 
   const exportEventReport = async () => {
@@ -2759,7 +2835,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
       {showIdentity && <IdentityModal me={{ name: meName }} onSave={async (n) => { await onEditName(n); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
       {showHelpRequest && <HelpRequestModal onSend={sendHelpRequest} onClose={() => setShowHelpRequest(false)} />}
-      {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length, quadrantChecks: fieldResetChecks.length }} onClear={clearSelected} onClose={() => setShowClear(false)} />}
+      {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length, quadrantChecks: fieldResetChecks.length }} onClear={clearSelected} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowClear(false)} />}
       {showOnline && (
         <div className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
           <div className="bg-white dark:bg-slate-800 w-full max-h-[100dvh] sm:max-w-md sm:max-h-[90vh] sm:rounded-2xl rounded-t-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -2782,7 +2858,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       )}
       {showTMSync && (
         <TMSyncCenter
-          onClose={() => setShowTMSync(false)}
+          onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowTMSync(false)}
           onImportTeams={() => teamFileRef.current?.click()}
           onImportMatches={() => matchFileRef.current?.click()}
           onImportRankings={() => rankingFileRef.current?.click()}
@@ -2842,50 +2918,55 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         </div>
       )}
       {showPreEventTest && adminUnlocked && <PreEventSystemTest eventId={eventId} adminUnlocked={adminUnlocked}
-        onClose={() => setShowPreEventTest(false)} onComplete={setLastSystemTest} />}
+        onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowPreEventTest(false)} onComplete={setLastSystemTest} />}
       {showTwoDeviceSyncTest && adminUnlocked && <TwoDeviceSyncTest fieldLog={fieldLog} deviceId={deviceId} meName={meName}
-        onAdd={addFieldLog} onRemove={removeFieldLog} onClose={() => setShowTwoDeviceSyncTest(false)} />}
+        onAdd={addFieldLog} onRemove={removeFieldLog} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowTwoDeviceSyncTest(false)} />}
       {showDiagnosticReport && adminUnlocked && <EventDiagnosticReport event={event} eventId={eventId} teams={teams} matches={matches}
         viols={viols} rules={rules} fieldLog={fieldLog} presence={presence} roster={refRoster} contacts={eventContacts}
         countdown={eventCountdown} tmSyncStatus={tmSyncStatus} online={online} pendingCount={pendingCount}
         queuedWrites={queuedWrites} failedSyncCount={failedSyncItems.length} cloudReachable={cloudReachable}
         lastCloudError={lastCloudError} syncedAt={syncedAt} syncing={syncing}
-        lastSystemTest={lastSystemTest} onClose={() => setShowDiagnosticReport(false)} />}
+        lastSystemTest={lastSystemTest} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowDiagnosticReport(false)} />}
       {showRoleCodeManager && adminUnlocked && <RoleAccessCodeManager eventId={eventId} config={sharedRoleCodeConfig} requestedRole={requestedRoleForManager}
-        onSave={saveRoleAccessConfig} onClose={() => { setShowRoleCodeManager(false); setRequestedRoleForManager(""); }} />}
+        onSave={saveRoleAccessConfig} onClose={() => { setRequestedRoleForManager(""); commandCenterChildOpen ? returnToCommandCenter() : setShowRoleCodeManager(false); }} />}
       {showContactDirectory && <EventContactDirectory contacts={eventContacts} canEdit={adminUnlocked}
-        onSave={saveEventContacts} onClose={() => setShowContactDirectory(false)} />}
+        onSave={saveEventContacts} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowContactDirectory(false)} />}
       {showCountdownSetup && adminUnlocked && <CountdownSetupModal current={eventCountdown}
         onSave={saveSharedCountdown}
         onClear={clearSharedCountdown}
-        onClose={() => setShowCountdownSetup(false)} />}
-      {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => setShowOfflineTest(false)} />}
+        onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowCountdownSetup(false)} />}
+      {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowOfflineTest(false)} />}
+      {commandCenterChildOpen && !showCommandCenter && (
+        <button onClick={returnToCommandCenter} className="fixed top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-[130] rounded-xl bg-[#101d33] text-white shadow-xl border border-white/20 px-3 py-2 flex items-center gap-1.5 text-sm font-bold">
+          <ChevronLeft size={18}/> Back to Command Center
+        </button>
+      )}
       {showCommandCenter && adminUnlocked && <CommandCenter matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
         eventMembers={eventMembers} meName={meName} onSetAdmin={setVolunteerAdmin}
         failedSyncItems={failedSyncItems} onRetryFailedSync={retryFailedSync} onDiscardFailedSync={discardFailedSync}
         countdown={eventCountdown} countdownText={countdownText}
-        onCountdown={() => { setShowCommandCenter(false); setShowCountdownSetup(true); }}
+        onCountdown={() => openCommandCenterTool(() => setShowCountdownSetup(true))}
         onClearCountdown={clearSharedCountdown}
-        onOfflineTest={() => { setShowCommandCenter(false); setShowOfflineTest(true); }}
-        onAnnouncement={() => { setShowCommandCenter(false); setShowAnnouncement(true); }}
+        onOfflineTest={() => openCommandCenterTool(() => setShowOfflineTest(true))}
+        onAnnouncement={() => openCommandCenterTool(() => setShowAnnouncement(true))}
         onDeleteAnnouncement={deleteAnnouncementForAll}
         onClearAnnouncements={clearAnnouncementsForAll}
-        onContactDirectory={() => { setShowCommandCenter(false); setShowContactDirectory(true); }}
-        onRoleCodes={() => { setShowCommandCenter(false); setShowRoleCodeManager(true); }}
-        onPreEventTest={() => { setShowCommandCenter(false); setShowPreEventTest(true); }}
-        onTwoDeviceSyncTest={() => { setShowCommandCenter(false); setShowTwoDeviceSyncTest(true); }}
-        onDiagnosticReport={() => { setShowCommandCenter(false); setShowDiagnosticReport(true); }}
-        onEventSetup={() => { setShowCommandCenter(false); setShowEvent(true); }}
-        onTMSync={() => { setShowCommandCenter(false); setShowTMSync(true); }}
+        onContactDirectory={() => openCommandCenterTool(() => setShowContactDirectory(true))}
+        onRoleCodes={() => openCommandCenterTool(() => setShowRoleCodeManager(true))}
+        onPreEventTest={() => openCommandCenterTool(() => setShowPreEventTest(true))}
+        onTwoDeviceSyncTest={() => openCommandCenterTool(() => setShowTwoDeviceSyncTest(true))}
+        onDiagnosticReport={() => openCommandCenterTool(() => setShowDiagnosticReport(true))}
+        onEventSetup={() => openCommandCenterTool(() => setShowEvent(true))}
+        onTMSync={() => openCommandCenterTool(() => setShowTMSync(true))}
         onExportViolations={exportCSV}
         onExportNominations={exportNominations}
         onExportEventReport={exportEventReport}
         onBackupAll={backupAll}
-        onActivityFeed={() => { setShowCommandCenter(false); setShowActivity(true); }}
-        onRankings={() => { setShowCommandCenter(false); setShowRankings(true); }}
-        onClearData={() => { setShowCommandCenter(false); setShowClear(true); }}
+        onActivityFeed={() => openCommandCenterTool(() => setShowActivity(true))}
+        onRankings={() => openCommandCenterTool(() => setShowRankings(true))}
+        onClearData={() => openCommandCenterTool(() => setShowClear(true))}
         onClose={() => setShowCommandCenter(false)} />}
-      {showAnnouncement && adminUnlocked && <AnnouncementModal onClose={() => setShowAnnouncement(false)} onSend={sendAnnouncement} />}
+      {showAnnouncement && adminUnlocked && <AnnouncementModal onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowAnnouncement(false)} onSend={sendAnnouncement} />}
       {showFeatures && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
           <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
@@ -2894,6 +2975,11 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           </div>
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-2xl mx-auto px-4 py-4">
+              <button onClick={() => { setOnboardingStep(0); setShowOnboarding(true); }} className="w-full mb-4 rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 p-4 flex items-center gap-3 text-left">
+                <div className="w-10 h-10 rounded-xl bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 flex items-center justify-center shrink-0"><Info size={19}/></div>
+                <div className="flex-1 min-w-0"><div className="font-bold text-slate-900 dark:text-slate-100">View Quick Start</div><div className="text-xs text-slate-500 dark:text-slate-400">Assignments, help requests, and offline saving in three short screens.</div></div>
+                <ChevronRight size={18} className="text-sky-600 shrink-0"/>
+              </button>
               <div className="mb-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/30 text-[#D7212B] flex items-center justify-center shrink-0"><Mail size={18} /></div>
                 <div className="flex-1 min-w-0">
@@ -2908,10 +2994,19 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         </div>
       )}
       {showFeedback && <FeedbackModal meName={meName} myRole={myRole} onSubmit={addFieldLog} onClose={() => setShowFeedback(false)} />}
+      {showOnboarding && <QuickStartModal step={onboardingStep} setStep={setOnboardingStep} onClose={closeOnboarding} />}
+      {undoPrompt && (
+        <div className="fixed left-3 right-3 bottom-[calc(78px+env(safe-area-inset-bottom))] sm:bottom-6 z-[100] max-w-md mx-auto rounded-xl bg-[#101d33] text-white shadow-2xl border border-white/15 px-4 py-3 flex items-center gap-3" role="status">
+          <Check size={18} className="text-emerald-300 shrink-0" />
+          <span className="flex-1 text-sm font-semibold">{undoPrompt.message}</span>
+          <button onClick={runUndo} className="rounded-lg bg-white text-[#101d33] px-3 py-1.5 text-sm font-bold">Undo</button>
+          <button onClick={() => { clearTimeout(undoTimerRef.current); setUndoPrompt(null); }} aria-label="Dismiss" className="text-white/70"><X size={17}/></button>
+        </div>
+      )}
       {showActivity && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
           <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
-            <button onClick={() => setShowActivity(false)} className="text-slate-500 dark:text-slate-400 p-1 -ml-1"><ChevronLeft size={22} /></button>
+            <button onClick={() => commandCenterChildOpen ? returnToCommandCenter() : setShowActivity(false)} className="text-slate-500 dark:text-slate-400 p-1 -ml-1"><ChevronLeft size={22} /></button>
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><ListOrdered size={18} /> Activity feed</h2>
           </div>
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><ActivityFeed viols={viols} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} /></div></div>
@@ -2920,7 +3015,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       {showRankings && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
           <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
-            <button onClick={() => setShowRankings(false)} className="text-slate-500 dark:text-slate-400 p-1 -ml-1"><ChevronLeft size={22} /></button>
+            <button onClick={() => commandCenterChildOpen ? returnToCommandCenter() : setShowRankings(false)} className="text-slate-500 dark:text-slate-400 p-1 -ml-1"><ChevronLeft size={22} /></button>
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><BarChart3 size={18} /> Team rankings</h2>
           </div>
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><Rankings viols={viols} teamName={teamNameMap} /></div></div>
@@ -2948,7 +3043,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           <button onClick={() => setShowInstallHelp(false)} className="w-full mt-4 py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold">Got it</button>
         </Modal>
       )}
-      {showEvent && <EventModal event={event} onSave={saveEvent} onClose={() => setShowEvent(false)} />}
+      {showEvent && <EventModal event={event} onSave={saveEvent} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEvent(false)} />}
       {lightbox && (
         <div onClick={() => setLightbox(null)} className="fixed inset-0 z-[60] bg-black/90 grid place-items-center p-4">
           <img src={lightbox} alt="robot" className="max-h-full max-w-full rounded-lg" />
@@ -5303,6 +5398,36 @@ function FieldLogView({ entries, onAdd, onRemove, meName, canDelete }) {
 }
 
 /* ============================ FEATURES & HELP ============================ */
+function QuickStartModal({ step, setStep, onClose }) {
+  const pages = [
+    { Icon: MapPin, title: "Know where to go", text: "Your current volunteer assignment appears near the top of the workspace. Assignments are directions only and never limit the matches, teams, or tools you can view." },
+    { Icon: LifeBuoy, title: "Ask the crew for help", text: "Use Request Help from Settings when you need an Admin, field support, a rules answer, medical assistance, or volunteer coverage. Include your location so someone can respond quickly." },
+    { Icon: CloudOff, title: "Keep working offline", text: "Violations and inspection pictures are saved safely on this device when the connection drops. Ref OS uploads queued work automatically after the device reconnects." },
+  ];
+  const page = pages[Math.max(0, Math.min(step, pages.length - 1))];
+  const PageIcon = page.Icon;
+  return (
+    <div className="fixed inset-0 z-[110] bg-black/55 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+      <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-white dark:bg-slate-800 shadow-2xl overflow-hidden" onClick={(event) => event.stopPropagation()}>
+        <div className="px-5 pt-5 flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Quick Start · {step + 1} of {pages.length}</span>
+          <button onClick={onClose} aria-label="Close Quick Start" className="text-slate-400 p-1"><X size={22}/></button>
+        </div>
+        <div className="px-6 py-8 text-center">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-red-50 dark:bg-red-950/35 text-[#D7212B] grid place-items-center"><PageIcon size={32}/></div>
+          <h2 className="mt-5 text-xl font-bold text-slate-900 dark:text-slate-100">{page.title}</h2>
+          <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{page.text}</p>
+          <div className="mt-6 flex justify-center gap-2">{pages.map((_, index) => <span key={index} className={`h-2 rounded-full transition-all ${index === step ? "w-7 bg-[#D7212B]" : "w-2 bg-slate-200 dark:bg-slate-600"}`}/>)}</div>
+        </div>
+        <div className="px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] flex gap-3">
+          {step > 0 && <button onClick={() => setStep(step - 1)} className="px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-600 font-bold text-slate-700 dark:text-slate-200">Back</button>}
+          <button onClick={() => step < pages.length - 1 ? setStep(step + 1) : onClose()} className="flex-1 px-4 py-3 rounded-xl bg-[#D7212B] text-white font-bold">{step < pages.length - 1 ? "Next" : "Start using Ref OS"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FeaturesGuide() {
   const Section = ({ icon: Ic, title, children }) => (
     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-3">

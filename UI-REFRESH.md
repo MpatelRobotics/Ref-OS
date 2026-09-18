@@ -50,6 +50,12 @@ Admins can assign signed in volunteers to Field 1, Field 2, Field 3, Pit Floor, 
 
 Robot inspection now requires labeled Front, Back, and Side pictures. Each team shows a three picture completion count, and every required angle has its own capture or retake control. Pictures taken while offline are retained in the device outbox, remain visible with a queued label, survive an app restart, and upload automatically after reconnection.
 
+New volunteers receive a three screen Quick Start for assignments, help requests, and offline saving. The introduction appears once per role on each device and remains available from Features and Help.
+
+New violations and inspection pictures show an eight second Undo action. Selecting Undo first asks for confirmation before removing the saved item.
+
+Admin tools opened from the Event Command Center now keep a persistent Back to Command Center action. Closing or saving those tools returns to the Command Center instead of exiting to the workspace.
+
 The admin push alert control is grouped under Access in the settings menu with the other login, invitation, and permission controls.
 
 Push alert enrollment is now available to Referees, Judge Advisors, Emcees, and Admins. Every role can send a categorized help request, all subscribed event members receive the notification, and an Admin acknowledgment updates live for the entire crew.

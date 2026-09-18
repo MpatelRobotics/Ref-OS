@@ -1,4 +1,4 @@
-const CACHE = "refos-v28-1.2.0-required-inspection-pictures";
+const CACHE = "refos-v30-1.2.0-undo-onboarding-command-back";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {

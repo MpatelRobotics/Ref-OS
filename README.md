@@ -12,6 +12,10 @@ Everyone works from the same event record. Updates made by one volunteer appear 
 
 The interface adapts to phones, tablets, and desktop operations stations. Mobile devices use quick bottom navigation and touch friendly sheets. Desktop devices use a wider operations layout with persistent navigation and event tools.
 
+New volunteers receive a three screen Quick Start covering assignments, help requests, and offline saving. It appears once per role on each device and can be reopened from Features and Help.
+
+After saving a new violation or inspection picture, volunteers receive an eight second Undo option. Ref OS asks for confirmation before completing the undo.
+
 ## Volunteer roles
 
 ### Referee
@@ -84,6 +88,8 @@ The alliance tools support captain and pick assignments, elimination bracket pre
 ## Event Command Center
 
 The Event Command Center centralizes administrator tools and event health information. It includes access to operational summaries, event settings, announcements, countdown management, data controls, volunteer information, exports, and readiness checks.
+
+Tools opened from the Event Command Center include a persistent Back to Command Center button. Closing or saving a Command Center tool returns the Admin to the Command Center instead of the main workspace.
 
 ## Key Volunteer Status
 
