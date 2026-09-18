@@ -2577,7 +2577,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         })()}
       </header>
 
-      {!openTeam && !openMatch && !openRobot && (() => {
+      {!openTeam && !openMatch && !openRobot && !showIdentity && (() => {
         const primary = isJudge ? [
           { k: "judging", label: "Judging", Icon: Trophy },
           { k: "alliances", label: "Alliances", Icon: GitBranch }

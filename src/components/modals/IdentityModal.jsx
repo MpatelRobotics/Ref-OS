@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import Label from "./FormLabel.jsx";
 
@@ -9,7 +10,7 @@ export default function IdentityModal({ me, onSave, onClose }) {
   const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
   const valid = !!firstName.trim() && !!lastName.trim();
   const submit = () => valid && onSave(fullName);
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[150] bg-black/40 flex items-stretch sm:items-center justify-center">
       <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-white dark:bg-slate-800 sm:h-auto sm:max-h-[90dvh] sm:max-w-sm sm:rounded-2xl">
         <div className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] dark:border-slate-700">
@@ -31,7 +32,8 @@ export default function IdentityModal({ me, onSave, onClose }) {
         </div>
         <div className="shrink-0 border-t border-slate-200 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 dark:border-slate-700"><button onClick={submit} disabled={!valid} className={`w-full py-2.5 rounded-lg font-semibold text-white ${valid ? "bg-slate-900 hover:bg-slate-800" : "bg-slate-300"}`}>Save</button></div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
