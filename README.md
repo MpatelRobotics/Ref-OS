@@ -12,6 +12,8 @@ Everyone works from the same event record. Updates made by one volunteer appear 
 
 The interface adapts to phones, tablets, and desktop operations stations. Mobile devices use quick bottom navigation and touch friendly sheets. Desktop devices use a wider operations layout with persistent navigation and event tools.
 
+Each volunteer creates a required identity profile with a nickname plus first and last name. Ref OS uses the nickname throughout the live workflow. The volunteer's full name is used on official violation and judging exports and is shown with their nickname and role in the shared Event Contact Directory. A volunteer may also add an optional phone number to the directory.
+
 New volunteers receive a three screen Quick Start covering assignments, help requests, and offline saving. It appears once per role on each device and can be reopened from Features and Help.
 
 After saving a new violation or inspection picture, volunteers receive an eight second Undo option. Ref OS asks for confirmation before completing the undo.

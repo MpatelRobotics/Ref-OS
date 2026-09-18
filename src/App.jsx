@@ -360,6 +360,8 @@ export default function App() {
   const cycleTextSize = () => setTextScale((s) => (s === "normal" ? "large" : s === "large" ? "xl" : "normal"));
 
   const [meName, setMeName] = useState(() => localStorage.getItem("refName") || "");
+  const [meFullName, setMeFullName] = useState(() => localStorage.getItem("refFullName") || "");
+  const [mePhone, setMePhone] = useState(() => localStorage.getItem("refPhone") || "");
   const [event, setEvent] = useState(null);
   const [loadErr, setLoadErr] = useState(false);
 
@@ -420,11 +422,16 @@ export default function App() {
     setUnlocked(true);
   };
 
-  const saveName = async (n) => {
-    const clean = n.trim();
-    localStorage.setItem("refName", clean);
-    setMeName(clean);
-    try { await api.setEventMemberName(EVENT_ID, clean); } catch {}
+  const saveIdentity = async ({ nickname, fullName, phone = "" }) => {
+    const cleanNickname = String(nickname || "").trim();
+    const cleanFullName = String(fullName || "").trim();
+    localStorage.setItem("refName", cleanNickname);
+    localStorage.setItem("refFullName", cleanFullName);
+    localStorage.setItem("refPhone", String(phone || "").trim());
+    setMeName(cleanNickname);
+    setMeFullName(cleanFullName);
+    setMePhone(String(phone || "").trim());
+    try { await api.setEventMemberName(EVENT_ID, cleanNickname); } catch {}
   };
 
   const lock = async () => {
@@ -439,7 +446,7 @@ export default function App() {
   if (!configured) return <ConfigError />;
   if (!accessChecked) return <FullPage>Checking event access…</FullPage>;
   if (!unlocked) return <LoginScreen eventId={EVENT_ID} onUnlock={unlock} />;
-  if (!meName) return <NameScreen onName={saveName} />;
+  if (!meName || !meFullName) return <NameScreen onIdentity={saveIdentity} />;
   if (loadErr) return (
     <FullPage>
       <div className="max-w-sm">
@@ -450,7 +457,7 @@ export default function App() {
   );
   if (!event) return <FullPage>Loading…</FullPage>;
 
-  return <Tracker key={event.id} initialEvent={event} meName={meName} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveName} onLock={lock} />;
+  return <Tracker key={event.id} initialEvent={event} meName={meName} meFullName={meFullName} mePhone={mePhone} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} />;
 }
 
 const FullPage = ({ children }) => (
@@ -468,7 +475,7 @@ const ConfigError = () => (
 /* ==================================================================== */
 /*  TRACKER (the main app, scoped to one event)                        */
 /* ==================================================================== */
-function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock }) {
+function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock }) {
   const isJudge = role === "judge";
   const isEmcee = role === "emcee";
   const eventId = initialEvent.id;
@@ -590,6 +597,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   const [lastSystemTest, setLastSystemTest] = useState(null);
   const [pushState, setPushState] = useState("checking");
   const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
+  const myRole = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
 
   const openCommandCenterTool = (openTool) => {
     setShowCommandCenter(false);
@@ -648,9 +656,60 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     try { const parsed = JSON.parse(contactDirectoryEntry.note); return Array.isArray(parsed) ? parsed : []; }
     catch { return []; }
   })();
-  const eventContacts = Array.isArray(eventSettings?.contact_directory?.value)
+  const savedEventContacts = Array.isArray(eventSettings?.contact_directory?.value)
     ? eventSettings.contact_directory.value
     : legacyContacts;
+  const latestVolunteerContacts = (() => {
+    const latest = new Map();
+    for (const entry of [...fieldLog].filter((item) => item.kind === "volunteer_contact").sort((a, b) => b.createdAt - a.createdAt)) {
+      try {
+        const profile = JSON.parse(entry.note || "{}");
+        const key = profile.userId || String(profile.nickname || "").trim().toLowerCase();
+        if (key && !latest.has(key)) latest.set(key, profile);
+      } catch {}
+    }
+    return latest;
+  })();
+  const volunteerContactKeys = new Set(latestVolunteerContacts.keys());
+  const eventContacts = [
+    ...savedEventContacts.filter((contact) => {
+      const key = contact._volunteerUserId || String(contact.nickname || "").trim().toLowerCase();
+      return !key || !volunteerContactKeys.has(key);
+    }),
+    ...[...latestVolunteerContacts.values()].map((profile) => ({
+      role: profile.role || "Volunteer",
+      name: profile.fullName || profile.nickname || "Volunteer",
+      nickname: profile.nickname || "",
+      phone: profile.phone || "",
+      email: "",
+      location: "",
+      notes: "",
+      _volunteerUserId: profile.userId || "",
+    })),
+  ];
+
+  useEffect(() => {
+    if (!ready || !currentUserId || !meName || !meFullName) return;
+    const profile = {
+      userId: currentUserId,
+      nickname: meName.trim(),
+      fullName: meFullName.trim(),
+      role: myRole,
+      phone: String(mePhone || "").trim(),
+    };
+    const signature = JSON.stringify(profile);
+    const storageKey = `refosVolunteerContactSynced:${eventId}:${currentUserId}`;
+    try { if (localStorage.getItem(storageKey) === signature) return; } catch {}
+    let cancelled = false;
+    api.addFieldLog(eventId, { kind: "volunteer_contact", note: signature, by: meName })
+      .then((saved) => {
+        if (cancelled) return;
+        setFieldLog((cur) => [saved, ...cur.filter((entry) => entry.id !== saved.id)]);
+        try { localStorage.setItem(storageKey, signature); } catch {}
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [ready, currentUserId, eventId, meName, meFullName, mePhone, myRole]);
   const baseRoleCodeConfig = eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config;
   const roleCodeLabels = { ref: "Referee", judge: "Judge Advisor", emcee: "Emcee" };
   const latestRoleCodeUpdates = (() => {
@@ -796,7 +855,6 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   });
   const [showRankings, setShowRankings] = useState(false);
   const [eventMembers, setEventMembers] = useState([]);
-  const myRole = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
   const deviceId = useMemo(() => {
     try {
       let id = localStorage.getItem("refosDeviceId");
@@ -1023,7 +1081,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       });
       const pend = q.filter((o) => o.kind === "violation").map((o) => ({
         id: o.row.id, team: o.row.team, type: o.row.type, code: o.row.code, desc: o.row.rule_desc || "",
-        notes: o.row.notes || "", match: o.row.match_info || null, by: o.row.logged_by || "",
+        notes: o.row.notes || "", match: o.row.match_info || null, by: api.decodeAttribution(o.row.logged_by).nickname, byFullName: api.decodeAttribution(o.row.logged_by).fullName,
         photoKeys: [], createdAt: o.createdAt || Date.now(), _pending: true, _localPhotos: o.photos || [],
       }));
       if (pend.length) setViols((cur) => { const have = new Set(cur.map((v) => v.id)); return [...pend.filter((p) => !have.has(p.id)), ...cur]; });
@@ -1092,13 +1150,13 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     const cleanMatch = match && match.phase && match.phase !== "none" ? { phase: match.phase, num: (match.num || "").trim() } : null;
     const row = api.buildViolationRow(eventId, {
       team, type, code: normNum(code).replace(/[<>]/g, ""), desc: desc.trim(),
-      notes: notes.trim(), by: meName || "", match: cleanMatch,
+      notes: notes.trim(), by: meName || "", byFullName: meFullName || meName || "", match: cleanMatch,
     });
     const createdAt = Date.now();
     // show it immediately (marked pending), then persist to the durable queue and try to send
     setViols((cur) => [{
       id: row.id, team: row.team, type: row.type, code: row.code, desc: row.rule_desc,
-      notes: row.notes, match: row.match_info, by: row.logged_by, photoKeys: [],
+      notes: row.notes, match: row.match_info, by: meName || "", byFullName: meFullName || meName || "", photoKeys: [],
       createdAt, _pending: true, _localPhotos: photos,
     }, ...cur]);
     if (cleanMatch) { setLastMatch(cleanMatch); localStorage.setItem("lastMatch", JSON.stringify(cleanMatch)); }
@@ -1122,7 +1180,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     const row = {
       id: orig.id, event_id: eventId, team: form.team, type: form.type,
       code: normNum(form.code).replace(/[<>]/g, ""), rule_desc: (form.desc || "").trim(),
-      notes: (form.notes || "").trim(), match_info: cleanMatch, logged_by: orig.by || meName || "",
+      notes: (form.notes || "").trim(), match_info: cleanMatch, logged_by: JSON.stringify({ v: 1, n: orig.by || meName || "", f: orig.byFullName || meFullName || meName || "" }),
     };
     try {
       const saved = await api.updateViolation(eventId, row, form.keepKeys || [], form.photos || [], orig.photoKeys || []);
@@ -1188,7 +1246,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
   };
   const addNomination = async (form) => {
     try {
-      const saved = await api.addNomination(eventId, { ...form, by: meName, byRole: myRole });
+      const saved = await api.addNomination(eventId, { ...form, by: meName, byFullName: meFullName, byRole: myRole });
       setNoms((cur) => [saved, ...cur.filter((x) => x.id !== saved.id)]);
     } catch (e) {
       if (outbox.isOffline(e)) throw new Error("You're offline — reconnect to nominate.");
@@ -1858,7 +1916,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         // Header fields (measured coordinates; energy/sports differ by ~1pt, negligible).
         page.drawText(String(event.name || "The Highlander Summit Signature Event"), { x: 116, y: 650, size: 9, font });
         page.drawText(fmtDate(n.createdAt), { x: 434, y: 650, size: 9, font });
-        page.drawText(String(n.by || ""), { x: 188, y: 625, size: 9, font });
+        page.drawText(String(n.byFullName || n.by || ""), { x: 188, y: 625, size: 9, font });
         page.drawText(String(n.team || ""), { x: 472, y: 625, size: 9.5, font: bold });
 
         // Check the same observed criteria selected in Ref OS.
@@ -2291,7 +2349,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         const matchLabel = fmtMatch(v.match) || "No match";
         const rule = v.code ? fmtRule(v.code) : "";
         const note = (v.notes || v.desc || "").replace(/\s+/g, " ").trim();
-        return [matchLabel, rule, note, violationResult(v)].filter(Boolean).join(" | ");
+        return [matchLabel, rule, note, violationResult(v), `Logged by ${v.byFullName || v.by || "Unknown"}`].filter(Boolean).join(" | ");
       };
 
       const pages = pdf.getPages();
@@ -2842,7 +2900,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await addNomination({ ...form, team }); setNominating(null); }} />
       )}
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
-      {showIdentity && <IdentityModal me={{ name: meName }} onSave={async (n) => { await onEditName(n); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
+      {showIdentity && <IdentityModal me={{ nickname: meName, fullName: meFullName, phone: mePhone }} onSave={async (identity) => { await onEditName(identity); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
       {showHelpRequest && <HelpRequestModal onSend={sendHelpRequest} onClose={() => setShowHelpRequest(false)} />}
       {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length, quadrantChecks: fieldResetChecks.length }} onClear={clearSelected} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowClear(false)} />}
       {showOnline && (
@@ -2922,7 +2980,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Flag size={18} /> Field log</h2>
           </div>
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4">
-            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","role_code_update","help_request","help_ack","feedback"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
+            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","volunteer_contact","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","role_code_update","help_request","help_ack","feedback"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
           </div></div>
         </div>
       )}
@@ -4257,7 +4315,7 @@ function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, f
     })();
   }, []);
 
-  const internalKinds = new Set(["announcement","event_countdown","contact_directory","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","role_code_update","help_request","help_ack","feedback"]);
+  const internalKinds = new Set(["announcement","event_countdown","contact_directory","volunteer_contact","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","role_code_update","help_request","help_ack","feedback"]);
   const operationalFieldLog = (fieldLog || []).filter((e) => !internalKinds.has(e.kind));
   const report = {
     generatedAt: new Date().toISOString(),

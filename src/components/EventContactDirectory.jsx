@@ -75,6 +75,7 @@ export default function EventContactDirectory({ contacts, canEdit, onSave, onClo
                 <div className="text-xs uppercase tracking-wide font-bold text-[#D7212B]">{c.role || "Event contact"}</div>
                 <div className="text-lg font-bold text-slate-900 dark:text-slate-100">{c.name || "Name not set"}</div>
                 <div className="mt-2 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                  {c.nickname && <div><b>Nickname:</b> {c.nickname}</div>}
                   {c.location && <div><b>Location:</b> {c.location}</div>}
                   {c.phone && <div><b>Phone:</b> <a className="underline" href={`tel:${c.phone}`}>{c.phone}</a></div>}
                   {c.email && <div><b>Email:</b> <a className="underline" href={`mailto:${c.email}`}>{c.email}</a></div>}
@@ -120,6 +121,7 @@ export default function EventContactDirectory({ contacts, canEdit, onSave, onClo
                   </div>
                   <input value={c.role} onChange={(e) => update(i,"role",e.target.value)} placeholder="Role, e.g. Head Referee" className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
                   <input value={c.name} onChange={(e) => update(i,"name",e.target.value)} placeholder="Name" className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
+                  {c.nickname !== undefined && <input value={c.nickname} onChange={(e) => update(i,"nickname",e.target.value)} placeholder="Nickname" className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>}
                   <div className="grid sm:grid-cols-2 gap-2">
                     <input value={c.phone} onChange={(e) => update(i,"phone",e.target.value)} placeholder="Phone" className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
                     <input value={c.email} onChange={(e) => update(i,"email",e.target.value)} placeholder="Email" className="w-full px-3 py-2.5 rounded-lg border dark:border-slate-600 bg-white dark:bg-slate-900"/>
@@ -140,4 +142,3 @@ export default function EventContactDirectory({ contacts, canEdit, onSave, onClo
     </div>
   );
 }
-

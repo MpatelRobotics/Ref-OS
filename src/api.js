@@ -553,7 +553,19 @@ export async function listRules(eventId) {
 }
 
 /* ================= award nominations (Judging) ================= */
-const mapNom = (r) => ({ id: r.id, award: r.award, team: r.team, match: r.match_info || null, reason: r.reason || "", criteria: r.criteria || [], whereWhen: r.where_when || "", by: r.nominated_by || "", byRole: r.nominated_role || "", createdAt: new Date(r.created_at).getTime() });
+export const decodeAttribution = (value) => {
+  const raw = String(value || "");
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed?.v === 1 && parsed?.n) return { nickname: String(parsed.n), fullName: String(parsed.f || parsed.n) };
+  } catch {}
+  return { nickname: raw, fullName: raw };
+};
+const encodeAttribution = (nickname, fullName) => JSON.stringify({ v: 1, n: String(nickname || "").trim(), f: String(fullName || nickname || "").trim() });
+const mapNom = (r) => {
+  const attribution = decodeAttribution(r.nominated_by);
+  return { id: r.id, award: r.award, team: r.team, match: r.match_info || null, reason: r.reason || "", criteria: r.criteria || [], whereWhen: r.where_when || "", by: attribution.nickname, byFullName: attribution.fullName, byRole: r.nominated_role || "", createdAt: new Date(r.created_at).getTime() };
+};
 export async function listNominations(eventId) {
   if (E2E_MOCK) return [];
   const { data } = await supabase.from("nominations").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
@@ -562,7 +574,7 @@ export async function listNominations(eventId) {
 export async function addNomination(eventId, n) {
   const id = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
   const cleanMatch = n.match && n.match.phase && n.match.phase !== "none" ? { phase: n.match.phase, num: (n.match.num || "").trim() } : null;
-  const row = { id, event_id: eventId, award: n.award, team: (n.team || "").trim().toUpperCase(), match_info: cleanMatch, reason: (n.reason || "").trim(), criteria: (n.criteria && n.criteria.length) ? n.criteria : null, where_when: (n.whereWhen || "").trim() || null, nominated_by: n.by || "", nominated_role: n.byRole || null };
+  const row = { id, event_id: eventId, award: n.award, team: (n.team || "").trim().toUpperCase(), match_info: cleanMatch, reason: (n.reason || "").trim(), criteria: (n.criteria && n.criteria.length) ? n.criteria : null, where_when: (n.whereWhen || "").trim() || null, nominated_by: encodeAttribution(n.by, n.byFullName), nominated_role: n.byRole || null };
   const { data, error } = await supabase.from("nominations").upsert(row, { onConflict: "id" }).select().single();
   if (error) throw error;
   return mapNom(data);
@@ -595,11 +607,14 @@ export async function setShortlist(eventId, award, team, on) {
 }
 
 /* ================= violations ================= */
-const mapViol = (r) => ({
-  id: r.id, team: r.team, type: r.type, code: r.code, desc: r.rule_desc || "",
-  notes: r.notes || "", match: r.match_info || null, by: r.logged_by || "",
-  photoKeys: r.photo_paths || [], createdAt: new Date(r.created_at).getTime(),
-});
+const mapViol = (r) => {
+  const attribution = decodeAttribution(r.logged_by);
+  return {
+    id: r.id, team: r.team, type: r.type, code: r.code, desc: r.rule_desc || "",
+    notes: r.notes || "", match: r.match_info || null, by: attribution.nickname, byFullName: attribution.fullName,
+    photoKeys: r.photo_paths || [], createdAt: new Date(r.created_at).getTime(),
+  };
+};
 export async function listViolations(eventId) {
   if (E2E_MOCK) return e2eState.violations.map((v) => ({ ...v }));
   const { data } = await supabase.from("violations").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
@@ -610,7 +625,7 @@ export async function listViolations(eventId) {
 export function buildViolationRow(eventId, v) {
   return {
     id: uid(), event_id: eventId, team: v.team, type: v.type, code: v.code,
-    rule_desc: v.desc, notes: v.notes, match_info: v.match, logged_by: v.by,
+    rule_desc: v.desc, notes: v.notes, match_info: v.match, logged_by: encodeAttribution(v.by, v.byFullName),
   };
 }
 // Upload photos then upsert the row. Safe to call more than once for the same
@@ -627,7 +642,8 @@ export async function addViolationRow(eventId, row, photoDataUrls = []) {
       desc: row.rule_desc || "",
       notes: row.notes || "",
       match: row.match_info || null,
-      by: row.logged_by || "",
+      by: decodeAttribution(row.logged_by).nickname,
+      byFullName: decodeAttribution(row.logged_by).fullName,
       photoKeys: [],
       createdAt: Date.now(),
     };
