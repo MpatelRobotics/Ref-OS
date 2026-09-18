@@ -5695,6 +5695,10 @@ function RuleBook({ rules }) {
     setManualNavigation((navigation) => navigation + 1);
   };
   const openManualAt = (page = 1) => {
+    if (window.matchMedia("(max-width: 767px)").matches) {
+      window.open(`/manuals/override-2.0.pdf#page=${page}`, "_blank", "noopener,noreferrer");
+      return;
+    }
     goToManualPage(page);
     setManualOpen(true);
   };
@@ -5734,13 +5738,12 @@ function RuleBook({ rules }) {
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
                 {g.items.map((r) => {
                   const note = RULE_NOTES[r.code];
-                  const manualPageForRule = RULE_MANUAL_PAGES[r.code];
                   return (
                     <div key={r.code} className="flex items-stretch hover:bg-slate-50 dark:hover:bg-slate-700">
-                    <button onClick={() => manualPageForRule && openManualAt(manualPageForRule)} disabled={!manualPageForRule} className="min-w-0 flex-1 text-left px-4 py-2.5 flex gap-3 items-baseline disabled:cursor-default">
+                    <div className="min-w-0 flex-1 px-4 py-2.5 flex gap-3 items-baseline">
                       <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
                       <span className="text-sm text-slate-600 dark:text-slate-300 flex-1">{r.desc}</span>
-                    </button>
+                    </div>
                     {note && <button onClick={() => setSelected(r)} className="shrink-0 border-l border-slate-100 px-3 text-[10px] font-bold text-slate-500 hover:text-[#D7212B] dark:border-slate-700 dark:text-slate-400" aria-label={`Open notes for ${r.code}`}>Notes</button>}
                     </div>
                   );
