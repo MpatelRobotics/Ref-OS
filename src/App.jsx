@@ -5695,10 +5695,6 @@ function RuleBook({ rules }) {
     setManualNavigation((navigation) => navigation + 1);
   };
   const openManualAt = (page = 1) => {
-    if (window.matchMedia("(max-width: 767px)").matches) {
-      window.open(`/manuals/override-2.0.pdf#page=${page}`, "_blank", "noopener,noreferrer");
-      return;
-    }
     goToManualPage(page);
     setManualOpen(true);
   };
@@ -5773,7 +5769,7 @@ function RuleBook({ rules }) {
         </div>,
         document.body
       )}
-      {manualOpen && (
+      {manualOpen && createPortal(
         <div className="fixed inset-0 z-[70] flex flex-col bg-slate-100 dark:bg-slate-950">
           <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-900">
             <button onClick={() => setManualOpen(false)} className="inline-flex items-center gap-1 rounded-lg px-2 py-2 text-sm font-bold text-slate-800 hover:bg-slate-100 dark:text-white dark:hover:bg-slate-800" aria-label="Back to Rules"><ChevronLeft size={21} /> Back</button>
@@ -5789,7 +5785,8 @@ function RuleBook({ rules }) {
             <span className="self-center text-xs text-slate-500 dark:text-slate-400">Page {manualPage}</span>
           </div>
           <iframe key={manualNavigation} src={`/manuals/override-2.0.pdf?navigation=${manualNavigation}#page=${manualPage}&view=FitH`} title={`Override 2.0 Game Manual page ${manualPage}`} className="min-h-0 w-full flex-1 bg-white" />
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

@@ -1,4 +1,4 @@
-const CACHE = "refos-v48-1.2.0-mobile-manual";
+const CACHE = "refos-v49-1.2.0-mobile-manual-controls";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png", "/manuals/override-2.0.pdf"];
 
 self.addEventListener("install", (event) => {

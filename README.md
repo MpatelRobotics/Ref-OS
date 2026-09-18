@@ -141,7 +141,7 @@ The shared contact directory keeps important event contacts available inside Ref
 
 The Rules workspace provides searchable Override rule summaries for quick event day access. The complete Override 2.0 Game Manual is stored with Ref OS for offline use.
 
-The desktop manual viewer includes Jump to Table of Contents and Jump to Quick Reference Guide controls. On phones, the manual opens directly in the device PDF viewer for reliable viewing and navigation. Rule links are used inside the manual's Quick Reference Guide, while the Ref OS Rules list remains a reference list. Rules with referee guidance include a separate Notes control. Rule notes open at the top of a full screen phone view, so volunteers do not need to scroll down the Rules list to read them.
+The full screen manual viewer includes Back, Jump to Table of Contents, and Jump to Quick Reference Guide controls on desktop and mobile devices. Rule links are used inside the manual's Quick Reference Guide, while the Ref OS Rules list remains a reference list. Rules with referee guidance include a separate Notes control. Rule notes open at the top of a full screen phone view, so volunteers do not need to scroll down the Rules list to read them.
 
 ## Offline resilience
 
