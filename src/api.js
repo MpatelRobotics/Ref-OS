@@ -696,6 +696,9 @@ export async function deleteViolation(v) {
   }
   const { error } = await supabase.from("violations").delete().eq("id", v.id);
   if (error) throw error;
+  const { data: remaining, error: verifyError } = await supabase.from("violations").select("id").eq("id", v.id).limit(1);
+  if (verifyError) throw verifyError;
+  if (remaining?.length) throw new Error("The violation is still stored in the cloud. Please try Undo again.");
 }
 export async function clearViolations(eventId) {
   if (E2E_MOCK) { e2eState.violations = []; return; }
@@ -736,7 +739,10 @@ export function subscribeEvent(eventId, onChange) {
   if (E2E_MOCK) return () => {};
   const ch = supabase
     .channel(`event-${eventId}-${Math.random().toString(36).slice(2)}`)
-    .on("postgres_changes", { event: "*", schema: "public", table: "violations", filter: `event_id=eq.${eventId}` }, onChange)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "violations", filter: `event_id=eq.${eventId}` }, onChange)
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "violations", filter: `event_id=eq.${eventId}` }, onChange)
+    // DELETE payloads may only contain the primary key, so filtering them by event_id prevents other devices from seeing the deletion.
+    .on("postgres_changes", { event: "DELETE", schema: "public", table: "violations" }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "teams", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "events", filter: `id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "nominations", filter: `event_id=eq.${eventId}` }, onChange)
