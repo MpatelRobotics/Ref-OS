@@ -511,6 +511,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const [lightbox, setLightbox] = useState(null);
   const [menu, setMenu] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [footerVisible, setFooterVisible] = useState(false);
+  const workspaceFooterRef = useRef(null);
   const [importPreview, setImportPreview] = useState(null); // { title, chips, warnings, resolve }
   const confirmImport = (p) => new Promise((resolve) => setImportPreview({ ...p, resolve }));
   const [importing, setImporting] = useState(null); // { label, done, total } | null while an import is writing
@@ -525,6 +527,14 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     evs.forEach((ev) => el && el.addEventListener(ev, reset, { passive: true }));
   return () => { clearTimeout(menuTimer.current); evs.forEach((ev) => el && el.removeEventListener(ev, reset)); };
   }, [menu]);
+
+  useEffect(() => {
+    const footer = workspaceFooterRef.current;
+    if (!footer || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => setFooterVisible(entry.isIntersecting), { threshold: 0.1 });
+    observer.observe(footer);
+    return () => observer.disconnect();
+  }, [view, ready]);
 
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstallHelp, setShowInstallHelp] = useState(false);
@@ -2876,7 +2886,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
             )}
           </>
         )}
-        <div className="flex flex-col items-center gap-2 mt-10 pb-2">
+        <div ref={workspaceFooterRef} className="flex flex-col items-center gap-2 mt-10 pb-2">
           <img src="/logo.svg" alt="Highlander Summit" className="h-10 w-10 object-contain opacity-90" />
           <p className="text-center text-xs text-slate-400">
             Made by Maharshi Patel ·{" "}
@@ -2885,8 +2895,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         </div>
       </main>
 
-      {!openTeam && !openMatch && !openRobot && view !== "judging" && !isEmcee && (
-        <button onClick={() => setLogFor("")} className="fixed bottom-5 left-1/2 -translate-x-1/2 z-20 bg-[#D7212B] text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
+      {!footerVisible && !openTeam && !openMatch && !openRobot && view !== "judging" && !isEmcee && (
+        <button onClick={() => setLogFor("")} className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] sm:bottom-5 left-1/2 -translate-x-1/2 z-50 sm:z-20 bg-[#D7212B] text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
           <Plus size={20} /> Log violation
         </button>
       )}
