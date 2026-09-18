@@ -56,6 +56,10 @@ New violations and inspection pictures show an eight second Undo action. Selecti
 
 Admin tools opened from the Event Command Center now keep a persistent Back to Command Center action. Closing or saving those tools returns to the Command Center instead of exiting to the workspace.
 
+Replay flags now require a reason from the match screen and Field Log. Preset choices cover field faults, scoring or timer issues, incorrect starts, safety interruptions, external interference, and other circumstances. The saved reason appears in match readiness, the replay queue, and the Field Log.
+
+Every Match Readiness card is clickable. AWP and Field Reset open their respective checks, Violations jumps to that match's violation history, and Replay opens the reason selector or confirms removal of an existing replay flag.
+
 The admin push alert control is grouped under Access in the settings menu with the other login, invitation, and permission controls.
 
 Push alert enrollment is now available to Referees, Judge Advisors, Emcees, and Admins. Every role can send a categorized help request, all subscribed event members receive the notification, and an Admin acknowledgment updates live for the entire crew.

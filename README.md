@@ -50,6 +50,10 @@ Volunteers can:
 
 When match data is available, Match Center becomes the default event workspace.
 
+Marking a match for replay requires a reason. Volunteers can select Field fault, Scoring or timer issue, Match started incorrectly, Safety interruption, External interference, or Other, with additional details when needed. The reason appears in match readiness, the replay queue, and the Field Log.
+
+The Match Readiness cards are interactive. Selecting AWP opens the AWP check, Field Reset opens the quadrant check, Violations jumps to the match violation history, and Replay opens the reason selector or removes an existing replay flag after confirmation.
+
 ## Violation tracking
 
 Referees can record minor, major, and inspection violations against a team while citing the applicable rule and match. Notes and supporting robot photos can be attached when additional context is needed.

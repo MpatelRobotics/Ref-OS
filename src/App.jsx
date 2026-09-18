@@ -3541,7 +3541,9 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
     }
   }, [hasElims]);
 
-  const replaySet = new Set(fieldLog.filter((e) => e.kind === "replay" && e.matchId).map((e) => e.matchId));
+  const replayEntries = fieldLog.filter((e) => e.kind === "replay" && e.matchId);
+  const replaySet = new Set(replayEntries.map((e) => e.matchId));
+  const replayByMatch = Object.fromEntries(replayEntries.map((entry) => [entry.matchId, entry]));
   const timeoutSet = new Set(fieldLog.filter((e) => e.kind === "timeout" && e.matchId).map((e) => e.matchId));
   const faultSet = new Set(fieldLog.filter((e) => e.kind === "field_fault" && e.matchId).map((e) => e.matchId));
   const inTab = all.filter((m) => (tab === "qual" ? (m.phase || "qual") === "qual" : (m.phase && m.phase !== "qual")));
@@ -3567,8 +3569,9 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
           <p className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300 mb-1.5 flex items-center gap-1"><RefreshCw size={13} /> Matches to re-run ({replaySet.size})</p>
           <div className="flex flex-wrap gap-1.5">
             {all.filter((m) => replaySet.has(m.id)).sort((a, b) => a.num - b.num).map((m) => (
-              <button key={m.id} onClick={() => onOpen(m.id)} className="font-mono text-xs font-bold px-2 py-1 rounded-md bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200">
-                {m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label)}
+              <button key={m.id} onClick={() => onOpen(m.id)} title={replayByMatch[m.id]?.note || "Replay reason not recorded"} className="text-left px-2 py-1 rounded-md bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200">
+                <span className="block font-mono text-xs font-bold">{m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label)}</span>
+                {replayByMatch[m.id]?.note && <span className="block text-[10px] font-semibold max-w-[180px] truncate">{replayByMatch[m.id].note}</span>}
               </button>
             ))}
           </div>
@@ -3730,12 +3733,17 @@ function AwpChecker({ onSave }) {
   );
 }
 
+const REPLAY_REASONS = ["Field fault", "Scoring or timer issue", "Match started incorrectly", "Safety interruption", "External interference", "Other"];
+
 function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee }) {
   const [toOpen, setToOpen] = useState(false);
   const [toAlliance, setToAlliance] = useState("red");
   const [toTeam, setToTeam] = useState("");
   const [faultOpen, setFaultOpen] = useState(false);
   const [faultNote, setFaultNote] = useState("");
+  const [replayOpen, setReplayOpen] = useState(false);
+  const [replayReason, setReplayReason] = useState("");
+  const [replayDetails, setReplayDetails] = useState("");
   const [awpOpen, setAwpOpen] = useState(false);
   const [fieldResetOpen, setFieldResetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -3778,10 +3786,22 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
     setBusy(false);
   };
   const toggleReplay = async () => {
-    if (busy) return; setBusy(true);
+    if (busy) return;
+    if (!replayEntry) { setReplayOpen(true); setFaultOpen(false); setToOpen(false); return; }
+    if (!confirm(`Remove the replay flag from ${heading}?`)) return;
+    setBusy(true);
     try {
-      if (replayEntry) { await onRemoveField(replayEntry.id); }
-      else { await onAddField({ kind: "replay", matchId: m.id, matchRef: heading, note: "" }); }
+      await onRemoveField(replayEntry.id);
+    } catch (e) { alert("Could not save: " + (e.message || e)); }
+    setBusy(false);
+  };
+  const saveReplay = async () => {
+    if (busy || !replayReason || (replayReason === "Other" && !replayDetails.trim())) return;
+    setBusy(true);
+    try {
+      const note = replayDetails.trim() ? `${replayReason}: ${replayDetails.trim()}` : replayReason;
+      await onAddField({ kind: "replay", matchId: m.id, matchRef: heading, field: m.field || "", note });
+      setReplayOpen(false); setReplayReason(""); setReplayDetails("");
     } catch (e) { alert("Could not save: " + (e.message || e)); }
     setBusy(false);
   };
@@ -3873,25 +3893,26 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
           </div>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-          <div className={`rounded-lg border px-3 py-2.5 ${isElim ? "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40" : awpEntry ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30" : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"}`}>
+          <button type="button" disabled={isElim} onClick={() => { setAwpOpen(true); setFieldResetOpen(false); setReplayOpen(false); setTimeout(() => document.getElementById(`match-operations-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }} className={`w-full text-left rounded-lg border px-3 py-2.5 transition hover:-translate-y-0.5 hover:shadow-sm disabled:hover:translate-y-0 disabled:hover:shadow-none ${isElim ? "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 cursor-not-allowed" : awpEntry ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30" : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"}`}>
             <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400"><ClipboardCheck size={13} /> AWP</div>
             <div className={`mt-1 text-sm font-bold ${isElim ? "text-slate-500 dark:text-slate-400" : awpEntry ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}>{isElim ? "N/A" : awpEntry ? "Checked" : "Unchecked"}</div>
-          </div>
+          </button>
 
-          <div className={`rounded-lg border px-3 py-2.5 ${fieldResetCount >= 4 ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30" : "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30"}`}>
+          <button type="button" onClick={() => { setFieldResetOpen(true); setAwpOpen(false); setReplayOpen(false); setTimeout(() => document.getElementById(`match-operations-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }} className={`w-full text-left rounded-lg border px-3 py-2.5 transition hover:-translate-y-0.5 hover:shadow-sm ${fieldResetCount >= 4 ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30" : "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30"}`}>
             <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400"><Check size={13} /> Field reset</div>
             <div className={`mt-1 text-sm font-bold ${fieldResetCount >= 4 ? "text-emerald-700 dark:text-emerald-300" : "text-blue-700 dark:text-blue-300"}`}>{fieldResetCount >= 4 ? "Ready" : `${fieldResetCount}/4`}</div>
-          </div>
+          </button>
 
-          <div className={`rounded-lg border px-3 py-2.5 ${mv.length > 0 ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30" : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40"}`}>
+          <button type="button" onClick={() => document.getElementById(`match-violations-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })} className={`w-full text-left rounded-lg border px-3 py-2.5 transition hover:-translate-y-0.5 hover:shadow-sm ${mv.length > 0 ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30" : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40"}`}>
             <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400"><ShieldAlert size={13} /> Violations</div>
             <div className={`mt-1 text-sm font-bold ${mv.length > 0 ? "text-red-700 dark:text-red-300" : "text-slate-700 dark:text-slate-300"}`}>{mv.length > 0 ? `${mv.length} logged` : "None logged"}</div>
-          </div>
+          </button>
 
-          <div className={`rounded-lg border px-3 py-2.5 ${replayEntry ? "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30" : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40"}`}>
+          <button type="button" onClick={() => { toggleReplay(); setAwpOpen(false); setFieldResetOpen(false); setTimeout(() => document.getElementById(`match-operations-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }} className={`w-full text-left rounded-lg border px-3 py-2.5 transition hover:-translate-y-0.5 hover:shadow-sm ${replayEntry ? "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30" : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40"}`}>
             <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400"><RefreshCw size={13} /> Replay</div>
             <div className={`mt-1 text-sm font-bold ${replayEntry ? "text-amber-700 dark:text-amber-300" : "text-slate-700 dark:text-slate-300"}`}>{replayEntry ? "Flagged" : "Not flagged"}</div>
-          </div>
+            {replayEntry?.note && <div className="mt-1 text-[11px] font-medium text-amber-800 dark:text-amber-200 leading-snug">{replayEntry.note}</div>}
+          </button>
         </div>
       </div>
 
@@ -3899,12 +3920,22 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
         <Alliance label="Red alliance" teams={match.red} color="red" />
         <Alliance label="Blue alliance" teams={match.blue} color="blue" />
       </div>
-      {!emcee && (<div className="mb-4">
+      {!emcee && (<div id={`match-operations-${m.id}`} className="mb-4 scroll-mt-24">
         <div className="flex gap-2">
           {isElim && <button onClick={() => { setToOpen((v) => !v); setFaultOpen(false); }} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${toOpen ? "bg-blue-600 text-white border-blue-600" : "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700"}`}><Clock size={15} /> Timeout</button>}
           <button onClick={() => { setFaultOpen((v) => !v); setToOpen(false); }} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${faultOpen ? "bg-red-600 text-white border-red-600" : "bg-white dark:bg-slate-800 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700"}`}><AlertTriangle size={15} /> Field fault</button>
           <button onClick={toggleReplay} className={`flex-1 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${replayEntry ? "bg-amber-500 text-white border-amber-500" : "bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"}`}><RefreshCw size={15} /> {replayEntry ? "For replay ✓" : "Replay"}</button>
         </div>
+        {replayOpen && !replayEntry && (
+          <div className="mt-2 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-3 space-y-3">
+            <div><div className="font-bold text-amber-900 dark:text-amber-100">Why is {heading} being replayed?</div><div className="text-xs text-amber-800/80 dark:text-amber-200/80 mt-0.5">A reason is required and will appear in the match details and Field Log.</div></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {REPLAY_REASONS.map((reason) => <button key={reason} onClick={() => setReplayReason(reason)} className={`px-3 py-2 rounded-lg border text-left text-sm font-semibold ${replayReason === reason ? "bg-amber-500 border-amber-500 text-white" : "bg-white dark:bg-slate-800 border-amber-200 dark:border-amber-800 text-slate-700 dark:text-slate-200"}`}>{reason}</button>)}
+            </div>
+            <textarea value={replayDetails} onChange={(event) => setReplayDetails(event.target.value)} rows={2} placeholder={replayReason === "Other" ? "Explain the replay reason" : "Additional details optional"} className="w-full px-3 py-2.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-sm" />
+            <div className="flex gap-2"><button onClick={() => { setReplayOpen(false); setReplayReason(""); setReplayDetails(""); }} className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-semibold">Cancel</button><button onClick={saveReplay} disabled={!replayReason || (replayReason === "Other" && !replayDetails.trim()) || busy} className="flex-1 px-4 py-2.5 rounded-lg bg-amber-500 text-white font-bold disabled:bg-slate-300">{busy ? "Saving…" : "Mark for replay"}</button></div>
+          </div>
+        )}
         {!isElim && <button onClick={() => { setAwpOpen((v) => !v); setToOpen(false); setFaultOpen(false); }} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${awpOpen ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"}`}><ClipboardCheck size={15} /> AWP check</button>}
         {!isElim && awpOpen && <AwpChecker onSave={(note) => onAddField({ kind: "awp", matchId: m.id, matchRef: heading, note })} />}
         <button onClick={() => setFieldResetOpen((v) => !v)} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${fieldResetOpen ? "bg-blue-600 text-white border-blue-600" : fieldResetCount >= 4 ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700"}`}><ShieldCheck size={15} /> {fieldResetCount >= 4 ? "Field Ready ✓" : `Quadrant check ${fieldResetCount}/4`}</button>
@@ -3959,7 +3990,7 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
         );
       })()}
       {!emcee && (<>
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">Violations in this match ({mv.length})</h2>
+      <h2 id={`match-violations-${m.id}`} className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1 scroll-mt-24">Violations in this match ({mv.length})</h2>
       {mv.length === 0 ? (
         <Empty title="No violations logged" sub="Tap a team above to log one for this match." />
       ) : (
@@ -5354,10 +5385,15 @@ function FieldLogView({ entries, onAdd, onRemove, meName, canDelete }) {
   const [field, setField] = useState("");
   const [matchRef, setMatchRef] = useState("");
   const [note, setNote] = useState("");
+  const [replayReason, setReplayReason] = useState("");
   const [busy, setBusy] = useState(false);
   const add = async () => {
     if (busy) return; setBusy(true);
-    try { await onAdd({ kind, field: field.trim(), matchRef: matchRef.trim(), note: note.trim() }); setField(""); setMatchRef(""); setNote(""); setKind("timeout"); }
+    try {
+      const savedNote = kind === "replay" ? (note.trim() ? `${replayReason}: ${note.trim()}` : replayReason) : note.trim();
+      await onAdd({ kind, field: field.trim(), matchRef: matchRef.trim(), note: savedNote });
+      setField(""); setMatchRef(""); setNote(""); setReplayReason(""); setKind("timeout");
+    }
     catch (e) { alert("Could not save: " + (e.message || e)); }
     setBusy(false);
   };
@@ -5365,14 +5401,15 @@ function FieldLogView({ entries, onAdd, onRemove, meName, canDelete }) {
     <>
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-3 mb-4 space-y-2">
         <div className="flex gap-2">
-          <select value={kind} onChange={(e) => setKind(e.target.value)} className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm">
+          <select value={kind} onChange={(e) => { setKind(e.target.value); setReplayReason(""); }} className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm">
             {FIELD_KINDS.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
           </select>
           <input value={field} onChange={(e) => setField(e.target.value)} placeholder="Field (opt)" className="w-28 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm" />
           <input value={matchRef} onChange={(e) => setMatchRef(e.target.value)} placeholder="Match (opt)" className="w-28 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm" />
         </div>
-        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="What happened…" className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm" />
-        <button onClick={add} disabled={busy} className="w-full py-2.5 rounded-lg bg-[#D7212B] text-white font-semibold disabled:bg-slate-300">{busy ? "Saving…" : "Log it"}</button>
+        {kind === "replay" && <select value={replayReason} onChange={(event) => setReplayReason(event.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-800 text-sm font-semibold"><option value="">Select replay reason</option>{REPLAY_REASONS.map((reason) => <option key={reason} value={reason}>{reason}</option>)}</select>}
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder={kind === "replay" ? (replayReason === "Other" ? "Explain the replay reason" : "Additional replay details optional") : "What happened…"} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm" />
+        <button onClick={add} disabled={busy || (kind === "replay" && (!replayReason || (replayReason === "Other" && !note.trim())))} className="w-full py-2.5 rounded-lg bg-[#D7212B] text-white font-semibold disabled:bg-slate-300">{busy ? "Saving…" : "Log it"}</button>
       </div>
       {entries.length === 0 ? (
         <Empty title="Nothing logged yet" sub="Timeouts, field faults, and replays you log will appear here." />
