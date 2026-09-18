@@ -1,5 +1,5 @@
-const CACHE = "refos-v35-1.2.0-contextual-back-buttons";
-const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png"];
+const CACHE = "refos-v36-1.2.0-rules-manual-restored";
+const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png", "/manuals/override-2.0.pdf"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(APP_SHELL)));

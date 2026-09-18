@@ -5672,6 +5672,7 @@ const RULE_NOTES = {
 function RuleBook({ rules }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(null); // rule object shown in the notes popup
+  const [manualOpen, setManualOpen] = useState(false);
   if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
   const q = query.trim().toUpperCase();
   const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
@@ -5683,6 +5684,16 @@ function RuleBook({ rules }) {
   }
   return (
     <>
+      <button onClick={() => setManualOpen(true)} className="mb-4 w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#0D0F32] text-white dark:bg-slate-950"><BookOpen size={21} /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-bold text-slate-900 dark:text-slate-100">Open Game Manual</span>
+            <span className="block text-xs text-slate-500 dark:text-slate-400">Override 2.0 is saved for offline event access</span>
+          </span>
+          <ChevronRight size={20} className="shrink-0 text-slate-400" />
+        </div>
+      </button>
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search rules — code or wording"
@@ -5720,9 +5731,9 @@ function RuleBook({ rules }) {
         <div className="fixed inset-0 z-[55] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setSelected(null)}>
           <div className="bg-white dark:bg-slate-800 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-white dark:bg-slate-800 px-4 py-3 flex items-center gap-2 border-b border-slate-200 dark:border-slate-700">
+              <button onClick={() => setSelected(null)} className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-sm font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700" aria-label="Back to Rules"><ChevronLeft size={19} /> Back to Rules</button>
               <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{fmtRule(selected.code)}</span>
               <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{selected.desc}</span>
-              <button onClick={() => setSelected(null)} className="ml-auto text-slate-400 hover:text-slate-600 shrink-0"><X size={22} /></button>
             </div>
             <div className="p-4">
               <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Violation notes</h3>
@@ -5733,6 +5744,19 @@ function RuleBook({ rules }) {
               )}
             </div>
           </div>
+        </div>
+      )}
+      {manualOpen && (
+        <div className="fixed inset-0 z-[70] flex flex-col bg-slate-100 dark:bg-slate-950">
+          <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-900">
+            <button onClick={() => setManualOpen(false)} className="inline-flex items-center gap-1 rounded-lg px-2 py-2 text-sm font-bold text-slate-800 hover:bg-slate-100 dark:text-white dark:hover:bg-slate-800" aria-label="Back to Rules"><ChevronLeft size={21} /> Back to Rules</button>
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-bold text-slate-900 dark:text-white">Override 2.0 Game Manual</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">Available offline after the app updates</div>
+            </div>
+            <a href="/manuals/override-2.0.pdf" target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:text-slate-100">Open separately</a>
+          </div>
+          <iframe src="/manuals/override-2.0.pdf" title="Override 2.0 Game Manual" className="min-h-0 w-full flex-1 bg-white" />
         </div>
       )}
     </>
