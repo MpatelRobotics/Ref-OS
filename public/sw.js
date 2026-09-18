@@ -1,4 +1,4 @@
-const CACHE = "refos-v32-1.2.0-clickable-readiness";
+const CACHE = "refos-v33-1.2.0-top-verify-button";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {

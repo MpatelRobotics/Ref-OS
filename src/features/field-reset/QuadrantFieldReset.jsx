@@ -218,7 +218,13 @@ export default function QuadrantFieldReset({
         ))}
       </div>
 
-      <div ref={contentRef} className="flex-1 overflow-y-auto p-3 pb-28">
+      <div className="shrink-0 p-3 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <button onClick={verify} disabled={!allChecks || !!row || !!busy} className={`w-full py-3.5 font-bold ${row ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100" : allChecks ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500"}`}>
+          {row ? `Quadrant ${def.id} Verified ✓` : allChecks ? (busy === def.id ? "Saving…" : `Verify Quadrant ${def.id}`) : `${def.items.length - checkedCount} positions remaining`}
+        </button>
+      </div>
+
+      <div ref={contentRef} className="flex-1 overflow-y-auto p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
             <div className="text-lg font-bold">Quadrant {def.id} • {def.name}</div>
@@ -272,11 +278,6 @@ export default function QuadrantFieldReset({
         </div>
       )}
 
-      <div className="fixed bottom-0 left-0 right-0 p-3 border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <button onClick={verify} disabled={!allChecks || !!row || !!busy} className={`w-full py-3.5 font-bold ${row ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100" : allChecks ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500"}`}>
-          {row ? `Quadrant ${def.id} Verified ✓` : allChecks ? (busy === def.id ? "Saving…" : `Verify Quadrant ${def.id}`) : `${def.items.length - checkedCount} positions remaining`}
-        </button>
-      </div>
     </div>
   );
 }
