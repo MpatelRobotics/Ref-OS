@@ -1,4 +1,4 @@
-const CACHE = "refos-v50-1.2.0-mobile-manual-pages";
+const CACHE = "refos-v51-1.2.0-mobile-rule-links";
 const MANUAL_PAGES = Array.from({ length: 129 }, (_, index) => `/manual-pages/page-${String(index + 1).padStart(3, "0")}.jpg`);
 const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png", "/manuals/override-2.0.pdf", ...MANUAL_PAGES];
 
