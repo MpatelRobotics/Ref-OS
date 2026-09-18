@@ -3,7 +3,7 @@ import { AlertTriangle, BarChart3, CalendarDays, ClipboardCheck, Clock, CloudOff
 
 const fmtTime = (ms) => ms ? new Date(ms).toLocaleString() : "—";
 
-export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onClearData, onClose }) {
+export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onClose }) {
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
@@ -81,6 +81,7 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
             <button onClick={onBackupAll} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Download size={16}/> Backup all JSON</button>
             <button onClick={onActivityFeed} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ListOrdered size={16}/> Activity feed</button>
             <button onClick={onRankings} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><BarChart3 size={16}/> Rankings</button>
+            <button onClick={onAwpHistory} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ClipboardCheck size={16}/> AWP History and Analytics</button>
           </div>
           <button onClick={onClearData} className="mt-2 w-full py-2.5 px-3 rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-semibold text-sm text-left flex items-center gap-2"><Trash2 size={16}/> Clear event data</button>
         </div>
@@ -223,4 +224,3 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
     </div>
   );
 }
-

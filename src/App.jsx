@@ -609,6 +609,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
     setShowActivity(false);
     setShowRankings(false);
     setShowClear(false);
+    if (view === "awp") setView("matches");
     setCommandCenterChildOpen(false);
     loadEventMembers();
     setShowCommandCenter(true);
@@ -2710,7 +2711,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       <main id="workspace" tabIndex={-1} className="refos-workspace mx-auto px-4 pb-28 pt-4">
         {!openTeam && !openMatch && !openRobot && <section className="refos-page-heading" aria-label="Workspace overview">
           <div>
-          {view === "awp" && <button onClick={() => { setView("matches"); setQuery(""); }} className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800" aria-label="Back to Matches">
+          {view === "awp" && !commandCenterChildOpen && <button onClick={() => { setView("matches"); setQuery(""); }} className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800" aria-label="Back to Matches">
             <ChevronLeft size={18} /> Back to Matches
           </button>}
           <p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: "Alliance selection"}[view] || "Event workspace"}</h2>
@@ -2733,7 +2734,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         ) : openRobot ? (
           <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : view === "matches" ? (
-          <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} onOpenAwp={() => setView("awp")} />
+          <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} />
         ) : view === "robots" ? (
           <RobotList teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "judging" ? (
@@ -2970,6 +2971,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         onBackupAll={backupAll}
         onActivityFeed={() => openCommandCenterTool(() => setShowActivity(true))}
         onRankings={() => openCommandCenterTool(() => setShowRankings(true))}
+        onAwpHistory={() => openCommandCenterTool(() => { setView("awp"); setQuery(""); })}
         onClearData={() => openCommandCenterTool(() => setShowClear(true))}
         onClose={() => setShowCommandCenter(false)} />}
       {showAnnouncement && adminUnlocked && <AnnouncementModal onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowAnnouncement(false)} onSend={sendAnnouncement} />}
@@ -3530,7 +3532,7 @@ function RulePicker({ rules, knownRules, selectedCodes = [], onPickRule, onPickC
 
 /* ============================ ADD TEAM MODAL ============================ */
 
-function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee, onOpenAwp }) {
+function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee }) {
   const [field, setField] = useState("all");
   const all = Object.values(matches);
   const hasElims = all.some((m) => m.phase && m.phase !== "qual");
@@ -3599,10 +3601,6 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
               {f === "all" ? "All fields" : f}
             </button>
           ))}
-          <button onClick={onOpenAwp}
-            className="px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600">
-            AWP
-          </button>
         </div>
       )}
       <div className="relative mb-4">
@@ -5550,7 +5548,7 @@ function FeaturesGuide() {
       <Section icon={Clock} title="AWP checks & analytics">
         <ul className="space-y-1.5">
           <Li><b>Qualification AWP check</b> — record what was observed for Red and Blue at the end of autonomous. Ref-OS evaluates the event checklist but does not change the official Tournament Manager score.</Li>
-          <Li><b>AWP history</b> — open AWP history from the Matches area next to the field filters instead of from the main navigation.</Li>
+          <Li><b>AWP history</b> — Admins can review saved AWP checks and analytics from Event Command Center.</Li>
           <Li><b>AWP analytics</b> — review overall, Red, and Blue success rates and the success rate for Pins, Goals, Field Perimeter, and autonomous violation criteria.</Li>
         </ul>
       </Section>
