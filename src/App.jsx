@@ -5689,7 +5689,15 @@ function RuleBook({ rules }) {
   const [selected, setSelected] = useState(null); // rule object shown in the notes popup
   const [manualOpen, setManualOpen] = useState(false);
   const [manualPage, setManualPage] = useState(1);
-  const openManualAt = (page = 1) => { setManualPage(page); setManualOpen(true); };
+  const [manualNavigation, setManualNavigation] = useState(0);
+  const goToManualPage = (page) => {
+    setManualPage(page);
+    setManualNavigation((navigation) => navigation + 1);
+  };
+  const openManualAt = (page = 1) => {
+    goToManualPage(page);
+    setManualOpen(true);
+  };
   if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
   const q = query.trim().toUpperCase();
   const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
@@ -5732,7 +5740,6 @@ function RuleBook({ rules }) {
                     <button onClick={() => manualPageForRule && openManualAt(manualPageForRule)} disabled={!manualPageForRule} className="min-w-0 flex-1 text-left px-4 py-2.5 flex gap-3 items-baseline disabled:cursor-default">
                       <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
                       <span className="text-sm text-slate-600 dark:text-slate-300 flex-1">{r.desc}</span>
-                      {manualPageForRule && <span className="text-[10px] font-semibold text-[#D7212B] shrink-0 self-center flex items-center gap-1">Manual <ChevronRight size={14} /></span>}
                     </button>
                     {note && <button onClick={() => setSelected(r)} className="shrink-0 border-l border-slate-100 px-3 text-[10px] font-bold text-slate-500 hover:text-[#D7212B] dark:border-slate-700 dark:text-slate-400" aria-label={`Open notes for ${r.code}`}>Notes</button>}
                     </div>
@@ -5774,11 +5781,11 @@ function RuleBook({ rules }) {
             <a href={`/manuals/override-2.0.pdf#page=${manualPage}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:text-slate-100">Open separately</a>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
-            <button onClick={() => setManualPage(3)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">Jump to Table of Contents</button>
-            <button onClick={() => setManualPage(7)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">Jump to Quick Reference Guide</button>
+            <button onClick={() => goToManualPage(3)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">Jump to Table of Contents</button>
+            <button onClick={() => goToManualPage(7)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">Jump to Quick Reference Guide</button>
             <span className="self-center text-xs text-slate-500 dark:text-slate-400">Page {manualPage}</span>
           </div>
-          <iframe key={manualPage} src={`/manuals/override-2.0.pdf#page=${manualPage}&view=FitH`} title={`Override 2.0 Game Manual page ${manualPage}`} className="min-h-0 w-full flex-1 bg-white" />
+          <iframe key={manualNavigation} src={`/manuals/override-2.0.pdf?navigation=${manualNavigation}#page=${manualPage}&view=FitH`} title={`Override 2.0 Game Manual page ${manualPage}`} className="min-h-0 w-full flex-1 bg-white" />
         </div>
       )}
     </>
