@@ -97,7 +97,7 @@ The alliance tools support captain and pick assignments, elimination bracket pre
 
 The Event Command Center centralizes administrator tools and event health information. It includes access to operational summaries, AWP History and Analytics, event settings, announcements, countdown management, data controls, volunteer information, exports, and readiness checks.
 
-Tools opened from Event Command Center include a compact Back button placed at the lower left so it does not cover page titles or close controls. Closing, saving, or selecting Back returns the Admin to Event Command Center instead of the main workspace.
+Back navigation uses the same plain left chevron and Back label throughout desktop and mobile views. Back controls stay in the normal page header flow so they do not cover titles or close controls. Closing, saving, or selecting Back from an Event Command Center tool returns the Admin to Event Command Center instead of the main workspace.
 
 ## Key Volunteer Status
 

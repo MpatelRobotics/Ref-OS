@@ -162,8 +162,8 @@ export default function QuadrantFieldReset({
   return (
     <div className="fixed inset-0 z-[70] bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white flex flex-col">
       <div className="px-3 py-3 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 flex items-center gap-2 shrink-0">
-        <button onClick={onClose} className="p-1 text-slate-600 dark:text-slate-300" aria-label="Back">
-          <ChevronLeft size={24} />
+        <button onClick={onClose} className="refos-back-button" aria-label="Back">
+          <ChevronLeft size={24} /> Back
         </button>
         <div className="min-w-0">
           <div className="font-bold leading-tight">Quadrant Field Reset Check{matchLabel ? ` • ${matchLabel}` : ""}</div>
