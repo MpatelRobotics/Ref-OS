@@ -122,7 +122,7 @@ export default function LoginScreen({ eventId, onUnlock }) {
               className="w-full mt-3 py-3 rounded-lg font-semibold bg-[#D7212B] text-white hover:bg-[#B42024] disabled:bg-slate-200 disabled:text-slate-400">Enter</button>
             <button onClick={() => { setMode("code"); setPw(""); setErr(""); }}
               className="w-full mt-3 py-3 rounded-lg font-semibold border border-slate-300 bg-white text-[#11172F] hover:bg-slate-50">
-              Back to event access code
+              Back
             </button>
           </>
         )}

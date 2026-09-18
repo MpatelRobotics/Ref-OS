@@ -2414,7 +2414,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         <div className="refos-header-inner mx-auto px-4 py-3 flex items-center gap-3">
           {(openTeam || openMatch || openRobot) ? (
             <button onClick={() => { setOpenTeam(null); setOpenMatch(null); setOpenRobot(null); }} aria-label={`Back to ${openTeam ? "Teams" : openRobot ? "Robots" : "Matches"}`} className="-ml-1 inline-flex items-center gap-1 rounded px-1.5 py-1 text-sm font-bold hover:bg-white/10">
-              <ChevronLeft size={22} /><span className="hidden sm:inline">Back to {openTeam ? "Teams" : openRobot ? "Robots" : "Matches"}</span>
+              <ChevronLeft size={22} /><span>Back</span>
             </button>
           ) : (
             <div className="refos-header-brand flex items-center gap-2 shrink-0">
@@ -2712,7 +2712,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
         {!openTeam && !openMatch && !openRobot && <section className="refos-page-heading" aria-label="Workspace overview">
           <div>
           {view === "awp" && !commandCenterChildOpen && <button onClick={() => { setView("matches"); setQuery(""); }} className="mb-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800" aria-label="Back to Matches">
-            <ChevronLeft size={18} /> Back to Matches
+            <ChevronLeft size={18} /> Back
           </button>}
           <p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: "Alliance selection"}[view] || "Event workspace"}</h2>
           <p className="refos-description">{{teams: "Find a team. Review its history. Keep your crew informed.", matches: "Your schedule, field activity, and match details in one place.", robots: "A shared visual reference for every robot.", judging: "Capture the moments that deserve recognition.", rulebook: "Find the right rule when you need it.", awp: "Review autonomous observations across the event.", alliances: "Follow the path from selection to the final."}[view]}</p></div>
@@ -2945,7 +2945,7 @@ function Tracker({ initialEvent, meName, role, theme, onToggleTheme, textScale, 
       {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowOfflineTest(false)} />}
       {commandCenterChildOpen && !showCommandCenter && (
         <button onClick={returnToCommandCenter} className="refos-command-center-back fixed top-[max(0.75rem,env(safe-area-inset-top))] left-3 z-[130] rounded-lg bg-slate-900/80 text-slate-300 shadow-sm border border-white/10 px-2.5 py-1.5 flex items-center gap-1 text-xs font-semibold backdrop-blur-sm hover:bg-slate-900 hover:text-white">
-          <ChevronLeft size={15}/> Back to Command Center
+          <ChevronLeft size={15}/> Back
         </button>
       )}
       {showCommandCenter && adminUnlocked && <CommandCenter matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
@@ -5729,7 +5729,7 @@ function RuleBook({ rules }) {
         <div className="fixed inset-0 z-[55] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setSelected(null)}>
           <div className="bg-white dark:bg-slate-800 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-white dark:bg-slate-800 px-4 py-3 flex items-center gap-2 border-b border-slate-200 dark:border-slate-700">
-              <button onClick={() => setSelected(null)} className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-sm font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700" aria-label="Back to Rules"><ChevronLeft size={19} /> Back to Rules</button>
+              <button onClick={() => setSelected(null)} className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-sm font-bold text-slate-700 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-700" aria-label="Back to Rules"><ChevronLeft size={19} /> Back</button>
               <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{fmtRule(selected.code)}</span>
               <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{selected.desc}</span>
             </div>
@@ -5747,7 +5747,7 @@ function RuleBook({ rules }) {
       {manualOpen && (
         <div className="fixed inset-0 z-[70] flex flex-col bg-slate-100 dark:bg-slate-950">
           <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-900">
-            <button onClick={() => setManualOpen(false)} className="inline-flex items-center gap-1 rounded-lg px-2 py-2 text-sm font-bold text-slate-800 hover:bg-slate-100 dark:text-white dark:hover:bg-slate-800" aria-label="Back to Rules"><ChevronLeft size={21} /> Back to Rules</button>
+            <button onClick={() => setManualOpen(false)} className="inline-flex items-center gap-1 rounded-lg px-2 py-2 text-sm font-bold text-slate-800 hover:bg-slate-100 dark:text-white dark:hover:bg-slate-800" aria-label="Back to Rules"><ChevronLeft size={21} /> Back</button>
             <div className="min-w-0 flex-1">
               <div className="truncate font-bold text-slate-900 dark:text-white">Override 2.0 Game Manual</div>
               <div className="text-[11px] text-slate-500 dark:text-slate-400">Available offline after the app updates</div>
