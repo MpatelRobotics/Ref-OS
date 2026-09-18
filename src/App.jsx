@@ -2635,7 +2635,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         })()}
       </header>
 
-      {!openTeam && !openMatch && !openRobot && !showIdentity && (() => {
+      {!openTeam && !openMatch && !openRobot && !showIdentity && !logFor && !editing && (() => {
         const primary = isJudge ? [
           { k: "judging", label: "Judging", Icon: Trophy },
           { k: "alliances", label: "Alliances", Icon: GitBranch }
@@ -3347,13 +3347,13 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
   };
 
   return (
-    <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-slate-50 dark:bg-slate-900 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto">
-        <div className="sticky top-0 bg-slate-50 dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
+    <div className="fixed inset-0 z-[80] bg-black/40 flex items-end sm:items-center justify-center">
+      <div className="bg-slate-50 dark:bg-slate-900 w-full h-[92dvh] sm:h-auto sm:max-h-[92dvh] sm:max-w-lg sm:rounded-2xl rounded-t-2xl flex flex-col overflow-hidden">
+        <div className="shrink-0 bg-slate-50 dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
           <h2 className="font-bold text-slate-900 dark:text-slate-100">{edit ? "Edit violation" : "New violation"}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:text-slate-300"><X size={22} /></button>
         </div>
-        <div className="p-4 space-y-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 space-y-4">
           <button onClick={onSetName} className="w-full flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
             <UserCircle2 size={15} className="text-slate-400" />
             {me?.name ? <>Logging as <b className="text-slate-700 dark:text-slate-200">{me.name}</b></> : <span className="text-amber-600 font-medium">Tap to set your ref name (so entries are attributed)</span>}
@@ -3487,7 +3487,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
               className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-slate-300" />
           </div>
         </div>
-        <div className="sticky bottom-0 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 p-4 flex gap-2">
+        <div className="shrink-0 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-2 shadow-[0_-8px_20px_rgba(15,23,42,0.08)]">
           <button onClick={onClose} className="px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
           <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? `${T.solid} ${T.solidHover}` : "bg-slate-300"}`}>{busy ? "Saving…" : edit ? "Save changes" : "Save violation"}</button>
         </div>
