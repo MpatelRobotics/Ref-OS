@@ -1,4 +1,4 @@
-const CACHE = "refos-v41-1.2.0-left-back-button";
+const CACHE = "refos-v43-1.2.0-responsive-back-placement";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png", "/manuals/override-2.0.pdf"];
 
 self.addEventListener("install", (event) => {
