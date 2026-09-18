@@ -1,4 +1,4 @@
-const CACHE = "refos-v38-1.2.0-command-center-back-fix";
+const CACHE = "refos-v39-1.2.0-subtle-command-center-back";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png", "/manuals/override-2.0.pdf"];
 
 self.addEventListener("install", (event) => {
