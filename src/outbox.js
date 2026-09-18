@@ -90,6 +90,14 @@ export function isOffline(e) {
 }
 
 let flushing = false;
+const cancelledOps = new Set();
+const cancelKey = (eventId, opId) => `${eventId}:${opId}`;
+
+export async function cancelOp(eventId, opId) {
+  cancelledOps.add(cancelKey(eventId, opId));
+  return removeOp(eventId, opId);
+}
+
 export async function flush(eventId, handlers = {}) {
   if (flushing) return;
   flushing = true;
@@ -97,18 +105,26 @@ export async function flush(eventId, handlers = {}) {
     let q = await loadQueue(eventId);
     while (q.length) {
       const op = q[0];
+      const opCancelKey = cancelKey(eventId, op.id);
+      if (cancelledOps.has(opCancelKey)) {
+        q = await removeOp(eventId, op.id);
+        cancelledOps.delete(opCancelKey);
+        continue;
+      }
       try {
         if (op.kind === "team") {
           await api.upsertTeam(op.eventId, op.number, op.name);
           handlers.onTeamSynced && handlers.onTeamSynced(op.number);
         } else if (op.kind === "violation") {
           const saved = await api.addViolationRow(op.eventId, op.row, op.photos || []);
-          handlers.onSynced && handlers.onSynced(saved);
+          if (cancelledOps.has(opCancelKey)) await api.deleteViolation(saved);
+          else handlers.onSynced && handlers.onSynced(saved);
         } else if (op.kind === "robot_photo") {
           const paths = await api.addTeamPhoto(op.eventId, op.number, op.dataUrl, op.angle, op.id);
           handlers.onRobotPhotoSynced && handlers.onRobotPhotoSynced(op, paths);
         }
         q = await removeOp(eventId, op.id);           // success -> drop it
+        cancelledOps.delete(opCancelKey);
       } catch (e) {
         if (isOffline(e)) break;                       // keep queued, retry later
         await keepFailed(eventId, op, e);              // permanent -> retain for recovery

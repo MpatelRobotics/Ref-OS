@@ -690,8 +690,12 @@ export async function deleteViolation(v) {
     e2eState.violations = e2eState.violations.filter((x) => x.id !== v.id);
     return;
   }
-  if (v.photoKeys?.length) await supabase.storage.from("robot-photos").remove(v.photoKeys);
-  await supabase.from("violations").delete().eq("id", v.id);
+  if (v.photoKeys?.length) {
+    const { error: storageError } = await supabase.storage.from("robot-photos").remove(v.photoKeys);
+    if (storageError) throw storageError;
+  }
+  const { error } = await supabase.from("violations").delete().eq("id", v.id);
+  if (error) throw error;
 }
 export async function clearViolations(eventId) {
   if (E2E_MOCK) { e2eState.violations = []; return; }

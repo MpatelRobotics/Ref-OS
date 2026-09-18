@@ -1163,7 +1163,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     await outbox.enqueue(eventId, { id: row.id, kind: "violation", eventId, row, photos, createdAt });
     doFlush();
     offerUndo(`Violation saved for ${row.team}`, async () => {
-      await outbox.removeOp(eventId, row.id);
+      await outbox.cancelOp(eventId, row.id);
       setViols((cur) => cur.filter((violation) => violation.id !== row.id));
       await api.deleteViolation({ id: row.id, photoKeys: [] });
       refreshQueueHealth();
