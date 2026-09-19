@@ -2930,12 +2930,12 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         onClose={() => setShowTeamScanner(false)}
       />}
       {logFor !== null && (
-        <LogModal teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules} onOpenPhoto={setLightbox}
+        <LogModal teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules} onOpenPhoto={setLightbox} fieldNames={fieldNames}
           onSetName={() => setShowIdentity(true)} onClose={() => { setLogFor(null); setLogMatch(null); }}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await saveViolation({ ...form, team }); setLogFor(null); setLogMatch(null); }} />
       )}
       {editing && (
-        <LogModal teams={teams} viols={viols} presetTeam={editing.team} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} rules={rules} onOpenPhoto={setLightbox} edit={editing}
+        <LogModal teams={teams} viols={viols} presetTeam={editing.team} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} rules={rules} onOpenPhoto={setLightbox} edit={editing} fieldNames={fieldNames}
           onSetName={() => setShowIdentity(true)} onClose={() => setEditing(null)}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await editViolation(editing, { ...form, team }); setEditing(null); }} />
       )}
@@ -3337,7 +3337,7 @@ function ByRule({ viols, expandRule, setExpandRule }) {
 }
 
 /* ============================ LOG MODAL ============================ */
-function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, edit, onSetName, onClose, onSave }) {
+function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, edit, onSetName, onClose, onSave, fieldNames = DEFAULT_FIELD_NAMES }) {
   const ruleBook = useMemo(() => {
     const m = {}; for (const r of (rules || [])) m[r.code] = r.desc; return m;
   }, [rules]);
@@ -3345,8 +3345,9 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
   const [creatingNew, setCreatingNew] = useState(!edit && teams.length === 0);
   const [newNumber, setNewNumber] = useState("");
   const [newName, setNewName] = useState("");
-  const [matchPhase, setMatchPhase] = useState((edit && edit.match?.phase) || (presetMatch?.phase) || (lastMatch?.phase || "qual"));
-  const [matchNum, setMatchNum] = useState((edit && edit.match?.num) || (presetMatch && presetMatch.num != null ? String(presetMatch.num) : (lastMatch?.num || "")));
+  const teamScopedMatches = !edit && !!presetTeam;
+  const [matchPhase, setMatchPhase] = useState((edit && edit.match?.phase) || (presetMatch?.phase) || (teamScopedMatches ? "none" : (lastMatch?.phase || "qual")));
+  const [matchNum, setMatchNum] = useState((edit && edit.match?.num) || (presetMatch && presetMatch.num != null ? String(presetMatch.num) : (teamScopedMatches ? "" : (lastMatch?.num || ""))));
   const [type, setType] = useState((edit && edit.type) || "minor");
   const [selectedRules, setSelectedRules] = useState(() => {
     const codes = splitRuleCodes((edit && edit.code) || "");
@@ -3362,6 +3363,13 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
   const [showRulePicker, setShowRulePicker] = useState(false);
   const fileRef = useRef(null);
   const T = TYPES[type];
+  const selectedTeamMatches = useMemo(() => {
+    if (!teamScopedMatches || creatingNew || !team) return [];
+    const phaseOrder = { practice: 0, qual: 1, r16: 2, qf: 3, sf: 4, final: 5 };
+    return Object.values(matches || {})
+      .filter((scheduledMatch) => [...(scheduledMatch.red || []), ...(scheduledMatch.blue || [])].includes(team))
+      .sort((a, b) => (phaseOrder[a.phase] ?? 99) - (phaseOrder[b.phase] ?? 99) || Number(a.num) - Number(b.num));
+  }, [teamScopedMatches, creatingNew, team, matches]);
 
   const addPhotos = async (files) => { const list = Array.from(files).slice(0, 4); const out = []; for (const f of list) { try { out.push(await compress(f)); } catch {} } setPhotos((p) => [...p, ...out].slice(0, 6)); };
   const valid = (creatingNew ? newNumber.trim() : team) && (code.trim() || desc.trim());
@@ -3437,7 +3445,25 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
 
           <div>
             <Label>Match</Label>
-            <div className="flex gap-2">
+            {teamScopedMatches && !creatingNew ? (
+              <select
+                value={matchPhase === "none" || !matchNum ? "none" : `${matchPhase}:${matchNum}`}
+                onChange={(event) => {
+                  if (event.target.value === "none") { setMatchPhase("none"); setMatchNum(""); return; }
+                  const [phase, number] = event.target.value.split(":");
+                  setMatchPhase(phase);
+                  setMatchNum(number);
+                }}
+                className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
+              >
+                <option value="none">Not tied to a match</option>
+                {selectedTeamMatches.map((scheduledMatch) => (
+                  <option key={scheduledMatch.id} value={`${scheduledMatch.phase}:${scheduledMatch.num}`}>
+                    {fmtMatch({ phase: scheduledMatch.phase, num: scheduledMatch.num })}{scheduledMatch.field ? ` · ${fieldDisplayName(scheduledMatch.field, fieldNames)}` : ""}
+                  </option>
+                ))}
+              </select>
+            ) : <div className="flex gap-2">
               <select value={matchPhase} onChange={(e) => { setMatchPhase(e.target.value); setMatchNum(""); }}
                 className="flex-1 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
                 {availablePhases(event).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
@@ -3455,7 +3481,8 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
                 return (<input value={matchNum} onChange={(e) => setMatchNum(e.target.value)} placeholder={matchPhase === "skills" ? "run" : "#"} inputMode="numeric"
                   className="w-24 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-center focus:outline-none focus:ring-2 focus:ring-slate-300" />);
               })()}
-            </div>
+            </div>}
+            {teamScopedMatches && !creatingNew && selectedTeamMatches.length === 0 && <p className="text-[11px] text-amber-600 dark:text-amber-300 mt-1">No scheduled matches were found for Team {team}.</p>}
             {fmtMatch({ phase: matchPhase, num: matchNum }) && (<p className="text-[11px] text-slate-400 mt-1">Recorded as <b className="font-mono text-slate-600 dark:text-slate-300">{fmtMatch({ phase: matchPhase, num: matchNum })}</b></p>)}
             {(() => {
               const m = matchNum && matchPhase !== "none" ? matches?.[matchPhase === "qual" ? String(matchNum) : `${matchPhase}-${matchNum}`] : null;

@@ -60,6 +60,8 @@ AWP History and Analytics is kept inside Event Command Center so the field filte
 
 ## Violation tracking
 
+When a violation is opened from a team page, the match selector only shows scheduled matches containing that team. The general Log Violation action continues to provide the complete event schedule.
+
 Referees can record minor, major, and inspection violations against a team while citing the applicable rule and match. Notes and supporting robot photos can be attached when additional context is needed.
 
 Violation history is available by team, match, rule, and event activity. Repeated minor violations of the same rule are surfaced to help the referee crew identify escalation patterns.
