@@ -4578,14 +4578,16 @@ function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onS
 }
 
 /* ============================ ROBOTS (inspection photos) ============================ */
-const REQUIRED_ROBOT_ANGLES = [
-  { key: "front", label: "Front" },
-  { key: "back", label: "Back" },
-  { key: "side", label: "Side" },
+const ROBOT_PHOTO_SLOTS = [
+  { key: "front", label: "Front", required: true },
+  { key: "back", label: "Back", required: true },
+  { key: "side", label: "Side", required: true },
+  { key: "lexan", label: "Lexan Diagram", required: false },
 ];
+const REQUIRED_ROBOT_ANGLES = ROBOT_PHOTO_SLOTS.filter((angle) => angle.required);
 
 function robotPhotoAngle(path) {
-  const match = String(path || "").match(/\/(front|back|side)-[^/]+\.jpg$/i);
+  const match = String(path || "").match(/\/(front|back|side|lexan)-[^/]+\.jpg$/i);
   return match ? match[1].toLowerCase() : "";
 }
 
@@ -4644,14 +4646,14 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
   if (!team) return <Empty title="Team not found" sub="" />;
   const photos = team.photoKeys || [];
   const pendingPhotos = team._pendingRobotPhotos || [];
-  const slotData = REQUIRED_ROBOT_ANGLES.map((angle) => ({
+  const slotData = ROBOT_PHOTO_SLOTS.map((angle) => ({
     ...angle,
     remote: [...photos].reverse().find((path) => robotPhotoAngle(path) === angle.key) || "",
     pending: [...pendingPhotos].reverse().find((photo) => photo.angle === angle.key) || null,
   }));
   const featuredKeys = new Set(slotData.map((slot) => slot.remote).filter(Boolean));
   const extraPhotos = photos.filter((path) => !featuredKeys.has(path));
-  const completed = slotData.filter((slot) => slot.remote || slot.pending).length;
+  const completed = slotData.filter((slot) => slot.required && (slot.remote || slot.pending)).length;
   const chooseAngle = (angle) => {
     setCaptureAngle(angle);
     fileRef.current?.click();
@@ -4675,12 +4677,12 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
         </div>
       </div>
       {!emcee && <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(event) => { add(event.target.files); event.target.value = ""; }} />}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {slotData.map((slot) => (
-          <section key={slot.key} className={`rounded-xl border-2 overflow-hidden ${slot.remote || slot.pending ? "border-emerald-300 dark:border-emerald-800" : "border-dashed border-amber-300 dark:border-amber-700"}`}>
+          <section key={slot.key} className={`rounded-xl border-2 overflow-hidden ${slot.remote || slot.pending ? "border-emerald-300 dark:border-emerald-800" : slot.required ? "border-dashed border-amber-300 dark:border-amber-700" : "border-dashed border-slate-300 dark:border-slate-600"}`}>
             <div className="px-3 py-2 flex items-center gap-2 bg-white dark:bg-slate-800">
               <span className="font-bold text-slate-900 dark:text-slate-100">{slot.label}</span>
-              <span className={`ml-auto text-[10px] font-bold uppercase ${slot.remote || slot.pending ? "text-emerald-600 dark:text-emerald-300" : "text-amber-600 dark:text-amber-300"}`}>{slot.pending ? "Queued" : slot.remote ? "Saved" : "Required"}</span>
+              <span className={`ml-auto text-[10px] font-bold uppercase ${slot.remote || slot.pending ? "text-emerald-600 dark:text-emerald-300" : slot.required ? "text-amber-600 dark:text-amber-300" : "text-slate-400"}`}>{slot.pending ? "Queued" : slot.remote ? "Saved" : slot.required ? "Required" : "Optional"}</span>
             </div>
             <div className="relative aspect-[4/3] bg-slate-100 dark:bg-slate-700 grid place-items-center">
               {slot.pending ? <button onClick={() => onOpenPhoto(slot.pending.dataUrl)} className="w-full h-full"><img src={slot.pending.dataUrl} alt={`${slot.label} robot view queued for upload`} className="w-full h-full object-cover" /></button>
@@ -5659,6 +5661,7 @@ function FeaturesGuide() {
           <Li><b>Team scanner</b> — use the camera OCR scanner to recognize a team number and jump to the team record.</Li>
           <Li><b>Watchlist</b> — add shared watch notes to teams. Watched teams are flagged and their notes appear during relevant matches.</Li>
           <Li><b>Required inspection pictures</b> — capture Front, Back, and Side views for every robot. Completion appears on each team card.</Li>
+          <Li><b>Optional Lexan Diagram</b> — save a picture of the team's Lexan or plastic diagram without affecting the three required picture completion count.</Li>
           <Li><b>Offline picture queue</b> — required pictures remain visible as queued and upload automatically after connectivity returns.</Li>
         </ul>
       </Section>
