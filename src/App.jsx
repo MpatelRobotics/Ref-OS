@@ -561,7 +561,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const [fieldLog, setFieldLog] = useState([]);
   const [fieldResetChecks, setFieldResetChecks] = useState([]);
   const [eventSettings, setEventSettings] = useState({});
-  const fieldNames = { ...DEFAULT_FIELD_NAMES, ...(eventSettings?.field_names?.value || {}) };
+  const savedFieldNames = eventSettings?.field_names?.value;
+  const fieldNames = useMemo(() => ({ ...DEFAULT_FIELD_NAMES, ...(savedFieldNames || {}) }), [savedFieldNames]);
   const volunteerAssignments = eventSettings?.volunteer_assignments?.value || {};
   const myAssignment = volunteerAssignments[currentUserId]?.location || Object.values(volunteerAssignments).find((assignment) =>
     (assignment?.name || "").trim().toLowerCase() === (meName || "").trim().toLowerCase()

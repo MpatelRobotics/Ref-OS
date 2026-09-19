@@ -10,7 +10,7 @@ export default function FieldNameConfiguratorModal({ current = {}, onSave, onClo
 
   useEffect(() => {
     setNames(Object.fromEntries(FIELDS.map((field) => [field, current[field] || field])));
-  }, [current]);
+  }, [current["Field 1"], current["Field 2"], current["Field 3"]]);
 
   const save = async () => {
     const cleaned = Object.fromEntries(FIELDS.map((field) => [field, String(names[field] || "").trim()]));

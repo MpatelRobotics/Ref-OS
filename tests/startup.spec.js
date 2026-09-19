@@ -162,7 +162,7 @@ test("service worker file is versioned for Ref OS 1.2", async ({ request }) => {
   const response = await request.get("/sw.js");
   expect(response.ok()).toBeTruthy();
   const text = await response.text();
-  expect(text).toContain("refos-v66-1.0.0-field-name-configurator");
+  expect(text).toContain("refos-v67-1.0.0-field-name-input-fix");
 });
 
 test("manifest remains available", async ({ request }) => {
