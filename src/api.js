@@ -26,9 +26,9 @@ export async function claimEventAccess(eventId, credential) {
   if (E2E_MOCK) {
     const value = String(credential || "");
     if (value === "1A23" || value === "test-admin") return { role: "ref", serverRole: "admin", isAdmin: true };
-    if (value === "test-ref") return { role: "ref", serverRole: "ref", isAdmin: false };
-    if (value === "test-judge") return { role: "judge", serverRole: "judge", isAdmin: false };
-    if (value === "test-emcee") return { role: "emcee", serverRole: "emcee", isAdmin: false };
+    if (value === "1B23" || value === "test-ref") return { role: "ref", serverRole: "ref", isAdmin: false };
+    if (value === "1C23" || value === "test-judge") return { role: "judge", serverRole: "judge", isAdmin: false };
+    if (value === "1D23" || value === "test-emcee") return { role: "emcee", serverRole: "emcee", isAdmin: false };
     throw new Error("Invalid event credential");
   }
   await ensureAnonymousSession();
