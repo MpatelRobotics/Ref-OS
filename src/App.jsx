@@ -26,6 +26,7 @@ import ClearModal from "./components/modals/ClearModal.jsx";
 import AddTeamModal from "./components/modals/AddTeamModal.jsx";
 import AnnouncementModal from "./components/modals/AnnouncementModal.jsx";
 import CountdownSetupModal from "./components/modals/CountdownSetupModal.jsx";
+import FieldNameConfiguratorModal from "./components/modals/FieldNameConfiguratorModal.jsx";
 import OfflineReadinessModal from "./components/modals/OfflineReadinessModal.jsx";
 import FeedbackModal from "./components/modals/FeedbackModal.jsx";
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
@@ -40,6 +41,12 @@ const EVENT_ID = "11111111-1111-4111-8111-111111111111";
 
 /* ---------- helpers ---------- */
 const normNum = (n) => (n || "").trim().toUpperCase();
+const DEFAULT_FIELD_NAMES = { "Field 1": "Field 1", "Field 2": "Field 2", "Field 3": "Field 3" };
+const canonicalFieldKey = (field) => {
+  const match = String(field || "").trim().match(/^(?:field\s*|f)([123])$/i);
+  return match ? `Field ${match[1]}` : String(field || "").trim();
+};
+const fieldDisplayName = (field, fieldNames = DEFAULT_FIELD_NAMES) => fieldNames?.[canonicalFieldKey(field)] || field || "";
 const initials = (name) =>
   (name || "").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 3).toUpperCase() || "?";
 
@@ -554,6 +561,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const [fieldLog, setFieldLog] = useState([]);
   const [fieldResetChecks, setFieldResetChecks] = useState([]);
   const [eventSettings, setEventSettings] = useState({});
+  const fieldNames = { ...DEFAULT_FIELD_NAMES, ...(eventSettings?.field_names?.value || {}) };
   const volunteerAssignments = eventSettings?.volunteer_assignments?.value || {};
   const myAssignment = volunteerAssignments[currentUserId]?.location || Object.values(volunteerAssignments).find((assignment) =>
     (assignment?.name || "").trim().toLowerCase() === (meName || "").trim().toLowerCase()
@@ -588,6 +596,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const [showTMSync, setShowTMSync] = useState(false);
   const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [showCountdownSetup, setShowCountdownSetup] = useState(false);
+  const [showFieldNameConfigurator, setShowFieldNameConfigurator] = useState(false);
   const [showOfflineTest, setShowOfflineTest] = useState(false);
   const [showCommandCenter, setShowCommandCenter] = useState(false);
   const [commandCenterChildOpen, setCommandCenterChildOpen] = useState(false);
@@ -618,6 +627,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
 
   const returnToCommandCenter = () => {
     setShowCountdownSetup(false);
+    setShowFieldNameConfigurator(false);
     setShowOfflineTest(false);
     setShowAnnouncement(false);
     setShowContactDirectory(false);
@@ -1304,6 +1314,18 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     } catch (e) {
       if (outbox.isOffline(e)) { alert("You're offline — reconnect to update the contact directory."); return; }
       alert("Could not save contact directory: " + (e.message || e));
+    }
+  };
+  const saveFieldNames = async (names) => {
+    try {
+      const saved = await api.upsertEventSetting(eventId, "field_names", names, meName);
+      setEventSettings((cur) => ({ ...cur, field_names: saved }));
+      if (commandCenterChildOpen) returnToCommandCenter();
+      else setShowFieldNameConfigurator(false);
+      return saved;
+    } catch (error) {
+      if (outbox.isOffline(error)) throw new Error("Reconnect before changing field names.");
+      throw error;
     }
   };
   const saveRoleAccessConfig = async (config) => {
@@ -2731,7 +2753,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
             <MapPin size={20} className="text-sky-700 dark:text-sky-300 shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-[11px] uppercase tracking-wide font-bold text-sky-700 dark:text-sky-300">Your assignment</div>
-              <div className="font-bold text-slate-900 dark:text-slate-100">{myAssignment}</div>
+              <div className="font-bold text-slate-900 dark:text-slate-100">{fieldDisplayName(myAssignment, fieldNames)}</div>
             </div>
             <span className="text-xs font-semibold text-sky-700 dark:text-sky-300">View crew</span>
           </button>
@@ -2744,7 +2766,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
             {visibleHelpRequest.acknowledgment ? <Check size={21} className="text-emerald-700 shrink-0" /> : <LifeBuoy size={21} className="text-[#D7212B] shrink-0" />}
             <div className="flex-1 min-w-0">
               <div className={`text-xs font-bold uppercase tracking-wide ${visibleHelpRequest.acknowledgment ? "text-emerald-700 dark:text-emerald-300" : "text-red-700 dark:text-red-300"}`}>{visibleHelpRequest.acknowledgment ? `Acknowledged by ${visibleHelpRequest.acknowledgment.admin}` : "Help requested"}</div>
-              <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{visibleHelpRequest.category || "Need an Admin"} · {visibleHelpRequest.location || "Location not provided"}</div>
+              <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{visibleHelpRequest.category || "Need an Admin"} · {fieldDisplayName(visibleHelpRequest.location, fieldNames) || "Location not provided"}</div>
               <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">Requested by {visibleHelpRequest.requester || visibleHelpRequest.by || "Volunteer"}</div>
               {visibleHelpRequest.details && <div className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">{visibleHelpRequest.details}</div>}
             </div>
@@ -2809,14 +2831,14 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={teamRecords[openTeam]}
             onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : openMatch ? (
-          <MatchDetail match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch}
+          <MatchDetail match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
             fieldLog={fieldLog} fieldResetChecks={fieldResetChecks} onVerifyFieldReset={verifyFieldResetQuadrant} onResetFieldReset={resetFieldResetMatch}
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={(n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} emcee={isEmcee} />
         ) : openRobot ? (
           <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : view === "matches" ? (
-          <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} />
+          <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
           <RobotList teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "judging" ? (
@@ -2827,7 +2849,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         ) : view === "rulebook" ? (
           <RuleBook rules={rules} />
         ) : view === "awp" ? (
-          <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} />
+          <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} fieldNames={fieldNames} />
         ) : view === "alliances" ? (
           <AllianceSelection teams={teams} alliances={alliances} matches={matches} canEditAlliances={adminUnlocked && !isJudge} canEditBracket={!isJudge && !isEmcee} onSet={setAllianceTeam} onFinalize={finalizeAlliances} onSetWinner={setMatchWinner} onClear={() => requireAdmin(() => { if (confirm("Clear all alliance picks? (This does not delete any matches already generated.)")) clearAlliances(); })} />
         ) : (
@@ -2923,7 +2945,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       )}
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
       {showIdentity && <IdentityModal me={{ nickname: meName, fullName: meFullName, phone: mePhone }} onSave={async (identity) => { await onEditName(identity); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
-      {showHelpRequest && <HelpRequestModal onSend={sendHelpRequest} onClose={() => setShowHelpRequest(false)} />}
+      {showHelpRequest && <HelpRequestModal fieldNames={fieldNames} onSend={sendHelpRequest} onClose={() => setShowHelpRequest(false)} />}
       {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length, quadrantChecks: fieldResetChecks.length }} onClear={clearSelected} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowClear(false)} />}
       {showOnline && (
         <div className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
@@ -2932,7 +2954,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
               <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Users size={18} /> Key Volunteer Status</h2>
               <button onClick={() => setShowOnline(false)} className="text-slate-400"><X size={22} /></button>
             </div>
-            <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}><OnlineList presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} eventMembers={eventMembers} onSetAdmin={adminUnlocked ? setVolunteerAdmin : undefined} assignments={volunteerAssignments} onSetAssignment={adminUnlocked ? setVolunteerAssignment : undefined} /></div>
+            <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}><OnlineList presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} eventMembers={eventMembers} onSetAdmin={adminUnlocked ? setVolunteerAdmin : undefined} assignments={volunteerAssignments} onSetAssignment={adminUnlocked ? setVolunteerAssignment : undefined} fieldNames={fieldNames} /></div>
           </div>
         </div>
       )}
@@ -3002,7 +3024,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Flag size={18} /> Field log</h2>
           </div>
           <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4">
-            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","volunteer_contact","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","role_code_update","help_request","help_ack","feedback"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} />
+            <FieldLogView entries={fieldLog.filter((e) => !["announcement","event_countdown","contact_directory","volunteer_contact","system_test","sync_probe","sync_ack","role_access_codes","role_code_request","role_code_update","help_request","help_ack","feedback"].includes(e.kind))} onAdd={addFieldLog} onRemove={removeFieldLog} meName={meName} canDelete={adminUnlocked} fieldNames={fieldNames} />
           </div></div>
         </div>
       )}
@@ -3024,6 +3046,9 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         onSave={saveSharedCountdown}
         onClear={clearSharedCountdown}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowCountdownSetup(false)} />}
+      {showFieldNameConfigurator && adminUnlocked && <FieldNameConfiguratorModal current={fieldNames}
+        onSave={saveFieldNames}
+        onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowFieldNameConfigurator(false)} />}
       {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowOfflineTest(false)} />}
       {showCommandCenter && adminUnlocked && <CommandCenter matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
         eventMembers={eventMembers} meName={meName} onSetAdmin={setVolunteerAdmin}
@@ -3037,6 +3062,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         onClearAnnouncements={clearAnnouncementsForAll}
         onContactDirectory={() => openCommandCenterTool(() => setShowContactDirectory(true))}
         onRoleCodes={() => openCommandCenterTool(() => setShowRoleCodeManager(true))}
+        onFieldNames={() => openCommandCenterTool(() => setShowFieldNameConfigurator(true))}
         onPreEventTest={() => openCommandCenterTool(() => setShowPreEventTest(true))}
         onTwoDeviceSyncTest={() => openCommandCenterTool(() => setShowTwoDeviceSyncTest(true))}
         onDiagnosticReport={() => openCommandCenterTool(() => setShowDiagnosticReport(true))}
@@ -3609,7 +3635,7 @@ function RulePicker({ rules, knownRules, selectedCodes = [], onPickRule, onPickC
 
 /* ============================ ADD TEAM MODAL ============================ */
 
-function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee }) {
+function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
   const [field, setField] = useState("all");
   const all = Object.values(matches);
   const hasElims = all.some((m) => m.phase && m.phase !== "qual");
@@ -3675,7 +3701,7 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
           {["all", ...fields].map((f) => (
             <button key={f} onClick={() => setField(f)}
               className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap border ${field === f ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:border-slate-600"}`}>
-              {f === "all" ? "All fields" : f}
+              {f === "all" ? "All fields" : fieldDisplayName(f, fieldNames)}
             </button>
           ))}
         </div>
@@ -3701,7 +3727,7 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
                   <span className="text-slate-300 dark:text-slate-400 font-sans">vs</span>
                   <span className="text-blue-700 dark:text-blue-300 font-semibold">{m.blue.join("  ")}</span>
                 </div>
-                {m.field && <span className="text-[11px] text-slate-400 shrink-0">{m.field.replace("Field ", "F")}</span>}
+                {m.field && <span className="text-[11px] text-slate-400 shrink-0">{fieldDisplayName(m.field, fieldNames)}</span>}
                 {m.redScore != null && m.blueScore != null && (
                   <span className="font-mono text-xs font-bold shrink-0"><span className={m.winner === "red" ? "text-red-700 dark:text-red-300" : "text-slate-400"}>{m.redScore}</span><span className="text-slate-300">-</span><span className={m.winner === "blue" ? "text-blue-700 dark:text-blue-300" : "text-slate-400"}>{m.blueScore}</span></span>
                 )}
@@ -3816,7 +3842,7 @@ function AwpChecker({ onSave }) {
 
 const REPLAY_REASONS = ["Field fault", "Scoring or timer issue", "Match started incorrectly", "Safety interruption", "External interference", "Other"];
 
-function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee }) {
+function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
   const [toOpen, setToOpen] = useState(false);
   const [toAlliance, setToAlliance] = useState("red");
   const [toTeam, setToTeam] = useState("");
@@ -3940,7 +3966,7 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
         <div className="flex items-center justify-between gap-2">
           <div>
             <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">{heading}</div>
-            {match.field && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{match.field}</div>}
+            {match.field && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{fieldDisplayName(match.field, fieldNames)}</div>}
             {m.redScore != null && m.blueScore != null && (
               <div className="mt-2 inline-flex items-center gap-2 text-sm font-mono font-bold">
                 <span className={`px-2 py-0.5 rounded ${m.winner === "red" ? "bg-red-600 text-white" : "text-red-700 dark:text-red-300"}`}>{m.redScore}</span>
@@ -4502,7 +4528,7 @@ function roleChip(role) {
 
 const VOLUNTEER_LOCATIONS = ["Field 1", "Field 2", "Field 3", "Pit Floor", "Competition Floor", "Skills", "Judging"];
 
-function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onSetAdmin, assignments = {}, onSetAssignment }) {
+function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onSetAdmin, assignments = {}, onSetAssignment, fieldNames = DEFAULT_FIELD_NAMES }) {
   const onlineCounts = {};
   const roleByName = {};
   const userIdByName = {};
@@ -4542,7 +4568,7 @@ function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onS
                   {role && <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md border shrink-0 ${roleChip(role)}`}>{role}</span>}
                 </div>
                 {!isOnline && r.lastSeen > 0 && <div className="text-[11px] text-slate-400">last seen {ago(r.lastSeen)}</div>}
-                {assignment && <div className="text-[11px] font-semibold text-sky-700 dark:text-sky-300 flex items-center gap-1 mt-0.5"><MapPin size={11}/>{assignment}</div>}
+                {assignment && <div className="text-[11px] font-semibold text-sky-700 dark:text-sky-300 flex items-center gap-1 mt-0.5"><MapPin size={11}/>{fieldDisplayName(assignment, fieldNames)}</div>}
               </div>
               <span className={`ml-auto inline-flex items-center gap-1 text-xs shrink-0 ${isOnline ? "text-emerald-600" : "text-slate-400"}`}>
                 <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500" : "bg-slate-300"}`} />
@@ -4564,7 +4590,7 @@ function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onS
                   <span className="text-xs font-semibold text-slate-500 dark:text-slate-300 shrink-0">Assignment</span>
                   <select value={assignment} onChange={(event) => onSetAssignment(member, event.target.value)} className="ml-auto min-w-0 flex-1 max-w-[190px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-100">
                     <option value="">Unassigned</option>
-                    {VOLUNTEER_LOCATIONS.map((location) => <option key={location} value={location}>{location}</option>)}
+                    {VOLUNTEER_LOCATIONS.map((location) => <option key={location} value={location}>{fieldDisplayName(location, fieldNames)}</option>)}
                   </select>
                 </label>
               )}
@@ -5311,7 +5337,7 @@ function AWPAnalytics({ fieldLog = [] }) {
   );
 }
 
-function FieldComparison({ matches = {}, viols = [], fieldLog = [] }) {
+function FieldComparison({ matches = {}, viols = [], fieldLog = [], fieldNames = DEFAULT_FIELD_NAMES }) {
   const all = Object.values(matches);
   const fields = [...new Set(all.map((m) => m.field).filter(Boolean))].sort();
   if (!fields.length) return null;
@@ -5331,7 +5357,7 @@ function FieldComparison({ matches = {}, viols = [], fieldLog = [] }) {
           const replays = fieldLog.filter((e) => e.kind === "replay" && ((e.matchId && ids.has(e.matchId)) || (e.matchRef && refs.has(e.matchRef)))).length;
           const faults = fieldLog.filter((e) => e.kind === "field_fault" && ((e.matchId && ids.has(e.matchId)) || (e.matchRef && refs.has(e.matchRef)))).length;
           return <div key={field} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
-            <div className="font-bold text-slate-900 dark:text-slate-100">{field}</div>
+            <div className="font-bold text-slate-900 dark:text-slate-100">{fieldDisplayName(field, fieldNames)}</div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2 text-xs">
               <span className="text-slate-500">Matches</span><span className="font-bold text-right">{fm.length}</span>
               <span className="text-slate-500">Violations</span><span className="font-bold text-right">{violations}</span>
@@ -5345,7 +5371,7 @@ function FieldComparison({ matches = {}, viols = [], fieldLog = [] }) {
   );
 }
 
-function AWPHistory({ fieldLog = [], matches = {}, viols = [], canSeeFieldComparison = false }) {
+function AWPHistory({ fieldLog = [], matches = {}, viols = [], canSeeFieldComparison = false, fieldNames = DEFAULT_FIELD_NAMES }) {
   const entries = fieldLog
     .filter((e) => e.kind === "awp")
     .sort((a, b) => b.createdAt - a.createdAt);
@@ -5428,7 +5454,7 @@ function AWPHistory({ fieldLog = [], matches = {}, viols = [], canSeeFieldCompar
       </div>
 
       <AWPAnalytics fieldLog={fieldLog} />
-      {canSeeFieldComparison && <FieldComparison matches={matches} viols={viols} fieldLog={fieldLog} />}
+      {canSeeFieldComparison && <FieldComparison matches={matches} viols={viols} fieldLog={fieldLog} fieldNames={fieldNames} />}
       {entries.map((e) => {
         const red = parseAwpSide(e.note, "Red");
         const blue = parseAwpSide(e.note, "Blue");
@@ -5463,7 +5489,7 @@ const kindColor = (k) => k === "field_fault" ? "bg-red-100 text-red-700 border-r
   : k === "awp" ? "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-200 dark:border-emerald-700"
   : "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600";
 
-function FieldLogView({ entries, onAdd, onRemove, meName, canDelete }) {
+function FieldLogView({ entries, onAdd, onRemove, meName, canDelete, fieldNames = DEFAULT_FIELD_NAMES }) {
   const [kind, setKind] = useState("timeout");
   const [field, setField] = useState("");
   const [matchRef, setMatchRef] = useState("");
@@ -5502,7 +5528,7 @@ function FieldLogView({ entries, onAdd, onRemove, meName, canDelete }) {
             <li key={e.id} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold border ${kindColor(e.kind)}`}>{kindLabel(e.kind)}</span>
-                {e.field && <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{e.field}</span>}
+                {e.field && <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{fieldDisplayName(e.field, fieldNames)}</span>}
                 {e.matchRef && <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{e.matchRef}</span>}
                 <span className="text-[11px] text-slate-400 ml-auto">{fmtTime(e.createdAt)}</span>
                 {(e.by === meName || canDelete) && <button onClick={() => { if (confirm("Remove this entry?")) onRemove(e.id); }} className="refos-destructive-icon"><Trash2 size={14} /></button>}
@@ -5612,6 +5638,7 @@ function FeaturesGuide() {
           <Li><b>Key Volunteer Status</b> — see volunteers online now and the known volunteer roster with role and online or offline status.</Li>
           <Li><b>Announcements</b> — send a shared Key Volunteer Announcement to connected Ref-OS devices. Each device can acknowledge it.</Li>
           <Li><b>Shared countdown</b> — create or clear an event countdown that syncs across devices.</Li>
+          <Li><b>Field Name Configurator</b> — replace Field 1, Field 2, and Field 3 with the competition field names shown throughout Ref OS without changing the imported schedule.</Li>
           <Li><b>Event Contact Directory</b> — shared names, roles, phone numbers, email, locations, and notes for event contacts. Admins can edit and reorder it.</Li>
           <Li><b>Role access codes</b> — generate, display, print, QR encode, or disable event role codes.</Li>
           <Li><b>Pre Event System Test</b> — checks browser storage, service worker readiness, database read/write, realtime sync, Tournament Manager parsing, PDF generation, and other event-critical functions.</Li>

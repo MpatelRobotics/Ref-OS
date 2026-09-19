@@ -9,10 +9,8 @@ const CATEGORIES = [
   "Volunteer replacement needed",
 ];
 
-const LOCATIONS = [
-  "Field 1",
-  "Field 2",
-  "Field 3",
+const FIELD_LOCATIONS = ["Field 1", "Field 2", "Field 3"];
+const OTHER_LOCATIONS = [
   "Pit Floor",
   "Competition Floor",
   "Skills",
@@ -20,7 +18,7 @@ const LOCATIONS = [
   "Other",
 ];
 
-export default function HelpRequestModal({ onSend, onClose }) {
+export default function HelpRequestModal({ fieldNames = {}, onSend, onClose }) {
   const [category, setCategory] = useState("Need an Admin");
   const [location, setLocation] = useState("");
   const [details, setDetails] = useState("");
@@ -32,7 +30,7 @@ export default function HelpRequestModal({ onSend, onClose }) {
     setError("");
     try {
       if (!location) { setError("Choose where help is needed."); setSending(false); return; }
-      await onSend({ category, location, details: details.trim() });
+      await onSend({ category, location: fieldNames[location] || location, details: details.trim() });
       onClose();
     } catch (requestError) {
       setError(requestError?.message || "Could not send the help request.");
@@ -59,9 +57,9 @@ export default function HelpRequestModal({ onSend, onClose }) {
           </div>
           <div className="mt-4 text-xs font-bold uppercase tracking-wide text-slate-500">Where is help needed?</div>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            {LOCATIONS.map((item) => (
+            {[...FIELD_LOCATIONS, ...OTHER_LOCATIONS].map((item) => (
               <button key={item} onClick={() => setLocation(item)} className={`min-h-11 px-3 py-2 rounded-xl border-2 text-left text-sm font-semibold ${location === item ? "border-[#D7212B] bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-200" : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"}`}>
-                {item}
+                {fieldNames[item] || item}
               </button>
             ))}
           </div>
