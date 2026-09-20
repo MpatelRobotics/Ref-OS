@@ -99,6 +99,27 @@ export async function clearAccessSession() {
   catch { await supabase.auth.signOut(); }
 }
 
+export async function hasCurrentEventAccess(eventId) {
+  if (E2E_MOCK) return true;
+  const { data, error } = await supabase.from("event_members").select("role").eq("event_id", eventId).maybeSingle();
+  if (error) throw error;
+  return !!data?.role;
+}
+
+export async function getIdentityResetVersion(eventId) {
+  if (E2E_MOCK) return "0";
+  const { data, error } = await supabase.from("event_settings").select("value").eq("event_id", eventId).eq("key", "identity_reset").maybeSingle();
+  if (error) throw error;
+  return String(data?.value?.version || "0");
+}
+
+export async function resetVolunteerSignIns(eventId) {
+  if (E2E_MOCK) return String(Date.now());
+  const { data, error } = await supabase.rpc("reset_volunteer_sign_ins", { p_event: eventId });
+  if (error) throw error;
+  return String(data || "");
+}
+
 
 export async function listEventMembersForAdmin(eventId) {
   if (E2E_MOCK) return [];

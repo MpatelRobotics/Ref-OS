@@ -101,6 +101,8 @@ The alliance tools support captain and pick assignments, elimination bracket pre
 
 The Event Command Center centralizes administrator tools and event health information. It includes access to operational summaries, AWP History and Analytics, event settings, announcements, countdown management, field name configuration, data controls, volunteer information, exports, and readiness checks. Admins can replace Field 1, Field 2, and Field 3 with the actual competition field names without changing imported match assignments. The shared names update across devices in match filters, match details, volunteer assignments, help locations, field logs, and field analytics.
 
+Reset Volunteer Sign Ins signs every event member out, clears the volunteer roster, contact profiles, and stale assignments, then requires a fresh nickname, first name, and last name on the next login. It preserves teams, matches, violations, pictures, judging, and other event records.
+
 Back navigation uses the same plain left chevron and Back label throughout desktop and mobile views. Back controls stay in the normal page header flow so they do not cover titles or close controls. Closing, saving, or selecting Back from an Event Command Center tool returns the Admin to Event Command Center instead of the main workspace.
 
 ## Key Volunteer Status

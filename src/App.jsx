@@ -352,6 +352,7 @@ export default function App() {
   const [unlocked, setUnlocked] = useState(false);
   const [role, setRole] = useState("ref");
   const [accessChecked, setAccessChecked] = useState(false);
+  const [identityChecked, setIdentityChecked] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem("refosTheme") || "light");
 
   useEffect(() => {
@@ -406,6 +407,38 @@ export default function App() {
   }, [unlocked, meName]);
 
   useEffect(() => {
+    if (!unlocked) {
+      setIdentityChecked(false);
+      return;
+    }
+    let live = true;
+    (async () => {
+      try {
+        const version = await api.getIdentityResetVersion(EVENT_ID);
+        if (!live) return;
+        const key = `refosIdentityResetVersion:${EVENT_ID}`;
+        const previous = localStorage.getItem(key);
+        if (version !== previous) {
+          if (version !== "0") {
+            localStorage.removeItem("refName");
+            localStorage.removeItem("refFullName");
+            localStorage.removeItem("refPhone");
+            setMeName("");
+            setMeFullName("");
+            setMePhone("");
+          }
+          localStorage.setItem(key, version);
+        }
+      } catch {
+        // Keep an event device usable if its connection is temporarily unavailable.
+      } finally {
+        if (live) setIdentityChecked(true);
+      }
+    })();
+    return () => { live = false; };
+  }, [unlocked]);
+
+  useEffect(() => {
     if (!unlocked || !meName) return;
     let live = true;
     setLoadErr(false);
@@ -442,18 +475,20 @@ export default function App() {
     try { await api.setEventMemberName(EVENT_ID, cleanNickname); } catch {}
   };
 
-  const lock = async () => {
+  const lock = useCallback(async () => {
     localStorage.removeItem("unlocked");
     localStorage.removeItem("refosRole");
     sessionStorage.removeItem("refosAdmin");
     setUnlocked(false);
+    setIdentityChecked(false);
     setEvent(null);
     await api.clearAccessSession();
-  };
+  }, []);
 
   if (!configured) return <ConfigError />;
   if (!accessChecked) return <FullPage>Checking event access…</FullPage>;
   if (!unlocked) return <LoginScreen eventId={EVENT_ID} onUnlock={unlock} />;
+  if (!identityChecked) return <FullPage>Checking volunteer profile…</FullPage>;
   if (!meName || !meFullName) return <NameScreen onIdentity={saveIdentity} />;
   if (loadErr) return (
     <FullPage>
@@ -505,6 +540,30 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const [currentUserId, setCurrentUserId] = useState(null);
   const undoneViolationIdsRef = useRef(new Set());
   const pendingCount = viols.filter((v) => v._pending).length;
+
+  useEffect(() => {
+    let live = true;
+    let checking = false;
+    const verifyAccess = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const allowed = await api.hasCurrentEventAccess(eventId);
+        if (live && !allowed) await onLock();
+      } catch {
+        // A failed network request must not sign out an offline event device.
+      } finally {
+        checking = false;
+      }
+    };
+    const timer = window.setInterval(verifyAccess, 5000);
+    window.addEventListener("focus", verifyAccess);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", verifyAccess);
+    };
+  }, [eventId, onLock]);
 
   const [lastMatch, setLastMatch] = useState(() => {
     try { return JSON.parse(localStorage.getItem("lastMatch")) || { phase: "qual", num: "" }; }
@@ -3110,6 +3169,14 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         onRankings={() => openCommandCenterTool(() => setShowRankings(true))}
         onAwpHistory={() => openCommandCenterTool(() => { setView("awp"); setQuery(""); })}
         onClearData={() => openCommandCenterTool(() => setShowClear(true))}
+        onResetVolunteerSignIns={async () => {
+          try {
+            await api.resetVolunteerSignIns(eventId);
+            await onLock();
+          } catch (error) {
+            alert(error?.message || "Could not reset volunteer sign ins.");
+          }
+        }}
         onClose={() => setShowCommandCenter(false)} />}
       {showAnnouncement && adminUnlocked && <AnnouncementModal onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowAnnouncement(false)} onSend={sendAnnouncement} />}
       {showFeatures && (
@@ -5706,6 +5773,7 @@ function FeaturesGuide() {
           <Li><b>Two Device Sync Test</b> — verifies that two Ref-OS devices can exchange a live probe and acknowledgement through the event backend.</Li>
           <Li><b>Event Diagnostic Report</b> — displays the app, device, event, storage, network, and sync snapshot and can copy or download the report as JSON.</Li>
           <Li><b>Failed Sync Items</b> — permanent offline write failures are retained so an Admin can retry or discard them instead of silently losing the entry.</Li>
+          <Li><b>Reset Volunteer Sign Ins</b> — signs out every event member, clears volunteer profiles and stale assignments, and requires a fresh nickname, first name, and last name on the next login without deleting event records.</Li>
           <Li><b>Event setup, TM Sync Center, exports, backup, Activity feed, Rankings, and Clear event data</b> are also accessed from the Command Center.</Li>
         </ul>
       </Section>
