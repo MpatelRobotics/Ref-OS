@@ -32,6 +32,7 @@ import FeedbackModal from "./components/modals/FeedbackModal.jsx";
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
 import HelpRequestModal from "./components/modals/HelpRequestModal.jsx";
 import manualQuickLinks from "./manualQuickLinks.json";
+import manualSearchIndex from "./manualSearchIndex.json";
 
 /* This build is locked to one event: The Highlander Summit Signature Event.
    EVENT_ID must match supabase/seed.sql. A shared site password gates entry. */
@@ -5847,6 +5848,7 @@ const RULE_MANUAL_PAGES = Object.fromEntries([
 
 function RuleBook({ rules }) {
   const [query, setQuery] = useState("");
+  const [manualQuery, setManualQuery] = useState("");
   const [selected, setSelected] = useState(null); // rule object shown in the notes popup
   const [manualOpen, setManualOpen] = useState(false);
   const [manualPage, setManualPage] = useState(1);
@@ -5861,6 +5863,20 @@ function RuleBook({ rules }) {
   };
   const manualImage = `/manual-pages/page-${String(manualPage).padStart(3, "0")}.jpg`;
   const manualPageLinks = manualQuickLinks[String(manualPage)] || [];
+  const manualSearchResults = useMemo(() => {
+    const cleanQuery = manualQuery.trim().toLowerCase();
+    const terms = cleanQuery.split(/\s+/).filter(Boolean);
+    if (!terms.length) return [];
+    return manualSearchIndex.flatMap(({ page, text }) => {
+      const lower = text.toLowerCase();
+      if (!terms.every((term) => lower.includes(term))) return [];
+      const firstMatch = Math.max(0, lower.indexOf(terms[0]));
+      const start = Math.max(0, firstMatch - 75);
+      const end = Math.min(text.length, firstMatch + terms[0].length + 145);
+      const exactRule = /^<?[a-z]{1,3}\d{1,2}>?$/.test(cleanQuery) && lower.includes(`<${cleanQuery.replace(/[<>]/g, "")}>`);
+      return [{ page, exactRule, firstMatch, snippet: `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}` }];
+    }).sort((a, b) => Number(b.exactRule) - Number(a.exactRule) || a.firstMatch - b.firstMatch || a.page - b.page).slice(0, 40);
+  }, [manualQuery]);
   if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
   const q = query.trim().toUpperCase();
   const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
@@ -5946,6 +5962,32 @@ function RuleBook({ rules }) {
             <button onClick={() => goToManualPage(3)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">Jump to Table of Contents</button>
             <button onClick={() => goToManualPage(7)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">Jump to Quick Reference Guide</button>
             <span className="self-center text-xs text-slate-500 dark:text-slate-400">Page {manualPage}</span>
+          </div>
+          <div className="relative shrink-0 border-b border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
+            <Search size={17} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={manualQuery}
+              onChange={(event) => setManualQuery(event.target.value)}
+              placeholder="Search the game manual"
+              aria-label="Search the game manual"
+              className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-9 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            />
+            {manualQuery && <button type="button" onClick={() => setManualQuery("")} aria-label="Clear manual search" className="absolute right-5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-100"><X size={17} /></button>}
+            {manualQuery.trim() && (
+              <div className="absolute left-3 right-3 top-full z-20 max-h-[45vh] overflow-y-auto rounded-b-xl border border-t-0 border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                {manualSearchResults.length ? manualSearchResults.map((result) => (
+                  <button
+                    key={result.page}
+                    type="button"
+                    onClick={() => { goToManualPage(result.page); setManualQuery(""); }}
+                    className="block w-full border-b border-slate-100 px-4 py-3 text-left last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800"
+                  >
+                    <span className="mb-1 block text-xs font-bold text-[#C53437]">Page {result.page}</span>
+                    <span className="block text-xs leading-relaxed text-slate-600 dark:text-slate-300">{result.snippet}</span>
+                  </button>
+                )) : <div className="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">No matches found in the manual.</div>}
+              </div>
+            )}
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto bg-slate-200 p-2 md:hidden dark:bg-slate-950">
             <div className="relative mx-auto max-w-3xl bg-white shadow-lg">
