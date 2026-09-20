@@ -5867,6 +5867,8 @@ function RuleBook({ rules }) {
     const cleanQuery = manualQuery.trim().toLowerCase();
     const terms = cleanQuery.split(/\s+/).filter(Boolean);
     if (!terms.length) return [];
+    const cleanRuleCode = cleanQuery.replace(/[<>]/g, "").toUpperCase();
+    const directRulePage = RULE_MANUAL_PAGES[cleanRuleCode];
     return manualSearchIndex.flatMap(({ page, text }) => {
       const lower = text.toLowerCase();
       if (!terms.every((term) => lower.includes(term))) return [];
@@ -5874,8 +5876,8 @@ function RuleBook({ rules }) {
       const start = Math.max(0, firstMatch - 75);
       const end = Math.min(text.length, firstMatch + terms[0].length + 145);
       const exactRule = /^<?[a-z]{1,3}\d{1,2}>?$/.test(cleanQuery) && lower.includes(`<${cleanQuery.replace(/[<>]/g, "")}>`);
-      return [{ page, exactRule, firstMatch, snippet: `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}` }];
-    }).sort((a, b) => Number(b.exactRule) - Number(a.exactRule) || a.firstMatch - b.firstMatch || a.page - b.page).slice(0, 40);
+      return [{ page, directRule: page === directRulePage, exactRule, firstMatch, snippet: `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}` }];
+    }).sort((a, b) => Number(b.directRule) - Number(a.directRule) || Number(b.exactRule) - Number(a.exactRule) || a.firstMatch - b.firstMatch || a.page - b.page).slice(0, 40);
   }, [manualQuery]);
   if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
   const q = query.trim().toUpperCase();
