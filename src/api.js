@@ -29,6 +29,7 @@ export async function claimEventAccess(eventId, credential) {
     if (value === "1B23" || value === "test-ref") return { role: "ref", serverRole: "ref", isAdmin: false };
     if (value === "1C23" || value === "test-judge") return { role: "judge", serverRole: "judge", isAdmin: false };
     if (value === "1D23" || value === "test-emcee") return { role: "emcee", serverRole: "emcee", isAdmin: false };
+    if (value === "2A23" || value === "test-inspection") return { role: "inspection", serverRole: "inspection", isAdmin: false };
     throw new Error("Invalid event credential");
   }
   await ensureAnonymousSession();
@@ -346,12 +347,12 @@ export async function addTeamPhoto(eventId, number, dataUrl, angle = "other", up
   const path = `${eventId}/team/${num}/${safeAngle}-${id}.jpg`;
   const up = await supabase.storage.from("robot-photos").upload(path, dataURLtoBlob(dataUrl), { contentType: "image/jpeg", upsert: true });
   if (up.error) throw up.error;
-  const { data: t } = await supabase.from("teams").select("photo_paths").eq("event_id", eventId).eq("number", num).single();
-  const current = ((t && t.photo_paths) || []);
-  const paths = current.includes(path) ? current : [...current, path];
-  const { error } = await supabase.from("teams").update({ photo_paths: paths }).eq("event_id", eventId).eq("number", num);
-  if (error) throw error;
-  return paths;
+  const { data: paths, error } = await supabase.rpc("append_team_photo_path", { p_event: eventId, p_team: num, p_path: path });
+  if (error) {
+    await supabase.storage.from("robot-photos").remove([path]);
+    throw error;
+  }
+  return paths || [];
 }
 export async function removeTeamPhoto(eventId, number, path) {
   const num = (number || "").trim().toUpperCase();

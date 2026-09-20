@@ -381,7 +381,7 @@ export default function App() {
         if (!live) return;
         if (serverRole) {
           const roleText = String(serverRole || "").trim().toLowerCase();
-          const uiRole = serverRole === "admin" ? "ref" : roleText.includes("judge") ? "judge" : roleText.includes("emcee") ? "emcee" : "ref";
+          const uiRole = serverRole === "admin" ? "ref" : roleText.includes("inspection") ? "inspection" : roleText.includes("judge") ? "judge" : roleText.includes("emcee") ? "emcee" : "ref";
           setRole(uiRole);
           setUnlocked(true);
           localStorage.setItem("unlocked", "1");
@@ -417,7 +417,7 @@ export default function App() {
 
   const unlock = (r, admin, serverRole, credential = "") => {
     const roleText = String(r || serverRole || "").trim().toLowerCase();
-    const uiRole = roleText.includes("judge") ? "judge" : roleText.includes("emcee") ? "emcee" : "ref";
+    const uiRole = roleText.includes("inspection") ? "inspection" : roleText.includes("judge") ? "judge" : roleText.includes("emcee") ? "emcee" : "ref";
     const enteredCode = String(credential || "").trim().toUpperCase();
     if (!admin && serverRole !== "admin" && /^\d[A-D]\d\d$/.test(enteredCode)) {
       localStorage.setItem(`refosVisibleRoleCode:${EVENT_ID}:${uiRole}`, enteredCode);
@@ -486,6 +486,7 @@ const ConfigError = () => (
 function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock }) {
   const isJudge = role === "judge";
   const isEmcee = role === "emcee";
+  const isInspection = role === "inspection";
   const eventId = initialEvent.id;
   const [event, setEvent] = useState(initialEvent);
   const [teams, setTeams] = useState([]);
@@ -510,7 +511,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     catch { return { phase: "qual", num: "" }; }
   });
 
-  const [view, setView] = useState(role === "judge" ? "judging" : "matches");
+  const [view, setView] = useState(role === "judge" ? "judging" : role === "inspection" ? "robots" : "matches");
   const [openTeam, setOpenTeam] = useState(null);
   const [openMatch, setOpenMatch] = useState(null);
   const [openRobot, setOpenRobot] = useState(null);
@@ -619,7 +620,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const [lastSystemTest, setLastSystemTest] = useState(null);
   const [pushState, setPushState] = useState("checking");
   const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
-  const myRole = isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
+  const myRole = isInspection ? "Inspection" : isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
 
   const openCommandCenterTool = (openTool) => {
     setShowCommandCenter(false);
@@ -1020,6 +1021,19 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     setSyncing(true);
     setAlliancesLoaded(false);
     try {
+      if (isInspection) {
+        const [ev, t, queuedOps] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), outbox.loadQueue(eventId)]);
+        if (ev) setEvent(ev);
+        const queuedPhotos = (queuedOps || []).filter((op) => op.kind === "robot_photo");
+        setTeams(t.map((team) => ({
+          ...team,
+          _pendingRobotPhotos: queuedPhotos.filter((op) => op.number === team.number).map((op) => ({ id: op.id, angle: op.angle, dataUrl: op.dataUrl })),
+        })));
+        setSyncedAt(Date.now());
+        setCloudReachable(true);
+        setLastCloudError("");
+        return;
+      }
       const [ev, t, v, nm, sl, wn, queuedOps] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), api.listViolations(eventId), api.listNominations(eventId), api.listShortlist(eventId), api.listWatchNotes(eventId), outbox.loadQueue(eventId)]);
       if (ev) setEvent(ev);
       setTeams((cur) => {
@@ -1055,7 +1069,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       setSyncing(false);
       refreshQueueHealth();
     }
-  }, [eventId, refreshQueueHealth]);
+  }, [eventId, isInspection, refreshQueueHealth]);
 
   const doFlush = useCallback(async () => {
     await outbox.flush(eventId, {
@@ -1093,7 +1107,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   useEffect(() => {
     (async () => {
       await refresh();
-      api.listMatches(eventId).then((list) => {
+      if (!isInspection) api.listMatches(eventId).then((list) => {
         const map = {}; for (const m of list) map[m.id] = m; setMatches(map);
       }).catch((error) => {
         console.warn("Matches unavailable and no local match cache exists yet.", error);
@@ -1109,7 +1123,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         const have = new Set(cur.map((t) => t.number));
         return [...cur, ...pendingTeams.filter((t) => !have.has(t.number))];
       });
-      const pend = q.filter((o) => o.kind === "violation").map((o) => ({
+      const pend = isInspection ? [] : q.filter((o) => o.kind === "violation").map((o) => ({
         id: o.row.id, team: o.row.team, type: o.row.type, code: o.row.code, desc: o.row.rule_desc || "",
         notes: o.row.notes || "", match: o.row.match_info || null, by: api.decodeAttribution(o.row.logged_by).nickname, byFullName: api.decodeAttribution(o.row.logged_by).fullName,
         photoKeys: [], createdAt: o.createdAt || Date.now(), _pending: true, _localPhotos: o.photos || [],
@@ -1131,16 +1145,17 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline);
       clearInterval(iv);
     };
-  }, [eventId, refresh, doFlush]);
+  }, [eventId, isInspection, refresh, doFlush]);
 
   useEffect(() => {
+    if (isInspection) return undefined;
     const name = meName || "Ref";
     const loadRoster = () => api.listRefRoster(eventId).then(setRefRoster);
     api.touchRefRoster(eventId, name, myRole).then(loadRoster);
     const leave = api.joinPresence(eventId, { name, role: myRole, online_at: Date.now() }, setPresence);
     const iv = setInterval(() => { api.touchRefRoster(eventId, name, myRole); loadRoster(); }, 60000);
     return () => { clearInterval(iv); leave(); };
-  }, [eventId, meName, myRole]);
+  }, [eventId, isInspection, meName, myRole]);
 
   const saveEvent = async (data) => {
     const ev = await api.updateEvent(eventId, {
@@ -2560,11 +2575,11 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
             </div>
             <button onClick={() => { refresh(); doFlush(); }} className="text-[11px] text-slate-400 leading-tight mt-0.5 flex items-center gap-1 hover:text-slate-200">
               <RefreshCw size={10} className={syncing ? "animate-spin" : ""} />
-              {teams.length} teams · {viols.length} violations · synced {ago(syncedAt)}
+              {isInspection ? `${teams.length} teams · inspection access` : `${teams.length} teams · ${viols.length} violations`} · synced {ago(syncedAt)}
             </button>
           </div>
-          <OnlineCluster presence={presence} onClick={openVolunteerStatus} />
-          {!isJudge && !isEmcee && <button onClick={() => setShowByRule(true)} title="By rule" className="p-1.5 rounded hover:bg-white/10"><BarChart3 size={18} /></button>}
+          {!isInspection && <OnlineCluster presence={presence} onClick={openVolunteerStatus} />}
+          {!isInspection && !isJudge && !isEmcee && <button onClick={() => setShowByRule(true)} title="By rule" className="p-1.5 rounded hover:bg-white/10"><BarChart3 size={18} /></button>}
           <button onClick={() => setShowIdentity(true)} title="Your full name"
             className="refos-user-chip flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-full pl-1 pr-2.5 py-1">
             <span className="w-6 h-6 rounded-full bg-[#D7212B] text-white text-[11px] font-bold grid place-items-center">{meName ? initials(meName) : "?"}</span>
@@ -2574,7 +2589,15 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
             <button aria-label="Settings" onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
               <div ref={menuRef} className="refos-menu-pop absolute right-0 mt-2 w-56 max-h-[75vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
-                {isJudge ? (
+                {isInspection ? (
+                  <>
+                    <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><ClipboardCheck size={12} /> Inspection</div>
+                    <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
+                    <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
+                    <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
+                    <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
+                  </>
+                ) : isJudge ? (
                   <>
                     <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><Trophy size={12} /> Judge Advisor</div>
                     <button onClick={() => { setMenu(false); exportNominations(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export nominations</button>
@@ -2637,7 +2660,10 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
           </div>
         </div>
         {!openTeam && !openMatch && !openRobot && (() => {
-          const navItems = isJudge ? [
+          const navItems = isInspection ? [
+            { k: "robots", label: "Robots", Icon: Camera },
+            ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])
+          ] : isJudge ? [
             { k: "judging", label: "Judging", Icon: Trophy },
             { k: "alliances", label: "Alliances", Icon: GitBranch }
           ] : [
@@ -2664,11 +2690,11 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                 <div className="refos-desktop-utilities">
                   <div className="refos-sidebar-section-label refos-sidebar-tools-label" aria-hidden="true">Event Tools</div>
                   {adminUnlocked && <button onClick={() => { loadEventMembers(); setShowCommandCenter(true); }} className="refos-sidebar-tool"><BarChart3 size={16} /> Command Center</button>}
-                  <button onClick={() => setShowFieldLog(true)} className="refos-sidebar-tool"><Flag size={16} /> Field Log</button>
-                  <button onClick={() => setShowContactDirectory(true)} className="refos-sidebar-tool"><Contact size={16} /> Contacts</button>
+                  {!isInspection && <button onClick={() => setShowFieldLog(true)} className="refos-sidebar-tool"><Flag size={16} /> Field Log</button>}
+                  {!isInspection && <button onClick={() => setShowContactDirectory(true)} className="refos-sidebar-tool"><Contact size={16} /> Contacts</button>}
                 </div>
                 <div className="refos-sidebar-footer">
-                  <span>{adminUnlocked ? "Admin" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
+                  <span>{adminUnlocked ? "Admin" : isInspection ? "Inspection" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
                   <span>v{APP_VERSION} · Highlander Summit Release</span>
                 </div>
               </nav>
@@ -2682,7 +2708,10 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       </header>
 
       {!openTeam && !openMatch && !openRobot && !showIdentity && !logFor && !editing && (() => {
-        const primary = isJudge ? [
+        const primary = isInspection ? [
+          { k: "robots", label: "Robots", Icon: Camera },
+          ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])
+        ] : isJudge ? [
           { k: "judging", label: "Judging", Icon: Trophy },
           { k: "alliances", label: "Alliances", Icon: GitBranch }
         ] : [
@@ -2698,13 +2727,16 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                 <Icon size={19}/><span>{label}</span>
               </button>
             ))}
-            {!isJudge && <button aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}><Menu size={19}/><span>More</span></button>}
+            {!isInspection && !isJudge && <button aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}><Menu size={19}/><span>More</span></button>}
           </nav>
         );
       })()}
 
       {mobileNavOpen && !openTeam && !openMatch && !openRobot && (() => {
-        const navItems = isJudge ? [
+        const navItems = isInspection ? [
+          { k: "robots", label: "Robots", Icon: Camera },
+          ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])
+        ] : isJudge ? [
           { k: "judging", label: "Judging", Icon: Trophy },
           { k: "alliances", label: "Alliances", Icon: GitBranch }
         ] : [
@@ -2822,7 +2854,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
           </button>}
           <p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: "Alliance selection"}[view] || "Event workspace"}</h2>
           <p className="refos-description">{{teams: "Find a team. Review its history. Keep your crew informed.", matches: "Your schedule, field activity, and match details in one place.", robots: "A shared visual reference for every robot.", judging: "Capture the moments that deserve recognition.", rulebook: "Find the right rule when you need it.", awp: "Review autonomous observations across the event.", alliances: "Follow the path from selection to the final."}[view]}</p></div>
-          <span className="refos-role">{adminUnlocked ? "Admin" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
+          <span className="refos-role">{adminUnlocked ? "Admin" : isInspection ? "Inspection" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
         </section>}
         {!openTeam && !openMatch && !openRobot && view === "teams" && <dl className="refos-stats">
           <div><dt>Event roster</dt><dd>{teams.length}<span> teams</span></dd></div>
@@ -2838,7 +2870,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={(n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} emcee={isEmcee} />
         ) : openRobot ? (
-          <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} emcee={isEmcee} />
+          <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} canTakePhotos={!isEmcee} canDeletePhotos={!isInspection && !isEmcee} />
         ) : view === "matches" ? (
           <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
@@ -2919,7 +2951,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         </div>
       </main>
 
-      {!footerVisible && !openTeam && !openMatch && !openRobot && view !== "judging" && !isEmcee && (
+      {!isInspection && !footerVisible && !openTeam && !openMatch && !openRobot && view !== "judging" && !isEmcee && (
         <button onClick={() => setLogFor("")} className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] sm:bottom-5 left-1/2 -translate-x-1/2 z-50 sm:z-20 bg-[#D7212B] text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
           <Plus size={20} /> Log violation
         </button>
@@ -4694,7 +4726,7 @@ function RobotList({ teams, query, setQuery, onOpen }) {
   );
 }
 
-function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, emcee }) {
+function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, canTakePhotos = true, canDeletePhotos = true }) {
   const [busy, setBusy] = useState(false);
   const [captureAngle, setCaptureAngle] = useState("");
   const fileRef = useRef(null);
@@ -4731,7 +4763,7 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
           <Camera size={13}/>{completed === 3 ? "Required pictures complete" : `${completed} of 3 required pictures`}
         </div>
       </div>
-      {!emcee && <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(event) => { add(event.target.files); event.target.value = ""; }} />}
+      {canTakePhotos && <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(event) => { add(event.target.files); event.target.value = ""; }} />}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {slotData.map((slot) => (
           <section key={slot.key} className={`rounded-xl border-2 overflow-hidden ${slot.remote || slot.pending ? "border-emerald-300 dark:border-emerald-800" : slot.required ? "border-dashed border-amber-300 dark:border-amber-700" : "border-dashed border-slate-300 dark:border-slate-600"}`}>
@@ -4743,15 +4775,15 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
               {slot.pending ? <button onClick={() => onOpenPhoto(slot.pending.dataUrl)} className="w-full h-full"><img src={slot.pending.dataUrl} alt={`${slot.label} robot view queued for upload`} className="w-full h-full object-cover" /></button>
                 : slot.remote ? <Thumb pkey={slot.remote} onOpen={onOpenPhoto} full />
                 : <div className="text-center text-slate-400"><Camera size={28} className="mx-auto mb-1"/><span className="text-xs">No {slot.label.toLowerCase()} picture</span></div>}
-              {!emcee && slot.pending && <button onClick={() => onRemovePendingPhoto(team.number, slot.pending.id)} className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1" title="Remove queued picture"><Trash2 size={13}/></button>}
-              {!emcee && !slot.pending && slot.remote && <button onClick={() => { if (confirm(`Delete the ${slot.label.toLowerCase()} robot picture?`)) onRemovePhoto(team.number, slot.remote); }} className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1"><Trash2 size={13}/></button>}
+              {canDeletePhotos && slot.pending && <button onClick={() => onRemovePendingPhoto(team.number, slot.pending.id)} className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1" title="Remove queued picture"><Trash2 size={13}/></button>}
+              {canDeletePhotos && !slot.pending && slot.remote && <button onClick={() => { if (confirm(`Delete the ${slot.label.toLowerCase()} robot picture?`)) onRemovePhoto(team.number, slot.remote); }} className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1"><Trash2 size={13}/></button>}
             </div>
-            {!emcee && <button onClick={() => chooseAngle(slot.key)} disabled={busy} className="w-full px-3 py-2.5 bg-[#D7212B] text-white text-sm font-bold disabled:bg-slate-400"><Camera size={15} className="inline mr-1.5"/>{busy && captureAngle === slot.key ? "Saving…" : slot.remote || slot.pending ? `Retake ${slot.label}` : `Take ${slot.label}`}</button>}
+            {canTakePhotos && <button onClick={() => chooseAngle(slot.key)} disabled={busy} className="w-full px-3 py-2.5 bg-[#D7212B] text-white text-sm font-bold disabled:bg-slate-400"><Camera size={15} className="inline mr-1.5"/>{busy && captureAngle === slot.key ? "Saving…" : slot.remote || slot.pending ? `Retake ${slot.label}` : `Take ${slot.label}`}</button>}
           </section>
         ))}
       </div>
       {pendingPhotos.length > 0 && <div className="mt-4 rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 px-3 py-2 text-xs font-semibold text-sky-800 dark:text-sky-200">{pendingPhotos.length} inspection {pendingPhotos.length === 1 ? "picture is" : "pictures are"} saved on this device and will upload automatically when connected.</div>}
-      {extraPhotos.length > 0 && <section className="mt-5"><h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2">Earlier and unlabeled pictures</h3><div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{extraPhotos.map((path) => <div key={path} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700"><Thumb pkey={path} onOpen={onOpenPhoto} full />{!emcee && <button onClick={() => { if (confirm("Delete this robot picture?")) onRemovePhoto(team.number, path); }} className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1"><Trash2 size={13}/></button>}</div>)}</div></section>}
+      {extraPhotos.length > 0 && <section className="mt-5"><h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2">Earlier and unlabeled pictures</h3><div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{extraPhotos.map((path) => <div key={path} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700"><Thumb pkey={path} onOpen={onOpenPhoto} full />{canDeletePhotos && <button onClick={() => { if (confirm("Delete this robot picture?")) onRemovePhoto(team.number, path); }} className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1"><Trash2 size={13}/></button>}</div>)}</div></section>}
     </>
   );
 }

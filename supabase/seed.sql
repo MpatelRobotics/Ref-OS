@@ -41,7 +41,8 @@ insert into public.event_access_credentials(event_id,credential_name,role,creden
 values
   ('11111111-1111-4111-8111-111111111111','backup_ref_code','ref','3604e01cd7f166aa7ba8171221bde0eb81321ec900d48b0ecf2bba329510adde',true),
   ('11111111-1111-4111-8111-111111111111','backup_judge_code','judge','acd804081f67a9f6983f69ea4da5c06bfa3823656e69da802192a75d9ad84d8e',true),
-  ('11111111-1111-4111-8111-111111111111','backup_emcee_code','emcee','5e0fc5e08d28ab37563e350a422f37dcc6272e8c1d2490bbec12df19619a8a5f',true)
+  ('11111111-1111-4111-8111-111111111111','backup_emcee_code','emcee','5e0fc5e08d28ab37563e350a422f37dcc6272e8c1d2490bbec12df19619a8a5f',true),
+  ('11111111-1111-4111-8111-111111111111','backup_inspection_code','inspection','507387d041d89ad1b99cfd2f292a2e758d884971d0a95d72d94c573eed734738',true)
 on conflict(event_id,credential_name)
 do update set role=excluded.role,credential_hash=excluded.credential_hash,enabled=true,updated_at=now();
 

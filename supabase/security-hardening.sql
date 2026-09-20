@@ -18,7 +18,7 @@ alter table public.event_settings enable row level security;
 create table if not exists public.event_access_credentials (
   event_id        uuid references public.events(id) on delete cascade,
   credential_name text not null,
-  role            text not null check (role in ('ref','judge','emcee','admin')),
+  role            text not null check (role in ('ref','judge','emcee','inspection','admin')),
   credential_hash text not null,
   enabled         boolean not null default true,
   updated_at      timestamptz default now(),
