@@ -1,4 +1,4 @@
-const CACHE = "refos-v73-1.0.0-volunteer-signin-reset";
+const CACHE = "refos-v74-1.0.0-admin-sms-alerts";
 const MANUAL_PAGES = Array.from({ length: 129 }, (_, index) => `/manual-pages/page-${String(index + 1).padStart(3, "0")}.jpg`);
 const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png", "/manuals/override-2.0.pdf", ...MANUAL_PAGES];
 

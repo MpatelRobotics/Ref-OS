@@ -113,6 +113,19 @@ Each volunteer receives a synchronized assignment card in their workspace. Assig
 
 On phones, the header uses a compact online volunteer count. Tapping it opens the complete scrollable status list.
 
+## Admin SMS alerts
+
+Ref OS can send a short SMS to two configured Admin phone numbers whenever a volunteer requests help or asks for a replacement role code. SMS delivery runs securely from the existing Supabase Edge Function through Twilio. Twilio credentials and Admin phone numbers are stored as Supabase secrets and are never included in browser code, the repository, exports, or the event contact directory. Each request is claimed once so reopening or refreshing Ref OS does not send duplicate texts. Web push continues to operate if Twilio is unavailable or has not been configured.
+
+Configure these Supabase secrets before deploying the function:
+
+* `TWILIO_ACCOUNT_SID`
+* `TWILIO_AUTH_TOKEN`
+* `TWILIO_FROM_NUMBER`
+* `ADMIN_SMS_NUMBERS` as two E.164 numbers separated by a comma
+
+After saving the secrets, deploy `send-code-request-push` again.
+
 ## Volunteer access and join codes
 
 Ref OS uses separate join codes for Referees, Judge Advisors, and Emcees.

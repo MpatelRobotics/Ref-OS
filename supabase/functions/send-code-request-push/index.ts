@@ -77,6 +77,10 @@ Deno.serve(async (request) => {
       url: `/?open=code-requests&role=${encodeURIComponent(details.role || "")}`,
     });
 
+    const smsBody = isHelp
+      ? limitSms(`REF OS HELP: ${category} at ${location}. From ${requester}.${extra ? ` ${extra}` : ""}`)
+      : limitSms(`REF OS CODE REQUEST: ${requester} requested a new ${role} join code.`);
+
     let sent = 0;
     const expired: string[] = [];
     await Promise.all(memberSubscriptions.map(async (subscription) => {
@@ -94,13 +98,63 @@ Deno.serve(async (request) => {
     }));
 
     if (expired.length) await serviceClient.from("push_subscriptions").delete().in("endpoint", expired);
-    await serviceClient.from("push_dispatches").update({ sent_count: sent }).eq("request_id", eventRequest.id);
-    return json({ sent, expired: expired.length });
+    const sms = await sendAdminSms(smsBody);
+    await serviceClient.from("push_dispatches").update({ sent_count: sent + sms.sent }).eq("request_id", eventRequest.id);
+    return json({ sent, expired: expired.length, smsSent: sms.sent, smsFailed: sms.failed });
   } catch (error) {
     console.error(error);
     return json({ error: (error as Error).message || "Push delivery failed" }, 500);
   }
 });
+
+function limitSms(value: string) {
+  const clean = value.replace(/\s+/g, " ").trim();
+  return clean.length <= 155 ? clean : `${clean.slice(0, 152)}...`;
+}
+
+async function sendAdminSms(body: string) {
+  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID") || "";
+  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN") || "";
+  const from = Deno.env.get("TWILIO_FROM_NUMBER") || "";
+  const recipients = (Deno.env.get("ADMIN_SMS_NUMBERS") || "")
+    .split(",")
+    .map((number) => number.trim())
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (!accountSid || !authToken || !from || recipients.length === 0) {
+    console.log("Twilio SMS is not configured; web push delivery will continue.");
+    return { sent: 0, failed: 0 };
+  }
+
+  let sent = 0;
+  let failed = 0;
+  const authorization = btoa(`${accountSid}:${authToken}`);
+  await Promise.all(recipients.map(async (to) => {
+    try {
+      const form = new URLSearchParams({ To: to, From: from, Body: body });
+      const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${authorization}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: form,
+      });
+      if (!response.ok) {
+        const detail = await response.text();
+        console.error("Twilio SMS delivery failed", response.status, detail.slice(0, 500));
+        failed += 1;
+        return;
+      }
+      sent += 1;
+    } catch (error) {
+      console.error("Twilio SMS delivery failed", (error as Error).message);
+      failed += 1;
+    }
+  }));
+  return { sent, failed };
+}
 
 function json(value: unknown, status = 200) {
   return new Response(JSON.stringify(value), {
