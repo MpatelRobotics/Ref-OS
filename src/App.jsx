@@ -668,6 +668,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const [showDiagnosticReport, setShowDiagnosticReport] = useState(false);
   const [showRoleCodeManager, setShowRoleCodeManager] = useState(false);
   const [showHelpRequest, setShowHelpRequest] = useState(false);
+  const [showNotificationPreferences, setShowNotificationPreferences] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => {
     try { return localStorage.getItem(`refosQuickStart:${eventId}:${role}`) !== "1"; }
     catch { return true; }
@@ -845,6 +846,10 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     : null;
 
   const pushSupported = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  const notificationDelivery = eventSettings?.notification_delivery?.value || { push: true, email: true };
+  const notificationDeliveryLabel = notificationDelivery.push && notificationDelivery.email
+    ? "Both"
+    : notificationDelivery.email ? "Email only" : "Push only";
   const refreshPushState = useCallback(async () => {
     if (!pushSupported) { setPushState("unsupported"); return; }
     if (Notification.permission === "denied") { setPushState("blocked"); return; }
@@ -892,6 +897,20 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     } catch (error) {
       await refreshPushState();
       alert(`Could not enable push alerts: ${error?.message || "Unknown error"}`);
+    }
+  };
+
+  const saveNotificationDelivery = async (mode) => {
+    const value = {
+      push: mode === "push" || mode === "both",
+      email: mode === "email" || mode === "both",
+    };
+    try {
+      const saved = await api.upsertEventSetting(eventId, "notification_delivery", value, meName);
+      setEventSettings((current) => ({ ...current, notification_delivery: saved }));
+      setShowNotificationPreferences(false);
+    } catch (error) {
+      alert(`Could not update alert delivery: ${error?.message || "Unknown error"}`);
     }
   };
 
@@ -2670,6 +2689,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; Help</button>
                 <div className="refos-menu-section">Access</div>
                 <button onClick={togglePushNotifications} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{pushState === "enabled" ? <Bell size={16} /> : <BellOff size={16} />} {pushState === "enabled" ? "Push alerts on" : pushState === "blocked" ? "Push alerts blocked" : "Enable push alerts"}</button>
+                {adminUnlocked && <button onClick={() => { setMenu(false); setShowNotificationPreferences(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Mail size={16} /> Alert delivery <span className="ml-auto text-[10px] font-bold text-slate-400">{notificationDeliveryLabel}</span></button>}
                 <button onClick={() => { setMenu(false); setShowHelpRequest(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LifeBuoy size={16} /> Request Help</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
@@ -3039,6 +3059,33 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
       {showIdentity && <IdentityModal me={{ nickname: meName, fullName: meFullName, phone: mePhone }} onSave={async (identity) => { await onEditName(identity); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
       {showHelpRequest && <HelpRequestModal fieldNames={fieldNames} onSend={sendHelpRequest} onClose={() => setShowHelpRequest(false)} />}
+      {showNotificationPreferences && createPortal(
+        <div className="fixed inset-0 z-[90] bg-black/45 flex items-end sm:items-center justify-center" onClick={() => setShowNotificationPreferences(false)}>
+          <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-white dark:bg-slate-800 shadow-2xl overflow-hidden" onClick={(event) => event.stopPropagation()}>
+            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-slate-900 dark:text-slate-100">Alert delivery</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Choose how new help and access code requests notify Admins.</p>
+              </div>
+              <button onClick={() => setShowNotificationPreferences(false)} aria-label="Close" className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-100"><X size={22} /></button>
+            </div>
+            <div className="p-4 space-y-2" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+              {[
+                { mode: "push", title: "Push only", detail: "Send device and watch push alerts without email." },
+                { mode: "email", title: "Email only", detail: "Email the configured Admin addresses without device push." },
+                { mode: "both", title: "Both", detail: "Send push alerts and Admin emails together." },
+              ].map((option) => {
+                const selected = option.mode === (notificationDelivery.push && notificationDelivery.email ? "both" : notificationDelivery.email ? "email" : "push");
+                return <button key={option.mode} onClick={() => saveNotificationDelivery(option.mode)} className={`w-full rounded-xl border p-4 text-left flex items-center gap-3 ${selected ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/30" : "border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-700"}`}>
+                  <span className={`h-5 w-5 rounded-full border-2 grid place-items-center ${selected ? "border-blue-600" : "border-slate-300 dark:border-slate-500"}`}>{selected && <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />}</span>
+                  <span className="min-w-0 flex-1"><span className="block font-bold text-slate-900 dark:text-slate-100">{option.title}</span><span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">{option.detail}</span></span>
+                </button>;
+              })}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
       {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length, quadrantChecks: fieldResetChecks.length }} onClear={clearSelected} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowClear(false)} />}
       {showOnline && (
         <div className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
@@ -5748,6 +5795,7 @@ function FeaturesGuide() {
           <Li><b>Acknowledgment</b> — one Admin can acknowledge a request for the crew so everyone knows it is being handled.</Li>
           <Li><b>Code requests</b> — volunteers can ask an Admin to regenerate their own role code, and the replacement appears without closing the app.</Li>
           <Li><b>Admin email alerts</b> — help requests and replacement code requests can email each of the two configured Admin addresses as a backup to device push notifications.</Li>
+          <Li><b>Alert delivery selector</b> — Admins can choose Push only, Email only, or Both from the Access section. The selection applies event wide and syncs across devices.</Li>
         </ul>
       </Section>
 

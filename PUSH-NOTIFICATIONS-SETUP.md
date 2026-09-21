@@ -73,3 +73,5 @@ npx supabase functions deploy send-code-request-push
 ```
 
 Admin email alerts are a backup for web push. A missing or unavailable Resend configuration does not prevent browser push delivery.
+
+After both channels are configured, an Admin can open **Access → Alert delivery** and choose **Push only**, **Email only**, or **Both**. Both is the default and the selection is shared across the event.

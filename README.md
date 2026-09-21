@@ -125,6 +125,8 @@ Configure these Supabase secrets before deploying the function:
 
 After saving the secrets, deploy `send-code-request-push` again.
 
+Administrators can open **Access → Alert delivery** and select **Push only**, **Email only**, or **Both**. This event wide preference syncs across devices and defaults to Both until an Admin changes it.
+
 ## Volunteer access and join codes
 
 Ref OS uses separate join codes for Referees, Judge Advisors, and Emcees.
@@ -140,6 +142,8 @@ Referees, Judge Advisors, Emcees, and Administrators can enable device push aler
 Tapping the notification opens Ref OS directly to role code management. The normal live in app request remains available as a fallback.
 
 On iPhone and iPad, Ref OS must be installed through Add to Home Screen before push notifications can be enabled.
+
+The per device push subscription remains separate from the event wide delivery choice. A device must have push alerts enabled before it can receive alerts when Push only or Both is selected.
 
 ## Request Help and acknowledgment
 

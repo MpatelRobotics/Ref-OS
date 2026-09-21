@@ -37,6 +37,17 @@ Deno.serve(async (request) => {
     if (claimError?.code === "23505") return json({ sent: 0, duplicate: true });
     if (claimError) throw claimError;
 
+    const { data: deliverySetting, error: deliveryError } = await serviceClient
+      .from("event_settings")
+      .select("value")
+      .eq("event_id", eventRequest.event_id)
+      .eq("key", "notification_delivery")
+      .maybeSingle();
+    if (deliveryError) throw deliveryError;
+    const delivery = deliverySetting?.value || { push: true, email: true };
+    const pushEnabled = delivery.push !== false;
+    const emailEnabled = delivery.email !== false;
+
     const { data: subscriptions, error: subscriptionError } = await serviceClient
       .from("push_subscriptions")
       .select("endpoint,user_id,p256dh,auth")
@@ -50,11 +61,13 @@ Deno.serve(async (request) => {
     const memberIds = new Set((members || []).map((member) => member.user_id));
     const memberSubscriptions = (subscriptions || []).filter((subscription) => memberIds.has(subscription.user_id));
 
-    const publicKey = Deno.env.get("VAPID_PUBLIC_KEY");
-    const privateKey = Deno.env.get("VAPID_PRIVATE_KEY");
-    const subject = Deno.env.get("VAPID_SUBJECT") || "mailto:admin@example.com";
-    if (!publicKey || !privateKey) throw new Error("VAPID secrets are not configured");
-    webpush.setVapidDetails(subject, publicKey, privateKey);
+    if (pushEnabled) {
+      const publicKey = Deno.env.get("VAPID_PUBLIC_KEY");
+      const privateKey = Deno.env.get("VAPID_PRIVATE_KEY");
+      const subject = Deno.env.get("VAPID_SUBJECT") || "mailto:admin@example.com";
+      if (!publicKey || !privateKey) throw new Error("VAPID secrets are not configured");
+      webpush.setVapidDetails(subject, publicKey, privateKey);
+    }
 
     let details: { role?: string; requester?: string; category?: string; location?: string; details?: string } = {};
     try { details = JSON.parse(eventRequest.note || "{}"); } catch { /* use defaults */ }
@@ -86,7 +99,7 @@ Deno.serve(async (request) => {
 
     let sent = 0;
     const expired: string[] = [];
-    await Promise.all(memberSubscriptions.map(async (subscription) => {
+    await Promise.all((pushEnabled ? memberSubscriptions : []).map(async (subscription) => {
       try {
         await webpush.sendNotification({
           endpoint: subscription.endpoint,
@@ -101,9 +114,9 @@ Deno.serve(async (request) => {
     }));
 
     if (expired.length) await serviceClient.from("push_subscriptions").delete().in("endpoint", expired);
-    const email = await sendAdminEmail(emailSubject, emailText);
+    const email = emailEnabled ? await sendAdminEmail(emailSubject, emailText) : { sent: 0, failed: 0 };
     await serviceClient.from("push_dispatches").update({ sent_count: sent + email.sent }).eq("request_id", eventRequest.id);
-    return json({ sent, expired: expired.length, emailSent: email.sent, emailFailed: email.failed });
+    return json({ sent, expired: expired.length, emailSent: email.sent, emailFailed: email.failed, delivery });
   } catch (error) {
     console.error(error);
     return json({ error: (error as Error).message || "Push delivery failed" }, 500);
