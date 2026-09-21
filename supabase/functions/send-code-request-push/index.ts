@@ -115,7 +115,12 @@ Deno.serve(async (request) => {
 
     if (expired.length) await serviceClient.from("push_subscriptions").delete().in("endpoint", expired);
     const email = emailEnabled ? await sendAdminEmail(emailSubject, emailText) : { sent: 0, failed: 0 };
-    await serviceClient.from("push_dispatches").update({ sent_count: sent + email.sent }).eq("request_id", eventRequest.id);
+    await serviceClient.from("push_dispatches").update({
+      sent_count: sent + email.sent,
+      push_count: sent,
+      email_count: email.sent,
+      email_failed_count: email.failed,
+    }).eq("request_id", eventRequest.id);
     return json({ sent, expired: expired.length, emailSent: email.sent, emailFailed: email.failed, delivery });
   } catch (error) {
     console.error(error);

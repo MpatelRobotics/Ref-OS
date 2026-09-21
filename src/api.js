@@ -181,6 +181,20 @@ export async function sendRoleCodeRequestPush(requestId) {
   return data;
 }
 
+export async function getAlertStats(eventId) {
+  if (E2E_MOCK) return { requests: 0, pushAlerts: 0, emailAlerts: 0, failedEmails: 0, totalAlerts: 0 };
+  const { data, error } = await supabase.rpc("get_alert_stats", { p_event: eventId });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    requests: Number(row?.requests || 0),
+    pushAlerts: Number(row?.push_alerts || 0),
+    emailAlerts: Number(row?.email_alerts || 0),
+    failedEmails: Number(row?.failed_emails || 0),
+    totalAlerts: Number(row?.total_alerts || 0),
+  };
+}
+
 
 /* ================= auth ================= */
 export const signIn = (email) =>

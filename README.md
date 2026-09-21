@@ -127,6 +127,8 @@ After saving the secrets, deploy `send-code-request-push` again.
 
 Administrators can open **Access → Alert delivery** and select **Push only**, **Email only**, or **Both**. This event wide preference syncs across devices and defaults to Both until an Admin changes it.
 
+The Event Command Center includes an **Event alert counter** under Admin tools. It reports the event wide number of help requests dispatched, push alerts sent, email alerts sent, and total alerts delivered across all devices. Run `supabase/alert-counter.sql` once in the Supabase SQL Editor and redeploy the alert Edge Function before using the counter.
+
 ## Volunteer access and join codes
 
 Ref OS uses separate join codes for Referees, Judge Advisors, and Emcees.

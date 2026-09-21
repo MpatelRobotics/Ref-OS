@@ -42,8 +42,15 @@ create table if not exists public.push_dispatches (
   request_id uuid primary key references public.field_log(id) on delete cascade,
   event_id uuid not null references public.events(id) on delete cascade,
   sent_count integer not null default 0,
+  push_count integer not null default 0,
+  email_count integer not null default 0,
+  email_failed_count integer not null default 0,
   created_at timestamptz not null default now()
 );
+
+alter table public.push_dispatches add column if not exists push_count integer not null default 0;
+alter table public.push_dispatches add column if not exists email_count integer not null default 0;
+alter table public.push_dispatches add column if not exists email_failed_count integer not null default 0;
 
 alter table public.push_dispatches enable row level security;
 -- No browser policies. Only the Edge Function service role can access dispatch records.

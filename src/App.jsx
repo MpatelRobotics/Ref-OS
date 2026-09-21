@@ -957,6 +957,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   });
   const [showRankings, setShowRankings] = useState(false);
   const [eventMembers, setEventMembers] = useState([]);
+  const [alertStats, setAlertStats] = useState(null);
+  const [alertStatsLoading, setAlertStatsLoading] = useState(false);
   const deviceId = useMemo(() => {
     try {
       let id = localStorage.getItem("refosDeviceId");
@@ -1050,6 +1052,18 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     if (!adminUnlocked) { setEventMembers([]); return; }
     try { setEventMembers(await api.listEventMembersForAdmin(eventId)); }
     catch { setEventMembers([]); }
+  }, [adminUnlocked, eventId]);
+
+  const loadAlertStats = useCallback(async () => {
+    if (!adminUnlocked) { setAlertStats(null); return; }
+    setAlertStatsLoading(true);
+    try { setAlertStats(await api.getAlertStats(eventId)); }
+    catch (error) {
+      console.error("Could not load alert totals", error);
+      setAlertStats(null);
+    } finally {
+      setAlertStatsLoading(false);
+    }
   }, [adminUnlocked, eventId]);
 
   useEffect(() => {
@@ -2711,7 +2725,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                 ) : (
                 <>
                 <div className="refos-menu-section">Event</div>
-                {adminUnlocked && <button onClick={() => { setMenu(false); loadEventMembers(); setShowCommandCenter(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Event Command Center</button>}
+                {adminUnlocked && <button onClick={() => { setMenu(false); loadEventMembers(); loadAlertStats(); setShowCommandCenter(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><BarChart3 size={16} /> Event Command Center</button>}
                 <button onClick={() => { setMenu(false); setShowContactDirectory(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Contact size={16} /> Event Contact Directory</button>
                 <button onClick={() => { setMenu(false); openVolunteerStatus(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Users size={16} /> Key Volunteer Status</button>
                 <button onClick={() => { setMenu(false); setShowFieldLog(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Flag size={16} /> Field Log</button>
@@ -2768,7 +2782,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                 ))}
                 <div className="refos-desktop-utilities">
                   <div className="refos-sidebar-section-label refos-sidebar-tools-label" aria-hidden="true">Event Tools</div>
-                  {adminUnlocked && <button onClick={() => { loadEventMembers(); setShowCommandCenter(true); }} className="refos-sidebar-tool"><BarChart3 size={16} /> Command Center</button>}
+                  {adminUnlocked && <button onClick={() => { loadEventMembers(); loadAlertStats(); setShowCommandCenter(true); }} className="refos-sidebar-tool"><BarChart3 size={16} /> Command Center</button>}
                   {!isInspection && <button onClick={() => setShowFieldLog(true)} className="refos-sidebar-tool"><Flag size={16} /> Field Log</button>}
                   {!isInspection && <button onClick={() => setShowContactDirectory(true)} className="refos-sidebar-tool"><Contact size={16} /> Contacts</button>}
                 </div>
@@ -3192,6 +3206,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowOfflineTest(false)} />}
       {showCommandCenter && adminUnlocked && <CommandCenter matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
         eventMembers={eventMembers} meName={meName} onSetAdmin={setVolunteerAdmin}
+        alertStats={alertStats} alertStatsLoading={alertStatsLoading} onRefreshAlertStats={loadAlertStats}
         failedSyncItems={failedSyncItems} onRetryFailedSync={retryFailedSync} onDiscardFailedSync={discardFailedSync}
         countdown={eventCountdown} countdownText={countdownText}
         onCountdown={() => openCommandCenterTool(() => setShowCountdownSetup(true))}
@@ -5796,6 +5811,7 @@ function FeaturesGuide() {
           <Li><b>Code requests</b> — volunteers can ask an Admin to regenerate their own role code, and the replacement appears without closing the app.</Li>
           <Li><b>Admin email alerts</b> — help requests and replacement code requests can email each of the two configured Admin addresses as a backup to device push notifications.</Li>
           <Li><b>Alert delivery selector</b> — Admins can choose Push only, Email only, or Both from the Access section. The selection applies event wide and syncs across devices.</Li>
+          <Li><b>Event alert counter</b> — Admin tools shows event wide totals for help requests, push alerts, email alerts, and all delivered alerts.</Li>
         </ul>
       </Section>
 
