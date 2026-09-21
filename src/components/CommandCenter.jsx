@@ -3,7 +3,7 @@ import { AlertTriangle, BarChart3, Bell, CalendarDays, ClipboardCheck, Clock, Cl
 
 const fmtTime = (ms) => ms ? new Date(ms).toLocaleString() : "—";
 
-export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onFieldNames, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, onClose }) {
+export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onAlertDelivery, alertDeliveryLabel = "Both", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onFieldNames, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, onClose }) {
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
@@ -89,6 +89,7 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
             {!!alertStats?.failedEmails && <div className="text-xs text-amber-700 dark:text-amber-300 mt-2">{alertStats.failedEmails} email delivery attempt{alertStats.failedEmails === 1 ? "" : "s"} failed.</div>}
           </div>
           <div className="grid sm:grid-cols-2 gap-2 mt-3">
+            <button onClick={onAlertDelivery} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Mail size={16}/> Alert delivery <span className="ml-auto text-[10px] font-bold text-slate-400">{alertDeliveryLabel}</span></button>
             <button onClick={onContactDirectory} className="w-full text-left px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><Contact size={16}/> Event Contact Directory</button>
             <button onClick={onRoleCodes} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><KeyRound size={16}/> Volunteer Access Codes</button>
             <button onClick={onFieldNames} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><MapPin size={16}/> Field Name Configurator</button>

@@ -2734,6 +2734,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
                 <div className="refos-menu-section">Access</div>
                 <button onClick={togglePushNotifications} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{pushState === "enabled" ? <Bell size={16} /> : <BellOff size={16} />} {pushState === "enabled" ? "Push alerts on" : pushState === "blocked" ? "Push alerts blocked" : "Enable push alerts"}</button>
+                {adminUnlocked && <button onClick={() => { setMenu(false); setShowNotificationPreferences(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Mail size={16} /> Alert delivery <span className="ml-auto text-[10px] font-bold text-slate-400">{notificationDeliveryLabel}</span></button>}
                 <button onClick={() => { setMenu(false); setShowHelpRequest(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LifeBuoy size={16} /> Request Help</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
@@ -3207,6 +3208,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       {showCommandCenter && adminUnlocked && <CommandCenter matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
         eventMembers={eventMembers} meName={meName} onSetAdmin={setVolunteerAdmin}
         alertStats={alertStats} alertStatsLoading={alertStatsLoading} onRefreshAlertStats={loadAlertStats}
+        alertDeliveryLabel={notificationDeliveryLabel}
+        onAlertDelivery={() => openCommandCenterTool(() => setShowNotificationPreferences(true))}
         failedSyncItems={failedSyncItems} onRetryFailedSync={retryFailedSync} onDiscardFailedSync={discardFailedSync}
         countdown={eventCountdown} countdownText={countdownText}
         onCountdown={() => openCommandCenterTool(() => setShowCountdownSetup(true))}
