@@ -195,6 +195,12 @@ export async function getAlertStats(eventId) {
   };
 }
 
+export async function resetAlertStats(eventId) {
+  if (E2E_MOCK) return;
+  const { error } = await supabase.rpc("reset_alert_stats", { p_event: eventId });
+  if (error) throw error;
+}
+
 
 /* ================= auth ================= */
 export const signIn = (email) =>

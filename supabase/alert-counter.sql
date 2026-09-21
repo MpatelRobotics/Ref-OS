@@ -39,3 +39,25 @@ $$;
 
 revoke all on function public.get_alert_stats(uuid) from public;
 grant execute on function public.get_alert_stats(uuid) to authenticated;
+
+create or replace function public.reset_alert_stats(p_event uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Authentication session required';
+  end if;
+
+  if not public.has_event_role(p_event, array['admin']) then
+    raise exception 'Admin role required';
+  end if;
+
+  delete from public.push_dispatches where event_id = p_event;
+end;
+$$;
+
+revoke all on function public.reset_alert_stats(uuid) from public;
+grant execute on function public.reset_alert_stats(uuid) to authenticated;

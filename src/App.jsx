@@ -1066,6 +1066,18 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     }
   }, [adminUnlocked, eventId]);
 
+  const resetAlertStats = useCallback(async () => {
+    setAlertStatsLoading(true);
+    try {
+      await api.resetAlertStats(eventId);
+      setAlertStats({ requests: 0, pushAlerts: 0, emailAlerts: 0, failedEmails: 0, totalAlerts: 0 });
+    } catch (error) {
+      alert(error?.message || "Could not reset the alert counter.");
+    } finally {
+      setAlertStatsLoading(false);
+    }
+  }, [eventId]);
+
   useEffect(() => {
     api.getCurrentUserId().then(setCurrentUserId).catch(() => setCurrentUserId(null));
   }, [eventId]);
@@ -3207,7 +3219,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowOfflineTest(false)} />}
       {showCommandCenter && adminUnlocked && <CommandCenter matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
         eventMembers={eventMembers} meName={meName} onSetAdmin={setVolunteerAdmin}
-        alertStats={alertStats} alertStatsLoading={alertStatsLoading} onRefreshAlertStats={loadAlertStats}
+        alertStats={alertStats} alertStatsLoading={alertStatsLoading} onRefreshAlertStats={loadAlertStats} onResetAlertStats={resetAlertStats}
         alertDeliveryLabel={notificationDeliveryLabel}
         onAlertDelivery={() => openCommandCenterTool(() => setShowNotificationPreferences(true))}
         failedSyncItems={failedSyncItems} onRetryFailedSync={retryFailedSync} onDiscardFailedSync={discardFailedSync}
