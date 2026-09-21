@@ -5747,7 +5747,7 @@ function FeaturesGuide() {
           <Li><b>Locations</b> — identify Field 1, Field 2, Field 3, Pit Floor, Competition Floor, Skills, Judging, or another location.</Li>
           <Li><b>Acknowledgment</b> — one Admin can acknowledge a request for the crew so everyone knows it is being handled.</Li>
           <Li><b>Code requests</b> — volunteers can ask an Admin to regenerate their own role code, and the replacement appears without closing the app.</Li>
-          <Li><b>Admin SMS alerts</b> — help requests and replacement code requests can send one short text to each of the two configured Admin phone numbers. SMS delivery is independent of browser push notification mirroring.</Li>
+          <Li><b>Admin email alerts</b> — help requests and replacement code requests can email each of the two configured Admin addresses as a backup to device push notifications.</Li>
         </ul>
       </Section>
 

@@ -57,3 +57,19 @@ Sign in as a Referee, Judge Advisor, Emcee, or Admin, open Settings, and tap **E
 On iPhone or iPad, Ref OS must first be installed with Safari's **Add to Home Screen** action. Open the installed Ref OS app and enable push alerts there.
 
 Each phone, tablet, or computer must enable alerts once. All subscribed event roles receive code and help request alerts so nearby volunteers can notify an Admin if needed.
+
+## 7. Add optional Admin email alerts
+
+Create a Resend account, verify a sending domain, and create an API key. Store the API key, verified sender, and up to two Admin recipients as Supabase secrets:
+
+```cmd
+npx supabase secrets set RESEND_API_KEY="re_YOUR_API_KEY" RESEND_FROM_EMAIL="Ref OS <alerts@YOUR_VERIFIED_DOMAIN>" ADMIN_ALERT_EMAILS="FIRST_ADMIN_EMAIL,SECOND_ADMIN_EMAIL"
+```
+
+Deploy the notification function again:
+
+```cmd
+npx supabase functions deploy send-code-request-push
+```
+
+Admin email alerts are a backup for web push. A missing or unavailable Resend configuration does not prevent browser push delivery.

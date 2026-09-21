@@ -77,9 +77,12 @@ Deno.serve(async (request) => {
       url: `/?open=code-requests&role=${encodeURIComponent(details.role || "")}`,
     });
 
-    const smsBody = isHelp
-      ? limitSms(`REF OS HELP: ${category} at ${location}. From ${requester}.${extra ? ` ${extra}` : ""}`)
-      : limitSms(`REF OS CODE REQUEST: ${requester} requested a new ${role} join code.`);
+    const emailSubject = isHelp
+      ? `Ref OS help request: ${category}`
+      : `Ref OS code request: ${role}`;
+    const emailText = isHelp
+      ? `REF OS HELP\n\nCategory: ${category}\nLocation: ${location}\nRequested by: ${requester}${extra ? `\nDetails: ${extra}` : ""}`
+      : `REF OS CODE REQUEST\n\n${requester} requested a new ${role} join code.`;
 
     let sent = 0;
     const expired: string[] = [];
@@ -98,62 +101,76 @@ Deno.serve(async (request) => {
     }));
 
     if (expired.length) await serviceClient.from("push_subscriptions").delete().in("endpoint", expired);
-    const sms = await sendAdminSms(smsBody);
-    await serviceClient.from("push_dispatches").update({ sent_count: sent + sms.sent }).eq("request_id", eventRequest.id);
-    return json({ sent, expired: expired.length, smsSent: sms.sent, smsFailed: sms.failed });
+    const email = await sendAdminEmail(emailSubject, emailText);
+    await serviceClient.from("push_dispatches").update({ sent_count: sent + email.sent }).eq("request_id", eventRequest.id);
+    return json({ sent, expired: expired.length, emailSent: email.sent, emailFailed: email.failed });
   } catch (error) {
     console.error(error);
     return json({ error: (error as Error).message || "Push delivery failed" }, 500);
   }
 });
 
-function limitSms(value: string) {
-  const clean = value.replace(/\s+/g, " ").trim();
-  return clean.length <= 155 ? clean : `${clean.slice(0, 152)}...`;
-}
-
-async function sendAdminSms(body: string) {
-  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID") || "";
-  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN") || "";
-  const from = Deno.env.get("TWILIO_FROM_NUMBER") || "";
-  const recipients = (Deno.env.get("ADMIN_SMS_NUMBERS") || "")
+async function sendAdminEmail(subject: string, text: string) {
+  const apiKey = Deno.env.get("RESEND_API_KEY") || "";
+  const from = Deno.env.get("RESEND_FROM_EMAIL") || "";
+  const recipients = (Deno.env.get("ADMIN_ALERT_EMAILS") || "")
     .split(",")
-    .map((number) => number.trim())
+    .map((email) => email.trim())
     .filter(Boolean)
     .slice(0, 2);
 
-  if (!accountSid || !authToken || !from || recipients.length === 0) {
-    console.log("Twilio SMS is not configured; web push delivery will continue.");
+  if (!apiKey || !from || recipients.length === 0) {
+    console.log("Resend email is not configured; web push delivery will continue.");
     return { sent: 0, failed: 0 };
   }
 
   let sent = 0;
   let failed = 0;
-  const authorization = btoa(`${accountSid}:${authToken}`);
   await Promise.all(recipients.map(async (to) => {
     try {
-      const form = new URLSearchParams({ To: to, From: from, Body: body });
-      const response = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`, {
+      const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
-          Authorization: `Basic ${authorization}`,
-          "Content-Type": "application/x-www-form-urlencoded",
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
         },
-        body: form,
+        body: JSON.stringify({
+          from,
+          to: [to],
+          subject,
+          text,
+          html: renderEmail(subject, text),
+        }),
       });
       if (!response.ok) {
         const detail = await response.text();
-        console.error("Twilio SMS delivery failed", response.status, detail.slice(0, 500));
+        console.error("Resend email delivery failed", response.status, detail.slice(0, 500));
         failed += 1;
         return;
       }
       sent += 1;
     } catch (error) {
-      console.error("Twilio SMS delivery failed", (error as Error).message);
+      console.error("Resend email delivery failed", (error as Error).message);
       failed += 1;
     }
   }));
   return { sent, failed };
+}
+
+function renderEmail(subject: string, text: string) {
+  const safeSubject = escapeHtml(subject);
+  const safeBody = escapeHtml(text).replace(/\n/g, "<br>");
+  return `<!doctype html><html><body style="margin:0;background:#f4f6fa;font-family:Arial,sans-serif;color:#111827"><div style="max-width:620px;margin:24px auto;padding:28px;background:#ffffff;border-radius:16px;border:1px solid #e5e7eb"><div style="font-size:13px;font-weight:700;letter-spacing:.08em;color:#b83232">REF OS</div><h1 style="font-size:24px;margin:10px 0 20px">${safeSubject}</h1><div style="font-size:16px;line-height:1.6">${safeBody}</div><p style="margin-top:24px;font-size:13px;color:#6b7280">This operational alert was sent to a configured Highlander Summit administrator.</p></div></body></html>`;
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  }[character] || character));
 }
 
 function json(value: unknown, status = 200) {

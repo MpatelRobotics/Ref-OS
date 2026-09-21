@@ -113,16 +113,15 @@ Each volunteer receives a synchronized assignment card in their workspace. Assig
 
 On phones, the header uses a compact online volunteer count. Tapping it opens the complete scrollable status list.
 
-## Admin SMS alerts
+## Admin email alerts
 
-Ref OS can send a short SMS to two configured Admin phone numbers whenever a volunteer requests help or asks for a replacement role code. SMS delivery runs securely from the existing Supabase Edge Function through Twilio. Twilio credentials and Admin phone numbers are stored as Supabase secrets and are never included in browser code, the repository, exports, or the event contact directory. Each request is claimed once so reopening or refreshing Ref OS does not send duplicate texts. Web push continues to operate if Twilio is unavailable or has not been configured.
+Ref OS can email two configured Admin addresses whenever a volunteer requests help or asks for a replacement role code. Email delivery runs securely from the existing Supabase Edge Function through Resend. The Resend credential, sender, and Admin addresses are stored as Supabase secrets and are never included in browser code, the repository, exports, or the event contact directory. Each request is claimed once so reopening or refreshing Ref OS does not send duplicate emails. Web push continues to operate if Resend is unavailable or has not been configured.
 
 Configure these Supabase secrets before deploying the function:
 
-* `TWILIO_ACCOUNT_SID`
-* `TWILIO_AUTH_TOKEN`
-* `TWILIO_FROM_NUMBER`
-* `ADMIN_SMS_NUMBERS` as two E.164 numbers separated by a comma
+* `RESEND_API_KEY`
+* `RESEND_FROM_EMAIL` as a sender on a verified Resend domain
+* `ADMIN_ALERT_EMAILS` as two email addresses separated by a comma
 
 After saving the secrets, deploy `send-code-request-push` again.
 
