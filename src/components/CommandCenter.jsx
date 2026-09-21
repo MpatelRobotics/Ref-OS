@@ -73,11 +73,9 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
               <div className="font-bold text-sm">Event alert counter</div>
               <button onClick={onRefreshAlertStats} disabled={alertStatsLoading} className="ml-auto p-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-800 disabled:opacity-50" title="Refresh alert totals"><RefreshCw size={15} className={alertStatsLoading ? "animate-spin" : ""}/></button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+            <div className="grid grid-cols-2 gap-2 mt-3">
               {[
                 ["Total sent", alertStats?.totalAlerts, Bell],
-                ["Push sent", alertStats?.pushAlerts, Bell],
-                ["Emails sent", alertStats?.emailAlerts, Mail],
                 ["Requests", alertStats?.requests, Users],
               ].map(([label, value, Icon]) => (
                 <div key={label} className="rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5">
@@ -86,7 +84,6 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
                 </div>
               ))}
             </div>
-            {!!alertStats?.failedEmails && <div className="text-xs text-amber-700 dark:text-amber-300 mt-2">{alertStats.failedEmails} email delivery attempt{alertStats.failedEmails === 1 ? "" : "s"} failed.</div>}
           </div>
           <div className="grid sm:grid-cols-2 gap-2 mt-3">
             <button onClick={onAlertDelivery} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Mail size={16}/> Alert delivery <span className="ml-auto text-[10px] font-bold text-slate-400">{alertDeliveryLabel}</span></button>
