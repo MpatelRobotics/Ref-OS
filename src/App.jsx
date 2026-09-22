@@ -3333,11 +3333,11 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         </Modal>
       )}
       {showEvent && <EventModal event={event} onSave={saveEvent} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEvent(false)} />}
-      {lightbox && (
-        <div onClick={() => setLightbox(null)} className="fixed inset-0 z-[60] bg-black/90 grid place-items-center p-4">
-          <img src={lightbox} alt="robot" className="max-h-full max-w-full rounded-lg" />
-          <button className="absolute top-4 right-4 text-white/80 p-2"><X size={26} /></button>
-        </div>
+      {lightbox && createPortal(
+        <div onClick={() => setLightbox(null)} role="dialog" aria-modal="true" aria-label="Robot photo" className="fixed inset-0 z-[200] bg-black/90 grid place-items-center p-4">
+          <img src={lightbox} alt="Robot" className="max-h-full max-w-full object-contain rounded-lg" />
+          <button type="button" onClick={() => setLightbox(null)} aria-label="Close photo" className="absolute top-4 right-4 text-white/80 p-2"><X size={26} /></button>
+        </div>, document.body
       )}
     </div>
   );
