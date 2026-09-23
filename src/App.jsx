@@ -3612,9 +3612,18 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
               const rk = (teams.find((t) => t.number === team)?.photoKeys) || [];
               if (creatingNew || rk.length === 0) return null;
               return (
-                <div className="mt-2 flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] text-slate-400">Robot on file:</span>
-                  {rk.map((k) => <Thumb key={k} pkey={k} onOpen={onOpenPhoto} />)}
+                <div className="mt-2">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">Robot on file:</span>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {rk.map((k) => {
+                      const slot = ROBOT_PHOTO_SLOTS.find((item) => item.key === robotPhotoAngle(k));
+                      return <div key={k} className={`w-24 rounded-lg border-2 p-1.5 text-center ${slot?.required ? "border-amber-400 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/30" : "border-slate-200 bg-white dark:border-slate-600 dark:bg-slate-800"}`}>
+                        <div className="flex justify-center"><Thumb pkey={k} onOpen={onOpenPhoto} /></div>
+                        <span className="mt-1 block break-words text-[11px] font-bold leading-tight text-slate-800 dark:text-slate-100">{slot?.label || "Other view"}</span>
+                        {slot?.required && <span className="block text-[10px] font-semibold uppercase text-amber-700 dark:text-amber-300">Required</span>}
+                      </div>;
+                    })}
+                  </div>
                 </div>
               );
             })()}
