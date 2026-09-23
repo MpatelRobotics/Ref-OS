@@ -2,9 +2,9 @@
 
 **Referee Operating System for live VEX Robotics events**
 
-Ref OS is a shared event operations workspace built for the Highlander Summit Signature Event. It gives referees, Judge Advisors, Emcees, and event administrators one live place to coordinate match activity, record violations, monitor field readiness, share role information, and respond to event day issues.
+Ref OS is a shared operations app for VEX robotics events. It gives referees, inspectors, Judge Advisors, Emcees, and event administrators one live place to coordinate match activity, record violations, document robots, monitor field readiness, share role information, and respond to event day issues.
 
-Ref OS 1.0.0 is the Highlander Summit Release created by Maharshi Patel.
+Ref OS 1.0.0 is the Highlander Summit Release created by Maharshi Patel. This release is configured for Highlander Summit and the Override game. The bundled game manual, rule index, inspection tag, field names, and some workflows are specific to that event. A reusable setup for other games and events is a future goal, not a feature of this release.
 
 ## One live event workspace
 
@@ -23,6 +23,10 @@ After saving a new violation or inspection picture, volunteers receive an eight 
 ### Referee
 
 Referees can review the match schedule, search teams, record violations, document robot concerns, complete field reset checks, review rules, and share the active Referee join code with another referee.
+
+### Inspection
+
+Inspectors can access Rules and Robots. They can capture required robot pictures and the optional Lexan Diagram without seeing the other event tabs.
 
 ### Judge Advisor
 
@@ -72,7 +76,7 @@ Violation history is available by team, match, rule, and event activity. Repeate
 
 The Teams workspace combines the event roster with violation totals, rankings, watch information, and quick access to team history.
 
-The Robots workspace requires four labeled inspection pictures for every team: Front, Back, Side, and the Highlander Inspection Tag attached to the robot after it passes inspection. Each team card shows picture completion, and the team view provides a dedicated capture slot for every required picture. An additional optional Lexan Diagram slot stores a picture of the team's Lexan or plastic diagram without changing the four picture completion count. Earlier unlabeled pictures remain available for reference.
+In this Highlander Summit release, the Robots workspace requires four labeled inspection pictures for every team: Front, Back, Side, and the Highlander Inspection Tag attached to the robot after it passes inspection. Each team card shows picture completion, and the team view provides a dedicated capture slot for every required picture. An additional optional Lexan Diagram slot stores a picture of the team's Lexan or plastic diagram without changing the four picture completion count. Earlier unlabeled pictures remain available for reference.
 
 Admin Clear Data includes Robot pictures to remove all team inspection pictures while keeping the roster and violation attachments. Pictures queued for upload on the Admin's current device are canceled too.
 
@@ -193,7 +197,7 @@ Administrators can export event information for review and record keeping, inclu
 
 ## Features and Help
 
-The in app Features and Help guide documents role access, volunteer profiles, push alerts, help requests, offline behavior, violation Undo, match readiness, required robot pictures, the offline Game Manual, Event Command Center tools, Tournament Manager imports, exports, and device settings. It displays the installed Ref OS version so event staff can confirm that every device is using the Highlander Summit Release.
+The in app Features and Help guide documents role access, volunteer profiles, push alerts, help requests, offline behavior, violation Undo, match readiness, guided robot picture capture, the offline Game Manual, Event Command Center tools, Tournament Manager imports, exports, and device settings. It distinguishes the current Highlander Summit setup from the wider goal of supporting other VEX events. It displays the installed Ref OS version so event staff can confirm that every device is using the Highlander Summit Release.
 
 ## Event day safety
 
@@ -212,7 +216,7 @@ Ref OS includes safeguards intended to reduce accidental event disruption:
 
 ## Privacy and access
 
-Ref OS is intended for authorized Highlander Summit volunteers. Join codes and Admin credentials should be shared only with people assigned to the corresponding event role.
+This release is intended for authorized Highlander Summit volunteers. Join codes and Admin credentials should be shared only with people assigned to the corresponding event role.
 
 Volunteer names, event records, device subscriptions, and operational data are stored only for running the shared event workspace. Push notification private keys remain on the server and are never exposed to the browser.
 

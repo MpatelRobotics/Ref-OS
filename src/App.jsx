@@ -5847,13 +5847,14 @@ function FeaturesGuide() {
   return (
     <>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-        Ref OS is the shared referee, event operations, alliance, and judging workspace for the Highlander Summit. This guide reflects Ref OS v{APP_VERSION} Highlander Summit Release.
+        Ref OS is an operations app for VEX robotics events. This v{APP_VERSION} Highlander Summit Release is configured for this event and the Override game. Its bundled rules, manual, inspection tag, and event workflows are specific to this release; setup for other events is a future goal.
       </p>
 
       <Section icon={KeyRound} title="Login, access codes & roles">
         <p>Ref-OS supports the normal role passwords plus event access codes and QR login. Role access is enforced by Supabase on the server, not only by hiding buttons in the interface.</p>
         <ul className="space-y-1.5">
           <Li><b>Referee / crew</b> — teams, matches, violations, robot photos, rules, watchlist, field operations, judging nominations, and bracket advancement.</Li>
+          <Li><b>Inspection</b> — Rules and Robots only. Inspectors can take robot pictures without access to other event tabs.</Li>
           <Li><b>Judge Advisor</b> — Judging plus view access to Alliances and the elimination bracket. Judge Advisors do not get referee violation tools or bracket editing.</Li>
           <Li><b>Emcee / announcer</b> — teams, matches, scores, rules, alliances, bracket information, and judging nominations without exposing referee disciplinary information.</Li>
           <Li><b>Admin</b> — all normal event access plus the Event Command Center, setup, imports, exports, role access code management, diagnostics, data clearing, and alliance selection controls.</Li>
@@ -5882,7 +5883,7 @@ function FeaturesGuide() {
           <Li><b>Code requests</b> — volunteers can ask an Admin to regenerate their own role code, and the replacement appears without closing the app.</Li>
           <Li><b>Admin email alerts</b> — help requests and replacement code requests can email each of the two configured Admin addresses as a backup to device push notifications.</Li>
           <Li><b>Alert delivery selector</b> — Admins can choose Push only, Email only, or Both from the Access section. The selection applies event wide and syncs across devices.</Li>
-          <Li><b>Event alert counter</b> — Admin tools shows event wide totals for help requests, push alerts, email alerts, and all delivered alerts.</Li>
+          <Li><b>Event alert counter</b> — Admin tools shows total sent alerts and requests. Admins can reset the count after testing.</Li>
         </ul>
       </Section>
 
@@ -5953,7 +5954,9 @@ function FeaturesGuide() {
           <Li><b>Team scanner</b> — use the camera OCR scanner to recognize a team number and jump to the team record.</Li>
           <Li><b>Watchlist</b> — add shared watch notes to teams. Watched teams are flagged and their notes appear during relevant matches.</Li>
           <Li><b>Required inspection pictures</b> — capture Front, Back, Side, and the Highlander inspection tag attached to the robot after it passes inspection. Completion appears on each team card.</Li>
+          <Li><b>Take pictures in order</b> — open a separate camera dialog that walks through the four required views and then offers the optional Lexan Diagram. The red camera button names the next picture.</Li>
           <Li><b>Optional Lexan Diagram</b> — save a picture of the team's Lexan or plastic diagram without affecting the four required picture completion count.</Li>
+          <Li><b>Pictures on violation forms</b> — compact bordered thumbnails show each view name and identify required inspection pictures.</Li>
           <Li><b>Offline picture queue</b> — required pictures remain visible as queued and upload automatically after connectivity returns.</Li>
         </ul>
       </Section>
@@ -6012,7 +6015,7 @@ function FeaturesGuide() {
           <Li><b>Judging export</b> — create the combined official Energy and Sportsmanship nomination PDF using the submitter's full name.</Li>
           <Li><b>Field comparison</b> — Admin view comparing matches, violations, replays, and field faults by field.</Li>
           <Li><b>Backup all JSON</b> — download a snapshot of the event data for event-day insurance.</Li>
-          <Li><b>Clear event data</b> — Admins can selectively clear supported event data, including judging, alliances, and watchlist data.</Li>
+          <Li><b>Clear event data</b> — Admins can selectively clear supported event data, including judging, alliances, watchlist, and team robot pictures. Clearing robot pictures keeps the roster and violation attachments and cancels picture uploads queued on the Admin's device.</Li>
         </ul>
       </Section>
 
