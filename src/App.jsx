@@ -1187,6 +1187,10 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         photoKeys: paths,
         _pendingRobotPhotos: (team._pendingRobotPhotos || []).filter((photo) => photo.id !== op.id),
       } : team)),
+      onRobotPhotoDiscarded: (op) => setTeams((cur) => cur.map((team) => team.number === op.number ? {
+        ...team,
+        _pendingRobotPhotos: (team._pendingRobotPhotos || []).filter((photo) => photo.id !== op.id),
+      } : team)),
       onFailed: (op, e) => {
         console.error("outbox op retained as failed", op, e);
         outbox.loadFailed(eventId).then(setFailedSyncItems).catch(() => {});
@@ -1369,10 +1373,11 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   };
 
   const addRobotPhoto = async (number, dataUrl, angle) => {
+    const generation = await api.getRobotPhotoGeneration(eventId, true);
     const id = api.uid();
     const pendingPhoto = { id, angle, dataUrl };
     setTeams((cur) => cur.map((team) => team.number === number ? { ...team, _pendingRobotPhotos: [...(team._pendingRobotPhotos || []), pendingPhoto] } : team));
-    await outbox.enqueue(eventId, { id, kind: "robot_photo", eventId, number, angle, dataUrl, createdAt: Date.now() });
+    await outbox.enqueue(eventId, { id, kind: "robot_photo", eventId, number, angle, dataUrl, generation, createdAt: Date.now() });
     await refreshQueueHealth();
     doFlush();
     offerUndo(`${angle.charAt(0).toUpperCase() + angle.slice(1)} inspection picture saved`, async () => {
@@ -2130,15 +2135,16 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const clearSelected = async (sel) => {
     try {
       if (sel.violations) { await api.clearViolations(eventId); setViols([]); }
-      if (sel.robotPhotos) {
+      if (sel.robotPhotos || sel.teams) {
         const pending = (await outbox.loadQueue(eventId)).filter((op) => op.kind === "robot_photo");
         for (const op of pending) await outbox.cancelOp(eventId, op.id);
         const failed = (await outbox.loadFailed(eventId)).filter((item) => item.op?.kind === "robot_photo");
         for (const item of failed) await outbox.discardFailed(eventId, item.failedId);
-        await api.clearTeamPhotos(eventId);
+        const reset = await api.resetTeamPhotos(eventId);
         setTeams((cur) => cur.map((team) => ({ ...team, photoKeys: [], _pendingRobotPhotos: [] })));
         setFailedSyncItems((cur) => cur.filter((item) => item.op?.kind !== "robot_photo"));
         await refreshQueueHealth();
+        await api.finishTeamPhotoCleanup(eventId, reset);
       }
       if (sel.replays) {
         const ids = fieldLog.filter((e) => e.kind === "replay").map((e) => e.id);
@@ -2153,7 +2159,9 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       if (sel.quadrants) { await api.clearFieldResetChecks(eventId); setFieldResetChecks([]); }
     } catch (e) {
       if (outbox.isOffline(e)) { alert("You're offline — reconnect to clear."); return; }
-      throw e;
+      alert(`Could not finish clearing event data: ${e?.message || e}. Reopen Clear Data and try again. Robot picture cleanup is retried on the next reset.`);
+      refresh().catch(() => {});
+      return;
     }
     if (sel.teams) setOpenTeam(null);
     if (sel.schedule) setOpenMatch(null);

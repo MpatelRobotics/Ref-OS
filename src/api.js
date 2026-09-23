@@ -3,6 +3,7 @@ import { OFFLINE_RULES } from "./offlineRules";
 
 const E2E_MOCK = import.meta.env.VITE_E2E_MOCK === "1";
 const e2eState = { teams: [], violations: [] };
+let e2eRobotGeneration = "0";
 
 export const uid = () =>
   (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) ||
@@ -381,42 +382,67 @@ export async function deleteTeam(eventId, number) {
 }
 
 /* ---- robot inspection photos (stored on the team) ---- */
-export async function addTeamPhoto(eventId, number, dataUrl, angle = "other", uploadId = "") {
+const robotGenerationCacheKey = (eventId) => `refos:robot-photo-generation:${eventId}`;
+export async function getRobotPhotoGeneration(eventId, allowCached = false) {
+  if (E2E_MOCK) return e2eRobotGeneration;
+  try {
+    const { data, error } = await supabase.rpc("robot_photo_generation", { p_event: eventId });
+    if (error) throw error;
+    const generation = String(data || "0");
+    localStorage.setItem(robotGenerationCacheKey(eventId), generation);
+    return generation;
+  } catch (error) {
+    if (allowCached && (typeof navigator !== "undefined" && !navigator.onLine || /failed to fetch|network|timeout/i.test(error?.message || ""))) {
+      return localStorage.getItem(robotGenerationCacheKey(eventId)) || "0";
+    }
+    throw error;
+  }
+}
+export async function addTeamPhoto(eventId, number, dataUrl, angle = "other", uploadId = "", generation = "0") {
+  const currentGeneration = await getRobotPhotoGeneration(eventId);
+  if (currentGeneration !== generation) return null;
   const num = (number || "").trim().toUpperCase();
   const safeAngle = ["front", "back", "side", "tag", "lexan"].includes(String(angle).toLowerCase()) ? String(angle).toLowerCase() : "other";
   const id = uploadId || ((self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2));
   const path = `${eventId}/team/${num}/${safeAngle}-${id}.jpg`;
   const up = await supabase.storage.from("robot-photos").upload(path, dataURLtoBlob(dataUrl), { contentType: "image/jpeg", upsert: true });
   if (up.error) throw up.error;
-  const { data: paths, error } = await supabase.rpc("append_team_photo_path", { p_event: eventId, p_team: num, p_path: path });
+  const { data: paths, error } = await supabase.rpc("append_team_photo_path", { p_event: eventId, p_team: num, p_path: path, p_generation: generation });
   if (error) {
     await supabase.storage.from("robot-photos").remove([path]);
+    if (/before the latest reset/i.test(error.message || "")) return null;
     throw error;
   }
   return paths || [];
 }
 export async function removeTeamPhoto(eventId, number, path) {
   const num = (number || "").trim().toUpperCase();
-  await supabase.storage.from("robot-photos").remove([path]);
-  const { data: t } = await supabase.from("teams").select("photo_paths").eq("event_id", eventId).eq("number", num).single();
-  const paths = ((t && t.photo_paths) || []).filter((p) => p !== path);
-  await supabase.from("teams").update({ photo_paths: paths }).eq("event_id", eventId).eq("number", num);
-  return paths;
+  const { data: paths, error } = await supabase.rpc("remove_team_photo_path", { p_event: eventId, p_team: num, p_path: path });
+  if (error) throw error;
+  const { error: storageError } = await supabase.storage.from("robot-photos").remove([path]);
+  if (storageError) throw storageError;
+  return paths || [];
 }
-export async function clearTeamPhotos(eventId) {
+export async function resetTeamPhotos(eventId) {
   if (E2E_MOCK) {
     e2eState.teams = e2eState.teams.map((team) => ({ ...team, photoKeys: [] }));
-    return;
+    e2eRobotGeneration = uid();
+    return { version: e2eRobotGeneration, paths: [] };
   }
-  const { data: teams, error: readError } = await supabase.from("teams").select("photo_paths").eq("event_id", eventId);
-  if (readError) throw readError;
-  const paths = [...new Set((teams || []).flatMap((team) => team.photo_paths || []))];
+  const { data, error } = await supabase.rpc("reset_event_robot_photos", { p_event: eventId });
+  if (error) throw error;
+  localStorage.setItem(robotGenerationCacheKey(eventId), data.version);
+  return data;
+}
+export async function finishTeamPhotoCleanup(eventId, reset) {
+  if (E2E_MOCK) return;
+  const paths = reset.paths || [];
   for (let i = 0; i < paths.length; i += 100) {
     const { error } = await supabase.storage.from("robot-photos").remove(paths.slice(i, i + 100));
     if (error) throw error;
   }
-  const { error: updateError } = await supabase.from("teams").update({ photo_paths: [] }).eq("event_id", eventId);
-  if (updateError) throw updateError;
+  const { error } = await supabase.rpc("finish_robot_photo_cleanup", { p_event: eventId, p_version: reset.version });
+  if (error) throw error;
 }
 
 /* ================= matches (qualification schedule) ================= */
@@ -766,7 +792,8 @@ export async function clearViolations(eventId) {
 }
 export async function clearTeams(eventId) {
   if (E2E_MOCK) { e2eState.teams = []; return; }
-  await supabase.from("teams").delete().eq("event_id", eventId);
+  const { error } = await supabase.from("teams").delete().eq("event_id", eventId);
+  if (error) throw error;
 }
 export async function clearMatches(eventId) {
   await supabase.from("matches").delete().eq("event_id", eventId);

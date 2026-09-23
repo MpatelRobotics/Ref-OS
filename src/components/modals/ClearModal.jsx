@@ -8,7 +8,7 @@ export default function ClearModal({ counts, onClear, onClose }) {
     { key: "robotPhotos", label: "Robot pictures", desc: `${counts.robotPhotos || 0} pictures`, note: "Removes inspection pictures from every team, including pictures queued on this device. Keeps violation photos." },
     { key: "replays", label: "Match replays", desc: `${counts.replays} flagged`, note: "Clears all matches marked to re-run (does not delete the matches)." },
     { key: "quadrants", label: "Quadrant checks", desc: `${counts.quadrantChecks || 0} verified`, note: "Clears shared Q1–Q4 progress and Field Ready status for every match." },
-    { key: "teams", label: "Teams", desc: `${counts.teams} teams`, note: "Removes the team roster." },
+    { key: "teams", label: "Teams", desc: `${counts.teams} teams`, note: "Removes the team roster and its inspection pictures. Keeps violation attachments unless Violations is also selected." },
     { key: "schedule", label: "Match schedule", desc: `${counts.schedule} matches`, note: "Removes the imported matches. Also clears team rankings and W-L-T (both come from the schedule)." },
     { key: "judging", label: "Judging", desc: `${counts.judging} nominations`, note: "Clears all award nominations and finalist selections." },
     { key: "alliances", label: "Alliances", desc: `${counts.alliances} alliances`, note: "Clears all alliance captain and first-pick assignments." },

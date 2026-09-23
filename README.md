@@ -79,6 +79,7 @@ The Teams workspace combines the event roster with violation totals, rankings, w
 In this Highlander Summit release, the Robots workspace requires four labeled inspection pictures for every team: Front, Back, Side, and the Highlander Inspection Tag attached to the robot after it passes inspection. Each team card shows picture completion, and the team view provides a dedicated capture slot for every required picture. An additional optional Lexan Diagram slot stores a picture of the team's Lexan or plastic diagram without changing the four picture completion count. Earlier unlabeled pictures remain available for reference.
 
 Admin Clear Data includes Robot pictures to remove all team inspection pictures while keeping the roster and violation attachments. Pictures queued for upload on the Admin's current device are canceled too.
+The reset also invalidates pictures queued on other devices before the reset, so they cannot reappear when those devices reconnect. Clearing Teams removes the inspection pictures first. Storage cleanup can be retried by running the robot picture reset again if the network interrupts it.
 
 Take pictures in order opens a separate picture sequence dialog that walks through Front, Back, Side, and Tag, then offers the optional Lexan Diagram. The dialog has a prominent red camera button naming each picture. After each required picture is saved, the app opens the camera for the next one when the browser allows it. After the Tag, Finish without Lexan ends the sequence with all four required pictures saved. Individual capture and retake buttons remain available on the team page.
 
@@ -225,3 +226,7 @@ Volunteer names, event records, device subscriptions, and operational data are s
 **Ref OS 1.0.0 Highlander Summit Release**
 
 Created by Maharshi Patel for Highlander Summit event operations.
+
+## Required Supabase update
+
+Before deploying this version, run `supabase/reset-robot-pictures-safely.sql` once in the project's Supabase SQL Editor. It makes the robot picture reset atomic with the team picture references and rejects uploads from before the reset. Deploying the app before this SQL is applied will prevent new robot picture uploads and picture resets.
