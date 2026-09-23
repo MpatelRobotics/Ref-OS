@@ -70,7 +70,7 @@ Violation history is available by team, match, rule, and event activity. Repeate
 
 The Teams workspace combines the event roster with violation totals, rankings, watch information, and quick access to team history.
 
-The Robots workspace requires three labeled inspection pictures for every team: Front, Back, and Side. Each team card shows picture completion, and the team view provides a dedicated capture slot for every required angle. An additional optional Lexan Diagram slot stores a picture of the team's Lexan or plastic diagram without changing the three picture completion count. Earlier unlabeled pictures remain available for reference.
+The Robots workspace requires four labeled inspection pictures for every team: Front, Back, Side, and the Highlander Inspection Tag attached to the robot after it passes inspection. Each team card shows picture completion, and the team view provides a dedicated capture slot for every required picture. An additional optional Lexan Diagram slot stores a picture of the team's Lexan or plastic diagram without changing the four picture completion count. Earlier unlabeled pictures remain available for reference.
 
 Images are compressed on the device before upload to reduce transfer time and storage use. Pictures captured without a connection are saved in the device outbox, shown immediately as queued, and uploaded automatically after connectivity returns.
 

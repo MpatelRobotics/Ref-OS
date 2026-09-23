@@ -4813,12 +4813,13 @@ const ROBOT_PHOTO_SLOTS = [
   { key: "front", label: "Front", required: true },
   { key: "back", label: "Back", required: true },
   { key: "side", label: "Side", required: true },
+  { key: "tag", label: "Highlander Inspection Tag", required: true },
   { key: "lexan", label: "Lexan Diagram", required: false },
 ];
 const REQUIRED_ROBOT_ANGLES = ROBOT_PHOTO_SLOTS.filter((angle) => angle.required);
 
 function robotPhotoAngle(path) {
-  const match = String(path || "").match(/\/(front|back|side|lexan)-[^/]+\.jpg$/i);
+  const match = String(path || "").match(/\/(front|back|side|tag|lexan)-[^/]+\.jpg$/i);
   return match ? match[1].toLowerCase() : "";
 }
 
@@ -4835,7 +4836,7 @@ function RobotList({ teams, query, setQuery, onOpen }) {
   const complete = teams.filter((team) => robotAngleCount(team) === REQUIRED_ROBOT_ANGLES.length).length;
   return (
     <>
-      <p className="text-xs text-slate-400 mb-3">{complete} of {teams.length} teams have all three required inspection pictures. Every team needs Front, Back, and Side.</p>
+      <p className="text-xs text-slate-400 mb-3">{complete} of {teams.length} teams have all four required inspection pictures. Every team needs Front, Back, Side, and the Highlander inspection tag attached to the robot.</p>
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search teams by number or name" placeholder="Search team #"
@@ -4857,7 +4858,7 @@ function RobotList({ teams, query, setQuery, onOpen }) {
                   </div>
                   <div className="px-2.5 py-2 flex items-center gap-1.5">
                     <span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm truncate">{t.number}</span>
-                    <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${angleCount === 3 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"}`}>{angleCount}/3</span>
+                    <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${angleCount === REQUIRED_ROBOT_ANGLES.length ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"}`}>{angleCount}/{REQUIRED_ROBOT_ANGLES.length}</span>
                     {pendingCount > 0 && <span className="text-[9px] font-bold text-sky-600 dark:text-sky-300">{pendingCount} queued</span>}
                   </div>
                 </button>
@@ -4903,12 +4904,13 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">{team.number}</div>
         {team.name && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{team.name}</div>}
-        <div className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${completed === 3 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"}`}>
-          <Camera size={13}/>{completed === 3 ? "Required pictures complete" : `${completed} of 3 required pictures`}
+        <div className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${completed === REQUIRED_ROBOT_ANGLES.length ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"}`}>
+          <Camera size={13}/>{completed === REQUIRED_ROBOT_ANGLES.length ? "Required pictures complete" : `${completed} of ${REQUIRED_ROBOT_ANGLES.length} required pictures`}
         </div>
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">After inspection passes, photograph the Highlander tag attached to the robot.</p>
       </div>
       {canTakePhotos && <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(event) => { add(event.target.files); event.target.value = ""; }} />}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
         {slotData.map((slot) => (
           <section key={slot.key} className={`rounded-xl border-2 overflow-hidden ${slot.remote || slot.pending ? "border-emerald-300 dark:border-emerald-800" : slot.required ? "border-dashed border-amber-300 dark:border-amber-700" : "border-dashed border-slate-300 dark:border-slate-600"}`}>
             <div className="px-3 py-2 flex items-center gap-2 bg-white dark:bg-slate-800">
@@ -5896,8 +5898,8 @@ function FeaturesGuide() {
           <Li><b>Teams</b> — search teams, open their full history, add teams, review Tournament Manager rank, and start a new log from the team record.</Li>
           <Li><b>Team scanner</b> — use the camera OCR scanner to recognize a team number and jump to the team record.</Li>
           <Li><b>Watchlist</b> — add shared watch notes to teams. Watched teams are flagged and their notes appear during relevant matches.</Li>
-          <Li><b>Required inspection pictures</b> — capture Front, Back, and Side views for every robot. Completion appears on each team card.</Li>
-          <Li><b>Optional Lexan Diagram</b> — save a picture of the team's Lexan or plastic diagram without affecting the three required picture completion count.</Li>
+          <Li><b>Required inspection pictures</b> — capture Front, Back, Side, and the Highlander inspection tag attached to the robot after it passes inspection. Completion appears on each team card.</Li>
+          <Li><b>Optional Lexan Diagram</b> — save a picture of the team's Lexan or plastic diagram without affecting the four required picture completion count.</Li>
           <Li><b>Offline picture queue</b> — required pictures remain visible as queued and upload automatically after connectivity returns.</Li>
         </ul>
       </Section>

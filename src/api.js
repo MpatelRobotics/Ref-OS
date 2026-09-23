@@ -383,7 +383,7 @@ export async function deleteTeam(eventId, number) {
 /* ---- robot inspection photos (stored on the team) ---- */
 export async function addTeamPhoto(eventId, number, dataUrl, angle = "other", uploadId = "") {
   const num = (number || "").trim().toUpperCase();
-  const safeAngle = ["front", "back", "side"].includes(String(angle).toLowerCase()) ? String(angle).toLowerCase() : "other";
+  const safeAngle = ["front", "back", "side", "tag", "lexan"].includes(String(angle).toLowerCase()) ? String(angle).toLowerCase() : "other";
   const id = uploadId || ((self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2));
   const path = `${eventId}/team/${num}/${safeAngle}-${id}.jpg`;
   const up = await supabase.storage.from("robot-photos").upload(path, dataURLtoBlob(dataUrl), { contentType: "image/jpeg", upsert: true });
