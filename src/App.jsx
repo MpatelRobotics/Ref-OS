@@ -4895,7 +4895,6 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
   const beginSequence = () => {
     setSequenceIndex(0);
     setCaptureAngle(ROBOT_PHOTO_SLOTS[0].key);
-    fileRef.current?.click();
   };
   const add = async (file) => {
     if (!file || !captureAngle) return;
@@ -4931,14 +4930,21 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
           <Camera size={13}/>{completed === REQUIRED_ROBOT_ANGLES.length ? "Required pictures complete" : `${completed} of ${REQUIRED_ROBOT_ANGLES.length} required pictures`}
         </div>
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">After inspection passes, photograph the Highlander tag attached to the robot.</p>
-        {canTakePhotos && sequenceIndex < 0 && <button type="button" onClick={beginSequence} disabled={busy} className="mt-3 w-full rounded-lg bg-[#D7212B] px-3 py-3 text-base font-bold text-white disabled:bg-slate-400"><Camera size={18} className="inline mr-1.5"/>Take pictures in order</button>}
-        {canTakePhotos && sequenceIndex >= 0 && <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 p-3 dark:border-sky-800 dark:bg-sky-950/30" role="status">
-          <p className="mb-2 font-semibold text-sky-900 dark:text-sky-100">Picture {sequenceIndex + 1} of {ROBOT_PHOTO_SLOTS.length}: {ROBOT_PHOTO_SLOTS[sequenceIndex].label}{ROBOT_PHOTO_SLOTS[sequenceIndex].required ? "" : " (optional)"}</p>
-          <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#D7212B] px-4 py-3 text-base font-bold text-white shadow-sm disabled:bg-slate-400"><Camera size={20}/>{ROBOT_PHOTO_SLOTS[sequenceIndex].required ? `Open camera: Take ${ROBOT_PHOTO_SLOTS[sequenceIndex].label} picture` : "Open camera: Take Lexan Diagram picture"}</button>
-          <button type="button" onClick={() => { setSequenceIndex(-1); setCaptureAngle(""); }} disabled={busy} className="mt-2 w-full rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-sky-100 dark:text-slate-300 dark:hover:bg-sky-900 disabled:opacity-50">{ROBOT_PHOTO_SLOTS[sequenceIndex].required ? "Stop taking pictures" : "Finish without Lexan"}</button>
-        </div>}
+        {canTakePhotos && <button type="button" onClick={beginSequence} disabled={busy} className="mt-3 w-full rounded-lg bg-[#D7212B] px-3 py-3 text-base font-bold text-white disabled:bg-slate-400"><Camera size={18} className="inline mr-1.5"/>Take pictures in order</button>}
       </div>
       {canTakePhotos && <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; add(file); }} />}
+      {canTakePhotos && sequenceIndex >= 0 && createPortal(
+        <div className="fixed inset-0 z-[160] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4" onClick={() => { if (!busy) { setSequenceIndex(-1); setCaptureAngle(""); } }}>
+          <div role="dialog" aria-modal="true" aria-labelledby="robot-photo-sequence-title" onClick={(event) => event.stopPropagation()} className="w-full max-w-lg rounded-t-2xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl dark:bg-slate-800 sm:rounded-2xl sm:p-6">
+            <h2 id="robot-photo-sequence-title" className="text-xl font-bold text-slate-900 dark:text-white">Take all robot pictures</h2>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Take Front, Back, Side, and the Highlander Inspection Tag in order. The Lexan Diagram is optional.</p>
+            <div role="status" className="mt-5 rounded-lg border border-sky-200 bg-sky-50 p-4 dark:border-sky-800 dark:bg-sky-950/30">
+              <p className="mb-3 text-base font-semibold text-sky-900 dark:text-sky-100">Picture {sequenceIndex + 1} of {ROBOT_PHOTO_SLOTS.length}: {ROBOT_PHOTO_SLOTS[sequenceIndex].label}{ROBOT_PHOTO_SLOTS[sequenceIndex].required ? "" : " (optional)"}</p>
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#D7212B] px-4 py-4 text-base font-bold text-white shadow-sm disabled:bg-slate-400"><Camera size={22}/>{busy ? "Saving picture…" : `Open camera: Take ${ROBOT_PHOTO_SLOTS[sequenceIndex].label} picture`}</button>
+            </div>
+            <button type="button" onClick={() => { setSequenceIndex(-1); setCaptureAngle(""); }} disabled={busy} className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-3 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200 disabled:opacity-50">{ROBOT_PHOTO_SLOTS[sequenceIndex].required ? "Stop taking pictures" : "Finish without Lexan"}</button>
+          </div>
+        </div>, document.body)}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
         {slotData.map((slot) => (
           <section key={slot.key} className={`rounded-xl border-2 overflow-hidden ${slot.remote || slot.pending ? "border-emerald-300 dark:border-emerald-800" : slot.required ? "border-dashed border-amber-300 dark:border-amber-700" : "border-dashed border-slate-300 dark:border-slate-600"}`}>
