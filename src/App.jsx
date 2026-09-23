@@ -4874,6 +4874,7 @@ function RobotList({ teams, query, setQuery, onOpen }) {
 function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, canTakePhotos = true, canDeletePhotos = true }) {
   const [busy, setBusy] = useState(false);
   const [captureAngle, setCaptureAngle] = useState("");
+  const [sequenceIndex, setSequenceIndex] = useState(-1);
   const fileRef = useRef(null);
   if (!team) return <Empty title="Team not found" sub="" />;
   const photos = team.photoKeys || [];
@@ -4887,17 +4888,39 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
   const extraPhotos = photos.filter((path) => !featuredKeys.has(path));
   const completed = slotData.filter((slot) => slot.required && (slot.remote || slot.pending)).length;
   const chooseAngle = (angle) => {
+    setSequenceIndex(-1);
     setCaptureAngle(angle);
     fileRef.current?.click();
   };
-  const add = async (files) => {
-    const file = Array.from(files)[0];
+  const beginSequence = () => {
+    setSequenceIndex(0);
+    setCaptureAngle(ROBOT_PHOTO_SLOTS[0].key);
+    fileRef.current?.click();
+  };
+  const add = async (file) => {
     if (!file || !captureAngle) return;
     setBusy(true);
-    try { const dataUrl = await compress(file); await onAddPhoto(team.number, dataUrl, captureAngle); }
-    catch (error) { alert(error?.message || "Could not save that inspection picture."); }
-    setBusy(false);
-    setCaptureAngle("");
+    try {
+      const dataUrl = await compress(file);
+      await onAddPhoto(team.number, dataUrl, captureAngle);
+      const nextIndex = sequenceIndex + 1;
+      if (sequenceIndex >= 0 && nextIndex < ROBOT_PHOTO_SLOTS.length) {
+        setSequenceIndex(nextIndex);
+        setCaptureAngle(ROBOT_PHOTO_SLOTS[nextIndex].key);
+        // Leave the optional Lexan photo as a choice after the required pictures.
+        if (ROBOT_PHOTO_SLOTS[nextIndex].required) {
+          // Mobile browsers may require another tap to reopen the camera.
+          setTimeout(() => fileRef.current?.click(), 0);
+        }
+      } else {
+        setSequenceIndex(-1);
+        setCaptureAngle("");
+      }
+    } catch (error) {
+      alert(error?.message || "Could not save that inspection picture. Try this picture again.");
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <>
@@ -4908,8 +4931,14 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
           <Camera size={13}/>{completed === REQUIRED_ROBOT_ANGLES.length ? "Required pictures complete" : `${completed} of ${REQUIRED_ROBOT_ANGLES.length} required pictures`}
         </div>
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">After inspection passes, photograph the Highlander tag attached to the robot.</p>
+        {canTakePhotos && <button type="button" onClick={beginSequence} disabled={busy} className="mt-3 w-full rounded-lg bg-[#D7212B] px-3 py-2.5 text-sm font-bold text-white disabled:bg-slate-400"><Camera size={16} className="inline mr-1.5"/>Take pictures in order</button>}
+        {canTakePhotos && sequenceIndex >= 0 && <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm dark:border-sky-800 dark:bg-sky-950/30" role="status">
+          <span className="basis-full sm:basis-auto min-w-0 flex-1 text-sky-900 dark:text-sky-100">Picture {sequenceIndex + 1} of {ROBOT_PHOTO_SLOTS.length}: {ROBOT_PHOTO_SLOTS[sequenceIndex].label}{ROBOT_PHOTO_SLOTS[sequenceIndex].required ? "" : " (optional)"}</span>
+          <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="shrink-0 font-bold text-sky-700 dark:text-sky-300 disabled:opacity-50">{ROBOT_PHOTO_SLOTS[sequenceIndex].required ? "Open camera" : "Take Lexan"}</button>
+          <button type="button" onClick={() => { setSequenceIndex(-1); setCaptureAngle(""); }} disabled={busy} className="shrink-0 text-slate-500 dark:text-slate-400 disabled:opacity-50">{ROBOT_PHOTO_SLOTS[sequenceIndex].required ? "Stop" : "Finish without Lexan"}</button>
+        </div>}
       </div>
-      {canTakePhotos && <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(event) => { add(event.target.files); event.target.value = ""; }} />}
+      {canTakePhotos && <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; add(file); }} />}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
         {slotData.map((slot) => (
           <section key={slot.key} className={`rounded-xl border-2 overflow-hidden ${slot.remote || slot.pending ? "border-emerald-300 dark:border-emerald-800" : slot.required ? "border-dashed border-amber-300 dark:border-amber-700" : "border-dashed border-slate-300 dark:border-slate-600"}`}>

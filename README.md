@@ -72,6 +72,8 @@ The Teams workspace combines the event roster with violation totals, rankings, w
 
 The Robots workspace requires four labeled inspection pictures for every team: Front, Back, Side, and the Highlander Inspection Tag attached to the robot after it passes inspection. Each team card shows picture completion, and the team view provides a dedicated capture slot for every required picture. An additional optional Lexan Diagram slot stores a picture of the team's Lexan or plastic diagram without changing the four picture completion count. Earlier unlabeled pictures remain available for reference.
 
+Take pictures in order walks through Front, Back, Side, and Tag, then offers the optional Lexan Diagram. After each required picture is saved, the app opens the camera for the next one when the browser allows it. On browsers that require a fresh tap, Open camera continues from the correct picture. After the Tag, Finish without Lexan ends the sequence with all four required pictures saved. Individual capture and retake buttons remain available.
+
 Images are compressed on the device before upload to reduce transfer time and storage use. Pictures captured without a connection are saved in the device outbox, shown immediately as queued, and uploaded automatically after connectivity returns.
 
 ## Field operations
