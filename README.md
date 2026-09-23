@@ -64,7 +64,7 @@ When a violation is opened from a team page, the match selector only shows sched
 
 Referees can record minor, major, and inspection violations against a team while citing the applicable rule and match. Notes and supporting robot photos can be attached when additional context is needed.
 
-The violation form shows each robot picture on file in a bordered card labeled Front, Back, Side, Highlander Inspection Tag, or Lexan Diagram. Required views have an amber border and a Required label; older unlabeled pictures appear as Other view.
+The violation form shows robot pictures on file in a compact horizontal row of bordered cards labeled Front, Back, Side, Highlander Inspection Tag, or Lexan Diagram. The row scrolls horizontally on small screens. Required views have an amber border and a Required label; older unlabeled pictures appear as Other view.
 
 Violation history is available by team, match, rule, and event activity. Repeated minor violations of the same rule are surfaced to help the referee crew identify escalation patterns.
 

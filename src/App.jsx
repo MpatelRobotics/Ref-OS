@@ -327,7 +327,7 @@ const ago = (ts) => {
 };
 
 /* ---------- lazy photo thumbnail (signed URL from Supabase Storage) ---------- */
-function Thumb({ pkey, onOpen, full = false }) {
+function Thumb({ pkey, onOpen, full = false, compact = false }) {
   const [src, setSrc] = useState(null);
   const [gone, setGone] = useState(false);
   useEffect(() => {
@@ -337,7 +337,7 @@ function Thumb({ pkey, onOpen, full = false }) {
     api.photoUrl(pkey).then((u) => { if (live) { u ? setSrc(u) : setGone(true); } });
     return () => { live = false; };
   }, [pkey]);
-  const size = full ? "w-full h-full" : "w-16 h-16";
+  const size = full ? "w-full h-full" : compact ? "w-12 h-12" : "w-16 h-16";
   if (gone) return <div className={`${size} rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 grid place-items-center text-slate-300`}><ImageOff size={18} /></div>;
   if (!src) return <div className={`${size} rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 animate-pulse`} />;
   const image = <img src={src} alt="robot" className={`${size} rounded-lg object-cover border border-slate-200 dark:border-slate-700`} />;
@@ -3612,15 +3612,15 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
               const rk = (teams.find((t) => t.number === team)?.photoKeys) || [];
               if (creatingNew || rk.length === 0) return null;
               return (
-                <div className="mt-2">
+                <div className="mt-1.5">
                   <span className="text-[11px] text-slate-500 dark:text-slate-400">Robot on file:</span>
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className="mt-1 flex gap-1.5 overflow-x-auto pb-1">
                     {rk.map((k) => {
                       const slot = ROBOT_PHOTO_SLOTS.find((item) => item.key === robotPhotoAngle(k));
-                      return <div key={k} className={`w-24 rounded-lg border-2 p-1.5 text-center ${slot?.required ? "border-amber-400 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/30" : "border-slate-200 bg-white dark:border-slate-600 dark:bg-slate-800"}`}>
-                        <div className="flex justify-center"><Thumb pkey={k} onOpen={onOpenPhoto} /></div>
-                        <span className="mt-1 block break-words text-[11px] font-bold leading-tight text-slate-800 dark:text-slate-100">{slot?.label || "Other view"}</span>
-                        {slot?.required && <span className="block text-[10px] font-semibold uppercase text-amber-700 dark:text-amber-300">Required</span>}
+                      return <div key={k} className={`w-[76px] shrink-0 rounded-md border p-1 text-center ${slot?.required ? "border-amber-400 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/30" : "border-slate-200 bg-white dark:border-slate-600 dark:bg-slate-800"}`}>
+                        <div className="flex justify-center"><Thumb pkey={k} onOpen={onOpenPhoto} compact /></div>
+                        <span className="mt-0.5 block break-words text-[10px] font-bold leading-tight text-slate-800 dark:text-slate-100">{slot?.label || "Other view"}</span>
+                        {slot?.required && <span className="block text-[9px] font-semibold uppercase leading-tight text-amber-700 dark:text-amber-300">Required</span>}
                       </div>;
                     })}
                   </div>
