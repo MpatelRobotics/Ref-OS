@@ -121,7 +121,11 @@ export async function flush(eventId, handlers = {}) {
           else handlers.onSynced && handlers.onSynced(saved);
         } else if (op.kind === "robot_photo") {
           const paths = await api.addTeamPhoto(op.eventId, op.number, op.dataUrl, op.angle, op.id);
-          handlers.onRobotPhotoSynced && handlers.onRobotPhotoSynced(op, paths);
+          if (cancelledOps.has(opCancelKey)) {
+            await api.removeTeamPhoto(op.eventId, op.number, `${op.eventId}/team/${op.number}/${op.angle}-${op.id}.jpg`);
+          } else {
+            handlers.onRobotPhotoSynced && handlers.onRobotPhotoSynced(op, paths);
+          }
         }
         q = await removeOp(eventId, op.id);           // success -> drop it
         cancelledOps.delete(opCancelKey);

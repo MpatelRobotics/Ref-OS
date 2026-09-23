@@ -2130,6 +2130,16 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const clearSelected = async (sel) => {
     try {
       if (sel.violations) { await api.clearViolations(eventId); setViols([]); }
+      if (sel.robotPhotos) {
+        const pending = (await outbox.loadQueue(eventId)).filter((op) => op.kind === "robot_photo");
+        for (const op of pending) await outbox.cancelOp(eventId, op.id);
+        const failed = (await outbox.loadFailed(eventId)).filter((item) => item.op?.kind === "robot_photo");
+        for (const item of failed) await outbox.discardFailed(eventId, item.failedId);
+        await api.clearTeamPhotos(eventId);
+        setTeams((cur) => cur.map((team) => ({ ...team, photoKeys: [], _pendingRobotPhotos: [] })));
+        setFailedSyncItems((cur) => cur.filter((item) => item.op?.kind !== "robot_photo"));
+        await refreshQueueHealth();
+      }
       if (sel.replays) {
         const ids = fieldLog.filter((e) => e.kind === "replay").map((e) => e.id);
         for (const id of ids) await api.deleteFieldLog(id);
@@ -3113,7 +3123,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         </div>,
         document.body
       )}
-      {showClear && <ClearModal counts={{ violations: viols.length, teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length, quadrantChecks: fieldResetChecks.length }} onClear={clearSelected} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowClear(false)} />}
+      {showClear && <ClearModal counts={{ violations: viols.length, robotPhotos: teams.reduce((total, team) => total + (team.photoKeys || []).length + (team._pendingRobotPhotos || []).length, 0), teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length, quadrantChecks: fieldResetChecks.length }} onClear={clearSelected} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowClear(false)} />}
       {showOnline && (
         <div className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
           <div className="bg-white dark:bg-slate-800 w-full max-h-[100dvh] sm:max-w-md sm:max-h-[90vh] sm:rounded-2xl rounded-t-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>

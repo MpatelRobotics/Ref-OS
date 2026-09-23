@@ -403,6 +403,21 @@ export async function removeTeamPhoto(eventId, number, path) {
   await supabase.from("teams").update({ photo_paths: paths }).eq("event_id", eventId).eq("number", num);
   return paths;
 }
+export async function clearTeamPhotos(eventId) {
+  if (E2E_MOCK) {
+    e2eState.teams = e2eState.teams.map((team) => ({ ...team, photoKeys: [] }));
+    return;
+  }
+  const { data: teams, error: readError } = await supabase.from("teams").select("photo_paths").eq("event_id", eventId);
+  if (readError) throw readError;
+  const paths = [...new Set((teams || []).flatMap((team) => team.photo_paths || []))];
+  for (let i = 0; i < paths.length; i += 100) {
+    const { error } = await supabase.storage.from("robot-photos").remove(paths.slice(i, i + 100));
+    if (error) throw error;
+  }
+  const { error: updateError } = await supabase.from("teams").update({ photo_paths: [] }).eq("event_id", eventId);
+  if (updateError) throw updateError;
+}
 
 /* ================= matches (qualification schedule) ================= */
 export async function listMatches(eventId) {
