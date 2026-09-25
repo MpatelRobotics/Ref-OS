@@ -4913,6 +4913,8 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
   }));
   const featuredKeys = new Set(slotData.map((slot) => slot.remote).filter(Boolean));
   const extraPhotos = photos.filter((path) => !featuredKeys.has(path));
+  const featuredPendingIds = new Set(slotData.map((slot) => slot.pending?.id).filter(Boolean));
+  const extraPendingPhotos = pendingPhotos.filter((photo) => !featuredPendingIds.has(photo.id));
   const completed = slotData.filter((slot) => slot.required && (slot.remote || slot.pending)).length;
   const chooseAngle = (angle) => {
     setSequenceIndex(-1);
@@ -4990,8 +4992,9 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
           </section>
         ))}
       </div>
+      {canTakePhotos && <button type="button" onClick={() => chooseAngle("other")} disabled={busy} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"><Camera size={18}/>{busy && captureAngle === "other" ? "Saving…" : "Add optional picture"}</button>}
       {pendingPhotos.length > 0 && <div className="mt-4 rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 px-3 py-2 text-xs font-semibold text-sky-800 dark:text-sky-200">{pendingPhotos.length} inspection {pendingPhotos.length === 1 ? "picture is" : "pictures are"} saved on this device and will upload automatically when connected.</div>}
-      {extraPhotos.length > 0 && <section className="mt-5"><h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2">Earlier and unlabeled pictures</h3><div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{extraPhotos.map((path) => <div key={path} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700"><Thumb pkey={path} onOpen={onOpenPhoto} full />{canDeletePhotos && <button onClick={() => { if (confirm("Delete this robot picture?")) onRemovePhoto(team.number, path); }} className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1"><Trash2 size={13}/></button>}</div>)}</div></section>}
+      {(extraPhotos.length > 0 || extraPendingPhotos.length > 0) && <section className="mt-5"><h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2">Additional pictures</h3><div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{extraPendingPhotos.map((photo) => <div key={photo.id} className="relative aspect-square rounded-lg overflow-hidden border border-sky-300 bg-slate-100 dark:bg-slate-700"><button onClick={() => onOpenPhoto(photo.dataUrl)} className="h-full w-full"><img src={photo.dataUrl} alt="Additional robot picture queued for upload" className="h-full w-full object-cover" /></button><span className="absolute bottom-1 left-1 rounded bg-sky-900/80 px-1.5 py-0.5 text-xs font-bold text-white">Queued</span>{canDeletePhotos && <button onClick={() => onRemovePendingPhoto(team.number, photo.id)} className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1" title="Remove queued picture"><Trash2 size={13}/></button>}</div>)}{extraPhotos.map((path) => <div key={path} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700"><Thumb pkey={path} onOpen={onOpenPhoto} full />{canDeletePhotos && <button onClick={() => { if (confirm("Delete this robot picture?")) onRemovePhoto(team.number, path); }} className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1"><Trash2 size={13}/></button>}</div>)}</div></section>}
     </>
   );
 }
