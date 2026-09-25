@@ -4837,8 +4837,8 @@ function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onS
 /* ============================ ROBOTS (inspection photos) ============================ */
 const ROBOT_PHOTO_SLOTS = [
   { key: "front", label: "Front", required: true },
-  { key: "back", label: "Back", required: true },
   { key: "side", label: "Side", required: true },
+  { key: "back", label: "Back", required: true },
   { key: "tag", label: "Highlander Inspection Tag", required: true },
   { key: "lexan", label: "Lexan Diagram", required: false },
 ];
@@ -4862,7 +4862,7 @@ function RobotList({ teams, query, setQuery, onOpen }) {
   const complete = teams.filter((team) => robotAngleCount(team) === REQUIRED_ROBOT_ANGLES.length).length;
   return (
     <>
-      <p className="text-xs text-slate-400 mb-3">{complete} of {teams.length} teams have all four required inspection pictures. Every team needs Front, Back, Side, and the Highlander inspection tag attached to the robot.</p>
+      <p className="text-xs text-slate-400 mb-3">{complete} of {teams.length} teams have all four required inspection pictures. Every team needs Front, Side, Back, and the Highlander inspection tag attached to the robot.</p>
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search teams by number or name" placeholder="Search team #"
@@ -4965,7 +4965,7 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
         <div className="fixed inset-0 z-[160] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4" onClick={() => { if (!busy) { setSequenceIndex(-1); setCaptureAngle(""); } }}>
           <div role="dialog" aria-modal="true" aria-labelledby="robot-photo-sequence-title" onClick={(event) => event.stopPropagation()} className="w-full max-w-lg rounded-t-2xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl dark:bg-slate-800 sm:rounded-2xl sm:p-6">
             <h2 id="robot-photo-sequence-title" className="text-xl font-bold text-slate-900 dark:text-white">Take all robot pictures</h2>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Take Front, Back, Side, and the Highlander Inspection Tag in order. The Lexan Diagram is optional.</p>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Take Front, Side, Back, and the Highlander Inspection Tag in order. The Lexan Diagram is optional.</p>
             <div role="status" className="mt-5 rounded-lg border border-sky-200 bg-sky-50 p-4 dark:border-sky-800 dark:bg-sky-950/30">
               <p className="mb-3 text-base font-semibold text-sky-900 dark:text-sky-100">Picture {sequenceIndex + 1} of {ROBOT_PHOTO_SLOTS.length}: {ROBOT_PHOTO_SLOTS[sequenceIndex].label}{ROBOT_PHOTO_SLOTS[sequenceIndex].required ? "" : " (optional)"}</p>
               <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#D7212B] px-4 py-4 text-base font-bold text-white shadow-sm disabled:bg-slate-400"><Camera size={22}/>{busy ? "Saving picture…" : `Open camera: Take ${ROBOT_PHOTO_SLOTS[sequenceIndex].label} picture`}</button>
