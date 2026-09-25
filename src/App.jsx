@@ -3809,13 +3809,12 @@ function RulePicker({ rules, knownRules, selectedCodes = [], onPickRule, onPickC
   const groups = [];
   if (!query) {
     const favorites = favoriteCodes.map((c) => byCode.get(c)).filter(Boolean);
-    const recent = recentCodes.filter((c) => !favoriteCodes.includes(c)).map((c) => byCode.get(c)).filter(Boolean);
+    const recent = recentCodes.map((c) => byCode.get(c)).filter(Boolean);
     if (favorites.length) groups.push({ cat: "Favorites", items: favorites });
     if (recent.length) groups.push({ cat: "Recently used", items: recent });
   }
   const idx = {};
   for (const r of filtered) {
-    if (!query && (favoriteCodes.includes(r.code) || recentCodes.includes(r.code))) continue;
     if (!(r.category in idx)) { idx[r.category] = groups.length; groups.push({ cat: r.category, items: [] }); }
     groups[idx[r.category]].items.push(r);
   }
