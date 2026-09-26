@@ -2026,6 +2026,30 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       if (outbox.isOffline(e)) alert("You're offline — reconnect to change finalists."); else throw e;
     }
   };
+  const moveJudgingRank = async (award, team, direction) => {
+    const forAward = noms.filter((nom) => nom.award === award);
+    const counts = {};
+    for (const nom of forAward) counts[nom.team] = (counts[nom.team] || 0) + 1;
+    const previous = eventSettings?.judging_rank_order?.value || {};
+    const preferred = Array.isArray(previous[award]) ? previous[award] : [];
+    const teams = Object.keys(counts).sort((a, b) => counts[b] - counts[a] ||
+      (preferred.includes(a) ? preferred.indexOf(a) : Infinity) - (preferred.includes(b) ? preferred.indexOf(b) : Infinity) ||
+      a.localeCompare(b, undefined, { numeric: true }));
+    const from = teams.indexOf(team);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= teams.length || counts[team] !== counts[teams[to]]) return;
+    [teams[from], teams[to]] = [teams[to], teams[from]];
+    const next = { ...previous, [award]: teams };
+    const priorSetting = eventSettings?.judging_rank_order;
+    setEventSettings((cur) => ({ ...cur, judging_rank_order: { key: "judging_rank_order", value: next } }));
+    try {
+      const saved = await api.upsertEventSetting(eventId, "judging_rank_order", next, meName);
+      setEventSettings((cur) => ({ ...cur, judging_rank_order: saved }));
+    } catch (error) {
+      setEventSettings((cur) => ({ ...cur, judging_rank_order: priorSetting }));
+      alert(`Could not save the ranking order: ${error?.message || error}`);
+    }
+  };
   const exportNominations = async () => {
     if (!noms.length) { alert("There are no nominations to export."); return; }
 
@@ -2155,7 +2179,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       }
       if (sel.teams) { await api.clearTeams(eventId); setTeams([]); }
       if (sel.schedule) { await api.clearMatches(eventId); setMatches({}); await api.clearRankings(eventId); setTeams((cur) => cur.map((t) => ({ ...t, rank: null }))); }
-      if (sel.judging) { await api.clearJudging(eventId); setNoms([]); setFinalists(new Set()); }
+      if (sel.judging) { await api.clearJudging(eventId); await api.deleteEventSetting(eventId, "judging_rank_order"); setNoms([]); setFinalists(new Set()); setEventSettings((cur) => { const next = { ...cur }; delete next.judging_rank_order; return next; }); }
       if (sel.alliances) { await api.clearAlliances(eventId); setAlliances({}); setAlliancesLoaded(true); }
       if (sel.watchlist) { await api.clearWatchNotes(eventId); setWatchNotes([]); }
       if (sel.quadrants) { await api.clearFieldResetChecks(eventId); setFieldResetChecks([]); }
@@ -3002,7 +3026,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         ) : view === "robots" ? (
           <RobotList teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "judging" ? (
-          <JudgingView noms={noms} viols={viols} teamName={teamNameMap} finalists={finalists} emcee={isEmcee}
+          <JudgingView noms={noms} viols={viols} teamName={teamNameMap} finalists={finalists} rankOrder={eventSettings?.judging_rank_order?.value || {}} canReorder={adminUnlocked} onMoveRank={moveJudgingRank} emcee={isEmcee}
             onToggleFinalist={(award, team) => (isJudge ? toggleFinalist(award, team) : requireAdmin(() => toggleFinalist(award, team)))}
             onNominate={(award) => setNominating(award || "sportsmanship")} onDeleteNom={removeNomination}
             onExport={isEmcee ? undefined : () => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
@@ -5035,7 +5059,7 @@ const AWARDS = [
 ];
 const G_RULE = /^G[1-5]$/i;
 
-function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNominate, onDeleteNom, onExport, emcee }) {
+function JudgingView({ noms, viols, teamName, finalists, rankOrder = {}, canReorder = false, onMoveRank, onToggleFinalist, onNominate, onDeleteNom, onExport, emcee }) {
   const [award, setAward] = useState("sportsmanship");
   const [openTeam, setOpenTeam] = useState(null);
 
@@ -5052,7 +5076,10 @@ function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNom
   const forAward = noms.filter((n) => n.award === award);
   const tally = {};
   for (const n of forAward) { tally[n.team] = tally[n.team] || { team: n.team, count: 0, noms: [] }; tally[n.team].count++; tally[n.team].noms.push(n); }
-  const ranked = Object.values(tally).sort((a, b) => b.count - a.count || a.team.localeCompare(b.team, undefined, { numeric: true }));
+  const preferred = Array.isArray(rankOrder[award]) ? rankOrder[award] : [];
+  const ranked = Object.values(tally).sort((a, b) => b.count - a.count ||
+    (preferred.includes(a.team) ? preferred.indexOf(a.team) : Infinity) - (preferred.includes(b.team) ? preferred.indexOf(b.team) : Infinity) ||
+    a.team.localeCompare(b.team, undefined, { numeric: true }));
   const cur = AWARDS.find((a) => a.key === award);
 
   return (
@@ -5101,6 +5128,10 @@ function JudgingView({ noms, viols, teamName, finalists, onToggleFinalist, onNom
                     </div>
                     <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold">{row.count} <span className="text-slate-400 font-normal text-xs">nom{row.count !== 1 ? "s" : ""}</span></span>
                   </button>
+                  {canReorder && <div className="flex shrink-0 flex-col" aria-label={`Reorder ${row.team} among teams with ${row.count} nominations`}>
+                    <button type="button" onClick={() => onMoveRank(award, row.team, -1)} disabled={i === 0 || ranked[i - 1].count !== row.count} aria-label={`Move ${row.team} up`} className="rounded px-1.5 text-sm font-bold text-slate-600 disabled:opacity-25 dark:text-slate-300">↑</button>
+                    <button type="button" onClick={() => onMoveRank(award, row.team, 1)} disabled={i === ranked.length - 1 || ranked[i + 1].count !== row.count} aria-label={`Move ${row.team} down`} className="rounded px-1.5 text-sm font-bold text-slate-600 disabled:opacity-25 dark:text-slate-300">↓</button>
+                  </div>}
                   {!emcee && <button onClick={() => onToggleFinalist(award, row.team)} title={isFinalist ? "Remove finalist" : "Mark finalist"} className="shrink-0 p-1">
                     <Star size={20} className={isFinalist ? "fill-[#EBA622] text-[#EBA622]" : "text-slate-300 hover:text-[#EBA622]"} />
                   </button>}
