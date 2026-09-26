@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ChevronLeft,
   CheckCircle2,
@@ -159,8 +160,8 @@ export default function QuadrantFieldReset({
     return checks.slice().sort((a, b) => new Date(b.verifiedAt || 0) - new Date(a.verifiedAt || 0))[0] || null;
   }, [checks, fieldReady]);
 
-  return (
-    <div className="fixed inset-0 z-[70] bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white flex flex-col">
+  return createPortal(
+    <div className="fixed inset-0 z-[70] h-[100dvh] min-h-0 bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-white flex flex-col overflow-hidden">
       <div className="px-3 py-3 border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 flex items-center gap-2 shrink-0">
         <button onClick={onClose} className="refos-back-button" aria-label="Back">
           <ChevronLeft size={24} /> Back
@@ -224,7 +225,7 @@ export default function QuadrantFieldReset({
         </button>
       </div>
 
-      <div ref={contentRef} className="flex-1 overflow-y-auto p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div ref={contentRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
             <div className="text-lg font-bold">Quadrant {def.id} • {def.name}</div>
@@ -278,6 +279,6 @@ export default function QuadrantFieldReset({
         </div>
       )}
 
-    </div>
+    </div>, document.body
   );
 }
