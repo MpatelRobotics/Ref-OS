@@ -5255,6 +5255,16 @@ function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSe
   const [whereWhen, setWhereWhen] = useState("");
   const [criteria, setCriteria] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [visibleViewport, setVisibleViewport] = useState(null);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const update = () => setVisibleViewport({ top: viewport.offsetTop, height: viewport.height });
+    update();
+    viewport.addEventListener("resize", update);
+    viewport.addEventListener("scroll", update);
+    return () => { viewport.removeEventListener("resize", update); viewport.removeEventListener("scroll", update); };
+  }, []);
   const awardDef = AWARDS.find((a) => a.key === award) || AWARDS[0];
   const toggleCriterion = (c) => setCriteria((cur) => cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c]);
   const pickAward = (k) => { setAward(k); setCriteria([]); };
@@ -5265,9 +5275,9 @@ function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSe
     try { await onSave({ award, team: creatingNew ? "" : team, newNumber, newName, reason, criteria, whereWhen, match: { phase: matchPhase, num: matchNum } }); }
     catch (e) { alert("Could not save: " + (e.message || e)); setBusy(false); }
   };
-  return (
-    <div className="fixed inset-0 z-[80] bg-black/40 flex items-end sm:items-center justify-center">
-      <div className="bg-slate-50 dark:bg-slate-900 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[100dvh] sm:max-h-[92dvh] flex flex-col overflow-hidden">
+  return createPortal(
+    <div className="fixed inset-x-0 z-[110] bg-black/40 flex items-end sm:items-center justify-center" style={{ top: visibleViewport?.top ?? 0, height: visibleViewport?.height ?? "100dvh" }}>
+      <div className="bg-slate-50 dark:bg-slate-900 w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-full sm:max-h-[92dvh] flex flex-col overflow-hidden">
         <div className="shrink-0 bg-slate-50 dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
           <h2 className="font-bold text-slate-900 dark:text-slate-100">Nominate for an award</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:text-slate-300"><X size={22} /></button>
@@ -5349,10 +5359,10 @@ function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSe
         </div>
         <div className="shrink-0 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 p-4 flex gap-2" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
           <button onClick={onClose} className="px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
-          <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? "bg-[#D7212B] hover:bg-[#B42024]" : "bg-slate-300"}`}>{busy ? "Saving…" : "Submit nomination"}</button>
+          <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? "bg-[#D7212B] hover:bg-[#B42024]" : "bg-slate-300"}`}>{busy ? "Saving…" : "Save nomination"}</button>
         </div>
       </div>
-    </div>
+    </div>, document.body
   );
 }
 
