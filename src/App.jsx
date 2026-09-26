@@ -3793,6 +3793,8 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
       {showRulePicker && (
         <RulePicker rules={rules} knownRules={knownRules}
           selectedCodes={selectedRules.map((r) => r.code)}
+          selectedRules={selectedRules} showRuleTypes={type !== "inspection"}
+          onSetRuleType={(code, ruleType) => setSelectedRules((rs) => rs.map((rule) => rule.code === code ? { ...rule, type: ruleType } : rule))}
           onPickRule={(c, d) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs.filter((r) => r.code !== clean) : [...rs, { code: clean, desc: d || ruleBook[clean] || knownRules[clean] || "", type: type === "major" ? "major" : "minor" }]); }}
           onPickCustom={(c) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs.filter((r) => r.code !== clean) : [...rs, { code: clean, desc: ruleBook[clean] || knownRules[clean] || "", type: type === "major" ? "major" : "minor" }]); }}
           onClose={() => setShowRulePicker(false)} />
@@ -3802,7 +3804,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
 }
 
 /* ============================ RULE PICKER ============================ */
-function RulePicker({ rules, knownRules, selectedCodes = [], onPickRule, onPickCustom, onClose }) {
+function RulePicker({ rules, knownRules, selectedCodes = [], selectedRules = [], showRuleTypes = true, onSetRuleType, onPickRule, onPickCustom, onClose }) {
   const [q, setQ] = useState("");
   const [favoriteCodes, setFavoriteCodes] = useState(() => { try { return JSON.parse(localStorage.getItem("refosRuleFavorites") || "[]"); } catch { return []; } });
   const [recentCodes, setRecentCodes] = useState(() => { try { return JSON.parse(localStorage.getItem("refosRecentRules") || "[]"); } catch { return []; } });
@@ -3864,12 +3866,15 @@ function RulePicker({ rules, knownRules, selectedCodes = [], onPickRule, onPickC
           <div key={g.cat}>
             <div className="sticky top-0 bg-slate-100 dark:bg-slate-700 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{g.cat}</div>
             {g.items.map((r) => (
-              <div key={`${g.cat}-${r.code}`} className="flex border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700">
+              <div key={`${g.cat}-${r.code}`} className="flex flex-wrap items-center border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700">
                 <button onClick={() => chooseRule(r)} className="flex-1 min-w-0 text-left px-4 py-2.5 flex gap-3 items-center">
                   <span className={`w-5 h-5 shrink-0 rounded border grid place-items-center ${selectedCodes.includes(r.code) ? "bg-emerald-600 border-emerald-600 text-white" : "border-slate-300 dark:border-slate-600"}`}>{selectedCodes.includes(r.code) ? "✓" : ""}</span>
                   <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-16 shrink-0">{fmtRule(r.code)}</span>
                   <span className="text-sm text-slate-600 dark:text-slate-300">{r.desc}</span>
                 </button>
+                {showRuleTypes && selectedCodes.includes(r.code) && <div className="flex shrink-0 items-center gap-1 px-2 py-1" role="group" aria-label={`Violation type for ${fmtRule(r.code)}`}>
+                  {["minor", "major"].map((ruleType) => <button key={ruleType} type="button" onClick={() => onSetRuleType(r.code, ruleType)} aria-pressed={(selectedRules.find((rule) => rule.code === r.code)?.type || "minor") === ruleType} className={`rounded-md border px-2 py-1.5 text-xs font-bold ${selectedRules.find((rule) => rule.code === r.code)?.type === ruleType ? ruleType === "major" ? "border-red-600 bg-red-600 text-white" : "border-amber-500 bg-amber-500 text-white" : "border-slate-300 bg-white text-slate-600 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"}`}>{ruleType === "major" ? "Major" : "Minor"}</button>)}
+                </div>}
                 <button type="button" onClick={(e) => toggleFavorite(r.code, e)} className={`px-3 shrink-0 ${favoriteCodes.includes(r.code) ? "text-amber-500" : "text-slate-300 hover:text-amber-500"}`}>
                   <Star size={17} fill={favoriteCodes.includes(r.code) ? "currentColor" : "none"} />
                 </button>
