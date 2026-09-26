@@ -1299,31 +1299,33 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     return num;
   };
 
-  const saveViolation = async ({ team, type, code, desc, notes, photos, match }) => {
+  const saveViolation = async ({ team, type, code, desc, notes, photos, match, ruleGroups }) => {
     const cleanMatch = match && match.phase && match.phase !== "none" ? { phase: match.phase, num: (match.num || "").trim() } : null;
-    const row = api.buildViolationRow(eventId, {
-      team, type, code: normNum(code).replace(/[<>]/g, ""), desc: desc.trim(),
+    const groups = ruleGroups?.length ? ruleGroups : [{ type, code, desc }];
+    const rows = groups.map((group) => api.buildViolationRow(eventId, {
+      team, type: group.type, code: normNum(group.code).replace(/[<>]/g, ""), desc: group.desc.trim(),
       notes: notes.trim(), by: meName || "", byFullName: meFullName || meName || "", match: cleanMatch,
-    });
+    }));
     const createdAt = Date.now();
-    // show it immediately (marked pending), then persist to the durable queue and try to send
-    setViols((cur) => [{
+    // Show every severity group immediately, then persist each one to the durable queue.
+    setViols((cur) => [...rows.map((row) => ({
       id: row.id, team: row.team, type: row.type, code: row.code, desc: row.rule_desc,
       notes: row.notes, match: row.match_info, by: meName || "", byFullName: meFullName || meName || "", photoKeys: [],
       createdAt, _pending: true, _localPhotos: photos,
-    }, ...cur]);
+    })), ...cur]);
     if (cleanMatch) { setLastMatch(cleanMatch); localStorage.setItem("lastMatch", JSON.stringify(cleanMatch)); }
-    await outbox.enqueue(eventId, { id: row.id, kind: "violation", eventId, row, photos, createdAt });
+    for (const row of rows) await outbox.enqueue(eventId, { id: row.id, kind: "violation", eventId, row, photos, createdAt });
     doFlush();
-    offerUndo(`Violation saved for ${row.team}`, async () => {
-      undoneViolationIdsRef.current.add(row.id);
-      await outbox.cancelOp(eventId, row.id);
-      setViols((cur) => cur.filter((violation) => violation.id !== row.id));
-      await api.deleteViolation({ id: row.id, photoKeys: [] });
-      setViols((cur) => cur.filter((violation) => violation.id !== row.id));
+    offerUndo(`${rows.length > 1 ? `${rows.length} violations` : "Violation"} saved for ${team}`, async () => {
+      const ids = new Set(rows.map((row) => row.id));
+      rows.forEach((row) => undoneViolationIdsRef.current.add(row.id));
+      for (const row of rows) await outbox.cancelOp(eventId, row.id);
+      setViols((cur) => cur.filter((violation) => !ids.has(violation.id)));
+      for (const row of rows) await api.deleteViolation({ id: row.id, photoKeys: [] });
+      setViols((cur) => cur.filter((violation) => !ids.has(violation.id)));
       await refresh().catch(() => {});
       refreshQueueHealth();
-      window.setTimeout(() => undoneViolationIdsRef.current.delete(row.id), 120000);
+      window.setTimeout(() => rows.forEach((row) => undoneViolationIdsRef.current.delete(row.id)), 120000);
     });
   };
 
@@ -3094,7 +3096,13 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       {editing && (
         <LogModal teams={teams} viols={viols} presetTeam={editing.team} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} rules={rules} onOpenPhoto={setLightbox} edit={editing} fieldNames={fieldNames}
           onSetName={() => setShowIdentity(true)} onClose={() => setEditing(null)}
-          onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await editViolation(editing, { ...form, team }); setEditing(null); }} />
+          onSave={async (form) => {
+            const team = await upsertTeam(form.team || form.newNumber, form.newName);
+            const [first, ...additional] = form.ruleGroups?.length ? form.ruleGroups : [{ type: form.type, code: form.code, desc: form.desc }];
+            await editViolation(editing, { ...form, ...first, team });
+            if (additional.length) await saveViolation({ ...form, team, ruleGroups: additional, photos: form.photos || [] });
+            setEditing(null);
+          }} />
       )}
       {nominating && (
         <NominateModal teams={teams} presetAward={nominating} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches}
@@ -3547,7 +3555,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
   const [selectedRules, setSelectedRules] = useState(() => {
     const codes = splitRuleCodes((edit && edit.code) || "");
     const descriptions = splitRuleDescs((edit && edit.desc) || "");
-    return codes.map((c, i) => ({ code: c, desc: descriptions[i] || ruleBook[c] || knownRules[c] || "" }));
+    return codes.map((c, i) => ({ code: c, desc: descriptions[i] || ruleBook[c] || knownRules[c] || "", type: (edit && edit.type) || "minor" }));
   });
   const code = selectedRules.map((r) => r.code).join(" | ");
   const desc = selectedRules.map((r) => r.desc || "").join(" | ");
@@ -3571,7 +3579,14 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
   const doSave = async () => {
     setBusy(true);
     try {
-      await onSave({ team: creatingNew ? "" : team, newNumber, newName, type, code, desc, notes, photos, keepKeys, match: { phase: matchPhase, num: matchNum } });
+      const ruleGroups = selectedRules.reduce((groups, rule) => {
+        const ruleType = type === "inspection" ? "inspection" : rule.type;
+        let group = groups.find((entry) => entry.type === ruleType);
+        if (!group) { group = { type: ruleType, rules: [] }; groups.push(group); }
+        group.rules.push(rule);
+        return groups;
+      }, []).map((group) => ({ type: group.type, code: group.rules.map((rule) => rule.code).join(" | "), desc: group.rules.map((rule) => rule.desc || "").join(" | ") }));
+      await onSave({ team: creatingNew ? "" : team, newNumber, newName, type: ruleGroups[0]?.type || type, code, desc, notes, photos, keepKeys, match: { phase: matchPhase, num: matchNum }, ruleGroups });
     } catch (e) {
       alert("Could not save: " + (e.message || e));
       setBusy(false);
@@ -3714,7 +3729,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
           </div>
 
           <div>
-            <Label>Type</Label>
+            <Label>{selectedRules.length ? "Default type for new rules" : "Type"}</Label>
             <div className="grid grid-cols-3 gap-2">
               {ORDER.map((ty) => { const M = TYPES[ty]; const on = type === ty; return (
                 <button key={ty} onClick={() => setType(ty)} className={`py-2.5 rounded-lg border-2 font-semibold text-sm flex flex-col items-center gap-1 transition ${on ? `${M.solid} text-white border-transparent` : `bg-white dark:bg-slate-800 ${M.text} border-slate-200 dark:border-slate-700`}`}>
@@ -3727,10 +3742,13 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
             <Label>Rules cited</Label>
             <div className="space-y-2">
               {selectedRules.map((r) => (
-                <div key={r.code} className="flex items-start gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2">
-                  <span className="font-mono font-semibold text-slate-900 dark:text-slate-100 shrink-0">{fmtRule(r.code)}</span>
-                  <span className="text-sm text-slate-500 dark:text-slate-400 flex-1">{r.desc || "Custom rule"}</span>
-                  <button type="button" onClick={() => setSelectedRules((rs) => rs.filter((x) => x.code !== r.code))} className="text-slate-400 hover:text-red-600" title="Remove rule"><X size={16} /></button>
+                <div key={r.code} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2">
+                  <div className="flex items-start gap-2">
+                    <span className="font-mono font-semibold text-slate-900 dark:text-slate-100 shrink-0">{fmtRule(r.code)}</span>
+                    <span className="text-sm text-slate-500 dark:text-slate-400 flex-1">{r.desc || "Custom rule"}</span>
+                    <button type="button" onClick={() => setSelectedRules((rs) => rs.filter((x) => x.code !== r.code))} className="text-slate-400 hover:text-red-600" title="Remove rule"><X size={16} /></button>
+                  </div>
+                  {type !== "inspection" && <div className="mt-2 flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300"><span>Violation type</span><select aria-label={`Violation type for ${fmtRule(r.code)}`} value={r.type} onChange={(event) => setSelectedRules((rs) => rs.map((rule) => rule.code === r.code ? { ...rule, type: event.target.value } : rule))} className="ml-auto rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1.5 text-sm"><option value="minor">Minor</option><option value="major">Major</option></select></div>}
                 </div>
               ))}
               <button type="button" onClick={() => setShowRulePicker(true)}
@@ -3738,7 +3756,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
                 {selectedRules.length ? "Change rule selection" : "Select rules"}
               </button>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">Select every rule that applies in one pass. Tap a selected rule again to unselect it, then tap Done.</p>
+            <p className="text-[11px] text-slate-400 mt-1">Select every rule that applies, then set each rule to Minor or Major. Rules with different types are saved as separate entries.</p>
           </div>
 
           <div>
@@ -3775,8 +3793,8 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
       {showRulePicker && (
         <RulePicker rules={rules} knownRules={knownRules}
           selectedCodes={selectedRules.map((r) => r.code)}
-          onPickRule={(c, d) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs.filter((r) => r.code !== clean) : [...rs, { code: clean, desc: d || ruleBook[clean] || knownRules[clean] || "" }]); }}
-          onPickCustom={(c) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs.filter((r) => r.code !== clean) : [...rs, { code: clean, desc: ruleBook[clean] || knownRules[clean] || "" }]); }}
+          onPickRule={(c, d) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs.filter((r) => r.code !== clean) : [...rs, { code: clean, desc: d || ruleBook[clean] || knownRules[clean] || "", type: type === "major" ? "major" : "minor" }]); }}
+          onPickCustom={(c) => { const clean = normNum(c).replace(/[<>]/g, ""); setSelectedRules((rs) => rs.some((r) => r.code === clean) ? rs.filter((r) => r.code !== clean) : [...rs, { code: clean, desc: ruleBook[clean] || knownRules[clean] || "", type: type === "major" ? "major" : "minor" }]); }}
           onClose={() => setShowRulePicker(false)} />
       )}
     </div>
@@ -3820,12 +3838,12 @@ function RulePicker({ rules, knownRules, selectedCodes = [], onPickRule, onPickC
   }
   const exact = all.some((r) => r.code.toUpperCase() === uq);
   const showCustom = query && !exact;
-  return (
-    <div className="fixed inset-0 z-50 bg-white dark:bg-slate-800 flex flex-col font-sans">
-      <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2 shrink-0">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] h-[100dvh] min-h-0 bg-white dark:bg-slate-800 flex flex-col font-sans overflow-hidden">
+      <div className="px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] border-b border-slate-200 dark:border-slate-700 flex items-center gap-2 shrink-0">
         <button onClick={onClose} className="refos-back-button"><ChevronLeft size={22} /> Back</button>
         <h2 className="font-bold text-slate-900 dark:text-slate-100 flex-1">Cite rules</h2>
-        <button type="button" onClick={onClose} className="px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-semibold">Done{selectedCodes.length ? ` (${selectedCodes.length})` : ""}</button>
+        <button type="button" onClick={onClose} className="hidden sm:block px-3 py-1.5 rounded-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-semibold">Done{selectedCodes.length ? ` (${selectedCodes.length})` : ""}</button>
       </div>
       <div className="p-3 border-b border-slate-100 shrink-0">
         <div className="relative">
@@ -3834,7 +3852,7 @@ function RulePicker({ rules, knownRules, selectedCodes = [], onPickRule, onPickC
             className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" />
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto overscroll-contain">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch]">
         {showCustom && (
           <button onClick={() => onPickCustom(uq.replace(/[<>]/g, ""))} className="w-full text-left px-4 py-3 border-b border-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900">
             <span className="font-mono font-bold text-slate-900 dark:text-slate-100">Use {fmtRule(uq)}</span>
@@ -3860,7 +3878,10 @@ function RulePicker({ rules, knownRules, selectedCodes = [], onPickRule, onPickC
           </div>
         ))}
       </div>
-    </div>
+      <div className="shrink-0 border-t border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden">
+        <button type="button" onClick={onClose} className="w-full rounded-lg bg-slate-900 px-4 py-3 text-white dark:bg-slate-100 dark:text-slate-900 font-bold">Done{selectedCodes.length ? ` (${selectedCodes.length})` : ""}</button>
+      </div>
+    </div>, document.body
   );
 }
 
