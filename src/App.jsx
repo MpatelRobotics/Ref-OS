@@ -1343,17 +1343,19 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   };
 
   const saveViolation = async ({ team, type, code, desc, notes, photos, match, ruleGroups }) => {
+    const authorId = currentUserId || await api.getCurrentUserId();
+    if (!authorId) throw new Error("Sign in again before logging a violation.");
     const cleanMatch = match && match.phase && match.phase !== "none" ? { phase: match.phase, num: (match.num || "").trim() } : null;
     const groups = ruleGroups?.length ? ruleGroups : [{ type, code, desc }];
     const rows = groups.map((group) => api.buildViolationRow(eventId, {
       team, type: group.type, code: normNum(group.code).replace(/[<>]/g, ""), desc: group.desc.trim(),
-      notes: notes.trim(), by: meName || "", byFullName: meFullName || meName || "", match: cleanMatch,
+      notes: notes.trim(), by: meName || "", byFullName: meFullName || meName || "", byUserId: authorId, match: cleanMatch,
     }));
     const createdAt = Date.now();
     // Show every severity group immediately, then persist each one to the durable queue.
     setViols((cur) => [...rows.map((row) => ({
       id: row.id, team: row.team, type: row.type, code: row.code, desc: row.rule_desc,
-      notes: row.notes, match: row.match_info, by: meName || "", byFullName: meFullName || meName || "", photoKeys: [],
+      notes: row.notes, match: row.match_info, by: meName || "", byFullName: meFullName || meName || "", byUserId: authorId, photoKeys: [],
       createdAt, _pending: true, _localPhotos: photos,
     })), ...cur]);
     if (cleanMatch) { setLastMatch(cleanMatch); localStorage.setItem("lastMatch", JSON.stringify(cleanMatch)); }
@@ -1373,6 +1375,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   };
 
   const deleteViolation = async (v) => {
+    if (!adminUnlocked && (!currentUserId || v.byUserId !== currentUserId)) return;
     if (v._pending) { await outbox.removeOp(eventId, v.id); setViols((cur) => cur.filter((x) => x.id !== v.id)); return; }
     try { await api.deleteViolation(v); setViols((cur) => cur.filter((x) => x.id !== v.id)); }
     catch (e) { if (outbox.isOffline(e)) alert("You're offline — reconnect to delete this violation."); else throw e; }
@@ -1382,7 +1385,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     const row = {
       id: orig.id, event_id: eventId, team: form.team, type: form.type,
       code: normNum(form.code).replace(/[<>]/g, ""), rule_desc: (form.desc || "").trim(),
-      notes: (form.notes || "").trim(), match_info: cleanMatch, logged_by: JSON.stringify({ v: 1, n: orig.by || meName || "", f: orig.byFullName || meFullName || meName || "" }),
+      notes: (form.notes || "").trim(), match_info: cleanMatch, logged_by: JSON.stringify({ v: 1, n: orig.by || meName || "", f: orig.byFullName || meFullName || meName || "" }), logged_by_user: orig.byUserId,
     };
     try {
       const saved = await api.updateViolation(eventId, row, form.keepKeys || [], form.photos || [], orig.photoKeys || []);
@@ -3080,12 +3083,12 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         </dl>}
         {openTeam ? (
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={teamRecords[openTeam]}
-            onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
+            onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => adminUnlocked || !!currentUserId && v.byUserId === currentUserId} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : openMatch ? (
           <MatchDetail match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
             fieldLog={fieldLog} fieldResetChecks={fieldResetChecks} onVerifyFieldReset={verifyFieldResetQuadrant} onResetFieldReset={resetFieldResetMatch}
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
-            onLogTeam={(n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} emcee={isEmcee} />
+            onLogTeam={(n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => adminUnlocked || !!currentUserId && v.byUserId === currentUserId} emcee={isEmcee} />
         ) : openRobot ? (
           <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} canTakePhotos={!isEmcee} canDeletePhotos={!isInspection && !isEmcee} />
         ) : view === "matches" ? (
@@ -3467,7 +3470,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
 }
 
 /* ============================ TEAM DETAIL ============================ */
-function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViolation, onDeleteTeam, canDeleteTeam, watch = [], meName, onAddWatch, onRemoveWatch, onOpenPhoto, emcee }) {
+function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViolation, canManageViolation, onDeleteTeam, canDeleteTeam, watch = [], meName, onAddWatch, onRemoveWatch, onOpenPhoto, emcee }) {
   const [wnote, setWnote] = useState("");
   const addWatch = () => { const n = wnote.trim(); if (!n) return; onAddWatch(team.number, n); setWnote(""); };
   if (!team) return null;
@@ -3547,16 +3550,16 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
       {!emcee && (<>
       <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">Log ({viols.length})</h2>
       {sorted.length === 0 ? <Empty title="No violations" sub="This team has a clean record." /> : (
-        <ul className="space-y-2">{sorted.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} />)}</ul>
+        <ul className="space-y-2">{sorted.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} canManage={canManageViolation(v)} />)}</ul>
       )}
       </>)}
     </>
   );
 }
 
-function ViolationCard({ v, onDelete, onOpenPhoto, onEdit, showTeam }) {
+function ViolationCard({ v, onDelete, onOpenPhoto, onEdit, showTeam, canManage = false }) {
   const T = TYPES[v.type];
-  const canEdit = onEdit && !v._pending;
+  const canEdit = onEdit && canManage && !v._pending;
   return (
     <li className={`rounded-xl border p-3 ${T.soft}`}>
       <div className="flex items-center gap-2 flex-wrap">
@@ -3567,7 +3570,7 @@ function ViolationCard({ v, onDelete, onOpenPhoto, onEdit, showTeam }) {
         {v._pending && <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-300"><RefreshCw size={9} className="animate-spin" /> Saving</span>}
         <span className="text-[11px] text-slate-400 ml-auto">{fmtTime(v.createdAt)}</span>
         {canEdit && <button onClick={() => onEdit(v)} className="text-slate-300 hover:text-slate-700 dark:text-slate-200" title="Edit"><Pencil size={15} /></button>}
-        <button onClick={() => { if (confirm(v._pending ? "Discard this unsynced violation?" : "Delete this violation?")) onDelete(v); }} className="refos-destructive-icon" title="Delete"><Trash2 size={15} /></button>
+        {canManage && <button onClick={() => { if (confirm(v._pending ? "Discard this unsynced violation?" : "Delete this violation?")) onDelete(v); }} className="refos-destructive-icon" title="Delete"><Trash2 size={15} /></button>}
       </div>
       {ruleEntries(v).some((r) => r.desc) && <div className="mt-1.5 space-y-1">{ruleEntries(v).filter((r) => r.desc).map((r) => <div key={r.code || r.desc} className={`text-sm font-medium ${T.text}`}><span className="font-mono font-bold">{r.code ? fmtRule(r.code) : ""}</span>{r.code ? " " : ""}{r.desc}</div>)}</div>}
       {v.notes && <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{v.notes}</p>}
@@ -4196,7 +4199,7 @@ function AwpChecker({ onSave }) {
 
 const REPLAY_REASONS = ["Field fault", "Scoring or timer issue", "Match started incorrectly", "Safety interruption", "External interference", "Other"];
 
-function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
+function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, canManageViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
   const [toOpen, setToOpen] = useState(false);
   const [toAlliance, setToAlliance] = useState("red");
   const [toTeam, setToTeam] = useState("");
@@ -4455,7 +4458,7 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
       {mv.length === 0 ? (
         <Empty title="No violations logged" sub="Tap a team above to log one for this match." />
       ) : (
-        <ul className="space-y-2">{mv.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} showTeam />)}</ul>
+        <ul className="space-y-2">{mv.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} canManage={canManageViolation(v)} showTeam />)}</ul>
       )}
       </>)}
     </>
@@ -5360,7 +5363,7 @@ function ActivityFeed({ viols, onOpenPhoto, onDeleteViolation, onEditViolation }
   return (
     <>
       <p className="text-xs text-slate-400 mb-3">{sorted.length} violation{sorted.length !== 1 ? "s" : ""} logged, newest first.</p>
-      <ul className="space-y-2">{sorted.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} showTeam />)}</ul>
+      <ul className="space-y-2">{sorted.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} canManage showTeam />)}</ul>
     </>
   );
 }

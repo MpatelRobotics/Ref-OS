@@ -293,10 +293,12 @@ create table if not exists public.violations (
   notes       text,
   match_info  jsonb,                  -- { phase, num }
   logged_by   text,                   -- ref name (denormalized for display)
+  logged_by_user uuid default auth.uid(), -- signed in creator; older rows may be null
   photo_paths text[] default '{}',    -- storage object paths in 'robot-photos'
   created_at  timestamptz default now()
 );
 alter table public.violations enable row level security;
+alter table public.violations add column if not exists logged_by_user uuid default auth.uid();
 drop policy if exists "members rw violations" on public.violations;
 drop policy if exists "open rw violations" on public.violations;
 
@@ -722,11 +724,18 @@ create policy "refs write teams" on public.teams for all
 drop policy if exists "open rw violations" on public.violations;
 drop policy if exists "members read violations" on public.violations;
 drop policy if exists "refs write violations" on public.violations;
+drop policy if exists "refs insert own violations" on public.violations;
+drop policy if exists "refs update own violations" on public.violations;
+drop policy if exists "refs delete own violations" on public.violations;
 create policy "members read violations" on public.violations for select
   using (public.has_event_role(event_id,array['ref','judge','emcee','admin']));
-create policy "refs write violations" on public.violations for all
-  using (public.has_event_role(event_id,array['ref','admin']))
-  with check (public.has_event_role(event_id,array['ref','admin']));
+create policy "refs insert own violations" on public.violations for insert
+  with check (public.has_event_role(event_id,array['ref','admin']) and logged_by_user = auth.uid());
+create policy "refs update own violations" on public.violations for update
+  using (public.has_event_role(event_id,array['admin']) or (public.has_event_role(event_id,array['ref']) and logged_by_user = auth.uid()))
+  with check (public.has_event_role(event_id,array['admin']) or (public.has_event_role(event_id,array['ref']) and logged_by_user = auth.uid()));
+create policy "refs delete own violations" on public.violations for delete
+  using (public.has_event_role(event_id,array['admin']) or (public.has_event_role(event_id,array['ref']) and logged_by_user = auth.uid()));
 
 drop policy if exists "open rw matches" on public.matches;
 drop policy if exists "members read matches" on public.matches;

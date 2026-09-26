@@ -694,7 +694,7 @@ const mapViol = (r) => {
   const attribution = decodeAttribution(r.logged_by);
   return {
     id: r.id, team: r.team, type: r.type, code: r.code, desc: r.rule_desc || "",
-    notes: r.notes || "", match: r.match_info || null, by: attribution.nickname, byFullName: attribution.fullName,
+    notes: r.notes || "", match: r.match_info || null, by: attribution.nickname, byFullName: attribution.fullName, byUserId: r.logged_by_user || null,
     photoKeys: r.photo_paths || [], createdAt: new Date(r.created_at).getTime(),
   };
 };
@@ -708,7 +708,7 @@ export async function listViolations(eventId) {
 export function buildViolationRow(eventId, v) {
   return {
     id: uid(), event_id: eventId, team: v.team, type: v.type, code: v.code,
-    rule_desc: v.desc, notes: v.notes, match_info: v.match, logged_by: encodeAttribution(v.by, v.byFullName),
+    rule_desc: v.desc, notes: v.notes, match_info: v.match, logged_by: encodeAttribution(v.by, v.byFullName), logged_by_user: v.byUserId,
   };
 }
 // Upload photos then upsert the row. Safe to call more than once for the same
@@ -727,6 +727,7 @@ export async function addViolationRow(eventId, row, photoDataUrls = []) {
       match: row.match_info || null,
       by: decodeAttribution(row.logged_by).nickname,
       byFullName: decodeAttribution(row.logged_by).fullName,
+      byUserId: row.logged_by_user,
       photoKeys: [],
       createdAt: Date.now(),
     };
@@ -756,7 +757,6 @@ export async function addViolation(eventId, v, photoDataUrls) {
 // newPhotoDataUrls = freshly added photos to upload; dropped keys are deleted from storage.
 export async function updateViolation(eventId, row, keepKeys = [], newPhotoDataUrls = [], allOldKeys = []) {
   const removed = allOldKeys.filter((k) => !keepKeys.includes(k));
-  if (removed.length) await supabase.storage.from("robot-photos").remove(removed);
   const paths = [...keepKeys];
   for (let i = 0; i < newPhotoDataUrls.length; i++) {
     const path = `${eventId}/${row.id}/e${Date.now()}-${i}.jpg`;
@@ -766,6 +766,10 @@ export async function updateViolation(eventId, row, keepKeys = [], newPhotoDataU
   }
   const { data, error } = await supabase.from("violations").upsert({ ...row, photo_paths: paths }, { onConflict: "id" }).select().single();
   if (error) throw error;
+  if (removed.length) {
+    const { error: cleanupError } = await supabase.storage.from("robot-photos").remove(removed);
+    if (cleanupError) console.warn("Violation updated; old photo cleanup needs attention.", cleanupError);
+  }
   return mapViol(data);
 }
 export async function deleteViolation(v) {
@@ -773,15 +777,15 @@ export async function deleteViolation(v) {
     e2eState.violations = e2eState.violations.filter((x) => x.id !== v.id);
     return;
   }
-  if (v.photoKeys?.length) {
-    const { error: storageError } = await supabase.storage.from("robot-photos").remove(v.photoKeys);
-    if (storageError) throw storageError;
-  }
   const { error } = await supabase.from("violations").delete().eq("id", v.id);
   if (error) throw error;
   const { data: remaining, error: verifyError } = await supabase.from("violations").select("id").eq("id", v.id).limit(1);
   if (verifyError) throw verifyError;
   if (remaining?.length) throw new Error("The violation is still stored in the cloud. Please try Undo again.");
+  if (v.photoKeys?.length) {
+    const { error: storageError } = await supabase.storage.from("robot-photos").remove(v.photoKeys);
+    if (storageError) console.warn("Violation deleted; photo cleanup needs attention.", storageError);
+  }
 }
 export async function clearViolations(eventId) {
   if (E2E_MOCK) { e2eState.violations = []; return; }
