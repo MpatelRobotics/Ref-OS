@@ -153,6 +153,47 @@ function parseRankingsFile(text, filename = "") {
   return { rows, warnings };
 }
 
+// Tournament Manager's combined skills standings. Keep the supplied rank when present.
+function parseSkillsRankingsFile(text, filename = "") {
+  const normalize = (value) => String(value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const score = (value) => {
+    const raw = String(value ?? "").trim().replace(/,/g, "");
+    return /^\d+(?:\.\d+)?$/.test(raw) ? Number(raw) : null;
+  };
+  let list;
+  if (filename.toLowerCase().endsWith(".json") || /^[\[{]/.test(text.trim())) {
+    const data = JSON.parse(text);
+    list = Array.isArray(data) ? data : (data.rankings || data.skills || data.teams || data.items || []);
+  } else {
+    const table = parseCSV(text);
+    if (table.length < 2) return { rows: [], warnings: ["No skills standings found in the file."] };
+    const headers = table[0].map(normalize);
+    list = table.slice(1).map((cells) => Object.fromEntries(headers.map((header, index) => [header, cells[index]])));
+  }
+  if (!Array.isArray(list)) return { rows: [], warnings: ["Expected a list of skills standings."] };
+  const field = (entry, aliases) => {
+    const values = Object.entries(entry || {});
+    const match = values.find(([key]) => aliases.includes(normalize(key)));
+    return match?.[1];
+  };
+  const parsed = list.map((entry) => {
+    const number = String(field(entry, ["teamnum", "teamnumber", "team", "number", "teamid"]) ?? "").trim().toUpperCase();
+    const driver = score(field(entry, ["driver", "driverskills", "drivingskills", "driverscore", "driving", "driverbest", "driverskillsscore", "drivingskillsscore"]));
+    const programming = score(field(entry, ["programming", "programmingskills", "autonomous", "autonomouscoding", "autonomouscodingskills", "programmingbest", "autonomousscore", "programmingskillsscore", "autonomouscodingscore", "auton", "autonscore"]));
+    const suppliedTotal = score(field(entry, ["combined", "combinedscore", "total", "totalscore", "skillsscore", "overallscore", "score"]));
+    const suppliedRank = score(field(entry, ["rank", "ranking", "place", "position", "skillsrank"]));
+    return { number, driver, programming, total: suppliedTotal ?? (driver != null || programming != null ? (driver ?? 0) + (programming ?? 0) : null), rank: suppliedRank };
+  }).filter((row) => row.number && row.total != null);
+  const warnings = [];
+  if (!parsed.length) return { rows: [], warnings: ["Could not find team numbers and skills scores. Export the combined Skills Challenge rankings as CSV or JSON."] };
+  if (parsed.length < list.length) warnings.push(`${list.length - parsed.length} row(s) without a team number or skills score were skipped.`);
+  const byTeam = new Map();
+  for (const row of parsed) byTeam.set(row.number, row);
+  const rows = [...byTeam.values()].sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity) || b.total - a.total || a.number.localeCompare(b.number, undefined, { numeric: true }));
+  rows.forEach((row, index) => { if (row.rank == null) row.rank = index + 1; });
+  return { rows, warnings };
+}
+
 const ORDER = ["minor", "major", "inspection"];
 
 /* ---- Parse a Tournament Manager export (CSV or JSON) into match rows ---- */
@@ -614,6 +655,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const teamFileRef = useRef(null);
   const scoreFileRef = useRef(null);
   const rankingFileRef = useRef(null);
+  const skillsFileRef = useRef(null);
   const allianceFileRef = useRef(null);
   const [logFor, setLogFor] = useState(null);
   const [noms, setNoms] = useState([]);
@@ -1027,6 +1069,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     try { await api.downgradeMyEventRole(eventId, role === "judge" ? "judge" : role === "emcee" ? "emcee" : "ref"); } catch {}
     sessionStorage.removeItem("refosAdmin");
     setAdminUnlocked(false);
+    if (view === "rankings") setView("teams");
     setMenu(false);
   };
 
@@ -1761,6 +1804,28 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       alert(`Uploaded rankings for ${rows.length} teams.` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
     } catch (e) {
       alert("Could not read that rankings file: " + (e.message || e) + "\n\nExport the rankings from Tournament Manager as CSV and try again.");
+    } finally { setImporting(null); }
+  };
+  const importSkillsFile = async (file) => {
+    if (!file || !adminUnlocked) return;
+    try {
+      const { rows, warnings } = parseSkillsRankingsFile(await file.text(), file.name);
+      if (!rows.length) { alert(warnings.join("\n")); return; }
+      const known = new Set(teams.map((team) => team.number));
+      const unknown = rows.filter((row) => !known.has(row.number)).length;
+      const previous = eventSettings?.skills_rankings?.value?.rows || [];
+      const same = JSON.stringify(rows) === JSON.stringify(previous);
+      if (!(await confirmImport({ title: "Skills Challenge — change preview", chips: [
+        { label: `${rows.length} teams with scores` },
+        { label: `${unknown} unknown teams`, warn: unknown > 0 },
+      ], warnings, noChanges: same }))) return;
+      setImporting({ label: "Importing skills rankings…", done: 0, total: 0 });
+      const saved = await api.upsertEventSetting(eventId, "skills_rankings", { rows, importedAt: Date.now() }, meName);
+      setEventSettings((current) => ({ ...current, skills_rankings: saved }));
+      markTMSync("skills");
+      alert(`Imported Skills Challenge scores for ${rows.length} teams.`);
+    } catch (e) {
+      alert("Could not import Skills Challenge rankings: " + (e.message || e));
     } finally { setImporting(null); }
   };
   const importScoresFile = async (file) => {
@@ -2822,7 +2887,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
             ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
             { k: "robots", label: "Robots", Icon: Camera },
             { k: "alliances", label: "Alliances", Icon: GitBranch },
-            { k: "judging", label: "Judging", Icon: Trophy }
+            { k: "judging", label: "Judging", Icon: Trophy },
+            ...(adminUnlocked ? [{ k: "rankings", label: "Rankings", Icon: BarChart3 }] : [])
           ];
           const active = navItems.find((item) => item.k === view) || navItems[0];
           const ActiveIcon = active?.Icon || Menu;
@@ -2895,7 +2961,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
           ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
           { k: "robots", label: "Robots", Icon: Camera },
           { k: "alliances", label: "Alliances", Icon: GitBranch },
-          { k: "judging", label: "Judging", Icon: Trophy }
+          { k: "judging", label: "Judging", Icon: Trophy },
+          ...(adminUnlocked ? [{ k: "rankings", label: "Rankings", Icon: BarChart3 }] : [])
         ];
         return (
           <div className="fixed inset-0 z-[60] bg-black/50 sm:hidden refos-mobile-sheet-backdrop" onClick={() => setMobileNavOpen(false)}>
@@ -3002,8 +3069,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
           {view === "awp" && <button onClick={() => { if (commandCenterChildOpen) return returnToCommandCenter(); setView("matches"); setQuery(""); }} className="refos-back-button mb-3" aria-label={commandCenterChildOpen ? "Back to Command Center" : "Back to Matches"}>
             <ChevronLeft size={18} /> Back
           </button>}
-          <p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: "Alliance selection"}[view] || "Event workspace"}</h2>
-          <p className="refos-description">{{teams: "Find a team. Review its history. Keep your crew informed.", matches: "Your schedule, field activity, and match details in one place.", robots: "A shared visual reference for every robot.", judging: "Capture the moments that deserve recognition.", rulebook: "Find the right rule when you need it.", awp: "Review autonomous observations across the event.", alliances: "Follow the path from selection to the final."}[view]}</p></div>
+          <p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: "Alliance selection", rankings: "Rankings"}[view] || "Event workspace"}</h2>
+          <p className="refos-description">{{teams: "Find a team. Review its history. Keep your crew informed.", matches: "Your schedule, field activity, and match details in one place.", robots: "A shared visual reference for every robot.", judging: "Capture the moments that deserve recognition.", rulebook: "Find the right rule when you need it.", awp: "Review autonomous observations across the event.", alliances: "Follow the path from selection to the final.", rankings: "Qualification standings and Skills Challenge scores."}[view]}</p></div>
           <span className="refos-role">{adminUnlocked ? "Admin" : isInspection ? "Inspection" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
         </section>}
         {!openTeam && !openMatch && !openRobot && view === "teams" && <dl className="refos-stats">
@@ -3032,6 +3099,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
             onExport={isEmcee ? undefined : () => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
         ) : view === "rulebook" ? (
           <RuleBook rules={rules} />
+        ) : view === "rankings" && adminUnlocked ? (
+          <EventRankings teams={teams} skills={eventSettings?.skills_rankings?.value?.rows || []} onImportSkills={() => skillsFileRef.current?.click()} />
         ) : view === "awp" ? (
           <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} fieldNames={fieldNames} />
         ) : view === "alliances" ? (
@@ -3190,12 +3259,14 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
           onImportTeams={() => teamFileRef.current?.click()}
           onImportMatches={() => matchFileRef.current?.click()}
           onImportRankings={() => rankingFileRef.current?.click()}
+          onImportSkills={() => skillsFileRef.current?.click()}
           onImportAlliances={() => allianceFileRef.current?.click()}
           onImportScores={() => scoreFileRef.current?.click()}
           stats={{
             teams: teams.length,
             matches: Object.keys(matches).length,
             ranked: teams.filter((t) => t.rank != null).length,
+            skills: eventSettings?.skills_rankings?.value?.rows?.length || 0,
             alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length >= 2).length,
             scored: Object.values(matches).filter((m) => m.redScore != null && m.blueScore != null).length,
           }}
@@ -3210,6 +3281,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importScoresFile(f); }} />
       <input ref={rankingFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importRankingsFile(f); }} />
+      <input ref={skillsFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importSkillsFile(f); }} />
       {importPreview && <ImportPreviewModal preview={importPreview}
         onImport={() => { const p = importPreview; setImportPreview(null); p.resolve(true); }}
         onCancel={() => { const p = importPreview; setImportPreview(null); p.resolve(false); }} />}
@@ -5293,6 +5366,27 @@ function ActivityFeed({ viols, onOpenPhoto, onDeleteViolation, onEditViolation }
 }
 
 /* ============================ RANKINGS (admin) ============================ */
+function EventRankings({ teams, skills, onImportSkills }) {
+  const [section, setSection] = useState("qualification");
+  const names = new Map(teams.map((team) => [team.number, team.name]));
+  const qualifications = teams.filter((team) => Number(team.rank) > 0).sort((a, b) => Number(a.rank) - Number(b.rank) || a.number.localeCompare(b.number, undefined, { numeric: true }));
+  const rankedSkills = [...skills].sort((a, b) => Number(a.rank) - Number(b.rank) || b.total - a.total);
+  const active = section === "qualification" ? qualifications : rankedSkills;
+  return <section className="space-y-4">
+    <div className="flex flex-wrap items-center gap-2">
+      <button onClick={() => setSection("qualification")} aria-pressed={section === "qualification"} className={`px-4 py-2 rounded-lg text-sm font-bold ${section === "qualification" ? "bg-[#0D0F32] text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"}`}>Qualification rankings</button>
+      <button onClick={() => setSection("skills")} aria-pressed={section === "skills"} className={`px-4 py-2 rounded-lg text-sm font-bold ${section === "skills" ? "bg-[#0D0F32] text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"}`}>Skills Challenge</button>
+      {section === "skills" && <button onClick={onImportSkills} className="ml-auto px-4 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-semibold">Import skills rankings</button>}
+    </div>
+    {!active.length ? <Empty title={section === "skills" ? "No Skills Challenge scores yet" : "No qualification rankings yet"} sub="Import the Tournament Manager standings in the Sync Center." /> :
+      <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+        <table className="w-full text-sm text-left"><thead className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200"><tr><th className="px-3 py-3">Rank</th><th className="px-3 py-3">Team</th><th className="px-3 py-3">Name</th>{section === "skills" && <><th className="px-3 py-3 text-right">Driver</th><th className="px-3 py-3 text-right">Autonomous</th><th className="px-3 py-3 text-right">Total</th></>}</tr></thead>
+          <tbody>{active.map((row) => <tr key={row.number} className="border-t border-slate-100 dark:border-slate-700"><td className="px-3 py-3 font-bold">{row.rank}</td><td className="px-3 py-3 font-mono font-bold whitespace-nowrap">{row.number}</td><td className="px-3 py-3 text-slate-500 dark:text-slate-300">{names.get(row.number) || "—"}</td>{section === "skills" && <><td className="px-3 py-3 text-right">{row.driver ?? "—"}</td><td className="px-3 py-3 text-right">{row.programming ?? "—"}</td><td className="px-3 py-3 text-right font-bold">{row.total}</td></>}</tr>)}</tbody>
+        </table>
+      </div>}
+  </section>;
+}
+
 function Rankings({ viols, teamName }) {
   const stat = {};
   for (const v of viols) {
@@ -5364,11 +5458,12 @@ function ImportPreviewModal({ preview, onImport, onCancel }) {
   );
 }
 
-function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRankings, onImportAlliances, onImportScores, stats, syncStatus }) {
+function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRankings, onImportSkills, onImportAlliances, onImportScores, stats, syncStatus }) {
   const items = [
     { key: "teams", title: "Teams", detail: `${stats.teams} teams loaded`, action: "Import teams", onClick: onImportTeams, Icon: Users },
     { key: "matches", title: "Match schedule", detail: `${stats.matches} matches loaded`, action: "Import matches", onClick: onImportMatches, Icon: ListOrdered },
     { key: "rankings", title: "Qualification rankings", detail: `${stats.ranked} ranked teams`, action: "Upload rankings", onClick: onImportRankings, Icon: BarChart3 },
+    { key: "skills", title: "Skills Challenge rankings", detail: `${stats.skills} teams with scores`, action: "Import skills", onClick: onImportSkills, Icon: Trophy },
     { key: "alliances", title: "Alliance selection", detail: `${stats.alliances} / 16 alliances loaded`, action: "Upload alliances", onClick: onImportAlliances, Icon: GitBranch },
     { key: "scores", title: "Match results", detail: `${stats.scored} scored matches`, action: "Import scores", onClick: onImportScores, Icon: Trophy },
   ];
@@ -5978,7 +6073,8 @@ function FeaturesGuide() {
           <Li><b>Event Diagnostic Report</b> — displays the app, device, event, storage, network, and sync snapshot and can copy or download the report as JSON.</Li>
           <Li><b>Failed Sync Items</b> — permanent offline write failures are retained so an Admin can retry or discard them instead of silently losing the entry.</Li>
           <Li><b>Reset Volunteer Sign Ins</b> — signs out every event member, clears volunteer profiles and stale assignments, and requires a fresh nickname, first name, and last name on the next login without deleting event records.</Li>
-          <Li><b>Event setup, TM Sync Center, exports, backup, Activity feed, Rankings, and Clear event data</b> are also accessed from the Command Center.</Li>
+          <Li><b>Rankings tab</b> — Admins can review qualification order and Skills Challenge scores, with a button to import skills standings. The TM Sync Center imports both types of rankings separately.</Li>
+          <Li><b>Event setup, TM Sync Center, exports, backup, Activity feed, violation rankings, and Clear event data</b> are also accessed from the Command Center.</Li>
         </ul>
       </Section>
 
