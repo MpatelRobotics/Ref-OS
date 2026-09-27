@@ -5547,7 +5547,7 @@ function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSet
     const pick = (alliances[s] || [])[1];
     if (pick) selectedPicks.add(pick);
   }
-  const Sel = ({ seed, idx, label }) => {
+  const renderSel = (seed, idx, label) => {
     const v = (alliances[seed] || [])[idx] || "";
     const captain = (alliances[seed] || [])[0] || "";
     return (
@@ -5599,8 +5599,8 @@ function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSet
           return (
             <div key={seed} className={`rounded-xl border p-3 flex items-center gap-3 ${done ? "border-emerald-300 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20" : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"}`}>
               <span className="w-8 shrink-0 text-center font-mono font-bold text-slate-900 dark:text-slate-100">A{seed}</span>
-              <Sel seed={seed} idx={0} label="Captain" />
-              <Sel seed={seed} idx={1} label="1st pick" />
+              {renderSel(seed, 0, "Captain")}
+              {renderSel(seed, 1, "1st pick")}
             </div>
           );
         })}
