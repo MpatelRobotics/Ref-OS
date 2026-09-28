@@ -53,11 +53,6 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
                 <div className="font-bold truncate">{brand.name}</div>
                 <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{brand.shortName}</div>
               </div>
-              {onEventSettings && (
-                <button onClick={onEventSettings} className="shrink-0 py-2 px-3 rounded-lg border font-semibold text-sm flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700">
-                  <Settings size={16}/> Event Settings
-                </button>
-              )}
             </div>
           </div>
         )}
@@ -110,6 +105,7 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
             {onAlertDelivery && <button onClick={onAlertDelivery} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Mail size={16}/> Alert delivery <span className="ml-auto text-[10px] font-bold text-slate-400">{alertDeliveryLabel}</span></button>}
             <button onClick={onContactDirectory} className="w-full text-left px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><Contact size={16}/> Event Contact Directory</button>
             <button onClick={onRoleCodes} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><KeyRound size={16}/> Volunteer Access Codes</button>
+            {onEventSettings && <button onClick={onEventSettings} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Settings size={16}/> Event Settings</button>}
             <button onClick={onFieldNames} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><MapPin size={16}/> Field Name Configurator</button>
             <button onClick={onPreEventTest} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ClipboardCheck size={16}/> Pre Event System Test</button>
             <button onClick={onTwoDeviceSyncTest} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Wifi size={16}/> Two Device Sync Test</button>

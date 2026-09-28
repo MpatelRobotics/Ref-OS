@@ -27,13 +27,15 @@ import AddTeamModal from "./components/modals/AddTeamModal.jsx";
 import AnnouncementModal from "./components/modals/AnnouncementModal.jsx";
 import CountdownSetupModal from "./components/modals/CountdownSetupModal.jsx";
 import FieldNameConfiguratorModal from "./components/modals/FieldNameConfiguratorModal.jsx";
+import EventSettingsModal from "./components/modals/EventSettingsModal.jsx";
+import EventLogo from "./components/EventLogo.jsx";
 import OfflineReadinessModal from "./components/modals/OfflineReadinessModal.jsx";
 import FeedbackModal from "./components/modals/FeedbackModal.jsx";
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
 import HelpRequestModal from "./components/modals/HelpRequestModal.jsx";
 import manualQuickLinks from "./manualQuickLinks.json";
 import manualSearchIndex from "./manualSearchIndex.json";
-import { HIGHLANDER_EVENT_ID, getEventProfile } from "./eventProfiles.js";
+import { HIGHLANDER_EVENT_ID, getEventProfile, resolveEventBranding } from "./eventProfiles.js";
 
 /* Ref OS 2.0 Phase 1: event behavior is resolved through an event profile.
    Highlander remains the only selectable production event in this phase so
@@ -723,8 +725,11 @@ export default function App() {
     return () => { live = false; };
   }, [unlocked, meName, activeEventId]);
 
+  // Phase 6: public branding for the selected event (from the pre-login event list).
+  const activeChoice = eventChoices.find((ev) => ev.id === activeEventId) || null;
+
   useEffect(() => {
-    const profile = getEventProfile(activeEventId, event);
+    const profile = resolveEventBranding(activeEventId, event || activeChoice, activeChoice?.branding);
     document.title = `Ref OS · ${profile.name}`;
     let favicon = document.querySelector('link[rel="icon"]');
     if (!favicon) {
@@ -733,7 +738,7 @@ export default function App() {
       document.head.appendChild(favicon);
     }
     favicon.href = profile.favicon;
-  }, [activeEventId, event?.name]);
+  }, [activeEventId, event?.name, activeChoice?.name]);
 
   const unlock = (r, admin, serverRole, credential = "") => {
     const roleText = String(r || serverRole || "").trim().toLowerCase();
@@ -798,7 +803,7 @@ export default function App() {
     />
   );
   if (!accessChecked) return <FullPage>Checking event access…</FullPage>;
-  if (!unlocked) return <LoginScreen eventId={activeEventId} eventName={event?.name} onUnlock={unlock} />;
+  if (!unlocked) return <LoginScreen eventId={activeEventId} eventName={event?.name || activeChoice?.name} branding={activeChoice?.branding} onUnlock={unlock} onChooseEvent={chooseAnotherEvent} />;
   if (!identityChecked) return <FullPage>Checking volunteer profile…</FullPage>;
   if (!meName || !meFullName) return <NameScreen onIdentity={saveIdentity} />;
   if (loadErr) return (
@@ -853,14 +858,17 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated }) => {
           <p className="text-center text-slate-500 py-8">No Ref OS events are available yet.</p>
         )}
         {!loading && !error && events.map((ev) => {
-          const profile = getEventProfile(ev.id, ev);
+          const profile = resolveEventBranding(ev.id, ev, ev.branding);
+          const showShort = profile.hasSavedShortName && profile.shortName.toLowerCase() !== profile.name.toLowerCase();
+          const branded = profile.accentSource !== "default";
           return (
             <button key={ev.id} type="button" onClick={() => onChoose(ev.id)}
-              className="w-full flex items-center gap-4 rounded-xl border border-slate-200 dark:border-slate-700 p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-700 transition">
-              <img src={profile.logo} alt="" className="w-12 h-12 object-contain rounded-lg" />
+              className="w-full flex items-center gap-4 rounded-xl border border-slate-200 dark:border-slate-700 p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-700 transition"
+              style={branded ? { borderLeftWidth: 4, borderLeftColor: profile.accent } : undefined}>
+              <EventLogo src={profile.logo} fallback={profile.highlander ? "/logo.svg" : "/refos-logo.svg"} className="w-12 h-12 object-contain rounded-lg shrink-0" />
               <span className="min-w-0 flex-1">
-                <span className="block font-semibold text-slate-900 dark:text-white truncate">{ev.name || profile.name}</span>
-                <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1">VEX Robotics event</span>
+                <span className="block font-semibold text-slate-900 dark:text-white truncate">{profile.name}</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{showShort ? `${profile.shortName} · VEX Robotics event` : "VEX Robotics event"}</span>
               </span>
               <ChevronRight size={20} className="text-slate-400" />
             </button>
@@ -1069,6 +1077,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [showCountdownSetup, setShowCountdownSetup] = useState(false);
   const [showFieldNameConfigurator, setShowFieldNameConfigurator] = useState(false);
+  const [showEventSettings, setShowEventSettings] = useState(false);
   const [showOfflineTest, setShowOfflineTest] = useState(false);
   const [showCommandCenter, setShowCommandCenter] = useState(false);
   const [commandCenterChildOpen, setCommandCenterChildOpen] = useState(false);
@@ -1101,6 +1110,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const returnToCommandCenter = () => {
     setShowCountdownSetup(false);
     setShowFieldNameConfigurator(false);
+    setShowEventSettings(false);
     setShowOfflineTest(false);
     setShowAnnouncement(false);
     setShowContactDirectory(false);
@@ -1257,6 +1267,9 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
 
   const pushSupported = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
   const eventBranding = eventSettings?.event_branding?.value || {};
+  // Phase 6: saved event setting -> built-in event profile -> Ref OS default.
+  const brand = useMemo(() => resolveEventBranding(eventId, event, eventBranding), [eventId, event?.name, eventSettings?.event_branding]);
+  useEffect(() => { document.title = `Ref OS · ${brand.name}`; }, [brand.name]);
   const notificationDelivery = isHighlander ? { push: true, email: true } : { push: true, email: false };
   const notificationDeliveryLabel = isHighlander ? "Push + email" : "Push only";
   const refreshPushState = useCallback(async () => {
@@ -1860,6 +1873,38 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       if (outbox.isOffline(error)) throw new Error("Reconnect before changing field names.");
       throw error;
     }
+  };
+  // Phase 6: Event Settings. Writes ONLY this event's row (eventId) in:
+  //   events.name, event_settings "event_branding", event_settings "field_names".
+  // Only the parts the Admin changed are written. Teams, matches, rankings, violations,
+  // alliances, nominations, and access credentials are never touched.
+  const saveEventSettings = async ({ name, branding, fieldNames: nextFieldNames }) => {
+    if (!adminUnlocked) throw new Error("Only this event's Admin can change event settings.");
+    try {
+      if (branding) {
+        const { removeLegacyLogo, ...changes } = branding;
+        const next = { ...(eventSettings?.event_branding?.value || {}), ...changes, updatedAt: Date.now() };
+        if (removeLegacyLogo) delete next.logoData;
+        if ("logoUrl" in next && !String(next.logoUrl || "").trim()) delete next.logoUrl; // blank = use the event profile / Ref OS logo
+        const savedBranding = await api.upsertEventSetting(eventId, "event_branding", next, meName);
+        setEventSettings((cur) => ({ ...cur, event_branding: savedBranding }));
+      }
+      if (nextFieldNames) {
+        const savedFields = await api.upsertEventSetting(eventId, "field_names", nextFieldNames, meName);
+        setEventSettings((cur) => ({ ...cur, field_names: savedFields }));
+      }
+      if (name) {
+        // Same row, same UUID: only the display name changes.
+        const renamed = await api.updateEvent(eventId, { ...event, name });
+        if (!renamed || renamed.id !== eventId) throw new Error("The event name could not be saved. Confirm this device still has Admin access.");
+        setEvent(renamed);
+      }
+    } catch (error) {
+      if (outbox.isOffline(error)) throw new Error("Reconnect before changing event settings.");
+      throw error;
+    }
+    if (commandCenterChildOpen) returnToCommandCenter();
+    else setShowEventSettings(false);
   };
   const saveRoleAccessConfig = async (config) => {
     try {
@@ -2959,7 +3004,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         const vc = viols.filter((v) => v.match && v.match.num != null && refs.has(v.match.phase === "qual" ? `Q${v.match.num}` : fmtMatch(v.match))).length;
         const rp = fieldLog.filter((e) => e.kind === "replay" && ((e.matchId && ids.has(e.matchId)) || (e.matchRef && refs.has(e.matchRef)))).length;
         const ff = fieldLog.filter((e) => e.kind === "field_fault" && ((e.matchId && ids.has(e.matchId)) || (e.matchRef && refs.has(e.matchRef)))).length;
-        line(`${field}: ${fm.length} matches, ${vc} violations, ${rp} replays, ${ff} field faults`);
+        line(`${fieldDisplayName(field, fieldNames)}: ${fm.length} matches, ${vc} violations, ${rp} replays, ${ff} field faults`);
       }
 
       section("Violation summary");
@@ -3221,7 +3266,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   return (
     <div className="refos-shell min-h-screen font-sans antialiased">
       <a className="refos-skip" href="#workspace">Skip to workspace</a>
-      <header className="refos-header sticky top-0 z-20 text-white" style={!isHighlander && eventBranding.accent ? { borderBottom: `3px solid ${eventBranding.accent}` } : undefined}>
+      <header className="refos-header sticky top-0 z-20 text-white" style={brand.accentSource === "saved" ? { borderBottom: `3px solid ${brand.accent}` } : undefined}>
         <div className="refos-header-inner mx-auto px-4 py-3 flex items-center gap-3">
           {(openTeam || openMatch || openRobot) ? (
             <button onClick={() => { setOpenTeam(null); setOpenMatch(null); setOpenRobot(null); }} aria-label={`Back to ${openTeam ? "Teams" : openRobot ? "Robots" : "Matches"}`} className="refos-back-button refos-back-button-on-dark">
@@ -3229,7 +3274,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
             </button>
           ) : (
             <div className="refos-header-brand flex items-center gap-2 shrink-0">
-              <img src={isHighlander ? "/logo.svg" : (eventBranding.logoData || "/refos-logo.svg")} alt={isHighlander ? "Highlander Summit" : (event.name || "Ref OS")} className="h-9 w-9 object-contain" />
+              <EventLogo src={brand.logo} fallback={brand.highlander ? "/logo.svg" : "/refos-logo.svg"} alt={brand.shortName} className="h-9 w-9 object-contain" />
               <div className="leading-tight hidden sm:block">
                 <div className="flex items-center gap-1.5">
                   <div className="font-bold text-[13px] text-white">Ref-OS</div>
@@ -3241,7 +3286,11 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
           )}
           <div className="flex-1 min-w-0">
             <div className="flex items-start gap-1.5 flex-wrap">
-              <h1 className="font-bold tracking-tight leading-tight text-[15px] sm:text-base line-clamp-1 sm:line-clamp-2">{event?.name || "Violation Log"}</h1>
+              <h1 className="font-bold tracking-tight leading-tight text-[15px] sm:text-base line-clamp-1 sm:line-clamp-2">
+                {brand.hasSavedShortName
+                  ? <><span className="sm:hidden">{brand.shortName}</span><span className="hidden sm:inline">{event?.name || brand.name}</span></>
+                  : (event?.name || "Violation Log")}
+              </h1>
               <button
                 onClick={() => adminUnlocked && setShowDiagnosticReport(true)}
                 title={adminUnlocked ? "Open Admin Diagnostics" : connectionHealth.label}
@@ -3821,6 +3870,9 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         onSave={saveSharedCountdown}
         onClear={clearSharedCountdown}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowCountdownSetup(false)} />}
+      {showEventSettings && adminUnlocked && <EventSettingsModal event={event} brand={brand} fieldNames={fieldNames}
+        onSave={saveEventSettings}
+        onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEventSettings(false)} />}
       {showFieldNameConfigurator && adminUnlocked && <FieldNameConfiguratorModal current={fieldNames}
         onSave={saveFieldNames}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowFieldNameConfigurator(false)} />}
@@ -3841,6 +3893,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         onContactDirectory={() => openCommandCenterTool(() => setShowContactDirectory(true))}
         onRoleCodes={() => openCommandCenterTool(() => setShowRoleCodeManager(true))}
         onFieldNames={() => openCommandCenterTool(() => setShowFieldNameConfigurator(true))}
+        brand={brand}
+        onEventSettings={() => openCommandCenterTool(() => setShowEventSettings(true))}
         onPreEventTest={() => openCommandCenterTool(() => setShowPreEventTest(true))}
         onTwoDeviceSyncTest={() => openCommandCenterTool(() => setShowTwoDeviceSyncTest(true))}
         onDiagnosticReport={() => openCommandCenterTool(() => setShowDiagnosticReport(true))}
