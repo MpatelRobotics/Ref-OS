@@ -85,6 +85,19 @@ export async function setEventAccessCredentialHash(eventId, credentialName, role
   if (error) throw error;
 }
 
+export async function getEventAccessStatus(eventId) {
+  await ensureAnonymousSession();
+  const { data, error } = await supabase.rpc("get_event_access_status", { p_event: eventId });
+  if (error) throw error;
+  return Object.fromEntries((data || []).map((row) => [row.role_name, !!row.enabled]));
+}
+
+export async function setEventRoleCode(eventId, role, credential, enabled = true) {
+  await ensureAnonymousSession();
+  const { error } = await supabase.rpc("set_event_role_code", { p_event: eventId, p_role: role, p_credential: credential, p_enabled: !!enabled });
+  if (error) throw error;
+}
+
 export async function disableEventAccessCredential(eventId, credentialName) {
   if (E2E_MOCK) return;
   const { error } = await supabase.rpc("disable_event_access_credential", {

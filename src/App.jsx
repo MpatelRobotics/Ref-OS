@@ -15,7 +15,7 @@ import CommandCenter from "./components/CommandCenter.jsx";
 import EventContactDirectory from "./components/EventContactDirectory.jsx";
 import LoginScreen from "./auth/LoginScreen.jsx";
 import NameScreen from "./auth/NameScreen.jsx";
-import RoleAccessCodeManager from "./auth/RoleAccessCodeManager.jsx";
+import EventAccessManager from "./auth/EventAccessManager.jsx";
 import { latestRoleAccessConfig } from "./auth/accessConfig.js";
 import TeamScanner from "./features/teams/TeamScanner.jsx";
 import IdentityModal from "./components/modals/IdentityModal.jsx";
@@ -3596,8 +3596,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         queuedWrites={queuedWrites} failedSyncCount={failedSyncItems.length} cloudReachable={cloudReachable}
         lastCloudError={lastCloudError} syncedAt={syncedAt} syncing={syncing}
         lastSystemTest={lastSystemTest} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowDiagnosticReport(false)} />}
-      {showRoleCodeManager && adminUnlocked && <RoleAccessCodeManager eventId={eventId} config={sharedRoleCodeConfig} requestedRole={requestedRoleForManager}
-        onSave={saveRoleAccessConfig} onClose={() => { setRequestedRoleForManager(""); commandCenterChildOpen ? returnToCommandCenter() : setShowRoleCodeManager(false); }} />}
+      {showRoleCodeManager && adminUnlocked && <EventAccessManager eventId={eventId} onClose={() => { setRequestedRoleForManager(""); commandCenterChildOpen ? returnToCommandCenter() : setShowRoleCodeManager(false); }} />}
       {showContactDirectory && <EventContactDirectory contacts={eventContacts} canEdit={adminUnlocked}
         onSave={saveEventContacts} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowContactDirectory(false)} />}
       {showCountdownSetup && adminUnlocked && <CountdownSetupModal current={eventCountdown}
