@@ -80,8 +80,20 @@ export default function LoginScreen({ eventId, eventName, onUnlock, onChooseEven
               ))}
             </div>
             <div className="text-xs text-slate-500 text-center mb-3">Format: number · A-Z · number · number</div>
-            <div className="grid grid-cols-4 gap-3">
-              {["1","2","3","A","4","5","6","B","7","8","9","C","Delete","0","Enter","D"].map((key) => {
+            {code.length === 1 ? (
+              <div className="grid grid-cols-6 gap-2 mb-3">
+                {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((key) => (
+                  <button key={key} disabled={checkingCode} onClick={() => enterCodeKey(key)}
+                    className={`h-12 rounded-xl border font-bold text-lg active:scale-[0.98] disabled:opacity-30 ${
+                      highlander ? "bg-indigo-50 border-indigo-200 text-[#303A8C]" : "bg-blue-50 border-blue-200 text-blue-700"
+                    }`}>
+                    {key}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <div className="grid grid-cols-3 gap-3">
+              {["1","2","3","4","5","6","7","8","9","Delete","0","Enter"].map((key) => {
                 const expectsLetter = code.length === 1;
                 const isLetter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").includes(key);
                 const isDigit = /^\d$/.test(key);
