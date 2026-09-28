@@ -319,6 +319,124 @@ const tmScoreChanged = (existing, redScore, blueScore, winner) => !existing ||
   Number(existing.blueScore) !== Number(blueScore) ||
   tmClean(existing.winner).toLowerCase() !== tmClean(winner).toLowerCase();
 
+/* ---- Phase 5: TM Driven Event Setup — identify Tournament Manager exports ----
+   Classification only. Importing is always done by the existing per-category
+   importers so each section keeps its normal change preview and event-scoped writes. */
+const TM_PACKAGE_ORDER = ["teams", "matches", "rankings", "skills", "alliances", "scores"];
+const TM_MATCH_FAMILY = new Set(["matches", "scores", "alliances"]);
+const tmNormKey = (v) => String(v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+// Filename hints, most specific first: "skills_rankings" -> skills,
+// "match_results" -> scores, "team_rankings" -> rankings, "alliance_schedule" -> alliances.
+function tmCategoryFromFilename(filename = "") {
+  const base = String(filename).toLowerCase().replace(/\.[a-z0-9]+$/, "");
+  const n = tmNormKey(base);
+  if (/skill|driver|programming|autonomous|combined/.test(n)) return "skills";
+  if (/alliance|roundof16/.test(n) || /(^|[^a-z0-9])r16([^a-z0-9]|$)/.test(base)) return "alliances";
+  if (/rank|standing/.test(n)) return "rankings";
+  if (/score|result/.test(n)) return "scores";
+  if (/match|schedule/.test(n)) return "matches";
+  if (/team|roster/.test(n)) return "teams";
+  return null;
+}
+
+// Returns a category, null when the file parsed but looks unfamiliar,
+// or undefined when the file is empty / not valid CSV or JSON.
+function tmCategoryFromContent(text, filename = "") {
+  const t = String(text || "").replace(/^﻿/, "").trim();
+  if (!t) return undefined;
+  const isJson = filename.toLowerCase().endsWith(".json") || t.startsWith("{") || t.startsWith("[");
+  let keys = [];
+  let wrapper = "";
+  let csvTable = null;
+  if (isJson) {
+    let data;
+    try { data = JSON.parse(t); } catch { return undefined; }
+    let list = data;
+    if (!Array.isArray(data)) {
+      wrapper = ["teams", "matches", "rankings", "skills", "items", "data"].find((k) => Array.isArray(data?.[k])) || "";
+      list = wrapper ? data[wrapper] : [];
+    }
+    const sample = (list || []).filter((x) => x && typeof x === "object").slice(0, 5);
+    const keySet = new Set();
+    for (const obj of sample) {
+      Object.keys(obj).forEach((k) => keySet.add(tmNormKey(k)));
+      if (obj.matchInfo && typeof obj.matchInfo === "object") Object.keys(obj.matchInfo).forEach((k) => keySet.add(tmNormKey(k)));
+    }
+    keys = [...keySet];
+    if (!keys.length) return null;
+  } else {
+    csvTable = parseCSV(t);
+    if (!csvTable.length) return undefined;
+    keys = csvTable[0].map(tmNormKey).filter(Boolean);
+  }
+  const has = (re) => keys.some((k) => re.test(k));
+  const isOneOf = (...names) => keys.some((k) => names.includes(k));
+
+  // 1. Match-style exports (schedule, results, Round of 16) share Red/Blue team columns.
+  const matchLike = (has(/^red(team)?\d$/) && has(/^blue(team)?\d$/)) ||
+    (isJson && (isOneOf("matchinfo", "matchtuple") || (wrapper === "matches" && isOneOf("alliances"))));
+  if (matchLike) {
+    let rows = [];
+    try { rows = parseMatchesFile(t, filename).rows; } catch { rows = []; }
+    // Round of 16 only (TM Round 6) -> alliance export. Uses the raw Round column for CSV
+    // because TM numbers QF/SF/F rounds too and only Round 6 maps to alliances.
+    let r16Only = false;
+    if (csvTable) {
+      const header = csvTable[0].map(tmNormKey);
+      const roundCol = header.indexOf("round");
+      if (roundCol >= 0) {
+        const rounds = csvTable.slice(1).map((r) => String(r[roundCol] ?? "").trim().toLowerCase()).filter(Boolean);
+        const isQualOrPractice = (v) => v === "1" || v === "2" || /qual|prac/.test(v);
+        const isR16 = (v) => v === "6" || /round of 16|^r16$|^ro16$/.test(v);
+        r16Only = rounds.length > 0 && !rounds.some(isQualOrPractice) && rounds.some(isR16);
+      }
+    } else {
+      r16Only = rows.length > 0 && rows.every((r) => r.phase !== "qual" && r.phase !== "practice") && rows.some((r) => r.phase === "r16");
+    }
+    if (r16Only) return "alliances";
+    if (rows.some((r) => r.scored && r.redScore != null && r.blueScore != null)) return "scores";
+    return "matches";
+  }
+
+  // 2. Skills before rankings: TM skills standings also carry a Rank column.
+  const hasRecord = isOneOf("wins", "win", "losses", "loss", "ties", "tie", "wlt", "record", "winlosstie", "w", "l", "t", "wp", "sp");
+  if (has(/driver|programming/) || isOneOf("combined", "combinedscore", "skillsscore") ||
+      (has(/autonomous|auton/) && !hasRecord) || (wrapper === "skills")) return "skills";
+
+  // 3. Qualification rankings.
+  const hasTeam = has(/team/) || isOneOf("number", "teamnum", "teamno");
+  if ((has(/rank/) || isOneOf("place", "position")) && hasTeam) return "rankings";
+  if (hasRecord && hasTeam) return "rankings";
+  if (wrapper === "rankings") return "rankings";
+
+  // 4. Team list.
+  if (hasTeam && !has(/score/)) return "teams";
+  return null;
+}
+
+async function classifyTMExport(file) {
+  const name = file?.name || "unnamed file";
+  if (!/\.(csv|json)$/i.test(name)) return { file, category: null, reason: "not a CSV or JSON file" };
+  let text = "";
+  try { text = await file.text(); } catch { return { file, category: null, reason: "could not be read" }; }
+  const byName = tmCategoryFromFilename(name);
+  let byContent;
+  try { byContent = tmCategoryFromContent(text, name); } catch { byContent = undefined; }
+  if (byContent === undefined) return { file, category: null, reason: "empty or not valid CSV/JSON" };
+  let category = null;
+  if (byName && byContent) {
+    if (byName === byContent) category = byName;
+    // Schedule, results, and R16 exports share the same TM columns; the filename separates them.
+    else if (TM_MATCH_FAMILY.has(byName) && TM_MATCH_FAMILY.has(byContent)) category = byName;
+    // Otherwise the columns are more reliable than the filename.
+    else category = byContent;
+  } else {
+    category = byContent || byName || null;
+  }
+  return { file, category, reason: category ? "" : "not recognized as a Tournament Manager export" };
+}
+
 const MATCH_PHASES = [
   { key: "qual", label: "Qualification", abbrev: "Q" },
   { key: "practice", label: "Practice", abbrev: "P" },
@@ -895,6 +1013,16 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const ruleImportRef = useRef(null);
   const skillsFileRef = useRef(null);
   const allianceFileRef = useRef(null);
+  // Phase 5: TM Driven Event Setup (multi-file TM Event Package).
+  const tmPackageFileRef = useRef(null);
+  const tmImportersRef = useRef({});
+  const tmSyncStatusRef = useRef({});
+  const tmPackageMountedRef = useRef(true);
+  const [tmPackageRunning, setTmPackageRunning] = useState(false);
+  useEffect(() => {
+    tmPackageMountedRef.current = true;
+    return () => { tmPackageMountedRef.current = false; };
+  }, []);
   const [logFor, setLogFor] = useState(null);
   const [noms, setNoms] = useState([]);
   const [finalists, setFinalists] = useState(new Set()); // `${award}::${team}`
@@ -2267,6 +2395,92 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       alert("Could not read that file: " + (e.message || e) + "\n\nExport the match list from Tournament Manager as CSV and try again.");
     } finally { setImporting(null); }
   };
+
+  // Phase 5: TM Driven Event Setup.
+  // The importers below close over this render's teams/matches/settings, so the
+  // package calls them through a ref that is refreshed every render and waits for a
+  // re-render between steps. Each step is still the EXISTING importer with its own
+  // change preview, Highlander demo lock, and writes scoped to this event's eventId.
+  tmImportersRef.current = {
+    teams: importTeamsFile,
+    matches: importMatchesFile,
+    rankings: importRankingsFile,
+    skills: importSkillsFile,
+    alliances: importAlliancesFile,
+    scores: importScoresFile,
+  };
+  tmSyncStatusRef.current = tmSyncStatus;
+  const waitForTMStateRefresh = () => new Promise((resolve) => setTimeout(resolve, 80));
+  const importTMSyncPackage = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length || tmPackageRunning) return;
+    if (!adminUnlocked) { alert("Only this event's Admin can import a TM Event Package."); return; }
+    const eventName = event?.name || "this event";
+    setTmPackageRunning(true);
+    try {
+      const results = [];
+      for (const file of files) results.push(await classifyTMExport(file));
+      const byCategory = {};
+      const skipped = [];
+      for (const r of results) {
+        if (!r.category) { skipped.push(r); continue; }
+        (byCategory[r.category] = byCategory[r.category] || []).push(r.file);
+      }
+      const skippedText = skipped.length
+        ? "\n\nSkipped (not recognized):\n" + skipped.map((r) => `${r.file?.name || "unnamed file"} (${r.reason})`).join("\n")
+        : "";
+
+      const duplicates = TM_PACKAGE_ORDER.filter((c) => (byCategory[c] || []).length > 1);
+      if (duplicates.length) {
+        alert(
+          `TM Event Package found multiple files for: ${duplicates.join(", ")}.\n\n` +
+          duplicates.map((c) => `${c}: ${byCategory[c].map((f) => f.name).join(", ")}`).join("\n") +
+          "\n\nChoose one export per category and try again."
+        );
+        return;
+      }
+
+      const detected = TM_PACKAGE_ORDER.filter((c) => (byCategory[c] || []).length === 1);
+      if (!detected.length) {
+        alert("Ref OS could not identify any Tournament Manager exports in that selection." + skippedText);
+        return;
+      }
+
+      const lockedNote = highlanderDemoLocked && detected.some((c) => ["matches", "alliances", "scores"].includes(c))
+        ? "\n\nHighlander Summit demo lock is on: matches, alliances, and scores will stay read only."
+        : "";
+      const summary =
+        "TM Event Package detected:\n\n" +
+        detected.map((c) => `${c}: ${byCategory[c][0].name}`).join("\n") +
+        skippedText +
+        `\n\nTarget event: ${eventName}\n` +
+        "Each section opens the normal change preview before anything is written." +
+        lockedNote +
+        "\n\nContinue?";
+      if (!confirm(summary)) return;
+
+      const applied = [];
+      const notApplied = [];
+      for (const category of detected) {
+        if (!tmPackageMountedRef.current) return; // event switched or screen closed; stop without touching another event
+        const before = tmSyncStatusRef.current?.[category] || 0;
+        await tmImportersRef.current[category](byCategory[category][0]);
+        await waitForTMStateRefresh();
+        const after = tmSyncStatusRef.current?.[category] || 0;
+        (after > before ? applied : notApplied).push(category);
+      }
+      if (!tmPackageMountedRef.current) return;
+      alert(
+        `TM Event Package finished for ${eventName}.\n\n` +
+        `Applied: ${applied.length ? applied.join(", ") : "none"}` +
+        (notApplied.length ? `\nNot applied (cancelled, no changes, or blocked): ${notApplied.join(", ")}` : "")
+      );
+    } catch (e) {
+      alert("Could not import the TM Event Package: " + (e?.message || e));
+    } finally {
+      if (tmPackageMountedRef.current) setTmPackageRunning(false);
+    }
+  };
   const setAllianceTeam = async (seed, idx, team) => {
     if (highlanderDemoLocked) { explainDemoLock(); return; }
     const cur = alliances[seed] ? [...alliances[seed]] : ["", ""];
@@ -3528,6 +3742,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
           onImportSkills={() => skillsFileRef.current?.click()}
           onImportAlliances={() => allianceFileRef.current?.click()}
           onImportScores={() => scoreFileRef.current?.click()}
+          onImportPackage={() => tmPackageFileRef.current?.click()}
+          packageRunning={tmPackageRunning}
           stats={{
             teams: teams.length,
             matches: Object.keys(matches).length,
@@ -3574,6 +3790,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       )}
       <input ref={allianceFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importAlliancesFile(f); }} />
+      <input ref={tmPackageFileRef} type="file" multiple accept=".csv,.json,text/csv,application/json" className="hidden"
+        onChange={(e) => { const files = Array.from(e.target.files || []); e.target.value = ""; importTMSyncPackage(files); }} />
       {addMatchOpen && !highlanderDemoLocked && <AddMatchModal teams={teams} onSave={addElimMatch} onClose={() => setAddMatchOpen(false)} />}
       {showFieldLog && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
@@ -5736,7 +5954,7 @@ function ImportPreviewModal({ preview, onImport, onCancel }) {
   );
 }
 
-function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRankings, onImportSkills, onImportAlliances, onImportScores, stats, syncStatus }) {
+function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRankings, onImportSkills, onImportAlliances, onImportScores, onImportPackage, packageRunning = false, stats, syncStatus }) {
   const items = [
     { key: "teams", title: "Teams", detail: `${stats.teams} teams loaded`, action: "Import teams", onClick: onImportTeams, Icon: Users },
     { key: "matches", title: "Match schedule", detail: `${stats.matches} matches loaded`, action: "Import matches", onClick: onImportMatches, Icon: ListOrdered },
@@ -5761,6 +5979,24 @@ function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRanking
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-3">
+          {onImportPackage && (
+            <div className="bg-white dark:bg-slate-800 rounded-xl border-2 border-red-200 dark:border-red-900 p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-red-50 dark:bg-red-950/40 flex items-center justify-center shrink-0">
+                  <Upload size={18} className="text-[#D7212B]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-slate-900 dark:text-slate-100">TM Driven Event Setup</div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Select your Tournament Manager exports together. Ref OS identifies teams, schedule, rankings, skills, alliances, and results, then runs the normal change preview for each detected file.</p>
+                </div>
+              </div>
+              <button onClick={onImportPackage} disabled={packageRunning}
+                className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#D7212B] text-white text-sm font-semibold hover:bg-[#B42024] disabled:bg-slate-400">
+                <Upload size={16} /> {packageRunning ? "Importing TM Event Package…" : "Import TM Event Package"}
+              </button>
+            </div>
+          )}
+          {onImportPackage && <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 pt-1">Or update one category</div>}
           {items.map(({ key, title, detail, action, onClick, Icon }) => (
             <div key={key} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
               <div className="flex items-start gap-3">
