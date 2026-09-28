@@ -2,19 +2,43 @@
 
 **Referee Operating System for live VEX Robotics events**
 
-Ref OS is a shared operations app for VEX robotics events. It gives referees, inspectors, Judge Advisors, Emcees, and event administrators one live place to coordinate match activity, record violations, document robots, monitor field readiness, share role information, and respond to event day issues.
+Ref OS is an event operations application created by **Maharshi Patel exclusively for VEX Robotics competitions**. The project was developed for the **Highlander Summit Signature Event** and is being published as source code so VEX Robotics developers, Event Partners, volunteers, and future VEX event software teams can study the implementation and build on its ideas.
 
-Ref OS 1.0.0 began as the Highlander Summit Release created by Maharshi Patel. Highlander retains its bundled Override manual and rules. Other organizers can create a separate event through the Event Configurator, import their own teams, matches, rankings, and rules, and generate volunteer role access codes. Each event has separate server data and device identity. New events do not inherit Highlander's manual or rule index.
+This repository is intended to provide a practical reference for software built specifically for VEX Robotics event operations. It includes workflows for referees, inspectors, Judge Advisors, Emcees, and event administrators, with tools for violation tracking, robot documentation, match operations, volunteer coordination, judging workflows, field logs, offline resilience, and event day communication.
 
-## Configure another event
+## Attribution
 
-1. Run `supabase/multi-event-configurator.sql` in the Supabase SQL Editor before deploying the multi event interface.
-2. From the login screen, choose **Choose or configure an event**. Enter the separate configurator login code provided by the owner.
-3. Enter the event name, qualification and practice match counts, elimination bracket, finals format, and an organizer Admin password of at least 12 characters. Save the password securely.
-4. After creation, copy the event link and open the new event. In Admin mode, generate the referee, Judge Advisor, and Emcee codes, then share each code with its intended volunteers along with the event link.
-5. In the event settings menu, import a rules CSV with `code` and `description` columns, optionally `category`. Use Tournament Manager Sync Center to import teams and the match schedule. Event setup and field names can be changed later from the Command Center.
+Ref OS was designed and developed by **Maharshi Patel**.
 
-The new event link contains an event ID; volunteers still need a valid role credential. Event data is isolated by event membership and server rules. Highlander's fixed backup credentials do not apply to new events. The bundled Override manual and its page navigation remain available only in Highlander. The bundled judging export forms and some game specific operational tools should be reviewed for a different game before relying on them. Email help alerts are wired only to Highlander's configured Admin addresses; new events can use event scoped push notifications. Deploy the updated `send-code-request-push` Edge Function to enforce that email separation.
+If this repository, its source code, architecture, interface concepts, workflows, or documentation are used as a reference for another application, please credit:
+
+> **Ref OS by Maharshi Patel**
+
+A link back to the original Ref OS repository is also appreciated when practical.
+
+This project is being shared publicly to help the VEX Robotics developer and event community learn from working VEX event software. Ref OS is intended for VEX Robotics events and is not presented as a general purpose event management platform. Public availability does not imply that VEX Robotics, the Robotics Education & Competition Foundation, or any other organization created, endorsed, or maintains Ref OS.
+
+## Project origin
+
+Ref OS 1.0.0 was built around the operational needs of the Highlander Summit Signature Event. It provides a shared workspace that helps key volunteers coordinate during a live competition rather than relying on disconnected spreadsheets, paper notes, and separate communication channels.
+
+The Highlander release is intentionally event specific. Some included workflows, terminology, rules resources, exports, credentials, and integrations may require modification before being reused for another VEX event or VEX game.
+
+## For developers
+
+Developers are welcome to inspect the code to understand how Ref OS approaches real time event coordination, role based interfaces, offline workflows, Supabase backed synchronization, mobile event operations, data imports and exports, and volunteer tooling.
+
+Before deploying a fork or derivative project, review the configuration carefully. Do not assume credentials, Supabase configuration, notification endpoints, event identifiers, or event specific resources in this repository are appropriate for another deployment.
+
+## Security before making the repository public
+
+Before changing the GitHub repository to public, review the **entire Git history**, not only the current files, for secrets or private event information. In particular, verify that no Supabase service role keys, private API keys, passwords, access tokens, webhook secrets, personal contact information, or other credentials have ever been committed.
+
+Client side Supabase anonymous keys are designed to be used by browser applications when Row Level Security is configured correctly, but privileged keys and secrets must never be published. Rotate any credential that may have been committed previously.
+
+## Trademark and affiliation
+
+VEX, VEX Robotics, and related names and marks belong to their respective owners. Ref OS is an independent project and should not be represented as an official VEX Robotics or REC Foundation product unless an authorized organization explicitly establishes that relationship.
 
 ## One live event workspace
 
