@@ -1,9 +1,10 @@
 import React from "react";
-import { AlertTriangle, BarChart3, Bell, CalendarDays, ClipboardCheck, Clock, CloudOff, Contact, Download, Flag, KeyRound, ListOrdered, Mail, MapPin, RefreshCw, ShieldCheck, Trash2, Trophy, Users, Wifi, X } from "lucide-react";
+import { AlertTriangle, BarChart3, Bell, CalendarDays, ClipboardCheck, Clock, CloudOff, Contact, Download, Flag, KeyRound, ListOrdered, Mail, MapPin, RefreshCw, Settings, ShieldCheck, Trash2, Trophy, Users, Wifi, X } from "lucide-react";
+import EventLogo from "./EventLogo.jsx";
 
 const fmtTime = (ms) => ms ? new Date(ms).toLocaleString() : "—";
 
-export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onFieldNames, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, onClose }) {
+export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onFieldNames, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, brand = null, onEventSettings, onClose }) {
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
@@ -43,6 +44,23 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
     <div className="fixed inset-0 z-[65] bg-slate-50 dark:bg-slate-900 flex flex-col">
       <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2"><BarChart3 size={20}/><div><h2 className="font-bold">Event Command Center</h2><p className="text-xs text-slate-400">Admin operations overview</p></div><button onClick={onClose} className="ml-auto"><X size={22}/></button></div>
       <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto p-4 space-y-3">
+        {brand && (
+          <div className="bg-white dark:bg-slate-800 border rounded-xl overflow-hidden">
+            <div className="h-1.5" style={{ backgroundColor: brand.accent }} />
+            <div className="p-3 flex items-center gap-3">
+              <EventLogo src={brand.logo} fallback={brand.highlander ? "/logo.svg" : "/refos-logo.svg"} alt="" className="w-11 h-11 object-contain rounded-lg shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="font-bold truncate">{brand.name}</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{brand.shortName}</div>
+              </div>
+              {onEventSettings && (
+                <button onClick={onEventSettings} className="shrink-0 py-2 px-3 rounded-lg border font-semibold text-sm flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700">
+                  <Settings size={16}/> Event Settings
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[["Matches",all.length],["Violations",viols.length],["Replays",replays],["Field faults",faults]].map(([l,v])=><div key={l} className="bg-white dark:bg-slate-800 border rounded-xl p-3"><div className="text-[11px] uppercase text-slate-400 font-semibold">{l}</div><div className="text-2xl font-bold">{v}</div></div>)}
         </div>

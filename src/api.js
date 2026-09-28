@@ -246,18 +246,29 @@ export async function listMyEvents() {
   return (data || []).map(mapEvent);
 }
 export async function listSelectableEvents() {
-  if (E2E_MOCK) return [{ id: "11111111-1111-4111-8111-111111111111", name: "Highlander Summit" }];
+  if (E2E_MOCK) return [{ id: "11111111-1111-4111-8111-111111111111", name: "Highlander Summit", branding: {} }];
   await ensureAnonymousSession();
-  const { data, error } = await supabase.rpc("list_refos_events");
-  if (error) throw error;
-  return (data || []).map((r) => ({
+  const toChoice = (r) => ({
     id: r.event_id,
     name: r.event_name,
     quals: 0,
     practice: 0,
     bracket: 0,
     finalsBestOf: 1,
-  }));
+    // Phase 6: public branding only (short name, logo URL, accent). Empty when not configured.
+    branding: {
+      shortName: r.short_name || "",
+      logoUrl: r.logo_url || "",
+      accent: r.accent_color || "",
+    },
+  });
+  // Phase 6 branding function (supabase/refos-2-phase6-event-settings.sql).
+  // Falls back to the Phase 3 selector function if it has not been installed yet.
+  const branded = await supabase.rpc("list_refos_event_branding");
+  if (!branded.error) return (branded.data || []).map(toChoice);
+  const { data, error } = await supabase.rpc("list_refos_events");
+  if (error) throw error;
+  return (data || []).map(toChoice);
 }
 export async function getEvent(id) {
   if (E2E_MOCK) return { id, name: "Highlander Summit E2E", quals: 10, practice: 0, bracket: 16, finalsBestOf: 1, joinCode: "TEST" };

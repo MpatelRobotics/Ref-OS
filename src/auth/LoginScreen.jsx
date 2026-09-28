@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from "react";
 import * as api from "../api";
 import { APP_VERSION } from "../appVersion";
-import { getEventProfile } from "../eventProfiles.js";
+import { resolveEventBranding } from "../eventProfiles.js";
+import EventLogo from "../components/EventLogo.jsx";
 
-export default function LoginScreen({ eventId, eventName, onUnlock, onChooseEvent }) {
-  const profile = getEventProfile(eventId, eventName ? { name: eventName } : null);
+// Phase 6: `branding` is the selected event's PUBLIC branding only ({ shortName, logoUrl, accent }),
+// read before login. No admin settings or access credentials are available here.
+export default function LoginScreen({ eventId, eventName, branding = null, onUnlock, onChooseEvent }) {
+  const profile = resolveEventBranding(eventId, eventName ? { name: eventName } : null, branding);
   const highlander = profile.highlander;
+  const accent = profile.accent;
+  const showShortName = profile.hasSavedShortName && profile.shortName.toLowerCase() !== profile.name.toLowerCase();
   const [mode, setMode] = useState("code");
   const [pw, setPw] = useState("");
   const [code, setCode] = useState("");
@@ -62,10 +67,13 @@ export default function LoginScreen({ eventId, eventName, onUnlock, onChooseEven
 
   return (
     <div className="min-h-screen bg-[#F4F6FA] text-[#11172F] grid place-items-center p-6 font-sans">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white px-6 py-7 sm:px-8 shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
+      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white px-6 py-7 sm:px-8 shadow-[0_24px_70px_rgba(15,23,42,0.12)] overflow-hidden relative">
+        {profile.accentSource === "saved" && <div className="absolute inset-x-0 top-0 h-1.5" style={{ backgroundColor: accent }} />}
         <div className="flex flex-col items-center text-center mb-6">
-          <img src={profile.logo} alt={profile.shortName} className={highlander ? "h-40 sm:h-48 w-40 sm:w-48 object-contain mb-2" : "h-24 sm:h-28 w-24 sm:w-28 object-contain mb-4"} />
+          <EventLogo src={profile.logo} fallback={highlander ? "/logo.svg" : "/refos-logo.svg"} alt={profile.shortName}
+            className={highlander && profile.logoSource === "profile" ? "h-40 sm:h-48 w-40 sm:w-48 object-contain mb-2" : "h-24 sm:h-28 w-24 sm:w-28 object-contain mb-4"} />
           <span className="font-bold text-xl text-[#11172F]">{eventName || (highlander ? "Highlander Summit — Violation Log" : "Ref OS Event")}</span>
+          {showShortName && <span className="mt-1 text-sm font-semibold text-slate-500">{profile.shortName}</span>}
           {highlander && <span className="mt-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-700">Highlander Summit Release</span>}
         </div>
 
@@ -109,8 +117,9 @@ export default function LoginScreen({ eventId, eventName, onUnlock, onChooseEven
                 };
                 return (
                   <button key={key} disabled={disabled} onClick={action}
+                    style={key === "Enter" ? { backgroundColor: accent, borderColor: accent } : undefined}
                     className={`h-14 rounded-xl border font-bold active:scale-[0.98] disabled:opacity-30 ${
-                      key === "Enter" ? (highlander ? "bg-[#D7212B] border-[#D7212B] text-white" : "bg-blue-600 border-blue-600 text-white")
+                      key === "Enter" ? "text-white hover:brightness-95"
                       : isLetter ? (highlander ? "bg-indigo-50 border-indigo-200 text-[#303A8C] text-xl" : "bg-blue-50 border-blue-200 text-blue-700 text-xl")
                       : key === "Delete" ? "bg-slate-100 border-slate-200 text-slate-700 text-sm"
                       : "bg-white border-slate-300 text-[#11172F] text-xl"
@@ -133,8 +142,8 @@ export default function LoginScreen({ eventId, eventName, onUnlock, onChooseEven
               onKeyDown={(e) => e.key === "Enter" && submit()}
               className={`w-full px-3 py-3 rounded-lg bg-white border border-slate-300 text-[#11172F] placeholder-slate-400 focus:outline-none focus:ring-2 ${highlander ? "focus:ring-[#D7212B]" : "focus:ring-blue-500"}`} />
             {err && <p className="text-sm text-red-400 mt-2 text-center">{err}</p>}
-            <button onClick={submit} disabled={!pw}
-              className={`w-full mt-3 py-3 rounded-lg font-semibold text-white disabled:bg-slate-200 disabled:text-slate-400 ${highlander ? "bg-[#D7212B] hover:bg-[#B42024]" : "bg-blue-600 hover:bg-blue-700"}`}>Enter</button>
+            <button onClick={submit} disabled={!pw} style={pw ? { backgroundColor: accent } : undefined}
+              className="w-full mt-3 py-3 rounded-lg font-semibold text-white hover:brightness-95 disabled:bg-slate-200 disabled:text-slate-400">Enter</button>
             <button onClick={() => { setMode("code"); setPw(""); setErr(""); }}
               className="w-full mt-3 py-3 rounded-lg font-semibold border border-slate-300 bg-white text-[#11172F] hover:bg-slate-50">
               Back
