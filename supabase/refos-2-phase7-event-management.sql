@@ -250,6 +250,19 @@ grant execute on function public.restore_refos_event(uuid, text) to authenticate
 -- Highlander Summit and events protected by the 'system_protection' setting can never be deleted.
 -- ===========================================================================
 
+-- 7-storage. Cloud photo cleanup queue.
+--   SQL cannot delete Supabase Storage files, so the permanent delete records the deleted event
+--   here (in the same transaction). The purge-deleted-event-photos Edge Function then deletes that
+--   event's objects from the robot-photos bucket using the service role, server-side.
+--   The column is purged_event_id (not event_id) so the event_id sweep below never removes it.
+--   RLS is on with no policies: browsers cannot read or write this table.
+create table if not exists public.refos_storage_purge_queue (
+  purged_event_id uuid primary key,
+  requested_at timestamptz not null default now()
+);
+alter table public.refos_storage_purge_queue enable row level security;
+revoke all on table public.refos_storage_purge_queue from anon, authenticated;
+
 -- 7a. Guard on the events table itself, so these rules hold for every delete path
 --     (including the older configurator delete function and direct table deletes).
 create or replace function public.guard_refos_event_delete()
@@ -409,6 +422,11 @@ begin
   loop
     execute format('delete from public.%I where event_id = $1', v_table) using p_event;
   end loop;
+
+  -- Queue this event's cloud photos for server-side removal (rolled back if the delete fails).
+  insert into public.refos_storage_purge_queue(purged_event_id)
+  values (p_event)
+  on conflict (purged_event_id) do update set requested_at = now();
 
   delete from public.events where id = p_event;
   return 'deleted';

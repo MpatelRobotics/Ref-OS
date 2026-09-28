@@ -11,6 +11,8 @@ import * as api from "./api";
 import * as outbox from "./outbox";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { APP_VERSION } from "./appVersion";
+import { compressRobotPhoto } from "./photoCompression";
+import * as photoCache from "./photoCache";
 import CommandCenter from "./components/CommandCenter.jsx";
 import EventContactDirectory from "./components/EventContactDirectory.jsx";
 import LoginScreen from "./auth/LoginScreen.jsx";
@@ -507,18 +509,35 @@ const ago = (ts) => {
   return `${days} ${days === 1 ? "day" : "days"} ago`;
 };
 
-/* ---------- lazy photo thumbnail (signed URL from Supabase Storage) ---------- */
+/* ---------- lazy photo thumbnail ----------
+   Local IndexedDB cache first (works offline), otherwise a signed URL from Supabase Storage,
+   which is then cached. Offline and never cached: an explicit "offline" state, not a fake image. */
 function Thumb({ pkey, onOpen, full = false, compact = false }) {
   const [src, setSrc] = useState(null);
   const [gone, setGone] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
     let live = true;
     setSrc(null);
     setGone(false);
-    api.photoUrl(pkey).then((u) => { if (live) { u ? setSrc(u) : setGone(true); } });
+    setOffline(false);
+    photoCache.loadPhoto(pkey, api.photoUrl).then((result) => {
+      if (!live) return;
+      if (result.url) setSrc(result.url);
+      else if (result.status === "offline") setOffline(true);
+      else setGone(true);
+    });
     return () => { live = false; };
-  }, [pkey]);
+  }, [pkey, retry]);
+  useEffect(() => {
+    if (!offline) return undefined;
+    const back = () => setRetry((n) => n + 1);
+    window.addEventListener("online", back);
+    return () => window.removeEventListener("online", back);
+  }, [offline]);
   const size = full ? "w-full h-full" : compact ? "w-12 h-12" : "w-16 h-16";
+  if (offline) return <div title="Offline: this picture has not been downloaded on this device yet" className={`${size} rounded-lg bg-slate-100 dark:bg-slate-700 border border-dashed border-slate-300 dark:border-slate-600 grid place-items-center text-slate-400`}><CloudOff size={18} /></div>;
   if (gone) return <div className={`${size} rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 grid place-items-center text-slate-300`}><ImageOff size={18} /></div>;
   if (!src) return <div className={`${size} rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 animate-pulse`} />;
   const image = <img src={src} alt="robot" className={`${size} rounded-lg object-cover border border-slate-200 dark:border-slate-700`} />;
@@ -640,6 +659,8 @@ export default function App() {
           ? rows
           : [highlander, ...rows];
         setEventChoices(choices);
+        // Cached photos for events that no longer exist (deleted elsewhere) are removed from this device.
+        if (rows.length) photoCache.pruneMissingEvents(choices.map((ev) => ev.id));
         // A restored event ID that no longer exists returns to Choose VEX Event.
         if (activeEventId && !choices.some((ev) => ev.id === activeEventId)) {
           localStorage.removeItem("refosActiveEventId");
@@ -872,6 +893,7 @@ export default function App() {
       // Emergency deletion succeeded: drop it from the list now, then leave the event
       // (clears refosActiveEventId, ?event=, and the access session) and reload the list.
       setEventChoices((current) => current.filter((ev) => ev.id !== deletedId));
+      cleanUpDeletedEventPhotos(deletedId);
       setSelectorNotice("Event permanently deleted.");
       await chooseAnotherEvent();
     }} />;
@@ -914,6 +936,13 @@ const ArchivedEventScreen = ({ eventId, choice, event, onBack }) => {
   );
 };
 
+// After an event is permanently deleted: remove its photos from this device's cache, and ask the
+// server-side cleanup function to delete its cloud photo objects (best effort; it retries next time).
+const cleanUpDeletedEventPhotos = (eventId) => {
+  photoCache.deleteEventCache(eventId);
+  api.purgeDeletedEventPhotos().catch((error) => console.warn("Photo cleanup will retry on the next deletion", error));
+};
+
 const formatEventDate = (value) => {
   if (!value) return "";
   const date = new Date(value);
@@ -943,6 +972,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
     if (!ev) return "invalid";
     const result = await api.deleteArchivedEvent(ev.id, typedName, code);
     if (result === "deleted") {
+      cleanUpDeletedEventPhotos(ev.id);
       setDeletedIds((current) => new Set(current).add(ev.id));
       setDeleteTarget(null);
       setRestoringId("");
@@ -2069,6 +2099,12 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to remove this note."); return; } throw e; }
   };
 
+  // Photo cache hygiene: after a successful sync, drop cached robot photos for THIS event that no
+  // team references anymore (replaced, deleted, or reset on another device). Skipped offline.
+  useEffect(() => {
+    if (!syncedAt || (typeof navigator !== "undefined" && navigator.onLine === false)) return;
+    photoCache.pruneEventRobotPhotos(eventId, teams.flatMap((team) => team.photoKeys || []));
+  }, [syncedAt, eventId]);
   const addRobotPhoto = async (number, dataUrl, angle) => {
     const generation = await api.getRobotPhotoGeneration(eventId, true);
     const id = api.uid();
@@ -2077,10 +2113,11 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     await outbox.enqueue(eventId, { id, kind: "robot_photo", eventId, number, angle, dataUrl, generation, createdAt: Date.now() });
     await refreshQueueHealth();
     doFlush();
+    const uploadedPath = api.robotPhotoPath(eventId, number, angle, id, (String(dataUrl).match(/^data:([^;,]+)/) || [])[1]);
     offerUndo(`${angle.charAt(0).toUpperCase() + angle.slice(1)} inspection picture saved`, async () => {
       await outbox.removeOp(eventId, id);
-      setTeams((cur) => cur.map((team) => team.number === number ? { ...team, _pendingRobotPhotos: (team._pendingRobotPhotos || []).filter((photo) => photo.id !== id), photoKeys: (team.photoKeys || []).filter((path) => !path.endsWith(`/${angle}-${id}.jpg`)) } : team));
-      try { await api.removeTeamPhoto(eventId, number, `${eventId}/team/${number}/${angle}-${id}.jpg`); }
+      setTeams((cur) => cur.map((team) => team.number === number ? { ...team, _pendingRobotPhotos: (team._pendingRobotPhotos || []).filter((photo) => photo.id !== id), photoKeys: (team.photoKeys || []).filter((path) => path !== uploadedPath) } : team));
+      try { await api.removeTeamPhoto(eventId, number, uploadedPath); }
       catch (error) { if (!outbox.isOffline(error)) throw error; }
       refreshQueueHealth();
     });
@@ -5808,7 +5845,7 @@ const ROBOT_PHOTO_SLOTS = [
 const REQUIRED_ROBOT_ANGLES = ROBOT_PHOTO_SLOTS.filter((angle) => angle.required);
 
 function robotPhotoAngle(path) {
-  const match = String(path || "").match(/\/(front|back|side|tag|lexan)-[^/]+\.jpg$/i);
+  const match = String(path || "").match(/\/(front|back|side|tag|lexan)-[^/]+\.(?:jpe?g|webp)$/i);
   return match ? match[1].toLowerCase() : "";
 }
 
@@ -5891,7 +5928,9 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
     if (!file || !captureAngle) return;
     setBusy(true);
     try {
-      const dataUrl = await compress(file);
+      // Robot reference photos: WebP (or JPEG fallback), max 1440 px, metadata stripped.
+      // If compression fails the error is shown and nothing is uploaded.
+      const { dataUrl } = await compressRobotPhoto(file);
       await onAddPhoto(team.number, dataUrl, captureAngle);
       const nextIndex = sequenceIndex + 1;
       if (sequenceIndex >= 0 && nextIndex < ROBOT_PHOTO_SLOTS.length) {

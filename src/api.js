@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseClient";
 import { OFFLINE_RULES } from "./offlineRules";
+import { putCachedBlob, deletePaths as deleteCachedPhotos } from "./photoCache";
 
 const E2E_MOCK = import.meta.env.VITE_E2E_MOCK === "1";
 const e2eState = { teams: [], violations: [] };
@@ -529,14 +530,29 @@ export async function getRobotPhotoGeneration(eventId, allowCached = false) {
     throw error;
   }
 }
+// Robot photo cloud path: <event-id>/team/<TEAM>/<angle>-<upload-id>.<webp|jpg>
+// Event-prefixed so event isolation and event cleanup can identify every object safely.
+// The extension follows the compressed image type (WebP, or JPEG where WebP encoding is unavailable).
+const ROBOT_PHOTO_ANGLES = ["front", "back", "side", "tag", "lexan"];
+export const robotPhotoAngleKey = (angle) => (ROBOT_PHOTO_ANGLES.includes(String(angle).toLowerCase()) ? String(angle).toLowerCase() : "other");
+export function robotPhotoPath(eventId, number, angle, id, mime = "image/jpeg") {
+  const num = String(number || "").trim().toUpperCase();
+  const ext = /webp/i.test(String(mime)) ? "webp" : "jpg";
+  return `${eventId}/team/${num}/${robotPhotoAngleKey(angle)}-${id}.${ext}`;
+}
+const dataUrlMimeType = (dataUrl) => (String(dataUrl).match(/^data:([^;,]+)/) || [])[1] || "image/jpeg";
+const pathAngle = (path) => (String(path || "").match(/\/(front|back|side|tag|lexan|other)-[^/]+\.(?:jpe?g|webp)$/i) || [])[1]?.toLowerCase() || "";
+
 export async function addTeamPhoto(eventId, number, dataUrl, angle = "other", uploadId = "", generation = "0") {
   const currentGeneration = await getRobotPhotoGeneration(eventId);
   if (currentGeneration !== generation) return null;
   const num = (number || "").trim().toUpperCase();
-  const safeAngle = ["front", "back", "side", "tag", "lexan"].includes(String(angle).toLowerCase()) ? String(angle).toLowerCase() : "other";
+  const safeAngle = robotPhotoAngleKey(angle);
   const id = uploadId || ((self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2));
-  const path = `${eventId}/team/${num}/${safeAngle}-${id}.jpg`;
-  const up = await supabase.storage.from("robot-photos").upload(path, dataURLtoBlob(dataUrl), { contentType: "image/jpeg", upsert: true });
+  const mime = dataUrlMimeType(dataUrl);
+  const path = robotPhotoPath(eventId, num, safeAngle, id, mime);
+  const blob = dataURLtoBlob(dataUrl);
+  const up = await supabase.storage.from("robot-photos").upload(path, blob, { contentType: mime, upsert: true });
   if (up.error) throw up.error;
   const { data: paths, error } = await supabase.rpc("append_team_photo_path", { p_event: eventId, p_team: num, p_path: path, p_generation: generation });
   if (error) {
@@ -544,7 +560,19 @@ export async function addTeamPhoto(eventId, number, dataUrl, angle = "other", up
     if (/before the latest reset/i.test(error.message || "")) return null;
     throw error;
   }
-  return paths || [];
+  // Cache the uploaded copy locally so this device never downloads its own photo again.
+  await putCachedBlob(path, blob);
+  // Replacement: once the new photo is committed, remove older photos for the same angle
+  // (cloud object, shared reference, and local cache). "Other" pictures are never replaced.
+  let current = paths || [];
+  if (safeAngle !== "other") {
+    const older = current.filter((existing) => existing !== path && pathAngle(existing) === safeAngle);
+    for (const oldPath of older) {
+      try { current = await removeTeamPhoto(eventId, num, oldPath); }
+      catch (cleanupError) { console.warn("Older robot photo could not be removed yet", cleanupError); }
+    }
+  }
+  return current;
 }
 export async function removeTeamPhoto(eventId, number, path) {
   const num = (number || "").trim().toUpperCase();
@@ -552,7 +580,16 @@ export async function removeTeamPhoto(eventId, number, path) {
   if (error) throw error;
   const { error: storageError } = await supabase.storage.from("robot-photos").remove([path]);
   if (storageError) throw storageError;
+  await deleteCachedPhotos([path]);
   return paths || [];
+}
+// Removes cloud photo objects for permanently deleted events. Runs server-side in the
+// purge-deleted-event-photos Edge Function; no service-role key exists in the browser.
+export async function purgeDeletedEventPhotos() {
+  if (E2E_MOCK) return { purged: [] };
+  const { data, error } = await supabase.functions.invoke("purge-deleted-event-photos", { body: {} });
+  if (error) throw error;
+  return data;
 }
 export async function resetTeamPhotos(eventId) {
   if (E2E_MOCK) {

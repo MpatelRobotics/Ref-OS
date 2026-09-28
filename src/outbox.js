@@ -124,7 +124,7 @@ export async function flush(eventId, handlers = {}) {
           if (!paths) {
             handlers.onRobotPhotoDiscarded && handlers.onRobotPhotoDiscarded(op);
           } else if (cancelledOps.has(opCancelKey)) {
-            await api.removeTeamPhoto(op.eventId, op.number, `${op.eventId}/team/${op.number}/${op.angle}-${op.id}.jpg`);
+            await api.removeTeamPhoto(op.eventId, op.number, api.robotPhotoPath(op.eventId, op.number, op.angle, op.id, (String(op.dataUrl).match(/^data:([^;,]+)/) || [])[1]));
           } else {
             handlers.onRobotPhotoSynced && handlers.onRobotPhotoSynced(op, paths);
           }
