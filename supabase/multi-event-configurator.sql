@@ -17,7 +17,7 @@ begin
      or p_bracket not in (0,4,8,16) or p_finals not in (1,3) then
     raise exception 'Invalid event format';
   end if;
-  if length(coalesce(p_admin_credential, '')) < 12 then raise exception 'Admin password must have at least 12 characters'; end if;
+  if length(coalesce(p_admin_credential, '')) < 12 then raise exception 'Admin password must have at least 4 characters'; end if;
   if (select count(*) from public.events where created_by = auth.uid()) >= 5 then
     raise exception 'This account has reached the event creation limit';
   end if;
