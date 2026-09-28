@@ -46,3 +46,43 @@ $$;
 
 revoke all on function public.list_refos_event_branding() from public;
 grant execute on function public.list_refos_event_branding() to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Field display names for every event role.
+--
+-- The event_settings read policy covers Referee, Judge Advisor, Emcee, and Admin, but not
+-- Inspection, so Inspection devices showed the default Field 1 / Field 2 / Field 3 names.
+-- Rather than widening that policy (which would expose every event setting to Inspection),
+-- this function returns ONLY the three field display names from the existing 'field_names'
+-- setting, and only to a signed-in member of that same event.
+--
+-- Read only: it cannot change Event Settings. Editing stays Admin-only through the existing
+-- "admins write event settings" policy. It exposes no credentials and no other settings.
+-- Safe to rerun.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.get_event_field_names(p_event uuid)
+returns table(
+  field_names jsonb,
+  updated_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    jsonb_strip_nulls(jsonb_build_object(
+      'Field 1', nullif(left(trim(coalesce(s.value->>'Field 1', '')), 40), ''),
+      'Field 2', nullif(left(trim(coalesce(s.value->>'Field 2', '')), 40), ''),
+      'Field 3', nullif(left(trim(coalesce(s.value->>'Field 3', '')), 40), '')
+    )),
+    s.updated_at
+  from public.event_settings s
+  where s.event_id = p_event
+    and s.key = 'field_names'
+    and public.has_event_role(p_event, array['ref','judge','emcee','inspection','admin']);
+$$;
+
+revoke all on function public.get_event_field_names(uuid) from public, anon;
+grant execute on function public.get_event_field_names(uuid) to authenticated;

@@ -571,6 +571,32 @@ export async function listEventSettings(eventId) {
   if (error) throw error;
   return Object.fromEntries((data || []).map((r) => [r.key, mapEventSetting(r)]));
 }
+// Phase 6: the selected event's public branding ({ shortName, logoUrl, accent }), read through the
+// existing list_refos_event_branding() function that already serves Choose VEX Event and the login
+// screen. Used by roles that cannot read event_settings (Inspection). Returns null if unavailable.
+export async function getPublicEventBranding(eventId) {
+  if (E2E_MOCK) return null;
+  const { data, error } = await supabase.rpc("list_refos_event_branding");
+  if (error) return null;
+  const row = (data || []).find((r) => r.event_id === eventId);
+  if (!row) return null;
+  return {
+    key: "event_branding",
+    value: { shortName: row.short_name || "", logoUrl: row.logo_url || "", accent: row.accent_color || "" },
+    updatedBy: "",
+    updatedAt: 0,
+  };
+}
+// Phase 6: field display names only, readable by every event role including Inspection
+// (supabase/refos-2-phase6-event-settings.sql). Returns null if the function is not installed.
+export async function getEventFieldNames(eventId) {
+  if (E2E_MOCK) return null;
+  const { data, error } = await supabase.rpc("get_event_field_names", { p_event: eventId });
+  if (error) return null;
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return null;
+  return { key: "field_names", value: row.field_names || {}, updatedBy: "", updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : 0 };
+}
 export async function getEventSetting(eventId, key) {
   const { data, error } = await supabase.from("event_settings").select("*").eq("event_id", eventId).eq("key", key).maybeSingle();
   if (error) throw error;

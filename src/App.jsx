@@ -47,9 +47,14 @@ const EVENT_ID = HIGHLANDER_EVENT_ID;
 /* ---------- helpers ---------- */
 const normNum = (n) => (n || "").trim().toUpperCase();
 const DEFAULT_FIELD_NAMES = { "Field 1": "Field 1", "Field 2": "Field 2", "Field 3": "Field 3" };
+// Maps the stored field identifier to the key used by the field_names setting
+// ("Field 1".."Field 3"). Stored values are never rewritten; this only affects display.
+// Accepts the forms Tournament Manager and Ref OS store: "Field 1", "field1", "F1",
+// "Field #1", "Field-1", "field_1", "#1", and a bare "1".
 const canonicalFieldKey = (field) => {
-  const match = String(field || "").trim().match(/^(?:field\s*|f)([123])$/i);
-  return match ? `Field ${match[1]}` : String(field || "").trim();
+  const raw = String(field ?? "").trim();
+  const match = raw.match(/^(?:field|f)?\s*[#_-]?\s*([123])$/i);
+  return match ? `Field ${match[1]}` : raw;
 };
 const fieldDisplayName = (field, fieldNames = DEFAULT_FIELD_NAMES) => fieldNames?.[canonicalFieldKey(field)] || field || "";
 const initials = (name) =>
@@ -521,24 +526,43 @@ function Thumb({ pkey, onOpen, full = false, compact = false }) {
 
 /* ==================================================================== */
 /*  ROOT: auth -> event selection -> tracker                            */
+const EVENT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Selected event to restore after a browser refresh: a valid ?event= UUID first, then the
+// saved refosActiveEventId. Anything else starts at Choose VEX Event.
+function readSavedEventId() {
+  try {
+    const fromUrl = String(new URL(window.location.href).searchParams.get("event") || "").trim();
+    if (EVENT_UUID_RE.test(fromUrl)) return fromUrl.toLowerCase();
+    const saved = String(localStorage.getItem("refosActiveEventId") || "").trim();
+    if (EVENT_UUID_RE.test(saved)) return saved.toLowerCase();
+  } catch {}
+  return "";
+}
+
 /* ==================================================================== */
 export default function App() {
-  // Phase 2 intentionally starts at the event selector on every fresh app load.
-  // Old ?event= links and saved event IDs from previous builds must not silently
-  // bypass the selector.
-  const initialEventId = "";
-  const [activeEventId, setActiveEventId] = useState(initialEventId);
+  // A browser refresh restores the selected event from a valid ?event= UUID, then from the
+  // saved refosActiveEventId. Only "Choose or configure an event" and "Lock This Device"
+  // clear the selection. Access is never restored from these values: the server-side
+  // event membership check below decides whether this device is still signed in.
+  const [activeEventId, setActiveEventId] = useState(readSavedEventId);
   const [eventChoices, setEventChoices] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventChoiceError, setEventChoiceError] = useState("");
 
   useEffect(() => {
-    localStorage.removeItem("refosActiveEventId");
-    const url = new URL(window.location.href);
-    if (url.searchParams.has("event")) {
-      url.searchParams.delete("event");
+    // Keep the URL and saved selection in sync with the restored event, and drop invalid values.
+    try {
+      const url = new URL(window.location.href);
+      if (activeEventId) {
+        localStorage.setItem("refosActiveEventId", activeEventId);
+        url.searchParams.set("event", activeEventId);
+      } else {
+        localStorage.removeItem("refosActiveEventId");
+        url.searchParams.delete("event");
+      }
       window.history.replaceState(null, "", url);
-    }
+    } catch {}
   }, []);
 
   const [unlocked, setUnlocked] = useState(false);
@@ -571,8 +595,21 @@ export default function App() {
   const [event, setEvent] = useState(null);
   const [loadErr, setLoadErr] = useState(false);
 
+  // Volunteer identity is stored per event on this device. Reload it whenever the selected
+  // event changes (including an event restored after a refresh) so one event's name is never
+  // carried into another event.
+  const identityEventRef = useRef(activeEventId);
   useEffect(() => {
-    if (activeEventId) return;
+    if (identityEventRef.current === activeEventId) return;
+    identityEventRef.current = activeEventId;
+    const identity = readIdentity(activeEventId);
+    setMeName(identity.nickname || "");
+    setMeFullName(identity.fullName || "");
+    setMePhone(identity.phone || "");
+  }, [activeEventId]);
+
+  useEffect(() => {
+    // Loaded for the selector and for the selected event's login screen branding.
     let live = true;
     setEventsLoading(true);
     setEventChoiceError("");
@@ -596,6 +633,16 @@ export default function App() {
           ? rows
           : [highlander, ...rows];
         setEventChoices(choices);
+        // A restored event ID that no longer exists returns to Choose VEX Event.
+        if (activeEventId && !choices.some((ev) => ev.id === activeEventId)) {
+          localStorage.removeItem("refosActiveEventId");
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete("event");
+            window.history.replaceState(null, "", url);
+          } catch {}
+          setActiveEventId("");
+        }
       } catch (error) {
         if (live) setEventChoiceError(error?.message || "Could not load events.");
       } finally {
@@ -1038,10 +1085,39 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const [fieldLog, setFieldLog] = useState([]);
   const [fieldResetChecks, setFieldResetChecks] = useState([]);
   const [eventSettings, setEventSettings] = useState({});
+  // Settings this device just saved. A realtime or focus refresh can return a server
+  // snapshot read before that save committed; keep the just-saved row until the server
+  // snapshot catches up, instead of letting the older snapshot overwrite it.
+  const recentSettingWritesRef = useRef({});
+  const rememberSettingWrite = (row) => {
+    if (row?.key) recentSettingWritesRef.current[row.key] = { row, at: Date.now() };
+  };
+  const applyServerSettings = useCallback((server) => {
+    const next = { ...(server || {}) };
+    const recent = recentSettingWritesRef.current;
+    for (const [key, entry] of Object.entries(recent)) {
+      const serverRow = next[key];
+      if (serverRow && (serverRow.updatedAt || 0) >= (entry.row.updatedAt || 0)) { delete recent[key]; continue; }
+      if (Date.now() - entry.at < 30000) next[key] = entry.row;
+      else delete recent[key];
+    }
+    setEventSettings(next);
+  }, []);
   const highlanderDemoLocked = eventId === "11111111-1111-4111-8111-111111111111" && eventSettings?.highlander_demo_lock?.value?.locked !== false;
   const explainDemoLock = () => alert("Highlander Summit matches, alliances, and violations are read only for the demo.");
   const savedFieldNames = eventSettings?.field_names?.value;
-  const fieldNames = useMemo(() => ({ ...DEFAULT_FIELD_NAMES, ...(savedFieldNames || {}) }), [savedFieldNames]);
+  // Same field_names setting used by Event Settings and the Field Name Configurator:
+  // { "Field 1": "...", "Field 2": "...", "Field 3": "..." }. Blank or invalid entries keep the default.
+  const fieldNames = useMemo(() => {
+    const names = { ...DEFAULT_FIELD_NAMES };
+    if (savedFieldNames && typeof savedFieldNames === "object") {
+      for (const key of Object.keys(DEFAULT_FIELD_NAMES)) {
+        const custom = String(savedFieldNames[key] ?? "").trim();
+        if (custom) names[key] = custom;
+      }
+    }
+    return names;
+  }, [savedFieldNames]);
   const volunteerAssignments = eventSettings?.volunteer_assignments?.value || {};
   const myAssignment = volunteerAssignments[currentUserId]?.location || Object.values(volunteerAssignments).find((assignment) =>
     (assignment?.name || "").trim().toLowerCase() === (meName || "").trim().toLowerCase()
@@ -1331,7 +1407,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       try {
         const [settings, entries] = await Promise.all([api.listEventSettings(eventId), api.listFieldLog(eventId)]);
         if (!live) return;
-        setEventSettings(settings);
+        applyServerSettings(settings);
         setFieldLog(entries);
       } catch {}
     };
@@ -1544,6 +1620,10 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
           ...team,
           _pendingRobotPhotos: queuedPhotos.filter((op) => op.number === team.number).map((op) => ({ id: op.id, angle: op.angle, dataUrl: op.dataUrl })),
         })));
+        // Inspection cannot read event_settings; load only the read-only display configuration:
+        // configured field display names and the event's public branding (short name, logo, accent).
+        api.getEventFieldNames(eventId).then((row) => { if (row) setEventSettings((cur) => ({ ...cur, field_names: row })); }).catch(() => {});
+        api.getPublicEventBranding(eventId).then((row) => { if (row) setEventSettings((cur) => ({ ...cur, event_branding: row })); }).catch(() => {});
         setSyncedAt(Date.now());
         setCloudReachable(true);
         setLastCloudError("");
@@ -1569,7 +1649,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       setWatchNotes(wn);
       api.listFieldLog(eventId).then(setFieldLog).catch(() => {});
       api.listFieldResetChecks(eventId).then(setFieldResetChecks).catch(() => {});
-      api.listEventSettings(eventId).then(setEventSettings).catch(() => {});
+      api.listEventSettings(eventId).then(applyServerSettings).catch(() => {});
       outbox.loadFailed(eventId).then(setFailedSyncItems).catch(() => {});
       api.listAlliances(eventId).then((rows) => { const m = {}; for (const a of rows) m[a.seed] = a.teams; setAlliances(m); setAlliancesLoaded(true); }).catch(() => { setAlliancesLoaded(true); });
       const now = Date.now();
@@ -1865,6 +1945,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const saveFieldNames = async (names) => {
     try {
       const saved = await api.upsertEventSetting(eventId, "field_names", names, meName);
+      rememberSettingWrite(saved);
       setEventSettings((cur) => ({ ...cur, field_names: saved }));
       if (commandCenterChildOpen) returnToCommandCenter();
       else setShowFieldNameConfigurator(false);
@@ -1887,10 +1968,12 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         if (removeLegacyLogo) delete next.logoData;
         if ("logoUrl" in next && !String(next.logoUrl || "").trim()) delete next.logoUrl; // blank = use the event profile / Ref OS logo
         const savedBranding = await api.upsertEventSetting(eventId, "event_branding", next, meName);
+        rememberSettingWrite(savedBranding);
         setEventSettings((cur) => ({ ...cur, event_branding: savedBranding }));
       }
       if (nextFieldNames) {
         const savedFields = await api.upsertEventSetting(eventId, "field_names", nextFieldNames, meName);
+        rememberSettingWrite(savedFields);
         setEventSettings((cur) => ({ ...cur, field_names: savedFields }));
       }
       if (name) {
