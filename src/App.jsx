@@ -466,6 +466,15 @@ export default function App() {
           localStorage.removeItem("refosRole");
           sessionStorage.removeItem("refosAdmin");
         }
+      } catch {
+        // A visitor to a new event normally has no event session yet.
+        // Treat a failed role lookup as logged out and show that event's login screen.
+        if (live) {
+          localStorage.removeItem("unlocked");
+          localStorage.removeItem("refosRole");
+          sessionStorage.removeItem("refosAdmin");
+          setUnlocked(false);
+        }
       } finally {
         if (live) setAccessChecked(true);
       }
