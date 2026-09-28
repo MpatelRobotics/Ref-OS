@@ -14,7 +14,7 @@ const hashCode = async (value) => {
 };
 
 export default function EventGateway({ currentEventId, onSelect, onClose }) {
-  const [events, setEvents] = useState([]), [eventLink, setEventLink] = useState("");
+  const [events, setEvents] = useState([]);
   const [builderCode, setBuilderCode] = useState(""), [authorizedCode, setAuthorizedCode] = useState("");
   const [step, setStep] = useState(0), [name, setName] = useState(""), [date, setDate] = useState("");
   const [venue, setVenue] = useState(""), [quals, setQuals] = useState("0"), [practice, setPractice] = useState("0");
@@ -22,6 +22,7 @@ export default function EventGateway({ currentEventId, onSelect, onClose }) {
   const [accent, setAccent] = useState("#2563eb"), [logoData, setLogoData] = useState("");
   const [codes, setCodes] = useState(() => Object.fromEntries(ROLE_META.map(([key]) => [key, randomCode()])));
   const [created, setCreated] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const [highlanderGateOpen, setHighlanderGateOpen] = useState(false), [highlanderCode, setHighlanderCode] = useState("");
 
   useEffect(() => { api.ensureAnonymousSession().then(() => api.listMyEvents()).then(setEvents).catch(() => {}); }, []);
   const eventUrl = created ? `${window.location.origin}/?event=${created.id}` : "";
@@ -62,12 +63,31 @@ export default function EventGateway({ currentEventId, onSelect, onClose }) {
     } catch (e) { setError(e.message || "Could not create the event."); } finally { setBusy(false); }
   };
 
-  const pickLink = () => { const raw = eventLink.trim(); let id = raw; try { id = new URL(raw).searchParams.get("event") || raw; } catch {} if (!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(id)) { setError("Enter an event link or event ID."); return; } onSelect(id); };
+
+
+  const selectEvent = (event) => {
+    setError("");
+    if (event.id === HIGHLANDER_EVENT_ID) {
+      setHighlanderCode("");
+      setHighlanderGateOpen(true);
+      return;
+    }
+    onSelect(event.id);
+  };
+  const unlockHighlander = () => {
+    if (highlanderCode.trim().toUpperCase() !== "9A12") {
+      setError("Incorrect Highlander access code.");
+      return;
+    }
+    setHighlanderGateOpen(false);
+    setHighlanderCode("");
+    onSelect(HIGHLANDER_EVENT_ID);
+  };
 
   return <div className="min-h-[100dvh] bg-slate-100 dark:bg-slate-900 p-4 sm:p-8 text-slate-900 dark:text-slate-100">
     <div className="max-w-2xl mx-auto bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-5">
-      <div className="flex items-start gap-3"><img src="/refos-logo.svg" alt="Ref OS" className="h-12 w-12 shrink-0"/><div className="flex-1"><h1 className="text-xl font-bold">Ref OS events</h1><p className="text-sm text-slate-500 dark:text-slate-300">Choose an event or configure a new one.</p></div><button onClick={onClose} className="px-3 py-2 rounded-lg border">Back</button></div>
-      {events.length > 0 && <section className="space-y-2"><h2 className="font-semibold">Your events</h2>{events.map((event) => <div key={event.id} className="flex items-stretch gap-2"><button onClick={() => onSelect(event.id)} className="min-w-0 flex-1 text-left rounded-lg border border-slate-200 dark:border-slate-600 p-3 hover:border-blue-500"><b>{event.name}</b>{event.id === HIGHLANDER_EVENT_ID && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">PROTECTED</span>}{event.id === currentEventId && <span className="text-xs ml-2 text-slate-400">Current</span>}</button>{authorizedCode && event.id !== HIGHLANDER_EVENT_ID && <button disabled={busy} onClick={() => removeEvent(event)} className="shrink-0 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30">Delete</button>}</div>)}</section>}
+      <div className="flex items-start gap-3"><img src="/refos-logo.svg" alt="Ref OS" className="h-12 w-12 shrink-0"/><div className="flex-1"><h1 className="text-xl font-bold">Ref OS events</h1><p className="text-sm text-slate-500 dark:text-slate-300">Select an existing event or configure a new one.</p></div></div>
+      {events.length > 0 && <section className="space-y-2"><h2 className="font-semibold">Your events</h2>{events.map((event) => <div key={event.id} className="flex items-stretch gap-2"><button onClick={() => selectEvent(event)} className="min-w-0 flex-1 text-left rounded-lg border border-slate-200 dark:border-slate-600 p-3 hover:border-blue-500"><b>{event.name}</b>{event.id === HIGHLANDER_EVENT_ID && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">PROTECTED</span>}{event.id === currentEventId && <span className="text-xs ml-2 text-slate-400">Current</span>}</button>{authorizedCode && event.id !== HIGHLANDER_EVENT_ID && <button disabled={busy} onClick={() => removeEvent(event)} className="shrink-0 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30">Delete</button>}</div>)}</section>}
       <section className="border-t pt-4 space-y-4"><h2 className="font-semibold">Create an event</h2>
         {!authorizedCode ? <div className="flex gap-2"><input value={builderCode} onChange={(e)=>setBuilderCode(e.target.value)} onKeyDown={(e)=>e.key === "Enter" && verify()} maxLength={4} placeholder="Configurator login code" className="min-w-0 flex-1 rounded-lg border px-3 py-2 bg-white dark:bg-slate-900"/><button disabled={busy || builderCode.length !== 4} onClick={verify} className="rounded-lg bg-blue-600 text-white px-4 disabled:opacity-50">Log in</button></div> : created ?
         <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 p-4 space-y-4"><div><h3 className="font-bold text-lg">{created.name} is ready</h3><p className="text-xs text-slate-600 dark:text-slate-300">Copy the event link and give each volunteer only the code for their role.</p></div><div className="rounded-lg bg-white dark:bg-slate-900 border p-3"><div className="text-xs font-bold uppercase text-slate-500">Event link</div><div className="flex gap-2 mt-1"><input readOnly value={eventUrl} className="min-w-0 flex-1 bg-transparent text-sm" onFocus={(e)=>e.target.select()}/><button onClick={()=>copy(eventUrl)} className="rounded bg-slate-900 text-white px-3 py-1 text-xs">Copy</button></div></div><div className="grid sm:grid-cols-2 gap-2">{ROLE_META.map(([role,label])=><div key={role} className="rounded-lg bg-white dark:bg-slate-900 border p-3"><div className="text-xs text-slate-500">{label}</div><div className="flex items-center justify-between"><b className="font-mono text-lg">{codes[role]}</b><button onClick={()=>copy(codes[role])} className="text-xs underline">Copy</button></div></div>)}</div><p className="text-xs"><b>Organizer Admin password:</b> use the password you created to regain Admin access on another device. It is intentionally not displayed here.</p><div className="flex gap-2"><button onClick={()=>copy([`Ref OS: ${created.name}`,eventUrl,...ROLE_META.map(([r,l])=>`${l}: ${codes[r]}`)].join("\n"))} className="flex-1 rounded-lg border px-4 py-2 font-bold">Copy setup sheet</button><button onClick={()=>onSelect(created.id)} className="flex-1 rounded-lg bg-blue-600 text-white px-4 py-2 font-bold">Open event</button></div></div> :
@@ -79,7 +99,9 @@ export default function EventGateway({ currentEventId, onSelect, onClose }) {
           {step===4 && <div className="rounded-xl border p-4 space-y-2 text-sm"><div className="flex items-center gap-3">{logoData ? <img src={logoData} className="h-12 w-12 object-contain" alt=""/>:<img src="/refos-logo.svg" className="h-12 w-12" alt=""/>}<div><div className="font-bold text-lg">{name}</div><div className="text-slate-500">{date || "Date not set"}{venue ? ` · ${venue}`:""}</div></div></div><p><b>Format:</b> {quals} qualification, {practice} practice, {bracket === "0" ? "no elimination bracket" : `top ${bracket} bracket`}, {finals === "3" ? "best of 3 finals":"single match finals"}.</p><p><b>Access:</b> Organizer Admin plus Referee, Judge Advisor, Emcee, and Inspection codes.</p><p className="text-xs text-slate-500">This creates an isolated event. Highlander is a protected legacy event and is not modified by this wizard.</p></div>}
           <div className="flex gap-2">{step>0 && <button onClick={()=>setStep(s=>s-1)} className="rounded-lg border px-4 py-2 font-bold">Back</button>}<button disabled={busy || !canNext} onClick={()=>step<STEPS.length-1 ? setStep(s=>s+1) : create()} className="flex-1 rounded-lg bg-blue-600 text-white px-4 py-3 font-bold disabled:opacity-50">{busy ? "Creating…" : step<STEPS.length-1 ? "Continue":"Create event"}</button></div>
         </div>}
-      </section>{error && <p role="alert" className="text-red-700 dark:text-red-300 text-sm">{error}</p>}
+      </section>
+      {highlanderGateOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"><div className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5 shadow-2xl space-y-4"><div><h2 className="text-xl font-bold">Open Highlander Summit</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-300">Enter the Highlander access code to continue to the Highlander login.</p></div><input autoFocus value={highlanderCode} onChange={(e)=>setHighlanderCode(e.target.value.toUpperCase())} onKeyDown={(e)=>e.key === "Enter" && unlockHighlander()} maxLength={4} placeholder="4 character code" className="w-full rounded-lg border px-3 py-3 bg-white dark:bg-slate-900 text-center font-mono text-xl tracking-[0.35em] uppercase"/><div className="flex gap-2"><button onClick={()=>{setHighlanderGateOpen(false);setHighlanderCode("");setError("");}} className="flex-1 rounded-lg border px-4 py-2 font-semibold">Cancel</button><button onClick={unlockHighlander} disabled={highlanderCode.length !== 4} className="flex-1 rounded-lg bg-slate-900 dark:bg-blue-600 text-white px-4 py-2 font-semibold disabled:opacity-50">Continue</button></div></div></div>}
+      {error && <p role="alert" className="text-red-700 dark:text-red-300 text-sm">{error}</p>}
     </div>
   </div>;
 }

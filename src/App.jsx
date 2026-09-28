@@ -406,7 +406,7 @@ export default function App() {
     const fromLink = new URLSearchParams(window.location.search).get("event");
     return /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(fromLink || "") ? fromLink : localStorage.getItem("refosActiveEvent") || EVENT_ID;
   });
-  const [selectingEvent, setSelectingEvent] = useState(false);
+  const [selectingEvent, setSelectingEvent] = useState(true);
   const [unlocked, setUnlocked] = useState(false);
   const [role, setRole] = useState("ref");
   const [accessChecked, setAccessChecked] = useState(false);
