@@ -403,14 +403,24 @@ function Thumb({ pkey, onOpen, full = false, compact = false }) {
 /*  ROOT: auth -> event selection -> tracker                            */
 /* ==================================================================== */
 export default function App() {
-  const initialEventId = (() => {
-    const fromUrl = new URLSearchParams(window.location.search).get("event");
-    return fromUrl || localStorage.getItem("refosActiveEventId") || "";
-  })();
+  // Phase 2 intentionally starts at the event selector on every fresh app load.
+  // Old ?event= links and saved event IDs from previous builds must not silently
+  // bypass the selector.
+  const initialEventId = "";
   const [activeEventId, setActiveEventId] = useState(initialEventId);
   const [eventChoices, setEventChoices] = useState([]);
-  const [eventsLoading, setEventsLoading] = useState(!initialEventId);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const [eventChoiceError, setEventChoiceError] = useState("");
+
+  useEffect(() => {
+    localStorage.removeItem("refosActiveEventId");
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("event")) {
+      url.searchParams.delete("event");
+      window.history.replaceState(null, "", url);
+    }
+  }, []);
+
   const [unlocked, setUnlocked] = useState(false);
   const [role, setRole] = useState("ref");
   const [accessChecked, setAccessChecked] = useState(false);
