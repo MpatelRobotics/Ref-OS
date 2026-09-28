@@ -246,32 +246,6 @@ export async function createEvent(d) {
   if (error) throw error;
   return mapEvent(Array.isArray(data) ? data[0] : data);
 }
-export async function createHighlanderSecondaryEvent(d) {
-  await ensureAnonymousSession();
-  const { data, error } = await supabase.rpc("create_highlander_secondary_event", {
-    p_name: String(d.name || "").trim(),
-  });
-  if (error) throw error;
-  return mapEvent(Array.isArray(data) ? data[0] : data);
-}
-
-export async function claimActiveSecondaryEvent(credential) {
-  await ensureAnonymousSession();
-  const { data, error } = await supabase.rpc("claim_active_secondary_event", {
-    p_credential: String(credential || "").trim().toUpperCase(),
-  });
-  if (error) throw error;
-  const row = Array.isArray(data) ? data[0] : data;
-  if (!row?.event_id) throw new Error("Invalid event credential.");
-  return {
-    eventId: row.event_id,
-    eventName: row.event_name,
-    role: row.role,
-    serverRole: row.role,
-    isAdmin: !!row.is_admin,
-  };
-}
-
 export async function deleteConfiguredEvent(eventId, builderCode) {
   await ensureAnonymousSession();
   const { data, error } = await supabase.rpc("delete_configured_event", {

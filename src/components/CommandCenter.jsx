@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React from "react";
 import { AlertTriangle, BarChart3, Bell, CalendarDays, ClipboardCheck, Clock, CloudOff, Contact, Download, Flag, KeyRound, ListOrdered, Mail, MapPin, RefreshCw, ShieldCheck, Trash2, Trophy, Users, Wifi, X } from "lucide-react";
 
 const fmtTime = (ms) => ms ? new Date(ms).toLocaleString() : "—";
 
-export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onFieldNames, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onCreateSecondaryEvent, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, onClose }) {
+export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onFieldNames, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, onClose }) {
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
@@ -39,62 +39,8 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
       </button>
     );
   };
-  const [showNewEvent, setShowNewEvent] = useState(false);
-  const [newEvent, setNewEvent] = useState({ name: "" });
-  const [creatingEvent, setCreatingEvent] = useState(false);
-  const [createEventError, setCreateEventError] = useState("");
-  const [createdEvent, setCreatedEvent] = useState(null);
-
-  const createSecondary = async () => {
-    if (!newEvent.name.trim() || creatingEvent) return;
-    setCreatingEvent(true);
-    setCreateEventError("");
-    try {
-      const ev = await onCreateSecondaryEvent(newEvent);
-      setCreatedEvent(ev);
-    } catch (error) {
-      setCreateEventError(error?.message || "Could not create event.");
-    } finally {
-      setCreatingEvent(false);
-    }
-  };
-
   return (
     <div className="fixed inset-0 z-[65] bg-slate-50 dark:bg-slate-900 flex flex-col">
-        {showNewEvent && (
-          <div className="fixed inset-0 z-[90] bg-black/50 grid place-items-center p-4">
-            <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-800 border dark:border-slate-700 shadow-2xl p-5 space-y-4">
-              <div className="flex items-center gap-2">
-                <CalendarDays size={20}/>
-                <div><h3 className="font-bold text-lg">Make New Event</h3><p className="text-xs text-slate-500">Creates the one active secondary VEX event.</p></div>
-                <button onClick={() => setShowNewEvent(false)} className="ml-auto p-2"><X size={20}/></button>
-              </div>
-              {createdEvent ? (
-                <div className="space-y-3">
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 p-4">
-                    <div className="font-bold">{createdEvent.name} created</div>
-                    <div className="mt-2 text-sm">Referee code: <b>2B23</b></div>
-                    <div className="text-sm">Judge Advisor code: <b>2C23</b></div>
-                    <div className="text-sm mt-2">Admin code: 2D23</div>
-                  </div>
-                  <button onClick={() => setShowNewEvent(false)} className="w-full py-2.5 rounded-xl bg-[#0D0F32] text-white font-semibold">Done</button>
-                </div>
-              ) : (
-                <>
-                  <label className="block text-sm font-semibold">Event name<input value={newEvent.name} onChange={e=>setNewEvent(v=>({...v,name:e.target.value}))} className="mt-1 w-full rounded-xl border px-3 py-2 bg-white dark:bg-slate-900" placeholder="Event name"/></label>
-                  <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-900 p-3 text-sm">
-                    After creating the event, use <b>TM Sync Center</b> to import the teams, qualification schedule, practice schedule, rankings, and other Tournament Manager data. Match counts do not need to be entered here.
-                  </div>
-                  <div className="rounded-xl bg-slate-50 dark:bg-slate-900 p-3 text-sm">
-                    <div><b>Referee:</b> 2B23</div><div><b>Judge Advisor:</b> 2C23</div><div><b>Admin:</b> 2D23</div>
-                  </div>
-                  {createEventError && <div className="text-sm text-red-600">{createEventError}</div>}
-                  <button disabled={!newEvent.name.trim() || creatingEvent} onClick={createSecondary} className="w-full py-2.5 rounded-xl bg-[#0D0F32] disabled:opacity-40 text-white font-semibold">{creatingEvent ? "Creating…" : "Create event"}</button>
-                </>
-              )}
-            </div>
-          </div>
-        )}
       <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2"><BarChart3 size={20}/><div><h2 className="font-bold">Event Command Center</h2><p className="text-xs text-slate-400">Admin operations overview</p></div><button onClick={onClose} className="ml-auto"><X size={22}/></button></div>
       <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto p-4 space-y-3">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -151,7 +97,6 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
             <button onClick={onTwoDeviceSyncTest} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Wifi size={16}/> Two Device Sync Test</button>
             <button onClick={onDiagnosticReport} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ShieldCheck size={16}/> Admin Diagnostics</button>
             <button onClick={onEventSetup} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><CalendarDays size={16}/> Event setup</button>
-            <button onClick={() => { setCreatedEvent(null); setCreateEventError(""); setShowNewEvent(true); }} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><CalendarDays size={16}/> Make New Event</button>
             <button onClick={onTMSync} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><RefreshCw size={16}/> TM Sync Center</button>
             <button onClick={onExportViolations} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Download size={16}/> Export violations</button>
             <button onClick={onExportNominations} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Trophy size={16}/> Export nominations</button>
