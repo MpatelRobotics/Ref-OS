@@ -238,11 +238,19 @@ export async function getEvent(id) {
   return mapEvent(data);
 }
 export async function createEvent(d) {
-  const { data, error } = await supabase.rpc("create_event", {
+  await ensureAnonymousSession();
+  const { data, error } = await supabase.rpc("create_configured_event", {
     p_name: d.name, p_quals: d.quals, p_practice: d.practice, p_bracket: d.bracket, p_finals: d.finalsBestOf,
+    p_admin_credential: d.adminCredential, p_builder_code: d.builderCode,
   });
   if (error) throw error;
   return mapEvent(Array.isArray(data) ? data[0] : data);
+}
+export async function verifyEventConfigurator(code) {
+  await ensureAnonymousSession();
+  const { data, error } = await supabase.rpc("verify_event_configurator", { p_builder_code: code });
+  if (error) throw error;
+  return data === true;
 }
 export async function updateEvent(id, d) {
   const { data } = await supabase.from("events").update({
@@ -623,16 +631,25 @@ export async function clearAlliances(eventId) {
 
 /* ================= rulebook ================= */
 export async function listRules(eventId) {
-  if (E2E_MOCK) return OFFLINE_RULES;
+  const highlander = eventId === "11111111-1111-4111-8111-111111111111";
+  if (E2E_MOCK) return highlander ? OFFLINE_RULES : [];
   try {
     const { data, error } = await supabase.from("rules").select("code,description,category,ord").eq("event_id", eventId).order("ord");
     if (error) throw error;
     const live = (data || []).map((r) => ({ code: r.code, desc: r.description || "", category: r.category || "", ord: r.ord ?? 0 }));
-    return live.length ? live : OFFLINE_RULES;
+    saveReadCache(eventId, "rules", live);
+    return live.length ? live : highlander ? OFFLINE_RULES : [];
   } catch (error) {
     console.warn("Rules unavailable from Supabase; using bundled offline rule index.", error);
-    return OFFLINE_RULES;
+    return loadReadCache(eventId, "rules") || (highlander ? OFFLINE_RULES : []);
   }
+}
+export async function importEventRules(eventId, rows) {
+  const { error } = await supabase.from("rules").upsert(rows.map((row, index) => ({
+    event_id: eventId, code: row.code, description: row.desc, category: row.category || "General", ord: index + 1,
+  })), { onConflict: "event_id,code" });
+  if (error) throw error;
+  return listRules(eventId);
 }
 
 /* ================= award nominations (Judging) ================= */
@@ -887,4 +904,16 @@ export function joinPresence(eventId, meta, onChange) {
     }
   });
   return () => supabase.removeChannel(ch);
+}
+
+/* ================= configurator completion ================= */
+export async function finishConfiguredEvent(eventId, { branding, roleCodes }) {
+  if (eventId === "11111111-1111-4111-8111-111111111111") throw new Error("Highlander is protected from generic configurator changes.");
+  await upsertEventSetting(eventId, "event_branding", branding || {}, "Configurator");
+  await upsertEventSetting(eventId, "role_access_codes", roleCodes || { version: 1, codes: {} }, "Configurator");
+  const roleMap = { ref: "ref", judge: "judge", emcee: "emcee", inspection: "inspection" };
+  await Promise.all(Object.entries(roleMap).map(([key, serverRole]) => {
+    const entry = roleCodes?.codes?.[key];
+    return entry?.hash ? setEventAccessCredentialHash(eventId, `${key}_code`, serverRole, entry.hash, entry.enabled !== false) : Promise.resolve();
+  }));
 }

@@ -4,7 +4,17 @@
 
 Ref OS is a shared operations app for VEX robotics events. It gives referees, inspectors, Judge Advisors, Emcees, and event administrators one live place to coordinate match activity, record violations, document robots, monitor field readiness, share role information, and respond to event day issues.
 
-Ref OS 1.0.0 is the Highlander Summit Release created by Maharshi Patel. This release is configured for Highlander Summit and the Override game. The bundled game manual, rule index, inspection tag, field names, and some workflows are specific to that event. A reusable setup for other games and events is a future goal, not a feature of this release.
+Ref OS 1.0.0 began as the Highlander Summit Release created by Maharshi Patel. Highlander retains its bundled Override manual and rules. Other organizers can create a separate event through the Event Configurator, import their own teams, matches, rankings, and rules, and generate volunteer role access codes. Each event has separate server data and device identity. New events do not inherit Highlander's manual or rule index.
+
+## Configure another event
+
+1. Run `supabase/multi-event-configurator.sql` in the Supabase SQL Editor before deploying the multi event interface.
+2. From the login screen, choose **Choose or configure an event**. Enter the separate configurator login code provided by the owner.
+3. Enter the event name, qualification and practice match counts, elimination bracket, finals format, and an organizer Admin password of at least 12 characters. Save the password securely.
+4. After creation, copy the event link and open the new event. In Admin mode, generate the referee, Judge Advisor, and Emcee codes, then share each code with its intended volunteers along with the event link.
+5. In the event settings menu, import a rules CSV with `code` and `description` columns, optionally `category`. Use Tournament Manager Sync Center to import teams and the match schedule. Event setup and field names can be changed later from the Command Center.
+
+The new event link contains an event ID; volunteers still need a valid role credential. Event data is isolated by event membership and server rules. Highlander's fixed backup credentials do not apply to new events. The bundled Override manual and its page navigation remain available only in Highlander. The bundled judging export forms and some game specific operational tools should be reviewed for a different game before relying on them. Email help alerts are wired only to Highlander's configured Admin addresses; new events can use event scoped push notifications. Deploy the updated `send-code-request-push` Edge Function to enforce that email separation.
 
 ## One live event workspace
 
@@ -230,3 +240,20 @@ Created by Maharshi Patel for Highlander Summit event operations.
 ## Required Supabase update
 
 Before deploying this version, run `supabase/reset-robot-pictures-safely.sql` once in the project's Supabase SQL Editor. It makes the robot picture reset atomic with the team picture references and rejects uploads from before the reset. Deploying the app before this SQL is applied will prevent new robot picture uploads and picture resets.
+
+## Generic Ref OS deployment prep (2026-09-27)
+
+- Added a generic Ref OS logo at `public/refos-logo.svg` for non-Highlander events and the Event Configurator.
+- Generic event login/configurator branding uses neutral slate and blue styling rather than Highlander red branding.
+- Existing Highlander event detection and legacy logo path remain intact so the current event identity is not migrated by this UI change.
+- Highlander retains its existing configured Admin email alerts in `send-code-request-push`. Generic configured events are push only and cannot send to Highlander Admin email addresses.
+- Generic events do not expose email delivery controls; Highlander continues to honor its existing `notification_delivery` setting.
+- Before multi-event production deployment, run `supabase/multi-event-configurator.sql`, then deploy the included `send-code-request-push` Edge Function update.
+
+## External event readiness additions
+
+The Event Configurator now uses a five step setup wizard for event details, match format, branding, access, and review. Generic events can store a custom accent color, date, venue, and small event logo. The configurator generates Referee, Judge Advisor, Emcee, and Inspection codes and writes their hashes to the event credential table. The completion screen provides the shareable event link, role codes, copy controls, and a copyable setup sheet.
+
+The Highlander production event (`11111111-1111-4111-8111-111111111111`) is explicitly marked as configurator protected. This protection is intentionally scoped to the generic configurator so existing Highlander Admin/event day workflows are not disabled.
+
+Features & Help now includes explicit release and support information. Highlander retains push plus email notification delivery. Generic configured events remain push only.

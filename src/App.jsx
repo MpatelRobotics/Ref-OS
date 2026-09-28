@@ -14,6 +14,7 @@ import { APP_VERSION } from "./appVersion";
 import CommandCenter from "./components/CommandCenter.jsx";
 import EventContactDirectory from "./components/EventContactDirectory.jsx";
 import LoginScreen from "./auth/LoginScreen.jsx";
+import EventGateway from "./auth/EventGateway.jsx";
 import NameScreen from "./auth/NameScreen.jsx";
 import RoleAccessCodeManager from "./auth/RoleAccessCodeManager.jsx";
 import { latestRoleAccessConfig } from "./auth/accessConfig.js";
@@ -401,6 +402,11 @@ function Thumb({ pkey, onOpen, full = false, compact = false }) {
 /*  ROOT: auth -> event selection -> tracker                            */
 /* ==================================================================== */
 export default function App() {
+  const [activeEventId, setActiveEventId] = useState(() => {
+    const fromLink = new URLSearchParams(window.location.search).get("event");
+    return /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(fromLink || "") ? fromLink : localStorage.getItem("refosActiveEvent") || EVENT_ID;
+  });
+  const [selectingEvent, setSelectingEvent] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [role, setRole] = useState("ref");
   const [accessChecked, setAccessChecked] = useState(false);
@@ -420,17 +426,31 @@ export default function App() {
   }, [textScale]);
   const cycleTextSize = () => setTextScale((s) => (s === "normal" ? "large" : s === "large" ? "xl" : "normal"));
 
-  const [meName, setMeName] = useState(() => localStorage.getItem("refName") || "");
-  const [meFullName, setMeFullName] = useState(() => localStorage.getItem("refFullName") || "");
-  const [mePhone, setMePhone] = useState(() => localStorage.getItem("refPhone") || "");
+  const identityKey = (id) => `refosIdentity:${id}`;
+  const readIdentity = (id) => {
+    try { return JSON.parse(localStorage.getItem(identityKey(id)) || "null") || (id === EVENT_ID ? { nickname: localStorage.getItem("refName") || "", fullName: localStorage.getItem("refFullName") || "", phone: localStorage.getItem("refPhone") || "" } : {}); }
+    catch { return {}; }
+  };
+  const [meName, setMeName] = useState(() => readIdentity(activeEventId).nickname || "");
+  const [meFullName, setMeFullName] = useState(() => readIdentity(activeEventId).fullName || "");
+  const [mePhone, setMePhone] = useState(() => readIdentity(activeEventId).phone || "");
   const [event, setEvent] = useState(null);
   const [loadErr, setLoadErr] = useState(false);
+  const selectEvent = (id) => {
+    const identity = readIdentity(id);
+    setMeName(identity.nickname || ""); setMeFullName(identity.fullName || ""); setMePhone(identity.phone || "");
+    localStorage.setItem("refosActiveEvent", id);
+    window.history.replaceState(null, "", id === EVENT_ID ? window.location.pathname : `${window.location.pathname}?event=${encodeURIComponent(id)}`);
+    setUnlocked(false); setAccessChecked(false); setIdentityChecked(false); setEvent(null); setLoadErr(false);
+    sessionStorage.removeItem("refosAdmin");
+    setActiveEventId(id); setSelectingEvent(false);
+  };
 
   useEffect(() => {
     let live = true;
     (async () => {
       try {
-        const serverRole = await api.getMyEventRole(EVENT_ID);
+        const serverRole = await api.getMyEventRole(activeEventId);
         if (!live) return;
         if (serverRole) {
           const roleText = String(serverRole || "").trim().toLowerCase();
@@ -451,12 +471,12 @@ export default function App() {
       }
     })();
     return () => { live = false; };
-  }, []);
+  }, [activeEventId]);
 
   useEffect(() => {
     if (!unlocked || !meName) return;
-    api.setEventMemberName(EVENT_ID, meName).catch(() => {});
-  }, [unlocked, meName]);
+    api.setEventMemberName(activeEventId, meName).catch(() => {});
+  }, [unlocked, meName, activeEventId]);
 
   useEffect(() => {
     if (!unlocked) {
@@ -466,15 +486,18 @@ export default function App() {
     let live = true;
     (async () => {
       try {
-        const version = await api.getIdentityResetVersion(EVENT_ID);
+        const version = await api.getIdentityResetVersion(activeEventId);
         if (!live) return;
-        const key = `refosIdentityResetVersion:${EVENT_ID}`;
+        const key = `refosIdentityResetVersion:${activeEventId}`;
         const previous = localStorage.getItem(key);
         if (version !== previous) {
           if (version !== "0") {
-            localStorage.removeItem("refName");
-            localStorage.removeItem("refFullName");
-            localStorage.removeItem("refPhone");
+            if (activeEventId === EVENT_ID) {
+              localStorage.removeItem("refName");
+              localStorage.removeItem("refFullName");
+              localStorage.removeItem("refPhone");
+            }
+            localStorage.removeItem(identityKey(activeEventId));
             setMeName("");
             setMeFullName("");
             setMePhone("");
@@ -488,24 +511,24 @@ export default function App() {
       }
     })();
     return () => { live = false; };
-  }, [unlocked]);
+  }, [unlocked, activeEventId]);
 
   useEffect(() => {
     if (!unlocked || !meName) return;
     let live = true;
     setLoadErr(false);
-    api.getEvent(EVENT_ID)
+    api.getEvent(activeEventId)
       .then((ev) => { if (live) { ev ? setEvent(ev) : setLoadErr(true); } })
       .catch(() => { if (live) setLoadErr(true); });
     return () => { live = false; };
-  }, [unlocked, meName]);
+  }, [unlocked, meName, activeEventId]);
 
   const unlock = (r, admin, serverRole, credential = "") => {
     const roleText = String(r || serverRole || "").trim().toLowerCase();
     const uiRole = roleText.includes("inspection") ? "inspection" : roleText.includes("judge") ? "judge" : roleText.includes("emcee") ? "emcee" : "ref";
     const enteredCode = String(credential || "").trim().toUpperCase();
     if (!admin && serverRole !== "admin" && /^\d[A-D]\d\d$/.test(enteredCode)) {
-      localStorage.setItem(`refosVisibleRoleCode:${EVENT_ID}:${uiRole}`, enteredCode);
+      localStorage.setItem(`refosVisibleRoleCode:${activeEventId}:${uiRole}`, enteredCode);
     }
     localStorage.setItem("unlocked", "1");
     localStorage.setItem("refosRole", uiRole);
@@ -518,13 +541,16 @@ export default function App() {
   const saveIdentity = async ({ nickname, fullName, phone = "" }) => {
     const cleanNickname = String(nickname || "").trim();
     const cleanFullName = String(fullName || "").trim();
-    localStorage.setItem("refName", cleanNickname);
-    localStorage.setItem("refFullName", cleanFullName);
-    localStorage.setItem("refPhone", String(phone || "").trim());
+    if (activeEventId === EVENT_ID) {
+      localStorage.setItem("refName", cleanNickname);
+      localStorage.setItem("refFullName", cleanFullName);
+      localStorage.setItem("refPhone", String(phone || "").trim());
+    }
+    localStorage.setItem(identityKey(activeEventId), JSON.stringify({ nickname: cleanNickname, fullName: cleanFullName, phone: String(phone || "").trim() }));
     setMeName(cleanNickname);
     setMeFullName(cleanFullName);
     setMePhone(String(phone || "").trim());
-    try { await api.setEventMemberName(EVENT_ID, cleanNickname); } catch {}
+    try { await api.setEventMemberName(activeEventId, cleanNickname); } catch {}
   };
 
   const lock = useCallback(async () => {
@@ -538,8 +564,9 @@ export default function App() {
   }, []);
 
   if (!configured) return <ConfigError />;
+  if (selectingEvent) return <EventGateway currentEventId={activeEventId} onSelect={selectEvent} onClose={() => setSelectingEvent(false)} />;
   if (!accessChecked) return <FullPage>Checking event access…</FullPage>;
-  if (!unlocked) return <LoginScreen eventId={EVENT_ID} onUnlock={unlock} />;
+  if (!unlocked) return <LoginScreen eventId={activeEventId} eventName={event?.name} onChooseEvent={() => setSelectingEvent(true)} onUnlock={unlock} />;
   if (!identityChecked) return <FullPage>Checking volunteer profile…</FullPage>;
   if (!meName || !meFullName) return <NameScreen onIdentity={saveIdentity} />;
   if (loadErr) return (
@@ -552,7 +579,7 @@ export default function App() {
   );
   if (!event) return <FullPage>Loading…</FullPage>;
 
-  return <Tracker key={event.id} initialEvent={event} meName={meName} meFullName={meFullName} mePhone={mePhone} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} />;
+  return <Tracker key={event.id} initialEvent={event} meName={meName} meFullName={meFullName} mePhone={mePhone} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} onChooseEvent={() => setSelectingEvent(true)} />;
 }
 
 const FullPage = ({ children }) => (
@@ -570,11 +597,12 @@ const ConfigError = () => (
 /* ==================================================================== */
 /*  TRACKER (the main app, scoped to one event)                        */
 /* ==================================================================== */
-function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock }) {
+function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onChooseEvent }) {
   const isJudge = role === "judge";
   const isEmcee = role === "emcee";
   const isInspection = role === "inspection";
   const eventId = initialEvent.id;
+  const isHighlander = eventId === EVENT_ID;
   const [event, setEvent] = useState(initialEvent);
   const [teams, setTeams] = useState([]);
   const [viols, setViols] = useState([]);
@@ -618,7 +646,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   }, [eventId, onLock]);
 
   const [lastMatch, setLastMatch] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("lastMatch")) || { phase: "qual", num: "" }; }
+    try { return JSON.parse(localStorage.getItem(`lastMatch:${eventId}`)) || { phase: "qual", num: "" }; }
     catch { return { phase: "qual", num: "" }; }
   });
 
@@ -666,6 +694,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const teamFileRef = useRef(null);
   const scoreFileRef = useRef(null);
   const rankingFileRef = useRef(null);
+  const ruleImportRef = useRef(null);
   const skillsFileRef = useRef(null);
   const allianceFileRef = useRef(null);
   const [logFor, setLogFor] = useState(null);
@@ -901,10 +930,9 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     : null;
 
   const pushSupported = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
-  const notificationDelivery = eventSettings?.notification_delivery?.value || { push: true, email: true };
-  const notificationDeliveryLabel = notificationDelivery.push && notificationDelivery.email
-    ? "Both"
-    : notificationDelivery.email ? "Email only" : "Push only";
+  const eventBranding = eventSettings?.event_branding?.value || {};
+  const notificationDelivery = isHighlander ? { push: true, email: true } : { push: true, email: false };
+  const notificationDeliveryLabel = isHighlander ? "Push + email" : "Push only";
   const refreshPushState = useCallback(async () => {
     if (!pushSupported) { setPushState("unsupported"); return; }
     if (Notification.permission === "denied") { setPushState("blocked"); return; }
@@ -955,19 +983,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     }
   };
 
-  const saveNotificationDelivery = async (mode) => {
-    const value = {
-      push: mode === "push" || mode === "both",
-      email: mode === "email" || mode === "both",
-    };
-    try {
-      const saved = await api.upsertEventSetting(eventId, "notification_delivery", value, meName);
-      setEventSettings((current) => ({ ...current, notification_delivery: saved }));
-      setShowNotificationPreferences(false);
-    } catch (error) {
-      alert(`Could not update alert delivery: ${error?.message || "Unknown error"}`);
-    }
-  };
+
 
   useEffect(() => {
     if (!showShare && !hasPendingRoleCodeRequests) return undefined;
@@ -1372,7 +1388,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       notes: row.notes, match: row.match_info, by: meName || "", byFullName: meFullName || meName || "", byUserId: authorId, photoKeys: [],
       createdAt, _pending: true, _localPhotos: photos,
     })), ...cur]);
-    if (cleanMatch) { setLastMatch(cleanMatch); localStorage.setItem("lastMatch", JSON.stringify(cleanMatch)); }
+    if (cleanMatch) { setLastMatch(cleanMatch); localStorage.setItem(`lastMatch:${eventId}`, JSON.stringify(cleanMatch)); }
     for (const row of rows) await outbox.enqueue(eventId, { id: row.id, kind: "violation", eventId, row, photos, createdAt });
     doFlush();
     offerUndo(`${rows.length > 1 ? `${rows.length} violations` : "Violation"} saved for ${team}`, async () => {
@@ -1853,6 +1869,22 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     } catch (e) {
       alert("Could not import Skills Challenge rankings: " + (e.message || e));
     } finally { setImporting(null); }
+  };
+  const importRulesFile = async (file) => {
+    if (!file || !adminUnlocked) return;
+    try {
+      const table = parseCSV(await file.text());
+      const header = (table[0] || []).map((name) => String(name).toLowerCase().replace(/[^a-z]/g, ""));
+      const codeCol = header.findIndex((name) => ["code", "rule", "rulecode"].includes(name));
+      const descCol = header.findIndex((name) => ["description", "desc", "text", "rulename"].includes(name));
+      const catCol = header.findIndex((name) => ["category", "section", "group"].includes(name));
+      if (codeCol < 0 || descCol < 0) throw new Error("CSV needs code and description columns. Category is optional.");
+      const rows = table.slice(1).map((line) => ({ code: String(line[codeCol] || "").trim().toUpperCase(), desc: String(line[descCol] || "").trim(), category: catCol < 0 ? "General" : String(line[catCol] || "General").trim() })).filter((row) => row.code && row.desc);
+      if (!rows.length) throw new Error("No rules found in the CSV.");
+      if (!confirm(`Import ${rows.length} rules into ${event.name}? Existing rules with the same code will be updated.`)) return;
+      setRules(await api.importEventRules(eventId, rows));
+      alert(`Imported ${rows.length} rules.`);
+    } catch (error) { alert(error.message || "Could not import rules."); }
   };
   const importScoresFile = async (file) => {
     if (!file) return;
@@ -2777,7 +2809,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   return (
     <div className="refos-shell min-h-screen font-sans antialiased">
       <a className="refos-skip" href="#workspace">Skip to workspace</a>
-      <header className="refos-header sticky top-0 z-20 text-white">
+      <header className="refos-header sticky top-0 z-20 text-white" style={!isHighlander && eventBranding.accent ? { borderBottom: `3px solid ${eventBranding.accent}` } : undefined}>
         <div className="refos-header-inner mx-auto px-4 py-3 flex items-center gap-3">
           {(openTeam || openMatch || openRobot) ? (
             <button onClick={() => { setOpenTeam(null); setOpenMatch(null); setOpenRobot(null); }} aria-label={`Back to ${openTeam ? "Teams" : openRobot ? "Robots" : "Matches"}`} className="refos-back-button refos-back-button-on-dark">
@@ -2785,11 +2817,11 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
             </button>
           ) : (
             <div className="refos-header-brand flex items-center gap-2 shrink-0">
-              <img src="/logo.svg" alt="Highlander Summit" className="h-9 w-9 object-contain" />
+              <img src={isHighlander ? "/logo.svg" : (eventBranding.logoData || "/refos-logo.svg")} alt={isHighlander ? "Highlander Summit" : (event.name || "Ref OS")} className="h-9 w-9 object-contain" />
               <div className="leading-tight hidden sm:block">
                 <div className="flex items-center gap-1.5">
                   <div className="font-bold text-[13px] text-white">Ref-OS</div>
-                  <span className="rounded-full border border-red-300/50 bg-red-400/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-red-100">Highlander Summit Release</span>
+                  {isHighlander && <span className="rounded-full border border-red-300/50 bg-red-400/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-red-100">Highlander Summit Release</span>}
                 </div>
                 <div className="text-[9px] text-slate-400">Referee Operating System</div>
               </div>
@@ -2835,6 +2867,9 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
             <button aria-label="Settings" onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
               <div ref={menuRef} className="refos-menu-pop absolute right-0 mt-2 w-56 max-h-[75vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
+                <button onClick={() => { setMenu(false); onChooseEvent(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><CalendarDays size={16} /> Switch event</button>
+                {adminUnlocked && <button onClick={async () => { setMenu(false); try { await navigator.clipboard.writeText(`${window.location.origin}/?event=${eventId}`); alert("Event link copied. Volunteers also need their role access code."); } catch { alert(`${window.location.origin}/?event=${eventId}`); } }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><Copy size={16} /> Copy event link</button>}
+                {adminUnlocked && !isHighlander && <button onClick={() => { setMenu(false); ruleImportRef.current?.click(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><BookOpen size={16} /> Import event rules CSV</button>}
                 {isInspection ? (
                   <>
                     <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><ClipboardCheck size={12} /> Inspection</div>
@@ -2857,7 +2892,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                 <button onClick={() => { setMenu(false); setShowFeatures(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Info size={16} /> Features &amp; Help</button>
                 <div className="refos-menu-section">Access</div>
                 <button onClick={togglePushNotifications} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{pushState === "enabled" ? <Bell size={16} /> : <BellOff size={16} />} {pushState === "enabled" ? "Push alerts on" : pushState === "blocked" ? "Push alerts blocked" : "Enable push alerts"}</button>
-                {adminUnlocked && <button onClick={() => { setMenu(false); setShowNotificationPreferences(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Mail size={16} /> Alert delivery <span className="ml-auto text-[10px] font-bold text-slate-400">{notificationDeliveryLabel}</span></button>}
+                
                 <button onClick={() => { setMenu(false); setShowHelpRequest(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LifeBuoy size={16} /> Request Help</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
@@ -2888,7 +2923,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
                 <div className="refos-menu-section">Access</div>
                 <button onClick={togglePushNotifications} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{pushState === "enabled" ? <Bell size={16} /> : <BellOff size={16} />} {pushState === "enabled" ? "Push alerts on" : pushState === "blocked" ? "Push alerts blocked" : "Enable push alerts"}</button>
-                {adminUnlocked && <button onClick={() => { setMenu(false); setShowNotificationPreferences(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Mail size={16} /> Alert delivery <span className="ml-auto text-[10px] font-bold text-slate-400">{notificationDeliveryLabel}</span></button>}
+                
                 <button onClick={() => { setMenu(false); setShowHelpRequest(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LifeBuoy size={16} /> Request Help</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
                 <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
@@ -2944,7 +2979,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                 </div>
                 <div className="refos-sidebar-footer">
                   <span>{adminUnlocked ? "Admin" : isInspection ? "Inspection" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
-                  <span>v{APP_VERSION} · Highlander Summit Release</span>
+                  <span>v{APP_VERSION}{isHighlander ? " · Highlander Summit Release" : ""}</span>
                 </div>
               </nav>
               <div className="sm:hidden refos-mobile-context">
@@ -3196,10 +3231,10 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
           </>
         )}
         <div ref={workspaceFooterRef} className="flex flex-col items-center gap-2 mt-10 pb-2">
-          <img src="/logo.svg" alt="Highlander Summit" className="h-10 w-10 object-contain opacity-90" />
+          <img src={isHighlander ? "/logo.svg" : "/refos-logo.svg"} alt={isHighlander ? "Highlander Summit" : "Ref OS"} className="h-10 w-10 object-contain opacity-90" />
           <p className="text-center text-xs text-slate-400">
             Made by Maharshi Patel ·{" "}
-            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 underline">@mpatel_ref</a>{" · "}v{APP_VERSION} · Highlander Summit Release
+            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 underline">@mpatel_ref</a>{" · "}v{APP_VERSION}{isHighlander ? " · Highlander Summit Release" : ""}
           </p>
         </div>
       </main>
@@ -3316,6 +3351,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importScoresFile(f); }} />
       <input ref={rankingFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importRankingsFile(f); }} />
+      <input ref={ruleImportRef} type="file" accept=".csv,text/csv" className="hidden"
+        onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; importRulesFile(file); }} />
       <input ref={skillsFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importSkillsFile(f); }} />
       {importPreview && <ImportPreviewModal preview={importPreview}
@@ -3379,7 +3416,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         eventMembers={eventMembers} meName={meName} onSetAdmin={setVolunteerAdmin}
         alertStats={alertStats} alertStatsLoading={alertStatsLoading} onRefreshAlertStats={loadAlertStats} onResetAlertStats={resetAlertStats}
         alertDeliveryLabel={notificationDeliveryLabel}
-        onAlertDelivery={() => openCommandCenterTool(() => setShowNotificationPreferences(true))}
+        onAlertDelivery={undefined}
         failedSyncItems={failedSyncItems} onRetryFailedSync={retryFailedSync} onDiscardFailedSync={discardFailedSync}
         countdown={eventCountdown} countdownText={countdownText}
         onCountdown={() => openCommandCenterTool(() => setShowCountdownSetup(true))}
@@ -3435,7 +3472,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                 </div>
                 <button onClick={() => setShowFeedback(true)} className="px-3 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-semibold shrink-0">Send Feedback</button>
               </div>
-              <FeaturesGuide />
+              <FeaturesGuide isHighlander={isHighlander} />
+              <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 text-sm"><div className="font-bold text-slate-900 dark:text-slate-100">Ref OS support & release</div><div className="mt-1 text-slate-600 dark:text-slate-300">Version v{APP_VERSION}{isHighlander ? " · Highlander Summit Release" : " · Multi Event Release"}</div><div className="mt-1 text-xs text-slate-500">Use Send Feedback above to report a bug or request a feature. Include the event name, device, and what you were doing when the issue occurred.</div></div>
             </div>
           </div>
         </div>
@@ -3538,7 +3576,7 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
             </button>
           )}
         </div>
-        {!emcee && onLog && <button onClick={onLog} className="mt-4 w-full bg-[#D7212B] text-white py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-[#B42024]"><Plus size={18} /> Log violation for {team.number}</button>}
+        {!emcee && <button onClick={onLog} className="mt-4 w-full bg-[#D7212B] text-white py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-[#B42024]"><Plus size={18} /> Log violation for {team.number}</button>}
         {!emcee && <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3">
           <div className="flex items-center gap-2 mb-2">
             <Star size={16} className="text-amber-500 fill-amber-500" />
@@ -3923,7 +3961,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
         </div>
       </div>
       {showRulePicker && (
-        <RulePicker rules={rules} knownRules={knownRules}
+        <RulePicker rules={rules} knownRules={knownRules} eventId={event.id}
           selectedCodes={selectedRules.map((r) => r.code)}
           selectedRules={selectedRules} showRuleTypes={type !== "inspection"}
           onSetRuleType={(code, ruleType) => setSelectedRules((rs) => rs.map((rule) => rule.code === code ? { ...rule, type: ruleType } : rule))}
@@ -3936,10 +3974,10 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
 }
 
 /* ============================ RULE PICKER ============================ */
-function RulePicker({ rules, knownRules, selectedCodes = [], selectedRules = [], showRuleTypes = true, onSetRuleType, onPickRule, onPickCustom, onClose }) {
+function RulePicker({ rules, knownRules, eventId, selectedCodes = [], selectedRules = [], showRuleTypes = true, onSetRuleType, onPickRule, onPickCustom, onClose }) {
   const [q, setQ] = useState("");
-  const [favoriteCodes, setFavoriteCodes] = useState(() => { try { return JSON.parse(localStorage.getItem("refosRuleFavorites") || "[]"); } catch { return []; } });
-  const [recentCodes, setRecentCodes] = useState(() => { try { return JSON.parse(localStorage.getItem("refosRecentRules") || "[]"); } catch { return []; } });
+  const [favoriteCodes, setFavoriteCodes] = useState(() => { try { return JSON.parse(localStorage.getItem(`refosRuleFavorites:${eventId}`) || "[]"); } catch { return []; } });
+  const [recentCodes, setRecentCodes] = useState(() => { try { return JSON.parse(localStorage.getItem(`refosRecentRules:${eventId}`) || "[]"); } catch { return []; } });
   const query = q.trim();
   const uq = query.toUpperCase();
   const book = rules || [];
@@ -3950,11 +3988,11 @@ function RulePicker({ rules, knownRules, selectedCodes = [], selectedRules = [],
   const toggleFavorite = (code, e) => {
     e?.stopPropagation();
     const next = favoriteCodes.includes(code) ? favoriteCodes.filter((c) => c !== code) : [...favoriteCodes, code];
-    setFavoriteCodes(next); localStorage.setItem("refosRuleFavorites", JSON.stringify(next));
+    setFavoriteCodes(next); localStorage.setItem(`refosRuleFavorites:${eventId}`, JSON.stringify(next));
   };
   const rememberRule = (code) => {
     const next = [code, ...recentCodes.filter((c) => c !== code)].slice(0, 8);
-    setRecentCodes(next); localStorage.setItem("refosRecentRules", JSON.stringify(next));
+    setRecentCodes(next); localStorage.setItem(`refosRecentRules:${eventId}`, JSON.stringify(next));
   };
   const chooseRule = (r) => { rememberRule(r.code); onPickRule(r.code, r.desc); };
   const filtered = query ? all.filter((r) => r.code.toUpperCase().includes(uq) || (r.desc || "").toUpperCase().includes(uq)) : all;
@@ -4324,7 +4362,7 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
         {teams.map((n) => {
           const s = stat[n];
           return (
-            <button key={n} onClick={emcee || !onLogTeam ? undefined : () => onLogTeam(n)} className={`w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2.5 text-left ${emcee || !onLogTeam ? "cursor-default" : "hover:border-slate-300 dark:border-slate-600"}`}>
+            <button key={n} onClick={emcee ? undefined : () => onLogTeam(n)} className={`w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2.5 text-left ${emcee ? "cursor-default" : "hover:border-slate-300 dark:border-slate-600"}`}>
               <div className="flex items-center gap-2">
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{n}</span>
                 {teamRank[n] != null && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-200 dark:border-indigo-800 text-[11px] font-bold shrink-0">Rank {teamRank[n]}</span>}
@@ -4997,7 +5035,7 @@ const ROBOT_PHOTO_SLOTS = [
   { key: "front", label: "Front", required: true },
   { key: "side", label: "Side", required: true },
   { key: "back", label: "Back", required: true },
-  { key: "tag", label: "Highlander Inspection Tag", required: true },
+  { key: "tag", label: "Inspection Tag", required: true },
   { key: "lexan", label: "Lexan Diagram", required: false },
 ];
 const REQUIRED_ROBOT_ANGLES = ROBOT_PHOTO_SLOTS.filter((angle) => angle.required);
@@ -5020,7 +5058,7 @@ function RobotList({ teams, query, setQuery, onOpen }) {
   const complete = teams.filter((team) => robotAngleCount(team) === REQUIRED_ROBOT_ANGLES.length).length;
   return (
     <>
-      <p className="text-xs text-slate-400 mb-3">{complete} of {teams.length} teams have all four required inspection pictures. Every team needs Front, Side, Back, and the Highlander inspection tag attached to the robot.</p>
+      <p className="text-xs text-slate-400 mb-3">{complete} of {teams.length} teams have all four required inspection pictures. Every team needs Front, Side, Back, and an inspection tag picture.</p>
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search teams by number or name" placeholder="Search team #"
@@ -5115,7 +5153,7 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
         <div className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${completed === REQUIRED_ROBOT_ANGLES.length ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"}`}>
           <Camera size={13}/>{completed === REQUIRED_ROBOT_ANGLES.length ? "Required pictures complete" : `${completed} of ${REQUIRED_ROBOT_ANGLES.length} required pictures`}
         </div>
-        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">After inspection passes, photograph the Highlander tag attached to the robot.</p>
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">After inspection passes, photograph the inspection tag attached to the robot.</p>
         {canTakePhotos && <button type="button" onClick={beginSequence} disabled={busy} className="mt-3 w-full rounded-lg bg-[#D7212B] px-3 py-3 text-base font-bold text-white disabled:bg-slate-400"><Camera size={18} className="inline mr-1.5"/>Take pictures in order</button>}
       </div>
       {canTakePhotos && <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; add(file); }} />}
@@ -5123,7 +5161,7 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
         <div className="fixed inset-0 z-[160] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4" onClick={() => { if (!busy) { setSequenceIndex(-1); setCaptureAngle(""); } }}>
           <div role="dialog" aria-modal="true" aria-labelledby="robot-photo-sequence-title" onClick={(event) => event.stopPropagation()} className="w-full max-w-lg rounded-t-2xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl dark:bg-slate-800 sm:rounded-2xl sm:p-6">
             <h2 id="robot-photo-sequence-title" className="text-xl font-bold text-slate-900 dark:text-white">Take all robot pictures</h2>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Take Front, Side, Back, and the Highlander Inspection Tag in order. The Lexan Diagram is optional.</p>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Take Front, Side, Back, and the Inspection Tag in order. The Lexan Diagram is optional.</p>
             <div role="status" className="mt-5 rounded-lg border border-sky-200 bg-sky-50 p-4 dark:border-sky-800 dark:bg-sky-950/30">
               <p className="mb-3 text-base font-semibold text-sky-900 dark:text-sky-100">Picture {sequenceIndex + 1} of {ROBOT_PHOTO_SLOTS.length}: {ROBOT_PHOTO_SLOTS[sequenceIndex].label}{ROBOT_PHOTO_SLOTS[sequenceIndex].required ? "" : " (optional)"}</p>
               <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#D7212B] px-4 py-4 text-base font-bold text-white shadow-sm disabled:bg-slate-400"><Camera size={22}/>{busy ? "Saving picture…" : `Open camera: Take ${ROBOT_PHOTO_SLOTS[sequenceIndex].label} picture`}</button>
@@ -5503,7 +5541,7 @@ function ImportPreviewModal({ preview, onImport, onCancel }) {
   );
 }
 
-function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRankings, onImportSkills, onImportAlliances, onImportScores, stats, syncStatus, protectedKeys = [] }) {
+function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRankings, onImportSkills, onImportAlliances, onImportScores, stats, syncStatus }) {
   const items = [
     { key: "teams", title: "Teams", detail: `${stats.teams} teams loaded`, action: "Import teams", onClick: onImportTeams, Icon: Users },
     { key: "matches", title: "Match schedule", detail: `${stats.matches} matches loaded`, action: "Import matches", onClick: onImportMatches, Icon: ListOrdered },
@@ -5539,8 +5577,8 @@ function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRanking
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{detail}</div>
                   <div className="text-[11px] text-slate-400 mt-0.5">{when(syncStatus[key])}</div>
                 </div>
-                <button onClick={onClick} disabled={protectedKeys.includes(key)} className="shrink-0 px-3 py-2 rounded-lg bg-[#0D0F32] text-white text-xs font-semibold hover:bg-[#171a45] disabled:bg-slate-300 disabled:cursor-not-allowed">
-                  {protectedKeys.includes(key) ? "Read only" : action}
+                <button onClick={onClick} className="shrink-0 px-3 py-2 rounded-lg bg-[#0D0F32] text-white text-xs font-semibold hover:bg-[#171a45]">
+                  {action}
                 </button>
               </div>
             </div>
@@ -5564,7 +5602,7 @@ function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSet
     const pick = (alliances[s] || [])[1];
     if (pick) selectedPicks.add(pick);
   }
-  const renderSel = (seed, idx, label) => {
+  const Sel = ({ seed, idx, label }) => {
     const v = (alliances[seed] || [])[idx] || "";
     const captain = (alliances[seed] || [])[0] || "";
     return (
@@ -5616,8 +5654,8 @@ function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSet
           return (
             <div key={seed} className={`rounded-xl border p-3 flex items-center gap-3 ${done ? "border-emerald-300 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20" : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"}`}>
               <span className="w-8 shrink-0 text-center font-mono font-bold text-slate-900 dark:text-slate-100">A{seed}</span>
-              {renderSel(seed, 0, "Captain")}
-              {renderSel(seed, 1, "1st pick")}
+              <Sel seed={seed} idx={0} label="Captain" />
+              <Sel seed={seed} idx={1} label="1st pick" />
             </div>
           );
         })}
@@ -6042,7 +6080,7 @@ function QuickStartModal({ step, setStep, onClose }) {
   );
 }
 
-function FeaturesGuide() {
+function FeaturesGuide({ isHighlander = true }) {
   const Section = ({ icon: Ic, title, children }) => (
     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-3">
       <h3 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-2">{Ic && <Ic size={17} className="text-[#D7212B]" />}{title}</h3>
@@ -6054,7 +6092,7 @@ function FeaturesGuide() {
   return (
     <>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-        Ref OS is an operations app for VEX robotics events. This v{APP_VERSION} Highlander Summit Release is configured for this event and the Override game. Its bundled rules, manual, inspection tag, and event workflows are specific to this release; setup for other events is a future goal.
+        Ref OS is an operations app for VEX robotics events. {isHighlander ? `This v${APP_VERSION} Highlander Summit Release includes the Override rules and manual.` : "This event has its own roster, matches, roles, rules, and settings. An Admin can import rules and Tournament Manager data. The bundled Override manual is only available in the Highlander event."}
       </p>
 
       <Section icon={KeyRound} title="Login, access codes & roles">
@@ -6065,7 +6103,7 @@ function FeaturesGuide() {
           <Li><b>Judge Advisor</b> — Judging plus view access to Alliances and the elimination bracket. Judge Advisors do not get referee violation tools or bracket editing.</Li>
           <Li><b>Emcee / announcer</b> — teams, matches, scores, rules, alliances, bracket information, and judging nominations without exposing referee disciplinary information.</Li>
           <Li><b>Admin</b> — all normal event access plus the Event Command Center, setup, imports, exports, role access code management, diagnostics, data clearing, and alliance selection controls.</Li>
-          <Li><b>Permanent Admin keypad code</b> — the fixed event Admin code can be entered directly on the keypad. Generated volunteer codes use the pattern number, letter A-D, number, number.</Li>
+          {isHighlander && <Li><b>Permanent Admin keypad code</b> — the fixed event Admin code can be entered directly on the keypad. Generated volunteer codes use the pattern number, letter A-D, number, number.</Li>}
           <Li><b>QR login</b> — admins can generate a QR login card for a role access code. QR creation and QR decoding are local to Ref-OS; the actual login still verifies access with Supabase.</Li>
         </ul>
         <p>After login, create a profile with a <b>nickname</b> plus required first and last name. Ref OS uses the nickname throughout the live app. The full name appears in the Event Contact Directory and on official violation and judging exports.</p>
@@ -6088,8 +6126,7 @@ function FeaturesGuide() {
           <Li><b>Locations</b> — identify Field 1, Field 2, Field 3, Pit Floor, Competition Floor, Skills, Judging, or another location.</Li>
           <Li><b>Acknowledgment</b> — one Admin can acknowledge a request for the crew so everyone knows it is being handled.</Li>
           <Li><b>Code requests</b> — volunteers can ask an Admin to regenerate their own role code, and the replacement appears without closing the app.</Li>
-          <Li><b>Admin email alerts</b> — help requests and replacement code requests can email each of the two configured Admin addresses as a backup to device push notifications.</Li>
-          <Li><b>Alert delivery selector</b> — Admins can choose Push only, Email only, or Both from the Access section. The selection applies event wide and syncs across devices.</Li>
+          <Li><b>Admin alerts</b> — help requests and replacement code requests notify subscribed Admin devices. Highlander also retains its configured Admin email alerts; other events are push only.</Li>
           <Li><b>Event alert counter</b> — Admin tools shows total sent alerts and requests. Admins can reset the count after testing.</Li>
         </ul>
       </Section>
@@ -6161,7 +6198,7 @@ function FeaturesGuide() {
           <Li><b>Teams</b> — search teams, open their full history, add teams, review Tournament Manager rank, and start a new log from the team record.</Li>
           <Li><b>Team scanner</b> — use the camera OCR scanner to recognize a team number and jump to the team record.</Li>
           <Li><b>Watchlist</b> — add shared watch notes to teams. Watched teams are flagged and their notes appear during relevant matches.</Li>
-          <Li><b>Required inspection pictures</b> — capture Front, Back, Side, and the Highlander inspection tag attached to the robot after it passes inspection. Completion appears on each team card.</Li>
+          <Li><b>Required inspection pictures</b> — capture Front, Back, Side, and the inspection tag attached to the robot after it passes inspection. Completion appears on each team card.</Li>
           <Li><b>Take pictures in order</b> — open a separate camera dialog that walks through the four required views and then offers the optional Lexan Diagram. The red camera button names the next picture.</Li>
           <Li><b>Optional Lexan Diagram</b> — save a picture of the team's Lexan or plastic diagram without affecting the four required picture completion count.</Li>
           <Li><b>Pictures on violation forms</b> — compact bordered thumbnails show each view name and identify required inspection pictures.</Li>
@@ -6231,7 +6268,7 @@ function FeaturesGuide() {
         <ul className="space-y-1.5">
           <Li><b>Install Ref-OS</b> — add the deployed HTTPS site to the device home screen for an app-like PWA experience.</Li>
           <Li><b>Dark / Light mode</b> and <b>Text size</b> are saved per device.</Li>
-          <Li><b>Release identification</b> — login, settings, diagnostics, and this guide display v{APP_VERSION} Highlander Summit Release.</Li>
+          <Li><b>Release identification</b> — login, settings, diagnostics, and this guide display v{APP_VERSION}{isHighlander ? " Highlander Summit Release" : ""}.</Li>
           <Li><b>Mobile navigation</b> — phones use the compact Go to section menu instead of forcing the full desktop navigation across the screen.</Li>
           <Li><b>Device readiness</b> — event staff can approve modern devices by running the Pre Event System Test before use.</Li>
         </ul>
@@ -6293,7 +6330,7 @@ const RULE_MANUAL_PAGES = Object.fromEntries([
   [77, ["T19", "T20", "T21", "T22"]], [78, ["T23"]], [79, ["T24"]],
 ].flatMap(([page, codes]) => codes.map((code) => [code, page])));
 
-function RuleBook({ rules }) {
+function RuleBook({ rules, hasBundledManual = false }) {
   const [query, setQuery] = useState("");
   const [manualQuery, setManualQuery] = useState("");
   const [selected, setSelected] = useState(null); // rule object shown in the notes popup
@@ -6326,7 +6363,7 @@ function RuleBook({ rules }) {
       return [{ page, directRule: page === directRulePage, exactRule, firstMatch, snippet: `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}` }];
     }).sort((a, b) => Number(b.directRule) - Number(a.directRule) || Number(b.exactRule) - Number(a.exactRule) || a.firstMatch - b.firstMatch || a.page - b.page).slice(0, 40);
   }, [manualQuery]);
-  if (!rules.length) return <Empty title="No rulebook loaded" sub="Run seed_rules.sql in Supabase to load the rules." />;
+  if (!rules.length) return <Empty title="No rulebook loaded" sub="Ask an Admin to import this event’s rule CSV." />;
   const q = query.trim().toUpperCase();
   const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
   const groups = [];
@@ -6337,7 +6374,7 @@ function RuleBook({ rules }) {
   }
   return (
     <>
-      <button onClick={() => openManualAt(1)} className="mb-4 w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
+      {hasBundledManual && <button onClick={() => openManualAt(1)} className="mb-4 w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
         <div className="flex items-center gap-3">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#0D0F32] text-white dark:bg-slate-950"><BookOpen size={21} /></span>
           <span className="min-w-0 flex-1">
@@ -6346,7 +6383,7 @@ function RuleBook({ rules }) {
           </span>
           <ChevronRight size={20} className="shrink-0 text-slate-400" />
         </div>
-      </button>
+      </button>}
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search rules — code or wording"
@@ -6361,7 +6398,7 @@ function RuleBook({ rules }) {
               <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">{g.cat}</h2>
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
                 {g.items.map((r) => {
-                  const note = RULE_NOTES[r.code];
+                  const note = hasBundledManual ? RULE_NOTES[r.code] : null;
                   return (
                     <div key={r.code} className="flex items-stretch hover:bg-slate-50 dark:hover:bg-slate-700">
                     <div className="min-w-0 flex-1 px-4 py-2.5 flex gap-3 items-baseline">

@@ -46,7 +46,8 @@ Deno.serve(async (request) => {
     if (deliveryError) throw deliveryError;
     const delivery = deliverySetting?.value || { push: true, email: true };
     const pushEnabled = delivery.push !== false;
-    const emailEnabled = delivery.email !== false;
+    // ADMIN_ALERT_EMAILS belongs to Highlander. Other events must never mail its admins.
+    const emailEnabled = eventRequest.event_id === "11111111-1111-4111-8111-111111111111" && delivery.email !== false;
 
     const { data: subscriptions, error: subscriptionError } = await serviceClient
       .from("push_subscriptions")
@@ -82,12 +83,12 @@ Deno.serve(async (request) => {
       title: `Ref OS help request · ${category}`,
       body: `${location} · ${requester}${extra ? `: ${extra}` : " requested assistance."}`,
       tag: `refos-help-${eventRequest.id}`,
-      url: "/?open=help-request",
+      url: `/?event=${encodeURIComponent(eventRequest.event_id)}&open=help-request`,
     } : {
       title: "Ref OS code request",
       body: `${requester} requested a new ${role} join code.`,
       tag: `refos-code-request-${details.role || "volunteer"}`,
-      url: `/?open=code-requests&role=${encodeURIComponent(details.role || "")}`,
+      url: `/?event=${encodeURIComponent(eventRequest.event_id)}&open=code-requests&role=${encodeURIComponent(details.role || "")}`,
     });
 
     const emailSubject = isHelp
