@@ -461,7 +461,21 @@ export default function App() {
         await api.ensureAnonymousSession();
         const rows = await api.listMyEvents();
         if (!live) return;
-        setEventChoices(rows);
+        // A visitor has not claimed an event role yet, so RLS can legitimately
+        // return no membership-scoped events. Highlander is the built-in Ref OS
+        // event and must remain selectable before login.
+        const highlander = {
+          id: HIGHLANDER_EVENT_ID,
+          name: "Highlander Summit",
+          quals: 0,
+          practice: 0,
+          bracket: 0,
+          finalsBestOf: 1,
+        };
+        const choices = rows.some((ev) => ev.id === HIGHLANDER_EVENT_ID)
+          ? rows
+          : [highlander, ...rows];
+        setEventChoices(choices);
       } catch (error) {
         if (live) setEventChoiceError(error?.message || "Could not load events.");
       } finally {
