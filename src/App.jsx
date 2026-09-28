@@ -2867,8 +2867,6 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
             <button aria-label="Settings" onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
               <div ref={menuRef} className="refos-menu-pop absolute right-0 mt-2 w-56 max-h-[75vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
-                <button onClick={() => { setMenu(false); onChooseEvent(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><CalendarDays size={16} /> Switch event</button>
-                {adminUnlocked && <button onClick={async () => { setMenu(false); try { await navigator.clipboard.writeText(`${window.location.origin}/?event=${eventId}`); alert("Event link copied. Volunteers also need their role access code."); } catch { alert(`${window.location.origin}/?event=${eventId}`); } }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><Copy size={16} /> Copy event link</button>}
                 {adminUnlocked && !isHighlander && <button onClick={() => { setMenu(false); ruleImportRef.current?.click(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><BookOpen size={16} /> Import event rules CSV</button>}
                 {isInspection ? (
                   <>
