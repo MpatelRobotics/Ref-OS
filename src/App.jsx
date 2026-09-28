@@ -401,7 +401,7 @@ function Thumb({ pkey, onOpen, full = false, compact = false }) {
 /*  ROOT: auth -> event selection -> tracker                            */
 /* ==================================================================== */
 export default function App() {
-  const [activeEventId] = useState(EVENT_ID);
+  const [activeEventId, setActiveEventId] = useState(EVENT_ID);
   const [unlocked, setUnlocked] = useState(false);
   const [role, setRole] = useState("ref");
   const [accessChecked, setAccessChecked] = useState(false);
@@ -524,12 +524,24 @@ export default function App() {
     if (favicon) favicon.href = "/favicon.ico";
   }, []);
 
-  const unlock = (r, admin, serverRole, credential = "") => {
+  const unlock = (r, admin, serverRole, credential = "", targetEventId = null) => {
+    if (targetEventId && targetEventId !== activeEventId) {
+      setActiveEventId(targetEventId);
+      setEvent(null);
+      setLoadErr(false);
+      setIdentityChecked(false);
+      const identity = readIdentity(targetEventId);
+      setMeName(identity.nickname || "");
+      setMeFullName(identity.fullName || "");
+      setMePhone(identity.phone || "");
+      window.history.replaceState(null, "", `${window.location.pathname}?event=${encodeURIComponent(targetEventId)}`);
+    }
+    const effectiveEventId = targetEventId || activeEventId;
     const roleText = String(r || serverRole || "").trim().toLowerCase();
     const uiRole = roleText.includes("inspection") ? "inspection" : roleText.includes("judge") ? "judge" : roleText.includes("emcee") ? "emcee" : "ref";
     const enteredCode = String(credential || "").trim().toUpperCase();
     if (!admin && serverRole !== "admin" && /^\d[A-D]\d\d$/.test(enteredCode)) {
-      localStorage.setItem(`refosVisibleRoleCode:${activeEventId}:${uiRole}`, enteredCode);
+      localStorage.setItem(`refosVisibleRoleCode:${effectiveEventId}:${uiRole}`, enteredCode);
     }
     localStorage.setItem("unlocked", "1");
     localStorage.setItem("refosRole", uiRole);
@@ -552,6 +564,11 @@ export default function App() {
     setMeFullName(cleanFullName);
     setMePhone(String(phone || "").trim());
     try { await api.setEventMemberName(activeEventId, cleanNickname); } catch {}
+  };
+
+  const createSecondaryEvent = async (data) => {
+    const created = await api.createHighlanderSecondaryEvent(data);
+    return created;
   };
 
   const lock = useCallback(async () => {
@@ -3430,6 +3447,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         onTwoDeviceSyncTest={() => openCommandCenterTool(() => setShowTwoDeviceSyncTest(true))}
         onDiagnosticReport={() => openCommandCenterTool(() => setShowDiagnosticReport(true))}
         onEventSetup={() => openCommandCenterTool(() => setShowEvent(true))}
+        onCreateSecondaryEvent={createSecondaryEvent}
         onTMSync={() => openCommandCenterTool(() => setShowTMSync(true))}
         onExportViolations={exportCSV}
         onExportNominations={exportNominations}

@@ -14,6 +14,12 @@ export default function LoginScreen({ eventId, eventName, onUnlock, onChooseEven
     setCheckingCode(true);
     setErr("");
     try {
+      const cleanCredential = String(credential || "").trim().toUpperCase();
+      if (highlander && (cleanCredential === "2B23" || cleanCredential === "2C23")) {
+        const result = await api.claimActiveSecondaryEvent(cleanCredential);
+        onUnlock(result.role, result.isAdmin, result.serverRole, cleanCredential, result.eventId);
+        return;
+      }
       const result = await api.claimEventAccess(eventId, credential);
       onUnlock(result.role, result.isAdmin, result.serverRole, credential);
     } catch (e) {
