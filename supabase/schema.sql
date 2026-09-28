@@ -602,7 +602,7 @@ create or replace function public.set_event_access_credential(
 returns void language plpgsql security definer set search_path=public, extensions as $$
 begin
   if not public.has_event_role(p_event,array['admin']) then raise exception 'Admin role required'; end if;
-  if p_role not in ('ref','judge','emcee','admin') then raise exception 'Invalid role'; end if;
+  if p_role not in ('ref','judge','emcee','inspection','admin') then raise exception 'Invalid role'; end if;
   insert into public.event_access_credentials(event_id,credential_name,role,credential_hash,enabled,updated_at)
   values(p_event,p_name,p_role,p_hash,p_enabled,now())
   on conflict(event_id,credential_name)

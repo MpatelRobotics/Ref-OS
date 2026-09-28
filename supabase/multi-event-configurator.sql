@@ -60,3 +60,20 @@ returns boolean language sql stable security definer set search_path = public as
 $$;
 revoke all on function public.is_configurator_protected_event(uuid) from public, anon;
 grant execute on function public.is_configurator_protected_event(uuid) to authenticated;
+
+-- Allow the Inspection role to receive an event-specific access code.
+-- Older Ref OS installs limited this RPC to ref/judge/emcee/admin even though
+-- event_members and event_access_credentials already support inspection.
+create or replace function public.set_event_access_credential(
+  p_event uuid, p_name text, p_role text, p_hash text, p_enabled boolean default true
+)
+returns void language plpgsql security definer set search_path=public, extensions as $$
+begin
+  if not public.has_event_role(p_event,array['admin']) then raise exception 'Admin role required'; end if;
+  if p_role not in ('ref','judge','emcee','inspection','admin') then raise exception 'Invalid role'; end if;
+  insert into public.event_access_credentials(event_id,credential_name,role,credential_hash,enabled,updated_at)
+  values(p_event,p_name,p_role,p_hash,p_enabled,now())
+  on conflict(event_id,credential_name)
+  do update set role=excluded.role,credential_hash=excluded.credential_hash,enabled=excluded.enabled,updated_at=now();
+end;
+$$;
