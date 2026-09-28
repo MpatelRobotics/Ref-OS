@@ -698,7 +698,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated }) => {
     const cleanName = name.trim();
     const cleanCode = adminCode.trim().toUpperCase();
     if (cleanName.length < 3) return setCreateError("Enter an event name.");
-    if (!/^\d[A-D]\d\d$/.test(cleanCode)) return setCreateError("Admin code must use the Ref OS 4 character format, for example 3A23.");
+    if (!/^\d[A-Z]\d\d$/.test(cleanCode)) return setCreateError("Admin code must use the Ref OS 4 character format, for example 3S23.");
     setSaving(true);
     setCreateError("");
     try {
@@ -753,7 +753,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated }) => {
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Example: NJ State Championship"
               className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-3 text-slate-900 dark:text-white mb-3" />
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Admin access code</label>
-            <input value={adminCode} onChange={(e) => setAdminCode(e.target.value.toUpperCase())} maxLength={4} placeholder="3A23"
+            <input value={adminCode} onChange={(e) => setAdminCode(e.target.value.toUpperCase())} maxLength={4} placeholder="3S23"
               className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-3 text-slate-900 dark:text-white" />
             <p className="text-xs text-slate-500 mt-2">Volunteer role codes can be configured from inside the event after creation.</p>
             {createError && <p className="text-sm text-red-600 mt-3">{createError}</p>}

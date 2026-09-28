@@ -27,7 +27,7 @@ begin
     raise exception 'Event name must be at least 3 characters.';
   end if;
 
-  if v_code !~ '^[0-9][A-D][0-9][0-9]$' then
+  if v_code !~ '^[0-9][A-Z][0-9][0-9]$' then
     raise exception 'Admin access code must use the Ref OS 4 character format.';
   end if;
 
@@ -57,7 +57,7 @@ begin
     v_event.id,
     'admin_keypad',
     'admin',
-    encode(digest(v_code, 'sha256'), 'hex'),
+    encode(extensions.digest(v_code, 'sha256'::text), 'hex'),
     true
   )
   on conflict (event_id, credential_name)
