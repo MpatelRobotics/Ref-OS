@@ -33,10 +33,12 @@ import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
 import HelpRequestModal from "./components/modals/HelpRequestModal.jsx";
 import manualQuickLinks from "./manualQuickLinks.json";
 import manualSearchIndex from "./manualSearchIndex.json";
+import { HIGHLANDER_EVENT_ID, getEventProfile } from "./eventProfiles.js";
 
-/* This build is locked to one event: The Highlander Summit Signature Event.
-   EVENT_ID must match supabase/seed.sql. A shared site password gates entry. */
-const EVENT_ID = "11111111-1111-4111-8111-111111111111";
+/* Ref OS 2.0 Phase 1: event behavior is resolved through an event profile.
+   Highlander remains the only selectable production event in this phase so
+   existing event behavior and data are not changed. */
+const EVENT_ID = HIGHLANDER_EVENT_ID;
 
 
 
@@ -519,10 +521,16 @@ export default function App() {
   }, [unlocked, meName, activeEventId]);
 
   useEffect(() => {
-    document.title = "Ref OS · Highlander Summit";
+    const profile = getEventProfile(activeEventId, event);
+    document.title = `Ref OS · ${profile.name}`;
     let favicon = document.querySelector('link[rel="icon"]');
-    if (favicon) favicon.href = "/favicon.ico";
-  }, []);
+    if (!favicon) {
+      favicon = document.createElement("link");
+      favicon.rel = "icon";
+      document.head.appendChild(favicon);
+    }
+    favicon.href = profile.favicon;
+  }, [activeEventId, event?.name]);
 
   const unlock = (r, admin, serverRole, credential = "") => {
     const roleText = String(r || serverRole || "").trim().toLowerCase();

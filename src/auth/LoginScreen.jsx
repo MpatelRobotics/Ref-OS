@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import * as api from "../api";
 import { APP_VERSION } from "../appVersion";
+import { getEventProfile } from "../eventProfiles.js";
 
 export default function LoginScreen({ eventId, eventName, onUnlock, onChooseEvent }) {
-  const highlander = eventId === "11111111-1111-4111-8111-111111111111";
+  const profile = getEventProfile(eventId, eventName ? { name: eventName } : null);
+  const highlander = profile.highlander;
   const [mode, setMode] = useState("code");
   const [pw, setPw] = useState("");
   const [code, setCode] = useState("");
@@ -62,7 +64,7 @@ export default function LoginScreen({ eventId, eventName, onUnlock, onChooseEven
     <div className="min-h-screen bg-[#F4F6FA] text-[#11172F] grid place-items-center p-6 font-sans">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white px-6 py-7 sm:px-8 shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
         <div className="flex flex-col items-center text-center mb-6">
-          <img src={highlander ? "/logo.svg" : "/refos-logo.svg"} alt={highlander ? "Highlander Summit" : "Ref OS"} className={highlander ? "h-40 sm:h-48 w-40 sm:w-48 object-contain mb-2" : "h-24 sm:h-28 w-24 sm:w-28 object-contain mb-4"} />
+          <img src={profile.logo} alt={profile.shortName} className={highlander ? "h-40 sm:h-48 w-40 sm:w-48 object-contain mb-2" : "h-24 sm:h-28 w-24 sm:w-28 object-contain mb-4"} />
           <span className="font-bold text-xl text-[#11172F]">{eventName || (highlander ? "Highlander Summit — Violation Log" : "Ref OS Event")}</span>
           {highlander && <span className="mt-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-700">Highlander Summit Release</span>}
         </div>
