@@ -39,7 +39,7 @@ export default function LoginScreen({ eventId, eventName, onUnlock, onChooseEven
       if (cur.length >= 4) return cur;
       const position = cur.length;
       const expectsLetter = position === 1;
-      if (expectsLetter && !["A","B","C","D"].includes(key)) return cur;
+      if (expectsLetter && !"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").includes(key)) return cur;
       if (!expectsLetter && !/^\d$/.test(key)) return cur;
       return cur + key;
     });
@@ -49,7 +49,7 @@ export default function LoginScreen({ eventId, eventName, onUnlock, onChooseEven
 
   const submitCode = async (candidate = code) => {
     const clean = String(candidate || "").toUpperCase().replace(/[^0-9A-D]/g, "").slice(0, 4);
-    if (!/^\d[A-D]\d\d$/.test(clean)) {
+    if (!/^\d[A-Z]\d\d$/.test(clean)) {
       setErr("Code format must be number, letter, number, number.");
       return;
     }
@@ -79,11 +79,11 @@ export default function LoginScreen({ eventId, eventName, onUnlock, onChooseEven
                 </div>
               ))}
             </div>
-            <div className="text-xs text-slate-500 text-center mb-3">Format: number · A/B/C/D · number · number</div>
+            <div className="text-xs text-slate-500 text-center mb-3">Format: number · A-Z · number · number</div>
             <div className="grid grid-cols-4 gap-3">
               {["1","2","3","A","4","5","6","B","7","8","9","C","Delete","0","Enter","D"].map((key) => {
                 const expectsLetter = code.length === 1;
-                const isLetter = ["A","B","C","D"].includes(key);
+                const isLetter = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").includes(key);
                 const isDigit = /^\d$/.test(key);
                 const disabled = checkingCode
                   || (isLetter && !expectsLetter)
