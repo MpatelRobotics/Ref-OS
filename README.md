@@ -1,6 +1,6 @@
 # Ref OS
 
-> **Ref OS 2.0 development:** Phase 1 introduces event profiles so Highlander specific branding and behavior can be separated from the core application. Highlander Summit remains the only selectable production event in this phase. Future phases will add safe event selection and creation while keeping all operational data scoped by event ID.
+> **Ref OS 2.0 development:** Phase 2 adds the VEX Event Selector. Ref OS now selects an active event ID before login and keeps operational data scoped to that event. This phase does not create events or change Highlander data; event creation comes in a later phase.
 
 
 **Referee Operating System for live VEX Robotics events**

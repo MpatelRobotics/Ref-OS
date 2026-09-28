@@ -403,7 +403,14 @@ function Thumb({ pkey, onOpen, full = false, compact = false }) {
 /*  ROOT: auth -> event selection -> tracker                            */
 /* ==================================================================== */
 export default function App() {
-  const [activeEventId] = useState(EVENT_ID);
+  const initialEventId = (() => {
+    const fromUrl = new URLSearchParams(window.location.search).get("event");
+    return fromUrl || localStorage.getItem("refosActiveEventId") || "";
+  })();
+  const [activeEventId, setActiveEventId] = useState(initialEventId);
+  const [eventChoices, setEventChoices] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(!initialEventId);
+  const [eventChoiceError, setEventChoiceError] = useState("");
   const [unlocked, setUnlocked] = useState(false);
   const [role, setRole] = useState("ref");
   const [accessChecked, setAccessChecked] = useState(false);
@@ -435,6 +442,60 @@ export default function App() {
   const [loadErr, setLoadErr] = useState(false);
 
   useEffect(() => {
+    if (activeEventId) return;
+    let live = true;
+    setEventsLoading(true);
+    setEventChoiceError("");
+    (async () => {
+      try {
+        await api.ensureAnonymousSession();
+        const rows = await api.listMyEvents();
+        if (!live) return;
+        setEventChoices(rows);
+      } catch (error) {
+        if (live) setEventChoiceError(error?.message || "Could not load events.");
+      } finally {
+        if (live) setEventsLoading(false);
+      }
+    })();
+    return () => { live = false; };
+  }, [activeEventId]);
+
+  const chooseEvent = (eventId) => {
+    if (!eventId) return;
+    localStorage.setItem("refosActiveEventId", eventId);
+    const url = new URL(window.location.href);
+    url.searchParams.set("event", eventId);
+    window.history.replaceState(null, "", url);
+    setEvent(null);
+    setLoadErr(false);
+    setAccessChecked(false);
+    setIdentityChecked(false);
+    setUnlocked(false);
+    setActiveEventId(eventId);
+  };
+
+  const chooseAnotherEvent = useCallback(async () => {
+    localStorage.removeItem("refosActiveEventId");
+    const url = new URL(window.location.href);
+    url.searchParams.delete("event");
+    window.history.replaceState(null, "", url);
+    localStorage.removeItem("unlocked");
+    localStorage.removeItem("refosRole");
+    sessionStorage.removeItem("refosAdmin");
+    setUnlocked(false);
+    setEvent(null);
+    setAccessChecked(false);
+    setIdentityChecked(false);
+    setActiveEventId("");
+    try { await api.clearAccessSession(); } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!activeEventId) {
+      setAccessChecked(false);
+      return;
+    }
     let live = true;
     (async () => {
       try {
@@ -573,6 +634,14 @@ export default function App() {
   }, []);
 
   if (!configured) return <ConfigError />;
+  if (!activeEventId) return (
+    <EventSelector
+      events={eventChoices}
+      loading={eventsLoading}
+      error={eventChoiceError}
+      onChoose={chooseEvent}
+    />
+  );
   if (!accessChecked) return <FullPage>Checking event access…</FullPage>;
   if (!unlocked) return <LoginScreen eventId={activeEventId} eventName={event?.name} onUnlock={unlock} />;
   if (!identityChecked) return <FullPage>Checking volunteer profile…</FullPage>;
@@ -587,8 +656,42 @@ export default function App() {
   );
   if (!event) return <FullPage>Loading…</FullPage>;
 
-  return <Tracker key={event.id} initialEvent={event} meName={meName} meFullName={meFullName} mePhone={mePhone} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} />;
+  return <Tracker key={event.id} initialEvent={event} meName={meName} meFullName={meFullName} mePhone={mePhone} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} onChooseEvent={chooseAnotherEvent} />;
 }
+
+const EventSelector = ({ events, loading, error, onChoose }) => (
+  <div className="min-h-screen bg-slate-100 dark:bg-slate-900 p-5 flex items-center justify-center">
+    <div className="w-full max-w-xl">
+      <div className="text-center mb-6">
+        <img src="/refos-logo.svg" alt="Ref OS" className="h-20 mx-auto mb-3" />
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Choose VEX Event</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Select the event this device is working at.</p>
+      </div>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 space-y-3">
+        {loading && <p className="text-center text-slate-500 py-8">Loading events…</p>}
+        {!loading && error && <p className="text-center text-red-600 py-5">{error}</p>}
+        {!loading && !error && events.length === 0 && (
+          <p className="text-center text-slate-500 py-8">No Ref OS events are available yet.</p>
+        )}
+        {!loading && !error && events.map((ev) => {
+          const profile = getEventProfile(ev.id, ev);
+          return (
+            <button key={ev.id} type="button" onClick={() => onChoose(ev.id)}
+              className="w-full flex items-center gap-4 rounded-xl border border-slate-200 dark:border-slate-700 p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+              <img src={profile.logo} alt="" className="w-12 h-12 object-contain rounded-lg" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-slate-900 dark:text-white truncate">{ev.name || profile.name}</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1">VEX Robotics event</span>
+              </span>
+              <ChevronRight size={20} className="text-slate-400" />
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-xs text-center text-slate-400 mt-4">Ref OS 2.0 · Event Selector</p>
+    </div>
+  </div>
+);
 
 const FullPage = ({ children }) => (
   <div className="min-h-screen grid place-items-center bg-slate-100 dark:bg-slate-700 text-slate-400 font-sans p-6 text-center">{children}</div>
