@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Check, Trash2, X } from "lucide-react";
 
-export default function ClearModal({ counts, onClear, onClose }) {
+export default function ClearModal({ counts, onClear, onClose, protectedKeys = [] }) {
   const [sel, setSel] = useState({ violations: false, robotPhotos: false, teams: false, schedule: false, replays: false, judging: false, alliances: false, watchlist: false, quadrants: false });
   const opts = [
     { key: "violations", label: "Violations", desc: `${counts.violations} logged`, note: "Clears every violation and its photos." },
@@ -14,8 +14,8 @@ export default function ClearModal({ counts, onClear, onClose }) {
     { key: "alliances", label: "Alliances", desc: `${counts.alliances} alliances`, note: "Clears all alliance captain and first-pick assignments." },
     { key: "watchlist", label: "Watchlist", desc: `${counts.watchlist} entries`, note: "Removes all teams and notes from the watchlist." },
   ];
-  const any = opts.some((o) => sel[o.key]);
-  const toggle = (k) => setSel((s) => ({ ...s, [k]: !s[k] }));
+  const any = opts.some((o) => sel[o.key] && !protectedKeys.includes(o.key));
+  const toggle = (k) => { if (!protectedKeys.includes(k)) setSel((s) => ({ ...s, [k]: !s[k] })); };
   const doClear = () => {
     const names = opts.filter((o) => sel[o.key]).map((o) => o.label.toLowerCase()).join(", ");
     if (confirm(`Permanently delete: ${names}?\nThis cannot be undone.`)) onClear(sel);
@@ -32,12 +32,12 @@ export default function ClearModal({ counts, onClear, onClose }) {
           {opts.map((o) => {
             const on = sel[o.key];
             return (
-              <button key={o.key} onClick={() => toggle(o.key)}
-                className={`w-full flex items-start gap-3 text-left rounded-xl border-2 p-3 transition ${on ? "border-red-400 bg-red-50" : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:border-slate-600"}`}>
+              <button key={o.key} onClick={() => toggle(o.key)} disabled={protectedKeys.includes(o.key)}
+                className={`w-full flex items-start gap-3 text-left rounded-xl border-2 p-3 transition ${protectedKeys.includes(o.key) ? "opacity-55 cursor-not-allowed border-slate-200 dark:border-slate-700" : on ? "border-red-400 bg-red-50" : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:border-slate-600"}`}>
                 <span className={`mt-0.5 w-5 h-5 rounded-md grid place-items-center shrink-0 border-2 ${on ? "bg-red-600 border-red-600 text-white" : "border-slate-300 dark:border-slate-600"}`}>{on && <Check size={13} />}</span>
                 <span className="flex-1">
                   <span className="flex items-center gap-2"><b className="text-slate-800 dark:text-slate-100">{o.label}</b><span className="text-xs text-slate-400">{o.desc}</span></span>
-                  <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">{o.note}</span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">{protectedKeys.includes(o.key) ? "Protected for the Highlander demo." : o.note}</span>
                 </span>
               </button>
             );

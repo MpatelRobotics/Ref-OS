@@ -675,6 +675,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const [fieldLog, setFieldLog] = useState([]);
   const [fieldResetChecks, setFieldResetChecks] = useState([]);
   const [eventSettings, setEventSettings] = useState({});
+  const highlanderDemoLocked = eventId === "11111111-1111-4111-8111-111111111111" && eventSettings?.highlander_demo_lock?.value?.locked !== false;
+  const explainDemoLock = () => alert("Highlander Summit matches, alliances, and violations are read only for the demo.");
   const savedFieldNames = eventSettings?.field_names?.value;
   const fieldNames = useMemo(() => ({ ...DEFAULT_FIELD_NAMES, ...(savedFieldNames || {}) }), [savedFieldNames]);
   const volunteerAssignments = eventSettings?.volunteer_assignments?.value || {};
@@ -1354,6 +1356,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   };
 
   const saveViolation = async ({ team, type, code, desc, notes, photos, match, ruleGroups }) => {
+    if (highlanderDemoLocked) throw new Error("Highlander Summit violations are read only for the demo.");
     const authorId = currentUserId || await api.getCurrentUserId();
     if (!authorId) throw new Error("Sign in again before logging a violation.");
     const cleanMatch = match && match.phase && match.phase !== "none" ? { phase: match.phase, num: (match.num || "").trim() } : null;
@@ -1386,12 +1389,14 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   };
 
   const deleteViolation = async (v) => {
+    if (highlanderDemoLocked) { explainDemoLock(); return; }
     if (!adminUnlocked && (!currentUserId || v.byUserId !== currentUserId)) return;
     if (v._pending) { await outbox.removeOp(eventId, v.id); setViols((cur) => cur.filter((x) => x.id !== v.id)); return; }
     try { await api.deleteViolation(v); setViols((cur) => cur.filter((x) => x.id !== v.id)); }
     catch (e) { if (outbox.isOffline(e)) alert("You're offline — reconnect to delete this violation."); else throw e; }
   };
   const editViolation = async (orig, form) => {
+    if (highlanderDemoLocked) throw new Error("Highlander Summit violations are read only for the demo.");
     const cleanMatch = form.match && form.match.phase && form.match.phase !== "none" ? { phase: form.match.phase, num: (form.match.num || "").trim() } : null;
     const row = {
       id: orig.id, event_id: eventId, team: form.team, type: form.type,
@@ -1407,6 +1412,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     }
   };
   const deleteTeam = async (num) => {
+    if (highlanderDemoLocked) { explainDemoLock(); return; }
     if (!adminUnlocked) {
       requireAdmin(() => deleteTeam(num));
       return;
@@ -1558,6 +1564,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   };
 
   const addElimMatch = async (m) => {
+    if (highlanderDemoLocked) { explainDemoLock(); return; }
     try {
       await api.addMatch(eventId, m);
       const list = await api.listMatches(eventId);
@@ -1605,6 +1612,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
 
   const importAlliancesFile = async (file) => {
     if (!file) return;
+    if (highlanderDemoLocked) { explainDemoLock(); return; }
     try {
       const text = await file.text();
       const lines = text.replace(/\r/g, "").split("\n").filter((line) => line.trim());
@@ -1848,6 +1856,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   };
   const importScoresFile = async (file) => {
     if (!file) return;
+    if (highlanderDemoLocked) { explainDemoLock(); return; }
     try {
       const text = await file.text();
 
@@ -1987,6 +1996,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   };
   const importMatchesFile = async (file) => {
     if (!file) return;
+    if (highlanderDemoLocked) { explainDemoLock(); return; }
     try {
       const text = await file.text();
       const { rows, warnings } = parseMatchesFile(text, file.name);
@@ -2028,6 +2038,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     } finally { setImporting(null); }
   };
   const setAllianceTeam = async (seed, idx, team) => {
+    if (highlanderDemoLocked) { explainDemoLock(); return; }
     const cur = alliances[seed] ? [...alliances[seed]] : ["", ""];
     cur[idx] = team;
     const teams = cur;
@@ -2036,6 +2047,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     catch (e) { if (!outbox.isOffline(e)) throw e; }
   };
   const clearAlliances = async () => {
+    if (highlanderDemoLocked) { explainDemoLock(); return; }
     await api.clearAlliances(eventId); setAlliances({});
   };
   const reloadMatches = async () => {
@@ -2056,6 +2068,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     if (toCreate.length) { for (const mm of toCreate) await api.addMatch(eventId, mm); await reloadMatches(); }
   };
   const setMatchWinner = async (m, winner) => {
+    if (highlanderDemoLocked) { explainDemoLock(); return; }
     const next = m.winner === winner ? "" : winner; // tapping the current winner clears it
     try {
       await api.setMatchWinner(eventId, m.phase, m.num, next);
@@ -2075,6 +2088,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   // 16-alliance single-elimination Round of 16 seeding (higher seed = red)
   const ELIM16 = [[1, 16], [8, 9], [5, 12], [4, 13], [3, 14], [6, 11], [7, 10], [2, 15]];
   const finalizeAlliances = async () => {
+    if (highlanderDemoLocked) { explainDemoLock(); return; }
     const complete = ELIM16.every(([a, b]) => (alliances[a] || []).filter(Boolean).length && (alliances[b] || []).filter(Boolean).length);
     if (!complete) { alert("Every alliance (seeds 1–16) needs at least one team before finalizing."); return; }
     const existingElims = Object.values(matches).some((m) => m.phase === "r16");
@@ -2242,6 +2256,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   };
 
   const clearSelected = async (sel) => {
+    if (highlanderDemoLocked && (sel.violations || sel.teams || sel.schedule || sel.alliances)) { explainDemoLock(); return; }
     try {
       if (sel.violations) { await api.clearViolations(eventId); setViols([]); }
       if (sel.robotPhotos || sel.teams) {
@@ -2306,7 +2321,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   // listed as a future captain. Once selected, that team leaves the captain
   // pool and the remaining ranked teams shift upward automatically.
   useEffect(() => {
-    if (!eventId || !alliancesLoaded || !rankedTeamsForAlliance.length) return;
+    if (!eventId || highlanderDemoLocked || !alliancesLoaded || !rankedTeamsForAlliance.length) return;
 
     // Once an R16 bracket exists, Tournament Manager is the source of truth
     // for alliance membership. Never let ranking-based captain logic rewrite
@@ -3082,6 +3097,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         </div>
       )}
       <main id="workspace" tabIndex={-1} className="refos-workspace mx-auto px-4 pb-28 pt-4">
+        {highlanderDemoLocked && <div role="status" className="mb-4 rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-900 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-100">Highlander Summit demo archive: matches, alliances, and violations are read only.</div>}
         {!openTeam && !openMatch && !openRobot && <section className="refos-page-heading" aria-label="Workspace overview">
           <div>
           {view === "awp" && <button onClick={() => { if (commandCenterChildOpen) return returnToCommandCenter(); setView("matches"); setQuery(""); }} className="refos-back-button mb-3" aria-label={commandCenterChildOpen ? "Back to Command Center" : "Back to Matches"}>
@@ -3098,16 +3114,16 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         </dl>}
         {openTeam ? (
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={teamRecords[openTeam]}
-            onLog={() => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => adminUnlocked || !!currentUserId && v.byUserId === currentUserId} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
+            onLog={highlanderDemoLocked ? undefined : () => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked && !highlanderDemoLocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : openMatch ? (
           <MatchDetail match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
             fieldLog={fieldLog} fieldResetChecks={fieldResetChecks} onVerifyFieldReset={verifyFieldResetQuadrant} onResetFieldReset={resetFieldResetMatch}
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
-            onLogTeam={(n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => adminUnlocked || !!currentUserId && v.byUserId === currentUserId} emcee={isEmcee} />
+            onLogTeam={highlanderDemoLocked ? undefined : (n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} emcee={isEmcee} />
         ) : openRobot ? (
           <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} canTakePhotos={!isEmcee} canDeletePhotos={!isInspection && !isEmcee} />
         ) : view === "matches" ? (
-          <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
+          <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
           <RobotList teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "judging" ? (
@@ -3122,7 +3138,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         ) : view === "awp" ? (
           <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} fieldNames={fieldNames} />
         ) : view === "alliances" ? (
-          <AllianceSelection teams={teams} alliances={alliances} matches={matches} canEditAlliances={adminUnlocked && !isJudge} canEditBracket={!isJudge && !isEmcee} onSet={setAllianceTeam} onFinalize={finalizeAlliances} onSetWinner={setMatchWinner} onClear={() => requireAdmin(() => { if (confirm("Clear all alliance picks? (This does not delete any matches already generated.)")) clearAlliances(); })} />
+          <AllianceSelection teams={teams} alliances={alliances} matches={matches} canEditAlliances={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!isJudge && !isEmcee && !highlanderDemoLocked} onSet={setAllianceTeam} onFinalize={finalizeAlliances} onSetWinner={setMatchWinner} onClear={() => requireAdmin(() => { if (confirm("Clear all alliance picks? (This does not delete any matches already generated.)")) clearAlliances(); })} />
         ) : (
           <>
             {!event?.quals ? (
@@ -3188,7 +3204,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         </div>
       </main>
 
-      {!isInspection && !footerVisible && !openTeam && !openMatch && !openRobot && view !== "judging" && !isEmcee && (
+      {!highlanderDemoLocked && !isInspection && !footerVisible && !openTeam && !openMatch && !openRobot && view !== "judging" && !isEmcee && (
         <button onClick={() => setLogFor("")} className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] sm:bottom-5 left-1/2 -translate-x-1/2 z-50 sm:z-20 bg-[#D7212B] text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
           <Plus size={20} /> Log violation
         </button>
@@ -3250,7 +3266,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         </div>,
         document.body
       )}
-      {showClear && <ClearModal counts={{ violations: viols.length, robotPhotos: teams.reduce((total, team) => total + (team.photoKeys || []).length + (team._pendingRobotPhotos || []).length, 0), teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length, quadrantChecks: fieldResetChecks.length }} onClear={clearSelected} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowClear(false)} />}
+      {showClear && <ClearModal protectedKeys={highlanderDemoLocked ? ["violations", "teams", "schedule", "alliances"] : []} counts={{ violations: viols.length, robotPhotos: teams.reduce((total, team) => total + (team.photoKeys || []).length + (team._pendingRobotPhotos || []).length, 0), teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length, quadrantChecks: fieldResetChecks.length }} onClear={clearSelected} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowClear(false)} />}
       {showOnline && (
         <div className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
           <div className="bg-white dark:bg-slate-800 w-full max-h-[100dvh] sm:max-w-md sm:max-h-[90vh] sm:rounded-2xl rounded-t-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -3273,6 +3289,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       )}
       {showTMSync && (
         <TMSyncCenter
+          protectedKeys={highlanderDemoLocked ? ["matches", "alliances", "scores"] : []}
           onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowTMSync(false)}
           onImportTeams={() => teamFileRef.current?.click()}
           onImportMatches={() => matchFileRef.current?.click()}
@@ -3324,7 +3341,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       )}
       <input ref={allianceFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importAlliancesFile(f); }} />
-      {addMatchOpen && <AddMatchModal teams={teams} onSave={addElimMatch} onClose={() => setAddMatchOpen(false)} />}
+      {addMatchOpen && !highlanderDemoLocked && <AddMatchModal teams={teams} onSave={addElimMatch} onClose={() => setAddMatchOpen(false)} />}
       {showFieldLog && (
         <div className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 flex flex-col font-sans">
           <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
@@ -3439,7 +3456,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
             <button onClick={() => commandCenterChildOpen ? returnToCommandCenter() : setShowActivity(false)} className="refos-back-button"><ChevronLeft size={22} /> Back</button>
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><ListOrdered size={18} /> Activity feed</h2>
           </div>
-          <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><ActivityFeed viols={viols} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} /></div></div>
+          <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><ActivityFeed viols={viols} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManage={!highlanderDemoLocked} /></div></div>
         </div>
       )}
       {showRankings && (
@@ -3521,7 +3538,7 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
             </button>
           )}
         </div>
-        {!emcee && <button onClick={onLog} className="mt-4 w-full bg-[#D7212B] text-white py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-[#B42024]"><Plus size={18} /> Log violation for {team.number}</button>}
+        {!emcee && onLog && <button onClick={onLog} className="mt-4 w-full bg-[#D7212B] text-white py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 hover:bg-[#B42024]"><Plus size={18} /> Log violation for {team.number}</button>}
         {!emcee && <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3">
           <div className="flex items-center gap-2 mb-2">
             <Star size={16} className="text-amber-500 fill-amber-500" />
@@ -4307,7 +4324,7 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
         {teams.map((n) => {
           const s = stat[n];
           return (
-            <button key={n} onClick={emcee ? undefined : () => onLogTeam(n)} className={`w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2.5 text-left ${emcee ? "cursor-default" : "hover:border-slate-300 dark:border-slate-600"}`}>
+            <button key={n} onClick={emcee || !onLogTeam ? undefined : () => onLogTeam(n)} className={`w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2.5 text-left ${emcee || !onLogTeam ? "cursor-default" : "hover:border-slate-300 dark:border-slate-600"}`}>
               <div className="flex items-center gap-2">
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{n}</span>
                 {teamRank[n] != null && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-200 dark:border-indigo-800 text-[11px] font-bold shrink-0">Rank {teamRank[n]}</span>}
@@ -5382,13 +5399,13 @@ function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSe
 }
 
 /* ============================ ACTIVITY FEED (admin) ============================ */
-function ActivityFeed({ viols, onOpenPhoto, onDeleteViolation, onEditViolation }) {
+function ActivityFeed({ viols, onOpenPhoto, onDeleteViolation, onEditViolation, canManage = false }) {
   const sorted = [...viols].sort((a, b) => b.createdAt - a.createdAt);
   if (sorted.length === 0) return <Empty title="No activity yet" sub="Violations will appear here as refs log them." />;
   return (
     <>
       <p className="text-xs text-slate-400 mb-3">{sorted.length} violation{sorted.length !== 1 ? "s" : ""} logged, newest first.</p>
-      <ul className="space-y-2">{sorted.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} canManage showTeam />)}</ul>
+      <ul className="space-y-2">{sorted.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} canManage={canManage} showTeam />)}</ul>
     </>
   );
 }
@@ -5486,7 +5503,7 @@ function ImportPreviewModal({ preview, onImport, onCancel }) {
   );
 }
 
-function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRankings, onImportSkills, onImportAlliances, onImportScores, stats, syncStatus }) {
+function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRankings, onImportSkills, onImportAlliances, onImportScores, stats, syncStatus, protectedKeys = [] }) {
   const items = [
     { key: "teams", title: "Teams", detail: `${stats.teams} teams loaded`, action: "Import teams", onClick: onImportTeams, Icon: Users },
     { key: "matches", title: "Match schedule", detail: `${stats.matches} matches loaded`, action: "Import matches", onClick: onImportMatches, Icon: ListOrdered },
@@ -5522,8 +5539,8 @@ function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRanking
                   <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{detail}</div>
                   <div className="text-[11px] text-slate-400 mt-0.5">{when(syncStatus[key])}</div>
                 </div>
-                <button onClick={onClick} className="shrink-0 px-3 py-2 rounded-lg bg-[#0D0F32] text-white text-xs font-semibold hover:bg-[#171a45]">
-                  {action}
+                <button onClick={onClick} disabled={protectedKeys.includes(key)} className="shrink-0 px-3 py-2 rounded-lg bg-[#0D0F32] text-white text-xs font-semibold hover:bg-[#171a45] disabled:bg-slate-300 disabled:cursor-not-allowed">
+                  {protectedKeys.includes(key) ? "Read only" : action}
                 </button>
               </div>
             </div>
