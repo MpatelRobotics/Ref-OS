@@ -14,7 +14,6 @@ import { APP_VERSION } from "./appVersion";
 import CommandCenter from "./components/CommandCenter.jsx";
 import EventContactDirectory from "./components/EventContactDirectory.jsx";
 import LoginScreen from "./auth/LoginScreen.jsx";
-import EventGateway from "./auth/EventGateway.jsx";
 import NameScreen from "./auth/NameScreen.jsx";
 import RoleAccessCodeManager from "./auth/RoleAccessCodeManager.jsx";
 import { latestRoleAccessConfig } from "./auth/accessConfig.js";
@@ -402,11 +401,7 @@ function Thumb({ pkey, onOpen, full = false, compact = false }) {
 /*  ROOT: auth -> event selection -> tracker                            */
 /* ==================================================================== */
 export default function App() {
-  const [activeEventId, setActiveEventId] = useState(() => {
-    const fromLink = new URLSearchParams(window.location.search).get("event");
-    return /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(fromLink || "") ? fromLink : localStorage.getItem("refosActiveEvent") || EVENT_ID;
-  });
-  const [selectingEvent, setSelectingEvent] = useState(true);
+  const [activeEventId] = useState(EVENT_ID);
   const [unlocked, setUnlocked] = useState(false);
   const [role, setRole] = useState("ref");
   const [accessChecked, setAccessChecked] = useState(false);
@@ -436,15 +431,6 @@ export default function App() {
   const [mePhone, setMePhone] = useState(() => readIdentity(activeEventId).phone || "");
   const [event, setEvent] = useState(null);
   const [loadErr, setLoadErr] = useState(false);
-  const selectEvent = (id) => {
-    const identity = readIdentity(id);
-    setMeName(identity.nickname || ""); setMeFullName(identity.fullName || ""); setMePhone(identity.phone || "");
-    localStorage.setItem("refosActiveEvent", id);
-    window.history.replaceState(null, "", id === EVENT_ID ? window.location.pathname : `${window.location.pathname}?event=${encodeURIComponent(id)}`);
-    setUnlocked(false); setAccessChecked(false); setIdentityChecked(false); setEvent(null); setLoadErr(false);
-    sessionStorage.removeItem("refosAdmin");
-    setActiveEventId(id); setSelectingEvent(false);
-  };
 
   useEffect(() => {
     let live = true;
@@ -533,17 +519,10 @@ export default function App() {
   }, [unlocked, meName, activeEventId]);
 
   useEffect(() => {
-    const highlander = activeEventId === EVENT_ID;
-    document.title = event?.name ? `Ref OS · ${event.name}` : highlander ? "Ref OS · Highlander Summit" : "Ref OS";
-
+    document.title = "Ref OS · Highlander Summit";
     let favicon = document.querySelector('link[rel="icon"]');
-    if (!favicon) {
-      favicon = document.createElement("link");
-      favicon.rel = "icon";
-      document.head.appendChild(favicon);
-    }
-    favicon.href = highlander ? "/favicon.ico" : "/refos-logo.svg";
-  }, [activeEventId, event?.name]);
+    if (favicon) favicon.href = "/favicon.ico";
+  }, []);
 
   const unlock = (r, admin, serverRole, credential = "") => {
     const roleText = String(r || serverRole || "").trim().toLowerCase();
@@ -586,9 +565,8 @@ export default function App() {
   }, []);
 
   if (!configured) return <ConfigError />;
-  if (selectingEvent) return <EventGateway currentEventId={activeEventId} onSelect={selectEvent} onClose={() => setSelectingEvent(false)} />;
   if (!accessChecked) return <FullPage>Checking event access…</FullPage>;
-  if (!unlocked) return <LoginScreen eventId={activeEventId} eventName={event?.name} onChooseEvent={() => setSelectingEvent(true)} onUnlock={unlock} />;
+  if (!unlocked) return <LoginScreen eventId={activeEventId} eventName={event?.name} onUnlock={unlock} />;
   if (!identityChecked) return <FullPage>Checking volunteer profile…</FullPage>;
   if (!meName || !meFullName) return <NameScreen onIdentity={saveIdentity} />;
   if (loadErr) return (
@@ -601,7 +579,7 @@ export default function App() {
   );
   if (!event) return <FullPage>Loading…</FullPage>;
 
-  return <Tracker key={event.id} initialEvent={event} meName={meName} meFullName={meFullName} mePhone={mePhone} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} onChooseEvent={() => setSelectingEvent(true)} />;
+  return <Tracker key={event.id} initialEvent={event} meName={meName} meFullName={meFullName} mePhone={mePhone} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} />;
 }
 
 const FullPage = ({ children }) => (
