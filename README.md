@@ -1,6 +1,6 @@
 # Ref OS
 
-> **Ref OS 2.0 development:** Phase 2 adds the VEX Event Selector. Ref OS now selects an active event ID before login and keeps operational data scoped to that event. This phase does not create events or change Highlander data; event creation comes in a later phase.
+> **Ref OS 2.0 development:** Phase 3 adds Create VEX Event. A new event starts as an empty event shell with its own event ID and Admin access code. Tournament Manager data is imported later through TM Sync Center. Highlander Summit remains unchanged.
 
 
 **Referee Operating System for live VEX Robotics events**

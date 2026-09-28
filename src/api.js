@@ -237,6 +237,17 @@ export async function getEvent(id) {
   const { data } = await supabase.from("events").select("*").eq("id", id).maybeSingle();
   return mapEvent(data);
 }
+export async function createVexEvent(name, adminCredential) {
+  await ensureAnonymousSession();
+  const cleanName = String(name || "").trim();
+  const cleanCredential = String(adminCredential || "").trim().toUpperCase();
+  const { data, error } = await supabase.rpc("create_refos_vex_event", {
+    p_name: cleanName,
+    p_admin_credential: cleanCredential,
+  });
+  if (error) throw error;
+  return mapEvent(Array.isArray(data) ? data[0] : data);
+}
 export async function createEvent(d) {
   await ensureAnonymousSession();
   const { data, error } = await supabase.rpc("create_configured_event", {

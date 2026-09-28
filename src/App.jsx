@@ -664,6 +664,10 @@ export default function App() {
       loading={eventsLoading}
       error={eventChoiceError}
       onChoose={chooseEvent}
+      onCreated={(ev) => {
+        setEventChoices((current) => [ev, ...current.filter((item) => item.id !== ev.id)]);
+        chooseEvent(ev.id);
+      }}
     />
   );
   if (!accessChecked) return <FullPage>Checking event access…</FullPage>;
@@ -683,7 +687,31 @@ export default function App() {
   return <Tracker key={event.id} initialEvent={event} meName={meName} meFullName={meFullName} mePhone={mePhone} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} onChooseEvent={chooseAnotherEvent} />;
 }
 
-const EventSelector = ({ events, loading, error, onChoose }) => (
+const EventSelector = ({ events, loading, error, onChoose, onCreated }) => {
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [adminCode, setAdminCode] = useState("");
+  const [createError, setCreateError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const createEvent = async () => {
+    const cleanName = name.trim();
+    const cleanCode = adminCode.trim().toUpperCase();
+    if (cleanName.length < 3) return setCreateError("Enter an event name.");
+    if (!/^\d[A-D]\d\d$/.test(cleanCode)) return setCreateError("Admin code must use the Ref OS 4 character format, for example 3A23.");
+    setSaving(true);
+    setCreateError("");
+    try {
+      const ev = await api.createVexEvent(cleanName, cleanCode);
+      onCreated(ev);
+    } catch (e) {
+      setCreateError(e?.message || "Could not create the event.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
   <div className="min-h-screen bg-slate-100 dark:bg-slate-900 p-5 flex items-center justify-center">
     <div className="w-full max-w-xl">
       <div className="text-center mb-6">
@@ -712,10 +740,36 @@ const EventSelector = ({ events, loading, error, onChoose }) => (
           );
         })}
       </div>
+        {!creating ? (
+          <button type="button" onClick={() => setCreating(true)}
+            className="w-full mt-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold px-4 py-3">
+            + Create VEX Event
+          </button>
+        ) : (
+          <div className="mt-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4">
+            <h2 className="font-bold text-slate-900 dark:text-white">Create VEX Event</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">Create the event shell now. Use TM Sync Center after login to import teams, schedules, rankings, skills, and alliances.</p>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Event name</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Example: NJ State Championship"
+              className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-3 text-slate-900 dark:text-white mb-3" />
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Admin access code</label>
+            <input value={adminCode} onChange={(e) => setAdminCode(e.target.value.toUpperCase())} maxLength={4} placeholder="3A23"
+              className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-3 text-slate-900 dark:text-white" />
+            <p className="text-xs text-slate-500 mt-2">Volunteer role codes can be configured from inside the event after creation.</p>
+            {createError && <p className="text-sm text-red-600 mt-3">{createError}</p>}
+            <div className="flex gap-2 mt-4">
+              <button type="button" onClick={() => { setCreating(false); setCreateError(""); }}
+                className="flex-1 rounded-xl border border-slate-300 dark:border-slate-600 px-4 py-3 font-semibold">Cancel</button>
+              <button type="button" disabled={saving} onClick={createEvent}
+                className="flex-1 rounded-xl bg-blue-600 text-white px-4 py-3 font-semibold disabled:opacity-50">{saving ? "Creating…" : "Create Event"}</button>
+            </div>
+          </div>
+        )}
       <p className="text-xs text-center text-slate-400 mt-4">Ref OS 2.0 · Event Selector</p>
     </div>
   </div>
-);
+  );
+};
 
 const FullPage = ({ children }) => (
   <div className="min-h-screen grid place-items-center bg-slate-100 dark:bg-slate-700 text-slate-400 font-sans p-6 text-center">{children}</div>
