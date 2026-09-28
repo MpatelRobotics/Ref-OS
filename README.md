@@ -30,11 +30,6 @@ Developers are welcome to inspect the code to understand how Ref OS approaches r
 
 Before deploying a fork or derivative project, review the configuration carefully. Do not assume credentials, Supabase configuration, notification endpoints, event identifiers, or event specific resources in this repository are appropriate for another deployment.
 
-## Security before making the repository public
-
-Before changing the GitHub repository to public, review the **entire Git history**, not only the current files, for secrets or private event information. In particular, verify that no Supabase service role keys, private API keys, passwords, access tokens, webhook secrets, personal contact information, or other credentials have ever been committed.
-
-Client side Supabase anonymous keys are designed to be used by browser applications when Row Level Security is configured correctly, but privileged keys and secrets must never be published. Rotate any credential that may have been committed previously.
 
 ## Trademark and affiliation
 
@@ -158,22 +153,6 @@ Each volunteer receives a synchronized assignment card in their workspace. Assig
 
 On phones, the header uses a compact online volunteer count. Tapping it opens the complete scrollable status list.
 
-## Admin email alerts
-
-Ref OS can email two configured Admin addresses whenever a volunteer requests help or asks for a replacement role code. Email delivery runs securely from the existing Supabase Edge Function through Resend. The Resend credential, sender, and Admin addresses are stored as Supabase secrets and are never included in browser code, the repository, exports, or the event contact directory. Each request is claimed once so reopening or refreshing Ref OS does not send duplicate emails. Web push continues to operate if Resend is unavailable or has not been configured.
-
-Configure these Supabase secrets before deploying the function:
-
-* `RESEND_API_KEY`
-* `RESEND_FROM_EMAIL` as a sender on a verified Resend domain
-* `ADMIN_ALERT_EMAILS` as two email addresses separated by a comma
-
-After saving the secrets, deploy `send-code-request-push` again.
-
-Administrators can open **Access → Alert delivery** and select **Push only**, **Email only**, or **Both**. This event wide preference syncs across devices and defaults to Both until an Admin changes it.
-
-The Event Command Center includes an **Event alert counter** under Admin tools. It reports the event wide number of requests and total alerts delivered across all devices. Admins can reset the counter after testing without deleting the underlying help requests or other event data. Run `supabase/alert-counter.sql` in the Supabase SQL Editor before using or resetting the counter.
-
 ## Volunteer access and join codes
 
 Ref OS uses separate join codes for Referees, Judge Advisors, and Emcees.
@@ -260,24 +239,3 @@ Volunteer names, event records, device subscriptions, and operational data are s
 **Ref OS 1.0.0 Highlander Summit Release**
 
 Created by Maharshi Patel for Highlander Summit event operations.
-
-## Required Supabase update
-
-Before deploying this version, run `supabase/reset-robot-pictures-safely.sql` once in the project's Supabase SQL Editor. It makes the robot picture reset atomic with the team picture references and rejects uploads from before the reset. Deploying the app before this SQL is applied will prevent new robot picture uploads and picture resets.
-
-## Generic Ref OS deployment prep (2026-09-27)
-
-- Added a generic Ref OS logo at `public/refos-logo.svg` for non-Highlander events and the Event Configurator.
-- Generic event login/configurator branding uses neutral slate and blue styling rather than Highlander red branding.
-- Existing Highlander event detection and legacy logo path remain intact so the current event identity is not migrated by this UI change.
-- Highlander retains its existing configured Admin email alerts in `send-code-request-push`. Generic configured events are push only and cannot send to Highlander Admin email addresses.
-- Generic events do not expose email delivery controls; Highlander continues to honor its existing `notification_delivery` setting.
-- Before multi-event production deployment, run `supabase/multi-event-configurator.sql`, then deploy the included `send-code-request-push` Edge Function update.
-
-## External event readiness additions
-
-The Event Configurator now uses a five step setup wizard for event details, match format, branding, access, and review. Generic events can store a custom accent color, date, venue, and small event logo. The configurator generates Referee, Judge Advisor, Emcee, and Inspection codes and writes their hashes to the event credential table. The completion screen provides the shareable event link, role codes, copy controls, and a copyable setup sheet.
-
-The Highlander production event (`11111111-1111-4111-8111-111111111111`) is explicitly marked as configurator protected. This protection is intentionally scoped to the generic configurator so existing Highlander Admin/event day workflows are not disabled.
-
-Features & Help now includes explicit release and support information. Highlander retains push plus email notification delivery. Generic configured events remain push only.
