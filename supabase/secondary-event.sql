@@ -13,7 +13,6 @@ set search_path = public, extensions as $$
 declare
   v_highlander constant uuid := '11111111-1111-4111-8111-111111111111'::uuid;
   ev public.events;
-  v_admin_hash text;
 begin
   if auth.uid() is null then raise exception 'Sign in before creating an event'; end if;
 
@@ -25,14 +24,6 @@ begin
   end if;
 
   if length(trim(coalesce(p_name,''))) < 3 then raise exception 'Enter an event name'; end if;
-  select credential_hash into v_admin_hash
-  from public.event_access_credentials
-  where event_id = v_highlander and role = 'admin' and enabled = true
-  order by updated_at desc nulls last
-  limit 1;
-
-  if v_admin_hash is null then raise exception 'Highlander Admin credential is not configured'; end if;
-
   -- Only one secondary event is active at a time. Disable the fixed access
   -- codes on any older secondary event without deleting its historical data.
   update public.event_access_credentials
@@ -52,7 +43,7 @@ begin
 
   insert into public.event_access_credentials(event_id,credential_name,role,credential_hash,enabled)
   values
-    (ev.id,'admin_keypad','admin',v_admin_hash,true),
+    (ev.id,'secondary_admin_code','admin',encode(digest('2A23','sha256'),'hex'),true),
     (ev.id,'secondary_ref_code','ref',encode(digest('2B23','sha256'),'hex'),true),
     (ev.id,'secondary_judge_code','judge',encode(digest('2C23','sha256'),'hex'),true)
   on conflict(event_id,credential_name)
@@ -72,7 +63,7 @@ grant execute on function public.create_highlander_secondary_event(text) to auth
 
 
 create or replace function public.claim_active_secondary_event(p_credential text)
-returns table(event_id uuid, event_name text, role text, is_admin boolean)
+returns table(target_event_id uuid, target_event_name text, target_role text, target_is_admin boolean)
 language plpgsql security definer
 set search_path = public, extensions as $$
 declare

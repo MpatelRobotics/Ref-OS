@@ -75,7 +75,7 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
                     <div className="font-bold">{createdEvent.name} created</div>
                     <div className="mt-2 text-sm">Referee code: <b>2B23</b></div>
                     <div className="text-sm">Judge Advisor code: <b>2C23</b></div>
-                    <div className="text-sm mt-2">Admin uses the same Highlander Summit Admin login.</div>
+                    <div className="text-sm mt-2">Admin code: 2A23</div>
                   </div>
                   <button onClick={() => setShowNewEvent(false)} className="w-full py-2.5 rounded-xl bg-[#0D0F32] text-white font-semibold">Done</button>
                 </div>
@@ -86,7 +86,7 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
                     After creating the event, use <b>TM Sync Center</b> to import the teams, qualification schedule, practice schedule, rankings, and other Tournament Manager data. Match counts do not need to be entered here.
                   </div>
                   <div className="rounded-xl bg-slate-50 dark:bg-slate-900 p-3 text-sm">
-                    <div><b>Referee:</b> 2B23</div><div><b>Judge Advisor:</b> 2C23</div><div><b>Admin:</b> same as Highlander Summit</div>
+                    <div><b>Referee:</b> 2B23</div><div><b>Judge Advisor:</b> 2C23</div><div><b>Admin:</b> 2A23</div>
                   </div>
                   {createEventError && <div className="text-sm text-red-600">{createEventError}</div>}
                   <button disabled={!newEvent.name.trim() || creatingEvent} onClick={createSecondary} className="w-full py-2.5 rounded-xl bg-[#0D0F32] disabled:opacity-40 text-white font-semibold">{creatingEvent ? "Creating…" : "Create event"}</button>
