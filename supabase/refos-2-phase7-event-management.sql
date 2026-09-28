@@ -280,7 +280,8 @@ for each row execute function public.guard_refos_event_delete();
 
 -- 7b. Permanent delete RPC.
 --   Requires: signed-in session, an ARCHIVED event, not protected, the exact event name,
---   and the event's enabled Admin access code (same format and hashing as login and restore).
+--   and EITHER the event's enabled Admin access code (same format and hashing as login and
+--   restore) OR the Ref OS emergency deletion override code (hash only; delete-only).
 --   Wrong codes count toward the existing event_access_attempts lockout
 --   (8 failures in 5 minutes locks this session for 5 minutes), shared with restore.
 --   Returns 'deleted', 'name_mismatch', 'invalid', or 'locked'. Refusals that must not be
@@ -351,6 +352,11 @@ begin
     return 'name_mismatch';
   end if;
 
+  -- Authorization: this event's Admin access code, OR the Ref OS emergency deletion override.
+  -- The override is stored only as a SHA-256 hash, exists only inside this function, and is
+  -- checked only after the protected-event, archived-event, lockout, and exact-name checks above.
+  -- It is not an event access credential: it cannot sign in, grant any role, unlock Event
+  -- Settings or Event Management, restore an event, or delete an active or protected event.
   if v_code ~ '^[0-9][A-Z][0-9][0-9]$' then
     v_ok := exists (
       select 1
@@ -359,9 +365,12 @@ begin
          and c.role = 'admin'
          and c.enabled = true
          and c.credential_hash = encode(extensions.digest(v_code, 'sha256'::text), 'hex')
-    );
+    )
+    or encode(extensions.digest(v_code, 'sha256'::text), 'hex')
+       = 'eff2e136933cf23f058b6c99d558a9f2a06d291bd8f505e56c176d085b6e84bf';
   end if;
 
+  -- A wrong Admin/override code counts toward the same lockout as restore and login attempts.
   if not v_ok then
     if v_attempt.user_id is null or v_attempt.window_started < now() - interval '5 minutes' then
       v_failed := 1;

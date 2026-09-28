@@ -17,7 +17,7 @@ const INCLUDED_DATA = [
 ];
 
 // Permanent deletion of an ARCHIVED event. Requires the exact event name (protects against mistakes)
-// and the event's Admin access code (authorization, verified by the server).
+// and an authorized code (this event's Admin code or a Ref OS override code), verified by the server.
 export default function DeleteEventModal({ event, profile, onDelete, onClose }) {
   const eventName = String(event?.name || "").trim();
   const [typedName, setTypedName] = useState("");
@@ -38,7 +38,7 @@ export default function DeleteEventModal({ event, profile, onDelete, onClose }) 
       if (result === "deleted") return; // parent closes the modal
       if (result === "locked") setError("Too many incorrect codes. Try again in a few minutes.");
       else if (result === "name_mismatch") setError("The event name does not match exactly.");
-      else setError("That is not this event's Admin access code.");
+      else setError("That code is not authorized to delete this event.");
       setDeleting(false);
     } catch (deleteError) {
       setError(deleteError?.message || "Could not delete this event.");
@@ -83,11 +83,11 @@ export default function DeleteEventModal({ event, profile, onDelete, onClose }) 
           </label>
 
           <label className="block">
-            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Admin access code for this event</span>
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Admin / Override Code</span>
             <input value={code} onChange={(e) => { setCode(e.target.value.toUpperCase()); setError(""); }} disabled={deleting} maxLength={4}
               autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder="3S23" inputMode="text"
               className="mt-1 w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-3 font-mono tracking-widest text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600" />
-            <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">The server checks this code. Only this event's Admin can delete it.</span>
+            <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">Enter this event's Admin code or an authorized Ref OS override code.</span>
           </label>
         </div>
 
