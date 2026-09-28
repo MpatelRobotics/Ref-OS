@@ -43,7 +43,7 @@ begin
 
   insert into public.event_access_credentials(event_id,credential_name,role,credential_hash,enabled)
   values
-    (ev.id,'secondary_admin_code','admin',encode(digest('2A23','sha256'),'hex'),true),
+    (ev.id,'secondary_admin_code','admin',encode(digest('2D23','sha256'),'hex'),true),
     (ev.id,'secondary_ref_code','ref',encode(digest('2B23','sha256'),'hex'),true),
     (ev.id,'secondary_judge_code','judge',encode(digest('2C23','sha256'),'hex'),true)
   on conflict(event_id,credential_name)
