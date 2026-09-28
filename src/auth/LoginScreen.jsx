@@ -48,17 +48,17 @@ export default function LoginScreen({ eventId, eventName, onUnlock, onChooseEven
 
 
   const submitCode = async (candidate = code) => {
-    const clean = String(candidate || "").toUpperCase().replace(/[^0-9A-D]/g, "").slice(0, 4);
+    const clean = String(candidate || "")
+      .trim()
+      .toUpperCase()
+      .replace(/[^0-9A-Z]/g, "")
+      .slice(0, 4);
     if (!/^\d[A-Z]\d\d$/.test(clean)) {
-      setErr("Code format must be number, letter, number, number.");
+      setErr("Code format must be number, letter A-Z, number, number.");
       return;
     }
     await finishServerLogin(clean);
   };
-
-  useEffect(() => {
-    if (mode === "code" && code.length === 4) submitCode(code);
-  }, [code, mode]);
 
   return (
     <div className="min-h-screen bg-[#F4F6FA] text-[#11172F] grid place-items-center p-6 font-sans">
