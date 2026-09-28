@@ -650,10 +650,19 @@ export default function App() {
   const lock = useCallback(async () => {
     localStorage.removeItem("unlocked");
     localStorage.removeItem("refosRole");
+    localStorage.removeItem("refosActiveEventId");
     sessionStorage.removeItem("refosAdmin");
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("event");
+    window.history.replaceState(null, "", url);
+
     setUnlocked(false);
     setIdentityChecked(false);
+    setAccessChecked(false);
     setEvent(null);
+    setActiveEventId("");
+
     await api.clearAccessSession();
   }, []);
 
