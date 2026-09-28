@@ -35,6 +35,17 @@ export default function EventGateway({ currentEventId, onSelect, onClose }) {
     const reader = new FileReader(); reader.onload = () => setLogoData(String(reader.result || "")); reader.readAsDataURL(file);
   };
   const regenerate = (role) => setCodes((current) => ({ ...current, [role]: randomCode() }));
+  const removeEvent = async (event) => {
+    if (event.id === HIGHLANDER_EVENT_ID) { setError("Highlander is protected and cannot be deleted."); return; }
+    const confirmed = window.confirm(`Delete ${event.name}? This permanently deletes this event and all of its Ref OS data. This cannot be undone.`);
+    if (!confirmed) return;
+    setBusy(true); setError("");
+    try {
+      await api.deleteConfiguredEvent(event.id, authorizedCode);
+      setEvents((current) => current.filter((item) => item.id !== event.id));
+      if (currentEventId === event.id) onSelect(HIGHLANDER_EVENT_ID);
+    } catch (e) { setError(e.message || "Could not delete the event."); } finally { setBusy(false); }
+  };
 
   const create = async () => {
     setError(""); setBusy(true);
@@ -56,7 +67,7 @@ export default function EventGateway({ currentEventId, onSelect, onClose }) {
   return <div className="min-h-[100dvh] bg-slate-100 dark:bg-slate-900 p-4 sm:p-8 text-slate-900 dark:text-slate-100">
     <div className="max-w-2xl mx-auto bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-5 space-y-5">
       <div className="flex items-start gap-3"><img src="/refos-logo.svg" alt="Ref OS" className="h-12 w-12 shrink-0"/><div className="flex-1"><h1 className="text-xl font-bold">Ref OS events</h1><p className="text-sm text-slate-500 dark:text-slate-300">Choose an event or configure a new one.</p></div><button onClick={onClose} className="px-3 py-2 rounded-lg border">Back</button></div>
-      {events.length > 0 && <section className="space-y-2"><h2 className="font-semibold">Your events</h2>{events.map((event) => <button key={event.id} onClick={() => onSelect(event.id)} className="w-full text-left rounded-lg border border-slate-200 dark:border-slate-600 p-3 hover:border-blue-500"><b>{event.name}</b>{event.id === HIGHLANDER_EVENT_ID && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">PROTECTED</span>}{event.id === currentEventId && <span className="text-xs ml-2 text-slate-400">Current</span>}</button>)}</section>}
+      {events.length > 0 && <section className="space-y-2"><h2 className="font-semibold">Your events</h2>{events.map((event) => <div key={event.id} className="flex items-stretch gap-2"><button onClick={() => onSelect(event.id)} className="min-w-0 flex-1 text-left rounded-lg border border-slate-200 dark:border-slate-600 p-3 hover:border-blue-500"><b>{event.name}</b>{event.id === HIGHLANDER_EVENT_ID && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">PROTECTED</span>}{event.id === currentEventId && <span className="text-xs ml-2 text-slate-400">Current</span>}</button>{authorizedCode && event.id !== HIGHLANDER_EVENT_ID && <button disabled={busy} onClick={() => removeEvent(event)} className="shrink-0 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30">Delete</button>}</div>)}</section>}
       <section className="border-t pt-4 space-y-2"><h2 className="font-semibold">Join another event</h2><p className="text-xs text-slate-500">Ask its organizer for the event link and a role access code.</p><div className="flex gap-2"><input value={eventLink} onChange={(e)=>setEventLink(e.target.value)} placeholder="Paste event link or ID" className="min-w-0 flex-1 rounded-lg border px-3 py-2 bg-white dark:bg-slate-900"/><button onClick={pickLink} className="rounded-lg bg-slate-900 text-white px-4">Continue</button></div></section>
       <section className="border-t pt-4 space-y-4"><h2 className="font-semibold">Create an event</h2>
         {!authorizedCode ? <div className="flex gap-2"><input value={builderCode} onChange={(e)=>setBuilderCode(e.target.value)} onKeyDown={(e)=>e.key === "Enter" && verify()} maxLength={4} placeholder="Configurator login code" className="min-w-0 flex-1 rounded-lg border px-3 py-2 bg-white dark:bg-slate-900"/><button disabled={busy || builderCode.length !== 4} onClick={verify} className="rounded-lg bg-blue-600 text-white px-4 disabled:opacity-50">Log in</button></div> : created ?

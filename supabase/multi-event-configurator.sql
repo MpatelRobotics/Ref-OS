@@ -77,3 +77,29 @@ begin
   do update set role=excluded.role,credential_hash=excluded.credential_hash,enabled=excluded.enabled,updated_at=now();
 end;
 $$;
+
+
+-- Delete an event created through the configurator.
+-- Highlander is permanently protected. The creator must be the signed-in user
+-- and must also provide the private configurator credential. Child event data
+-- is removed by the existing ON DELETE CASCADE foreign keys.
+create or replace function public.delete_configured_event(p_event uuid, p_builder_code text)
+returns boolean language plpgsql security definer
+set search_path = public, extensions as $$
+begin
+  if auth.uid() is null then raise exception 'Sign in before deleting an event'; end if;
+  if encode(digest(coalesce(p_builder_code, ''), 'sha256'), 'hex') <> encode(digest('4A23', 'sha256'), 'hex') then
+    raise exception 'Invalid configurator credential';
+  end if;
+  if public.is_configurator_protected_event(p_event) then
+    raise exception 'This event is protected and cannot be deleted';
+  end if;
+  if not exists (select 1 from public.events where id = p_event and created_by = auth.uid()) then
+    raise exception 'Only the event creator can delete this event';
+  end if;
+  delete from public.events where id = p_event and created_by = auth.uid();
+  return found;
+end;
+$$;
+revoke all on function public.delete_configured_event(uuid,text) from public, anon;
+grant execute on function public.delete_configured_event(uuid,text) to authenticated;

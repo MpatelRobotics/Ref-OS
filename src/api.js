@@ -246,6 +246,15 @@ export async function createEvent(d) {
   if (error) throw error;
   return mapEvent(Array.isArray(data) ? data[0] : data);
 }
+export async function deleteConfiguredEvent(eventId, builderCode) {
+  await ensureAnonymousSession();
+  const { data, error } = await supabase.rpc("delete_configured_event", {
+    p_event: eventId, p_builder_code: builderCode,
+  });
+  if (error) throw error;
+  return data === true;
+}
+
 export async function verifyEventConfigurator(code) {
   await ensureAnonymousSession();
   const { data, error } = await supabase.rpc("verify_event_configurator", { p_builder_code: code });
