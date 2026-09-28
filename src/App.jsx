@@ -523,6 +523,19 @@ export default function App() {
     return () => { live = false; };
   }, [unlocked, meName, activeEventId]);
 
+  useEffect(() => {
+    const highlander = activeEventId === EVENT_ID;
+    document.title = event?.name ? `Ref OS · ${event.name}` : highlander ? "Ref OS · Highlander Summit" : "Ref OS";
+
+    let favicon = document.querySelector('link[rel="icon"]');
+    if (!favicon) {
+      favicon = document.createElement("link");
+      favicon.rel = "icon";
+      document.head.appendChild(favicon);
+    }
+    favicon.href = highlander ? "/favicon.ico" : "/refos-logo.svg";
+  }, [activeEventId, event?.name]);
+
   const unlock = (r, admin, serverRole, credential = "") => {
     const roleText = String(r || serverRole || "").trim().toLowerCase();
     const uiRole = roleText.includes("inspection") ? "inspection" : roleText.includes("judge") ? "judge" : roleText.includes("emcee") ? "emcee" : "ref";
