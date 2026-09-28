@@ -18,7 +18,10 @@ const INCLUDED_DATA = [
 
 // Permanent deletion of an ARCHIVED event. Requires the exact event name (protects against mistakes)
 // and an authorized code (this event's Admin code or a Ref OS override code), verified by the server.
-export default function DeleteEventModal({ event, profile, onDelete, onClose }) {
+// mode "archived" (Archived Events screen): Admin code or override. mode "emergency" (event login
+// screen, forgotten Admin code): override only; the server archives and deletes in one step.
+export default function DeleteEventModal({ event, profile, onDelete, onClose, mode = "archived" }) {
+  const emergency = mode === "emergency";
   const eventName = String(event?.name || "").trim();
   const [typedName, setTypedName] = useState("");
   const [code, setCode] = useState("");
@@ -38,7 +41,7 @@ export default function DeleteEventModal({ event, profile, onDelete, onClose }) 
       if (result === "deleted") return; // parent closes the modal
       if (result === "locked") setError("Too many incorrect codes. Try again in a few minutes.");
       else if (result === "name_mismatch") setError("The event name does not match exactly.");
-      else setError("That code is not authorized to delete this event.");
+      else setError(emergency ? "That override code is not authorized." : "That code is not authorized to delete this event.");
       setDeleting(false);
     } catch (deleteError) {
       setError(deleteError?.message || "Could not delete this event.");
@@ -60,17 +63,20 @@ export default function DeleteEventModal({ event, profile, onDelete, onClose }) 
             <EventLogo src={profile?.logo} fallback="/refos-logo.svg" className="w-12 h-12 object-contain rounded-lg shrink-0 opacity-80" />
             <div className="min-w-0">
               <div className="font-bold text-slate-900 dark:text-slate-100 truncate">{eventName || "Event"}</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">Archived event</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">{emergency ? "Selected event" : "Archived event"}</div>
             </div>
           </div>
 
           <div className="rounded-xl border border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-4 text-sm text-red-900 dark:text-red-100">
             <div className="font-bold flex items-center gap-2 mb-1"><AlertTriangle size={17} /> This cannot be undone</div>
-            <p>This permanently deletes this event and all Ref OS data associated with it. This cannot be undone.</p>
+            <p>{emergency
+              ? "This will permanently delete this event and all Ref OS data associated with it. This cannot be undone."
+              : "This permanently deletes this event and all Ref OS data associated with it. This cannot be undone."}</p>
             <p className="mt-2 font-semibold">This includes:</p>
             <ul className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 list-disc pl-5">
               {INCLUDED_DATA.map((item) => <li key={item}>{item}</li>)}
             </ul>
+            {emergency && <p className="mt-2">If this event is still active, Ref OS archives it and deletes it in one step.</p>}
           </div>
 
           <label className="block">
@@ -83,11 +89,13 @@ export default function DeleteEventModal({ event, profile, onDelete, onClose }) 
           </label>
 
           <label className="block">
-            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Admin / Override Code</span>
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{emergency ? "Override Code" : "Admin / Override Code"}</span>
             <input value={code} onChange={(e) => { setCode(e.target.value.toUpperCase()); setError(""); }} disabled={deleting} maxLength={4}
               autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder="3S23" inputMode="text"
               className="mt-1 w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-3 font-mono tracking-widest text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-600" />
-            <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">Enter this event's Admin code or an authorized Ref OS override code.</span>
+            <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{emergency
+              ? "Enter an authorized Ref OS override code. Event access codes are not accepted here."
+              : "Enter this event's Admin code or an authorized Ref OS override code."}</span>
           </label>
         </div>
 

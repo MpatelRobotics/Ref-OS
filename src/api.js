@@ -311,6 +311,19 @@ export async function deleteArchivedEvent(eventId, confirmName, adminCredential)
   if (error) throw error;
   return String(data || "");
 }
+// Emergency deletion from the event login screen (forgotten Admin code). Server accepts ONLY the
+// Ref OS deletion override, refuses Highlander and protected events, and archives + deletes atomically.
+// Resolves to "deleted", "name_mismatch", "invalid", or "locked".
+export async function emergencyDeleteEvent(eventId, confirmName, overrideCode) {
+  await ensureAnonymousSession();
+  const { data, error } = await supabase.rpc("emergency_delete_refos_event", {
+    p_event: eventId,
+    p_confirm_name: String(confirmName || ""),
+    p_override_code: String(overrideCode || "").trim().toUpperCase(),
+  });
+  if (error) throw error;
+  return String(data || "");
+}
 // Restore: server requires this event's Admin (existing Admin session or the event's Admin access code).
 // Resolves to "restored", "active", "invalid", or "locked".
 export async function restoreEvent(eventId, adminCredential) {

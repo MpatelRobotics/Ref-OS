@@ -554,6 +554,8 @@ export default function App() {
   // Phase 7: bump to reload the event list (after a restore); event archived while this device was inside it.
   const [eventsReloadKey, setEventsReloadKey] = useState(0);
   const [archivedNoticeId, setArchivedNoticeId] = useState("");
+  // Message shown on Choose VEX Event after an emergency deletion from the login screen.
+  const [selectorNotice, setSelectorNotice] = useState("");
 
   useEffect(() => {
     // Keep the URL and saved selection in sync with the restored event, and drop invalid values.
@@ -660,6 +662,7 @@ export default function App() {
   const chooseEvent = (eventId) => {
     if (!eventId) return;
     setArchivedNoticeId("");
+    setSelectorNotice("");
     localStorage.setItem("refosActiveEventId", eventId);
     const url = new URL(window.location.href);
     url.searchParams.set("event", eventId);
@@ -850,6 +853,7 @@ export default function App() {
       error={eventChoiceError}
       onChoose={chooseEvent}
       onReload={() => setEventsReloadKey((key) => key + 1)}
+      initialNotice={selectorNotice}
       onCreated={(ev) => {
         setEventChoices((current) => [ev, ...current.filter((item) => item.id !== ev.id)]);
         chooseEvent(ev.id);
@@ -863,7 +867,14 @@ export default function App() {
     return <ArchivedEventScreen eventId={activeEventId} choice={activeChoice} event={event} onBack={chooseAnotherEvent} />;
   }
   if (!accessChecked) return <FullPage>Checking event access…</FullPage>;
-  if (!unlocked) return <LoginScreen eventId={activeEventId} eventName={event?.name || activeChoice?.name} branding={activeChoice?.branding} onUnlock={unlock} onChooseEvent={chooseAnotherEvent} />;
+  if (!unlocked) return <LoginScreen eventId={activeEventId} eventName={event?.name || activeChoice?.name} branding={activeChoice?.branding} onUnlock={unlock} onChooseEvent={chooseAnotherEvent}
+    onEventDeleted={async (deletedId) => {
+      // Emergency deletion succeeded: drop it from the list now, then leave the event
+      // (clears refosActiveEventId, ?event=, and the access session) and reload the list.
+      setEventChoices((current) => current.filter((ev) => ev.id !== deletedId));
+      setSelectorNotice("Event permanently deleted.");
+      await chooseAnotherEvent();
+    }} />;
   if (!identityChecked) return <FullPage>Checking volunteer profile…</FullPage>;
   if (!meName || !meFullName) return <NameScreen onIdentity={saveIdentity} />;
   if (loadErr) return (
@@ -909,7 +920,7 @@ const formatEventDate = (value) => {
   return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 };
 
-const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload }) => {
+const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, initialNotice = "" }) => {
   const [creating, setCreating] = useState(false);
   // Phase 7: active events by default; archived events in their own view.
   const [view, setView] = useState("active");
@@ -917,7 +928,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload }
   const [restoreCode, setRestoreCode] = useState("");
   const [restoreBusy, setRestoreBusy] = useState(false);
   const [restoreError, setRestoreError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [notice, setNotice] = useState(initialNotice);
   // Permanent deletion (archived events only). Deleted events disappear immediately.
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deletedIds, setDeletedIds] = useState(() => new Set());

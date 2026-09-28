@@ -3,10 +3,11 @@ import * as api from "../api";
 import { APP_VERSION } from "../appVersion";
 import { resolveEventBranding } from "../eventProfiles.js";
 import EventLogo from "../components/EventLogo.jsx";
+import DeleteEventModal from "../components/modals/DeleteEventModal.jsx";
 
 // Phase 6: `branding` is the selected event's PUBLIC branding only ({ shortName, logoUrl, accent }),
 // read before login. No admin settings or access credentials are available here.
-export default function LoginScreen({ eventId, eventName, branding = null, onUnlock, onChooseEvent }) {
+export default function LoginScreen({ eventId, eventName, branding = null, onUnlock, onChooseEvent, onEventDeleted }) {
   const profile = resolveEventBranding(eventId, eventName ? { name: eventName } : null, branding);
   const highlander = profile.highlander;
   const accent = profile.accent;
@@ -16,6 +17,17 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   const [checkingCode, setCheckingCode] = useState(false);
+  // Emergency deletion (forgotten Admin code). Never offered for Highlander; the server also refuses it.
+  const [showDelete, setShowDelete] = useState(false);
+  const canEmergencyDelete = !highlander && !!eventName && !!onEventDeleted;
+  const emergencyDelete = async (typedName, overrideCode) => {
+    const result = await api.emergencyDeleteEvent(eventId, typedName, overrideCode);
+    if (result === "deleted") {
+      setShowDelete(false);
+      await onEventDeleted(eventId);
+    }
+    return result;
+  };
 
   const finishServerLogin = async (credential) => {
     setCheckingCode(true);
@@ -151,6 +163,15 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
           </>
         )}
         <button onClick={onChooseEvent} className="w-full mt-5 rounded-lg border border-slate-300 px-4 py-2.5 font-semibold text-[#11172F]">Choose or configure an event</button>
+        {canEmergencyDelete && (
+          <button type="button" onClick={() => setShowDelete(true)} className="block mx-auto mt-3 text-xs font-semibold text-red-600 hover:text-red-700 underline underline-offset-2">
+            Delete Event
+          </button>
+        )}
+        {showDelete && (
+          <DeleteEventModal mode="emergency" event={{ id: eventId, name: eventName }} profile={profile}
+            onDelete={emergencyDelete} onClose={() => setShowDelete(false)} />
+        )}
         <div className="flex flex-col items-center gap-2 mt-8">
           <img src={highlander ? "/logo.svg" : "/refos-logo.svg"} alt={highlander ? "Highlander Summit" : "Ref OS"} className="h-12 w-12 object-contain" />
           <p className="text-center text-xs text-slate-500">
