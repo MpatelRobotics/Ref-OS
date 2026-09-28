@@ -62,6 +62,11 @@ revoke all on function public.create_highlander_secondary_event(text) from publi
 grant execute on function public.create_highlander_secondary_event(text) to authenticated;
 
 
+-- The OUT column names changed from the first version of this RPC.
+-- PostgreSQL cannot change an existing function's TABLE return type with
+-- CREATE OR REPLACE, so drop only this RPC before recreating it.
+drop function if exists public.claim_active_secondary_event(text);
+
 create or replace function public.claim_active_secondary_event(p_credential text)
 returns table(target_event_id uuid, target_event_name text, target_role text, target_is_admin boolean)
 language plpgsql security definer
