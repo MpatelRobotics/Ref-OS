@@ -232,6 +232,20 @@ export async function listMyEvents() {
   const { data } = await supabase.from("events").select("*").order("created_at", { ascending: false });
   return (data || []).map(mapEvent);
 }
+export async function listSelectableEvents() {
+  if (E2E_MOCK) return [{ id: "11111111-1111-4111-8111-111111111111", name: "Highlander Summit" }];
+  await ensureAnonymousSession();
+  const { data, error } = await supabase.rpc("list_refos_events");
+  if (error) throw error;
+  return (data || []).map((r) => ({
+    id: r.event_id,
+    name: r.event_name,
+    quals: 0,
+    practice: 0,
+    bracket: 0,
+    finalsBestOf: 1,
+  }));
+}
 export async function getEvent(id) {
   if (E2E_MOCK) return { id, name: "Highlander Summit E2E", quals: 10, practice: 0, bracket: 16, finalsBestOf: 1, joinCode: "TEST" };
   const { data } = await supabase.from("events").select("*").eq("id", id).maybeSingle();

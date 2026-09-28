@@ -459,7 +459,7 @@ export default function App() {
     (async () => {
       try {
         await api.ensureAnonymousSession();
-        const rows = await api.listMyEvents();
+        const rows = await api.listSelectableEvents();
         if (!live) return;
         // A visitor has not claimed an event role yet, so RLS can legitimately
         // return no membership-scoped events. Highlander is the built-in Ref OS
