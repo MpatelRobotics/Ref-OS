@@ -298,6 +298,19 @@ export async function archiveEvent(eventId) {
   if (error) throw error;
   return data;
 }
+// Permanent delete (archived events only): server requires the exact event name AND this event's
+// Admin access code, refuses active and protected events, and deletes atomically.
+// Resolves to "deleted", "name_mismatch", "invalid", or "locked".
+export async function deleteArchivedEvent(eventId, confirmName, adminCredential) {
+  await ensureAnonymousSession();
+  const { data, error } = await supabase.rpc("delete_archived_refos_event", {
+    p_event: eventId,
+    p_confirm_name: String(confirmName || ""),
+    p_admin_credential: String(adminCredential || "").trim().toUpperCase(),
+  });
+  if (error) throw error;
+  return String(data || "");
+}
 // Restore: server requires this event's Admin (existing Admin session or the event's Admin access code).
 // Resolves to "restored", "active", "invalid", or "locked".
 export async function restoreEvent(eventId, adminCredential) {

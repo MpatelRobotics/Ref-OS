@@ -29,6 +29,7 @@ import CountdownSetupModal from "./components/modals/CountdownSetupModal.jsx";
 import FieldNameConfiguratorModal from "./components/modals/FieldNameConfiguratorModal.jsx";
 import EventSettingsModal from "./components/modals/EventSettingsModal.jsx";
 import EventManagementModal from "./components/modals/EventManagementModal.jsx";
+import DeleteEventModal from "./components/modals/DeleteEventModal.jsx";
 import EventLogo from "./components/EventLogo.jsx";
 import OfflineReadinessModal from "./components/modals/OfflineReadinessModal.jsx";
 import FeedbackModal from "./components/modals/FeedbackModal.jsx";
@@ -917,11 +918,28 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload }
   const [restoreBusy, setRestoreBusy] = useState(false);
   const [restoreError, setRestoreError] = useState("");
   const [notice, setNotice] = useState("");
-  const activeEvents = events.filter((ev) => !ev.archivedAt);
-  const archivedEvents = events.filter((ev) => ev.archivedAt)
+  // Permanent deletion (archived events only). Deleted events disappear immediately.
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deletedIds, setDeletedIds] = useState(() => new Set());
+  const [archivedNotice, setArchivedNotice] = useState("");
+  const activeEvents = events.filter((ev) => !ev.archivedAt && !deletedIds.has(ev.id));
+  const archivedEvents = events.filter((ev) => ev.archivedAt && !deletedIds.has(ev.id))
     .sort((a, b) => new Date(b.archivedAt).getTime() - new Date(a.archivedAt).getTime());
 
-  const startRestore = (id) => { setRestoringId(id); setRestoreCode(""); setRestoreError(""); };
+  const startRestore = (id) => { setRestoringId(id); setRestoreCode(""); setRestoreError(""); setArchivedNotice(""); };
+  const deletePermanently = async (typedName, code) => {
+    const ev = deleteTarget;
+    if (!ev) return "invalid";
+    const result = await api.deleteArchivedEvent(ev.id, typedName, code);
+    if (result === "deleted") {
+      setDeletedIds((current) => new Set(current).add(ev.id));
+      setDeleteTarget(null);
+      setRestoringId("");
+      setArchivedNotice("Event permanently deleted.");
+      onReload?.();
+    }
+    return result;
+  };
   const restore = async (ev) => {
     const code = restoreCode.trim().toUpperCase();
     if (!/^\d[A-Z]\d\d$/.test(code)) { setRestoreError("Enter this event's 4 character Admin access code."); return; }
@@ -981,10 +999,13 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload }
       )}
       {view === "archived" ? (
         <>
-          <button type="button" onClick={() => { setView("active"); setRestoringId(""); }}
+          <button type="button" onClick={() => { setView("active"); setRestoringId(""); setArchivedNotice(""); }}
             className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
             <ChevronLeft size={18} /> Back to Active Events
           </button>
+          {archivedNotice && (
+            <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">{archivedNotice}</div>
+          )}
           <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 space-y-3">
             {loading && <p className="text-center text-slate-500 py-8">Loading events…</p>}
             {!loading && error && <p className="text-center text-red-600 py-5">{error}</p>}
@@ -1011,10 +1032,18 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload }
                     </div>
                   </div>
                   {!open ? (
-                    <button type="button" onClick={() => startRestore(ev.id)}
-                      className="w-full mt-3 rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2">
-                      <RotateCcw size={16} /> Restore Event
-                    </button>
+                    <>
+                      <button type="button" onClick={() => startRestore(ev.id)}
+                        className="w-full mt-3 rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2">
+                        <RotateCcw size={16} /> Restore Event
+                      </button>
+                      {!profile.highlander && (
+                        <button type="button" onClick={() => { setDeleteTarget(ev); setArchivedNotice(""); }}
+                          className="w-full mt-2 rounded-lg border border-red-300 dark:border-red-800 px-4 py-2.5 text-sm font-semibold text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center justify-center gap-2">
+                          <Trash2 size={16} /> Delete Permanently
+                        </button>
+                      )}
+                    </>
                   ) : (
                     <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 p-3">
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Admin access code for this event</label>
@@ -1097,6 +1126,10 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload }
       </>
       )}
       <p className="text-xs text-center text-slate-400 mt-4">Ref OS 2.0 · Event Selector</p>
+      {deleteTarget && (
+        <DeleteEventModal event={deleteTarget} profile={resolveEventBranding(deleteTarget.id, deleteTarget, deleteTarget.branding)}
+          onDelete={deletePermanently} onClose={() => setDeleteTarget(null)} />
+      )}
     </div>
   </div>
   );
