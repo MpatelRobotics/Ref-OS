@@ -566,11 +566,6 @@ export default function App() {
     try { await api.setEventMemberName(activeEventId, cleanNickname); } catch {}
   };
 
-  const createSecondaryEvent = async (data) => {
-    const created = await api.createHighlanderSecondaryEvent(data);
-    return created;
-  };
-
   const lock = useCallback(async () => {
     localStorage.removeItem("unlocked");
     localStorage.removeItem("refosRole");
@@ -3447,7 +3442,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         onTwoDeviceSyncTest={() => openCommandCenterTool(() => setShowTwoDeviceSyncTest(true))}
         onDiagnosticReport={() => openCommandCenterTool(() => setShowDiagnosticReport(true))}
         onEventSetup={() => openCommandCenterTool(() => setShowEvent(true))}
-        onCreateSecondaryEvent={createSecondaryEvent}
+        onCreateSecondaryEvent={(data) => api.createHighlanderSecondaryEvent(data)}
         onTMSync={() => openCommandCenterTool(() => setShowTMSync(true))}
         onExportViolations={exportCSV}
         onExportNominations={exportNominations}
