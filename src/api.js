@@ -240,6 +240,9 @@ export async function setMyName(name) {
 const mapEvent = (r) => r && {
   id: r.id, name: r.name, quals: r.quals, practice: r.practice,
   bracket: r.bracket, finalsBestOf: r.finals_best_of, joinCode: r.join_code,
+  // Phase 7 lifecycle (null archivedAt = ACTIVE). Undefined until the Phase 7 SQL is installed.
+  createdAt: r.created_at || null,
+  archivedAt: r.archived_at || null,
 };
 export async function listMyEvents() {
   const { data } = await supabase.from("events").select("*").order("created_at", { ascending: false });
@@ -262,13 +265,49 @@ export async function listSelectableEvents() {
       accent: r.accent_color || "",
     },
   });
+  // Phase 7: archive status and creation date, merged onto every event (active and archived).
+  const withLifecycle = async (choices) => {
+    const lifecycle = await listEventLifecycle();
+    return choices.map((choice) => ({
+      ...choice,
+      archivedAt: lifecycle?.get(choice.id)?.archivedAt || null,
+      createdAt: lifecycle?.get(choice.id)?.createdAt || null,
+    }));
+  };
   // Phase 6 branding function (supabase/refos-2-phase6-event-settings.sql).
   // Falls back to the Phase 3 selector function if it has not been installed yet.
   const branded = await supabase.rpc("list_refos_event_branding");
-  if (!branded.error) return (branded.data || []).map(toChoice);
+  if (!branded.error) return withLifecycle((branded.data || []).map(toChoice));
   const { data, error } = await supabase.rpc("list_refos_events");
   if (error) throw error;
-  return (data || []).map(toChoice);
+  return withLifecycle((data || []).map(toChoice));
+}
+
+/* ================= Phase 7: event lifecycle (supabase/refos-2-phase7-event-management.sql) ================= */
+// Public lifecycle metadata: Map(eventId -> { archivedAt, createdAt }). Returns null if the Phase 7
+// SQL is not installed, so every event is then treated as active (the pre-Phase 7 behavior).
+export async function listEventLifecycle() {
+  if (E2E_MOCK) return null;
+  const { data, error } = await supabase.rpc("list_refos_event_lifecycle");
+  if (error) return null;
+  return new Map((data || []).map((r) => [r.event_id, { archivedAt: r.archived_at || null, createdAt: r.created_at || null }]));
+}
+// Archive: server allows only an Admin member of this event, and never Highlander.
+export async function archiveEvent(eventId) {
+  const { data, error } = await supabase.rpc("archive_refos_event", { p_event: eventId });
+  if (error) throw error;
+  return data;
+}
+// Restore: server requires this event's Admin (existing Admin session or the event's Admin access code).
+// Resolves to "restored", "active", "invalid", or "locked".
+export async function restoreEvent(eventId, adminCredential) {
+  await ensureAnonymousSession();
+  const { data, error } = await supabase.rpc("restore_refos_event", {
+    p_event: eventId,
+    p_admin_credential: String(adminCredential || "").trim().toUpperCase(),
+  });
+  if (error) throw error;
+  return String(data || "");
 }
 export async function getEvent(id) {
   if (E2E_MOCK) return { id, name: "Highlander Summit E2E", quals: 10, practice: 0, bracket: 16, finalsBestOf: 1, joinCode: "TEST" };

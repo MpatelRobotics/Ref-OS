@@ -4,7 +4,7 @@ import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
   ClipboardCheck, X, Search, BarChart3, Users, Download, Save,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check, Bell, BellOff,
-  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, QrCode, ScanLine, LifeBuoy, MapPin,
+  CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, QrCode, ScanLine, LifeBuoy, MapPin, RotateCcw,
 } from "lucide-react";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -28,6 +28,7 @@ import AnnouncementModal from "./components/modals/AnnouncementModal.jsx";
 import CountdownSetupModal from "./components/modals/CountdownSetupModal.jsx";
 import FieldNameConfiguratorModal from "./components/modals/FieldNameConfiguratorModal.jsx";
 import EventSettingsModal from "./components/modals/EventSettingsModal.jsx";
+import EventManagementModal from "./components/modals/EventManagementModal.jsx";
 import EventLogo from "./components/EventLogo.jsx";
 import OfflineReadinessModal from "./components/modals/OfflineReadinessModal.jsx";
 import FeedbackModal from "./components/modals/FeedbackModal.jsx";
@@ -549,6 +550,9 @@ export default function App() {
   const [eventChoices, setEventChoices] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventChoiceError, setEventChoiceError] = useState("");
+  // Phase 7: bump to reload the event list (after a restore); event archived while this device was inside it.
+  const [eventsReloadKey, setEventsReloadKey] = useState(0);
+  const [archivedNoticeId, setArchivedNoticeId] = useState("");
 
   useEffect(() => {
     // Keep the URL and saved selection in sync with the restored event, and drop invalid values.
@@ -650,10 +654,11 @@ export default function App() {
       }
     })();
     return () => { live = false; };
-  }, [activeEventId]);
+  }, [activeEventId, eventsReloadKey]);
 
   const chooseEvent = (eventId) => {
     if (!eventId) return;
+    setArchivedNoticeId("");
     localStorage.setItem("refosActiveEventId", eventId);
     const url = new URL(window.location.href);
     url.searchParams.set("event", eventId);
@@ -843,12 +848,19 @@ export default function App() {
       loading={eventsLoading}
       error={eventChoiceError}
       onChoose={chooseEvent}
+      onReload={() => setEventsReloadKey((key) => key + 1)}
       onCreated={(ev) => {
         setEventChoices((current) => [ev, ...current.filter((item) => item.id !== ev.id)]);
         chooseEvent(ev.id);
       }}
     />
   );
+  // Phase 7: a restored or linked event must not enter login or the event until its lifecycle is known.
+  // If the event list cannot be loaded (for example offline), continue so an active event stays usable.
+  if (!activeChoice && eventsLoading && !eventChoiceError) return <FullPage>Checking event…</FullPage>;
+  if (activeChoice?.archivedAt || event?.archivedAt || archivedNoticeId === activeEventId) {
+    return <ArchivedEventScreen eventId={activeEventId} choice={activeChoice} event={event} onBack={chooseAnotherEvent} />;
+  }
   if (!accessChecked) return <FullPage>Checking event access…</FullPage>;
   if (!unlocked) return <LoginScreen eventId={activeEventId} eventName={event?.name || activeChoice?.name} branding={activeChoice?.branding} onUnlock={unlock} onChooseEvent={chooseAnotherEvent} />;
   if (!identityChecked) return <FullPage>Checking volunteer profile…</FullPage>;
@@ -863,11 +875,77 @@ export default function App() {
   );
   if (!event) return <FullPage>Loading…</FullPage>;
 
-  return <Tracker key={event.id} initialEvent={event} meName={meName} meFullName={meFullName} mePhone={mePhone} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} onChooseEvent={chooseAnotherEvent} />;
+  return <Tracker key={event.id} initialEvent={event} meName={meName} meFullName={meFullName} mePhone={mePhone} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} onChooseEvent={chooseAnotherEvent}
+    onEventArchived={() => setArchivedNoticeId(event.id)} onArchivedBySelf={chooseAnotherEvent} />;
 }
 
-const EventSelector = ({ events, loading, error, onChoose, onCreated }) => {
+// Phase 7: shown for an old link or restored selection that points at an archived event.
+// It never signs in, never restores, and offers only a way back to Choose VEX Event.
+const ArchivedEventScreen = ({ eventId, choice, event, onBack }) => {
+  const profile = resolveEventBranding(eventId, event || choice, choice?.branding);
+  const archivedAt = choice?.archivedAt || event?.archivedAt;
+  return (
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-900 p-5 flex items-center justify-center">
+      <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 text-center">
+        <EventLogo src={profile.logo} fallback={profile.highlander ? "/logo.svg" : "/refos-logo.svg"} className="w-20 h-20 object-contain mx-auto mb-3 opacity-80" />
+        <h1 className="text-lg font-bold text-slate-900 dark:text-white">{profile.name}</h1>
+        <span className="inline-block mt-2 rounded-full border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 px-2.5 py-0.5 text-xs font-semibold text-slate-600 dark:text-slate-300">Archived</span>
+        <p className="mt-4 text-slate-700 dark:text-slate-200 font-semibold">This event has been archived.</p>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          {archivedAt ? `Archived ${formatEventDate(archivedAt)}. ` : ""}Its data is kept. An event Admin can restore it from Archived Events on Choose VEX Event.
+        </p>
+        <button type="button" onClick={onBack} className="w-full mt-5 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold px-4 py-3">
+          Back to Choose VEX Event
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const formatEventDate = (value) => {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+};
+
+const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload }) => {
   const [creating, setCreating] = useState(false);
+  // Phase 7: active events by default; archived events in their own view.
+  const [view, setView] = useState("active");
+  const [restoringId, setRestoringId] = useState("");
+  const [restoreCode, setRestoreCode] = useState("");
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restoreError, setRestoreError] = useState("");
+  const [notice, setNotice] = useState("");
+  const activeEvents = events.filter((ev) => !ev.archivedAt);
+  const archivedEvents = events.filter((ev) => ev.archivedAt)
+    .sort((a, b) => new Date(b.archivedAt).getTime() - new Date(a.archivedAt).getTime());
+
+  const startRestore = (id) => { setRestoringId(id); setRestoreCode(""); setRestoreError(""); };
+  const restore = async (ev) => {
+    const code = restoreCode.trim().toUpperCase();
+    if (!/^\d[A-Z]\d\d$/.test(code)) { setRestoreError("Enter this event's 4 character Admin access code."); return; }
+    setRestoreBusy(true);
+    setRestoreError("");
+    try {
+      const result = await api.restoreEvent(ev.id, code);
+      if (result === "restored" || result === "active") {
+        setRestoringId("");
+        setRestoreCode("");
+        setView("active");
+        setNotice(`${ev.name || "The event"} was restored and is active again.`);
+        onReload?.();
+      } else if (result === "locked") {
+        setRestoreError("Too many incorrect codes. Try again in a few minutes.");
+      } else {
+        setRestoreError("That is not this event's Admin access code.");
+      }
+    } catch (e) {
+      setRestoreError(e?.message || "Could not restore the event.");
+    } finally {
+      setRestoreBusy(false);
+    }
+  };
   const [name, setName] = useState("");
   const [adminCode, setAdminCode] = useState("");
   const [createError, setCreateError] = useState("");
@@ -895,16 +973,79 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated }) => {
     <div className="w-full max-w-xl">
       <div className="text-center mb-6">
         <img src="/refos-logo.svg" alt="Ref OS" className="h-20 mx-auto mb-3" />
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Choose VEX Event</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Select the event this device is working at.</p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{view === "archived" ? "Archived events keep all of their data. An event Admin can restore one." : "Select the event this device is working at."}</p>
       </div>
+      {notice && view === "active" && (
+        <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">{notice}</div>
+      )}
+      {view === "archived" ? (
+        <>
+          <button type="button" onClick={() => { setView("active"); setRestoringId(""); }}
+            className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
+            <ChevronLeft size={18} /> Back to Active Events
+          </button>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 space-y-3">
+            {loading && <p className="text-center text-slate-500 py-8">Loading events…</p>}
+            {!loading && error && <p className="text-center text-red-600 py-5">{error}</p>}
+            {!loading && !error && archivedEvents.length === 0 && (
+              <p className="text-center text-slate-500 py-8">No events are archived.</p>
+            )}
+            {!loading && !error && archivedEvents.map((ev) => {
+              const profile = resolveEventBranding(ev.id, ev, ev.branding);
+              const showShort = profile.hasSavedShortName && profile.shortName.toLowerCase() !== profile.name.toLowerCase();
+              const open = restoringId === ev.id;
+              return (
+                <div key={ev.id} className="rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+                  <div className="flex items-center gap-4">
+                    <EventLogo src={profile.logo} fallback={profile.highlander ? "/logo.svg" : "/refos-logo.svg"} className="w-12 h-12 object-contain rounded-lg shrink-0 opacity-80" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-semibold text-slate-900 dark:text-white truncate">{profile.name}</span>
+                        <span className="shrink-0 rounded-full border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">Archived</span>
+                      </div>
+                      {showShort && <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{profile.shortName}</div>}
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        Archived {formatEventDate(ev.archivedAt)}{ev.createdAt ? ` · Created ${formatEventDate(ev.createdAt)}` : ""}
+                      </div>
+                    </div>
+                  </div>
+                  {!open ? (
+                    <button type="button" onClick={() => startRestore(ev.id)}
+                      className="w-full mt-3 rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2">
+                      <RotateCcw size={16} /> Restore Event
+                    </button>
+                  ) : (
+                    <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 p-3">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Admin access code for this event</label>
+                      <input value={restoreCode} onChange={(e) => { setRestoreCode(e.target.value.toUpperCase()); setRestoreError(""); }} maxLength={4} placeholder="3S23"
+                        autoCapitalize="characters" autoCorrect="off" spellCheck={false} disabled={restoreBusy}
+                        onKeyDown={(e) => e.key === "Enter" && restore(ev)}
+                        className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-3 font-mono tracking-widest text-slate-900 dark:text-white" />
+                      <p className="text-xs text-slate-500 mt-2">Restoring returns this event to the active list with all of its data, branding, and access codes.</p>
+                      {restoreError && <p className="text-sm text-red-600 dark:text-red-400 mt-2">{restoreError}</p>}
+                      <div className="flex gap-2 mt-3">
+                        <button type="button" disabled={restoreBusy} onClick={() => setRestoringId("")}
+                          className="flex-1 rounded-xl border border-slate-300 dark:border-slate-600 px-4 py-2.5 font-semibold disabled:opacity-50">Cancel</button>
+                        <button type="button" disabled={restoreBusy} onClick={() => restore(ev)}
+                          className="flex-1 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2.5 font-semibold disabled:opacity-50">{restoreBusy ? "Restoring…" : "Restore Event"}</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+      <>
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 space-y-3">
         {loading && <p className="text-center text-slate-500 py-8">Loading events…</p>}
         {!loading && error && <p className="text-center text-red-600 py-5">{error}</p>}
-        {!loading && !error && events.length === 0 && (
-          <p className="text-center text-slate-500 py-8">No Ref OS events are available yet.</p>
+        {!loading && !error && activeEvents.length === 0 && (
+          <p className="text-center text-slate-500 py-8">No active Ref OS events are available.</p>
         )}
-        {!loading && !error && events.map((ev) => {
+        {!loading && !error && activeEvents.map((ev) => {
           const profile = resolveEventBranding(ev.id, ev, ev.branding);
           const showShort = profile.hasSavedShortName && profile.shortName.toLowerCase() !== profile.name.toLowerCase();
           const branded = profile.accentSource !== "default";
@@ -922,6 +1063,12 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated }) => {
           );
         })}
       </div>
+        {!loading && !error && (
+          <button type="button" onClick={() => { setView("archived"); setNotice(""); }}
+            className="w-full mt-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300">
+            Archived Events ({archivedEvents.length})
+          </button>
+        )}
         {!creating ? (
           <button type="button" onClick={() => setCreating(true)}
             className="w-full mt-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold px-4 py-3">
@@ -947,6 +1094,8 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated }) => {
             </div>
           </div>
         )}
+      </>
+      )}
       <p className="text-xs text-center text-slate-400 mt-4">Ref OS 2.0 · Event Selector</p>
     </div>
   </div>
@@ -968,7 +1117,7 @@ const ConfigError = () => (
 /* ==================================================================== */
 /*  TRACKER (the main app, scoped to one event)                        */
 /* ==================================================================== */
-function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onChooseEvent }) {
+function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onChooseEvent, onEventArchived, onArchivedBySelf }) {
   const isJudge = role === "judge";
   const isEmcee = role === "emcee";
   const isInspection = role === "inspection";
@@ -1154,6 +1303,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const [showCountdownSetup, setShowCountdownSetup] = useState(false);
   const [showFieldNameConfigurator, setShowFieldNameConfigurator] = useState(false);
   const [showEventSettings, setShowEventSettings] = useState(false);
+  const [showEventManagement, setShowEventManagement] = useState(false);
   const [showOfflineTest, setShowOfflineTest] = useState(false);
   const [showCommandCenter, setShowCommandCenter] = useState(false);
   const [commandCenterChildOpen, setCommandCenterChildOpen] = useState(false);
@@ -1187,6 +1337,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     setShowCountdownSetup(false);
     setShowFieldNameConfigurator(false);
     setShowEventSettings(false);
+    setShowEventManagement(false);
     setShowOfflineTest(false);
     setShowAnnouncement(false);
     setShowContactDirectory(false);
@@ -1615,6 +1766,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       if (isInspection) {
         const [ev, t, queuedOps] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), outbox.loadQueue(eventId)]);
         if (ev) setEvent(ev);
+        if (ev?.archivedAt) onEventArchived?.();
         const queuedPhotos = (queuedOps || []).filter((op) => op.kind === "robot_photo");
         setTeams(t.map((team) => ({
           ...team,
@@ -1631,6 +1783,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       }
       const [ev, t, v, nm, sl, wn, queuedOps] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), api.listViolations(eventId), api.listNominations(eventId), api.listShortlist(eventId), api.listWatchNotes(eventId), outbox.loadQueue(eventId)]);
       if (ev) setEvent(ev);
+      if (ev?.archivedAt) onEventArchived?.();
       setTeams((cur) => {
         const pending = cur.filter((x) => x._pending && !t.some((s) => s.number === x.number));
         const queuedPhotos = (queuedOps || []).filter((op) => op.kind === "robot_photo");
@@ -1988,6 +2141,22 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
     }
     if (commandCenterChildOpen) returnToCommandCenter();
     else setShowEventSettings(false);
+  };
+  // Phase 7: Event Management. Archive changes only this event's lifecycle state (server enforces
+  // Admin-of-this-event and Highlander protection). Afterwards this device leaves the event.
+  const eventProtected = isHighlander || eventSettings?.system_protection?.value?.protected === true;
+  const archiveCurrentEvent = async () => {
+    if (!adminUnlocked) throw new Error("Only this event's Admin can archive it.");
+    if (eventProtected) throw new Error("This event is protected and cannot be archived.");
+    try {
+      await api.archiveEvent(eventId);
+    } catch (error) {
+      if (outbox.isOffline(error)) throw new Error("Reconnect before archiving this event.");
+      throw error;
+    }
+    setShowEventManagement(false);
+    setCommandCenterChildOpen(false);
+    await onArchivedBySelf?.();
   };
   const saveRoleAccessConfig = async (config) => {
     try {
@@ -3953,6 +4122,9 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         onSave={saveSharedCountdown}
         onClear={clearSharedCountdown}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowCountdownSetup(false)} />}
+      {showEventManagement && adminUnlocked && <EventManagementModal event={event} eventId={eventId} brand={brand} roleLabel={myRole} isProtected={eventProtected}
+        onArchive={archiveCurrentEvent}
+        onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEventManagement(false)} />}
       {showEventSettings && adminUnlocked && <EventSettingsModal event={event} brand={brand} fieldNames={fieldNames}
         onSave={saveEventSettings}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEventSettings(false)} />}
@@ -3978,6 +4150,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         onFieldNames={() => openCommandCenterTool(() => setShowFieldNameConfigurator(true))}
         brand={brand}
         onEventSettings={() => openCommandCenterTool(() => setShowEventSettings(true))}
+        onEventManagement={() => openCommandCenterTool(() => setShowEventManagement(true))}
         onPreEventTest={() => openCommandCenterTool(() => setShowPreEventTest(true))}
         onTwoDeviceSyncTest={() => openCommandCenterTool(() => setShowTwoDeviceSyncTest(true))}
         onDiagnosticReport={() => openCommandCenterTool(() => setShowDiagnosticReport(true))}
