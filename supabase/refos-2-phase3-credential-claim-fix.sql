@@ -5,7 +5,7 @@
 create extension if not exists pgcrypto;
 
 create or replace function public.claim_event_access(
-  p_event_id uuid,
+  p_event uuid,
   p_credential text
 )
 returns table(role text, is_admin boolean)
@@ -29,7 +29,7 @@ begin
   select c.role
     into v_role
     from public.event_access_credentials c
-   where c.event_id = p_event_id
+   where c.event_id = p_event
      and c.enabled = true
      and c.credential_hash = encode(extensions.digest(v_code, 'sha256'::text), 'hex')
    limit 1;
@@ -39,7 +39,7 @@ begin
   end if;
 
   insert into public.event_members(event_id, user_id, role)
-  values (p_event_id, v_user, v_role)
+  values (p_event, v_user, v_role)
   on conflict (event_id, user_id)
   do update set role = excluded.role;
 
