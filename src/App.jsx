@@ -60,7 +60,8 @@ const canonicalFieldKey = (field) => {
   const match = raw.match(/^(?:field|f)?\s*[#_-]?\s*([123])$/i);
   return match ? `Field ${match[1]}` : raw;
 };
-const fieldDisplayName = (field, fieldNames = DEFAULT_FIELD_NAMES) => fieldNames?.[canonicalFieldKey(field)] || field || "";
+// Fields beyond the three named ones (a TM export can use any number) read as "Field N".
+const fieldDisplayName = (field, fieldNames = DEFAULT_FIELD_NAMES) => fieldNames?.[canonicalFieldKey(field)] || (/^\d+$/.test(String(field ?? "").trim()) ? `Field ${String(field).trim()}` : field) || "";
 const initials = (name) =>
   (name || "").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 3).toUpperCase() || "?";
 
@@ -146,7 +147,22 @@ function parseRankingsFile(text, filename = "") {
     const w = count(values.wins ?? values.win ?? values.w);
     const l = count(values.losses ?? values.loss ?? values.l);
     const ties = count(values.ties ?? values.tie ?? values.draws ?? values.draw ?? values.t);
-    return w != null && l != null && ties != null ? { w, l, t: ties } : null;
+    const wlt = w != null && l != null && ties != null ? { w, l, t: ties } : null;
+    // Optional Tournament Manager ranking statistics (rank.csv): WP, AP, SP, NumPlayed,
+    // Win Percentage, Average Points, Total Points, High Score. Only columns present are kept.
+    const stats = {};
+    const stat = (key, ...aliases) => {
+      const raw = aliases.map((a) => values[a]).find((v) => v != null && String(v).trim() !== "");
+      const num = raw == null ? NaN : Number(String(raw).trim().replace(/,/g, "").replace(/%$/, ""));
+      if (Number.isFinite(num)) stats[key] = num;
+    };
+    stat("wp", "wp"); stat("ap", "ap"); stat("sp", "sp");
+    stat("played", "numplayed", "played", "matchesplayed");
+    stat("winPct", "winpercentage", "winpct");
+    stat("avgPoints", "averagepoints", "avgpoints");
+    stat("totalPoints", "totalpoints");
+    stat("highScore", "highscore");
+    return wlt || Object.keys(stats).length ? { ...(wlt || {}), ...stats } : null;
   };
   if (filename.toLowerCase().endsWith(".json") || t.startsWith("{") || t.startsWith("[")) {
     const data = JSON.parse(t);
@@ -172,7 +188,9 @@ function parseRankingsFile(text, filename = "") {
   for (let i = 1; i < table.length; i++) {
     const number = cleanNum(table[i][numberCol]);
     const rank = cleanRank(table[i][rankCol]);
-    if (number && rank != null) rows.push({ number, rank, record: record(Object.fromEntries(header.map((key, index) => [key, table[i][index]]))) });
+    const entry = Object.fromEntries(header.map((key, index) => [key, table[i][index]]));
+    const nameValue = entry.teamname ?? entry["team name"] ?? entry.name;
+    if (number && rank != null) rows.push({ number, rank, name: String(nameValue ?? "").trim(), record: record(entry) });
   }
   return { rows, warnings };
 }
@@ -189,12 +207,19 @@ function parseSkillsRankingsFile(text, filename = "") {
     const data = JSON.parse(text);
     list = Array.isArray(data) ? data : (data.rankings || data.skills || data.teams || data.items || []);
   } else {
-    const table = parseCSV(text);
-    if (table.length < 2) return { rows: [], warnings: ["No skills standings found in the file."] };
+    const table = parseCSV(String(text).replace(/^\uFEFF/, ""));
+    if (!table.length) return { rows: [], warnings: ["No skills standings found in the file."] };
     const headers = table[0].map(normalize);
+    // A Tournament Manager Robot Skills export with headers but no rows is valid: no attempts yet.
+    if (table.length < 2) {
+      const looksLikeSkills = headers.some((h) => ["team", "teamnum", "teamnumber", "number"].includes(h)) &&
+        headers.some((h) => /driver|prog|totalscore|combined|skills/.test(h));
+      return looksLikeSkills ? { rows: [], warnings: [], empty: true } : { rows: [], warnings: ["No skills standings found in the file."] };
+    }
     list = table.slice(1).map((cells) => Object.fromEntries(headers.map((header, index) => [header, cells[index]])));
   }
   if (!Array.isArray(list)) return { rows: [], warnings: ["Expected a list of skills standings."] };
+  if (!list.length) return { rows: [], warnings: [], empty: true };
   const field = (entry, aliases) => {
     const values = Object.entries(entry || {});
     const match = values.find(([key]) => aliases.includes(normalize(key)));
@@ -202,11 +227,17 @@ function parseSkillsRankingsFile(text, filename = "") {
   };
   const parsed = list.map((entry) => {
     const number = String(field(entry, ["teamnum", "teamnumber", "team", "number", "teamid"]) ?? "").trim().toUpperCase();
-    const driver = score(field(entry, ["driver", "driverskills", "drivingskills", "driverscore", "driving", "driverbest", "driverskillsscore", "drivingskillsscore"]));
-    const programming = score(field(entry, ["programming", "programmingskills", "autonomous", "autonomouscoding", "autonomouscodingskills", "programmingbest", "autonomousscore", "programmingskillsscore", "autonomouscodingscore", "auton", "autonscore"]));
+    const driver = score(field(entry, ["driver", "driverskills", "drivingskills", "driverscore", "driving", "driverbest", "driverskillsscore", "drivingskillsscore", "driverhighscore"]));
+    const programming = score(field(entry, ["programming", "programmingskills", "autonomous", "autonomouscoding", "autonomouscodingskills", "programmingbest", "autonomousscore", "programmingskillsscore", "autonomouscodingscore", "auton", "autonscore", "proghighscore", "programminghighscore"]));
     const suppliedTotal = score(field(entry, ["combined", "combinedscore", "total", "totalscore", "skillsscore", "overallscore", "score"]));
     const suppliedRank = score(field(entry, ["rank", "ranking", "place", "position", "skillsrank"]));
-    return { number, driver, programming, total: suppliedTotal ?? (driver != null || programming != null ? (driver ?? 0) + (programming ?? 0) : null), rank: suppliedRank };
+    const row = { number, driver, programming, total: suppliedTotal ?? (driver != null || programming != null ? (driver ?? 0) + (programming ?? 0) : null), rank: suppliedRank };
+    // Tournament Manager RobotSkills.csv attempt counts, kept only when the export has them.
+    const driverAttempts = score(field(entry, ["driverattempts"]));
+    const programmingAttempts = score(field(entry, ["progattempts", "programmingattempts"]));
+    if (driverAttempts != null) row.driverAttempts = driverAttempts;
+    if (programmingAttempts != null) row.programmingAttempts = programmingAttempts;
+    return row;
   }).filter((row) => row.number && row.total != null);
   const warnings = [];
   if (!parsed.length) return { rows: [], warnings: ["Could not find team numbers and skills scores. Export the combined Skills Challenge rankings as CSV or JSON."] };
@@ -238,15 +269,16 @@ function parseCSV(text) {
   return rows.filter((r) => r.some((x) => String(x).trim() !== ""));
 }
 const _roundMap = { qualification: "qual", qual: "qual", q: "qual", qualifier: "qual", qualifying: "qual", practice: "practice", p: "practice", "round of 16": "r16", r16: "r16", ro16: "r16", quarterfinal: "qf", quarterfinals: "qf", qf: "qf", semifinal: "sf", semifinals: "sf", sf: "sf", final: "final", finals: "final", f: "final" };
+const TM_ROUND_CODES = { 1: "practice", 2: "qual", 3: "qf", 4: "sf", 5: "final", 6: "r16" };
 function phaseFrom(roundVal, matchVal) {
   const raw = String(roundVal == null ? "" : roundVal).trim();
   const r = raw.toLowerCase();
 
-  // Tournament Manager elimination CSVs often use numeric Round values.
-  // Tournament Manager elimination exports for this event use Round 6 for the Round of 16.
+  // Tournament Manager match exports use numeric Round codes:
+  // 1 Practice, 2 Qualification, 3 Quarterfinal, 4 Semifinal, 5 Final, 6 Round of 16.
   if (/^\d+$/.test(raw)) {
-    const n = Number(raw);
-    if (n === 6) return "r16";
+    const tmRound = TM_ROUND_CODES[Number(raw)];
+    if (tmRound) return tmRound;
   }
 
   if (_roundMap[r]) return _roundMap[r];
@@ -283,32 +315,47 @@ function parseMatchesFile(text, filename = "") {
   const find = (...keys) => header.findIndex((h) => keys.some((k) => h.includes(k)));
   const matchCol = (() => { const tm = header.indexOf("matchnum"); if (tm >= 0) return tm; const exact = header.indexOf("match"); return exact >= 0 ? exact : find("match #", "match number", "match"); })();
   const roundCol = (() => { const exact = header.indexOf("round"); return exact >= 0 ? exact : find("round", "type", "phase"); })();
-    const instanceCol = header.indexOf("instance");
+  const instanceCol = header.indexOf("instance");
   const fieldCol = find("field");
   const redScoreCol = header.findIndex((h) => h.includes("red") && h.includes("score"));
   const blueScoreCol = header.findIndex((h) => h.includes("blue") && h.includes("score"));
-  const stateCol = header.findIndex((h) => h.includes("state") || h.includes("scored") || h.includes("status"));
-  const redCols = header.map((h, i) => ({ h, i })).filter((x) => x.h.includes("red") && !x.h.includes("score") && !x.h.includes("won")).map((x) => x.i);
-  const blueCols = header.map((h, i) => ({ h, i })).filter((x) => x.h.includes("blue") && !x.h.includes("score") && !x.h.includes("won")).map((x) => x.i);
+  const stateCol = (() => { const exact = header.indexOf("scored"); return exact >= 0 ? exact : header.findIndex((h) => h.includes("state") || h.includes("scored") || h.includes("status")); })();
+  const winnerCol = header.indexOf("winner");
+  // Tournament Manager names alliance slots Red1..RedN / Blue1..BlueN. Use exactly those
+  // when present (any number of slots; empty Red3/Blue3 are simply skipped). RedSit/BlueSit
+  // name a sitting team, not an alliance member, so they are never alliance columns.
+  const slotCols = (color) => header.map((h, i) => ({ h, i })).filter((x) => new RegExp(`^${color}\\s*(team)?\\s*\\d+$`).test(x.h)).map((x) => x.i);
+  const fuzzyCols = (color) => header.map((h, i) => ({ h, i })).filter((x) => x.h.includes(color) && !x.h.includes("score") && !x.h.includes("won") && !x.h.includes("sit")).map((x) => x.i);
+  const tmSlots = slotCols("red").length > 0 && slotCols("blue").length > 0;
+  const redCols = tmSlots ? slotCols("red") : fuzzyCols("red");
+  const blueCols = tmSlots ? slotCols("blue") : fuzzyCols("blue");
   const warnings = [];
   if (matchCol < 0) warnings.push("Couldn't find a 'Match' column.");
   if (!redCols.length || !blueCols.length) warnings.push("Couldn't find Red/Blue team columns — check the export includes team columns.");
   const clean = (v) => String(v == null ? "" : v).trim().toUpperCase();
-  const isTeam = (v) => /^[0-9]{1,6}[A-Z]{1,2}$/.test(clean(v)); // e.g. 1234A, 25335A, 119B — not "0"/"FALSE"/scores
+  // Exact TM slot columns hold only team numbers, so any non-empty value is a team.
+  // Fuzzy columns are filtered to team-number shapes so scores and flags are ignored.
+  const isTeam = (v) => tmSlots ? clean(v) !== "" : /^[0-9]{1,6}[A-Z]{1,2}$/.test(clean(v)); // e.g. 1234A
   const rows = [];
   for (let i = 1; i < table.length; i++) {
     const r = table[i];
     const matchVal = matchCol >= 0 ? r[matchCol] : "";
     const roundVal = roundCol >= 0 ? r[roundCol] : "";
     const phase = phaseFrom(roundVal, matchVal);
-    const num = _numFrom(matchVal) ?? _numFrom(r[roundCol]) ?? i;
+    const matchNumber = _numFrom(matchVal) ?? _numFrom(r[roundCol]) ?? i;
+    // TM elimination series are identified by Instance (R16 1-8, QF 1-4, SF 1-2); MatchNum is
+    // the game within the series. Finals are one series, so the match number identifies the game.
+    const instance = instanceCol >= 0 ? _numFrom(r[instanceCol]) : null;
+    const num = ["r16", "qf", "sf"].includes(phase) && instance > 0 ? instance : matchNumber;
     const red = redCols.map((c) => clean(r[c])).filter(isTeam);
     const blue = blueCols.map((c) => clean(r[c])).filter(isTeam);
     const field = fieldCol >= 0 ? String(r[fieldCol] || "").trim() : "";
     const rs = redScoreCol >= 0 ? _numFrom(r[redScoreCol]) : null;
     const bs = blueScoreCol >= 0 ? _numFrom(r[blueScoreCol]) : null;
     const scored = stateCol >= 0 ? /scored|complete|final|done|true|1/i.test(String(r[stateCol] || "")) : ((rs != null || bs != null) && ((rs || 0) > 0 || (bs || 0) > 0));
-    if (num > 0 && (red.length || blue.length)) rows.push({ phase, num, red, blue, field, redScore: scored ? rs : null, blueScore: scored ? bs : null, scored });
+    const tmWinner = winnerCol >= 0 ? String(r[winnerCol] || "").trim().toLowerCase() : "";
+    const winner = scored && rs != null && bs != null ? (["red", "blue", "tie"].includes(tmWinner) ? tmWinner : tmScoreWinner(rs, bs)) : null;
+    if (num > 0 && (red.length || blue.length)) rows.push({ phase, num, red, blue, field, redScore: scored ? rs : null, blueScore: scored ? bs : null, scored, winner });
   }
   return { rows, warnings };
 }
@@ -351,6 +398,21 @@ function tmCategoryFromFilename(filename = "") {
   return null;
 }
 
+// Standard Tournament Manager CSV exports, recognised by their column headers alone
+// (normalised: lower case, letters and digits only). Only the schema is fixed here;
+// team numbers, match counts, fields, dates, divisions, and scores all come from the file.
+const TM_STANDARD_SCHEMAS = [
+  { category: "skills", label: "Robot Skills", headers: ["rank", "team", "totalscore", "proghighscore", "driverhighscore"] },
+  { category: "rankings", label: "Qualification Rankings", headers: ["rank", "teamnum", "wins", "losses", "wp"] },
+  { category: "matches", label: "Matches", headers: ["round", "matchnum", "red1", "blue1", "timescheduled"] },
+  { category: "teams", label: "Teams", headers: ["number", "name", "city", "division"] },
+];
+const TM_CATEGORY_LABELS = { teams: "Teams", matches: "Matches", rankings: "Qualification Rankings", skills: "Robot Skills", alliances: "Alliances (Round of 16)", scores: "Match Results" };
+function tmStandardSchema(keys) {
+  const set = new Set(keys);
+  return TM_STANDARD_SCHEMAS.find((schema) => schema.headers.every((h) => set.has(h)))?.category || null;
+}
+
 // Returns a category, null when the file parsed but looks unfamiliar,
 // or undefined when the file is empty / not valid CSV or JSON.
 function tmCategoryFromContent(text, filename = "") {
@@ -384,6 +446,9 @@ function tmCategoryFromContent(text, filename = "") {
   const has = (re) => keys.some((k) => re.test(k));
   const isOneOf = (...names) => keys.some((k) => names.includes(k));
 
+  // 0. Standard TM exports (teams / Match / rank / RobotSkills) by their full header signature.
+  const standard = csvTable ? tmStandardSchema(keys) : null;
+
   // 1. Match-style exports (schedule, results, Round of 16) share Red/Blue team columns.
   const matchLike = (has(/^red(team)?\d$/) && has(/^blue(team)?\d$/)) ||
     (isJson && (isOneOf("matchinfo", "matchtuple") || (wrapper === "matches" && isOneOf("alliances"))));
@@ -406,9 +471,14 @@ function tmCategoryFromContent(text, filename = "") {
       r16Only = rows.length > 0 && rows.every((r) => r.phase !== "qual" && r.phase !== "practice") && rows.some((r) => r.phase === "r16");
     }
     if (r16Only) return "alliances";
+    // A standard TM Match export is a full sync: the match importer updates the schedule
+    // and any scored results together, so later exports update the same matches.
+    if (standard === "matches") return "matches";
     if (rows.some((r) => r.scored && r.redScore != null && r.blueScore != null)) return "scores";
     return "matches";
   }
+
+  if (standard) return standard;
 
   // 2. Skills before rankings: TM skills standings also carry a Rank column.
   const hasRecord = isOneOf("wins", "win", "losses", "loss", "ties", "tie", "wlt", "record", "winlosstie", "w", "l", "t", "wp", "sp");
@@ -445,7 +515,22 @@ async function classifyTMExport(file) {
   } else {
     category = byContent || byName || null;
   }
-  return { file, category, reason: category ? "" : "not recognized as a Tournament Manager export" };
+  return { file, category, rows: category ? tmCountRows(category, text, name) : 0, reason: category ? "" : "not recognized as a Tournament Manager export" };
+}
+
+// Number of data rows each importer will read from a classified export (shown before importing).
+function tmCountRows(category, text, filename = "") {
+  try {
+    if (category === "teams") return parseTeamsFile(text, filename).rows.length;
+    if (category === "rankings") return parseRankingsFile(text, filename).rows.length;
+    if (category === "skills") return parseSkillsRankingsFile(text, filename).rows.length;
+    const rows = parseMatchesFile(text, filename).rows;
+    if (category === "alliances") return rows.filter((r) => r.phase === "r16").length;
+    if (category === "scores") return rows.filter((r) => r.scored).length;
+    return rows.length;
+  } catch {
+    return 0;
+  }
 }
 
 const MATCH_PHASES = [
@@ -2524,7 +2609,9 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       if (!rows.length) { alert("No rankings found in that file.\n" + warnings.join("\n")); return; }
       const teamMapR = new Map(teams.map((t) => [t.number, t]));
       const importedRecords = Object.fromEntries(rows.filter((r) => r.record).map((r) => [r.number, r.record]));
-      const recordsChanged = JSON.stringify(importedRecords) !== JSON.stringify(eventSettings?.qualification_records?.value?.records || {});
+      const previousRecords = eventSettings?.qualification_records?.value?.records || {};
+      const recordsChanged = JSON.stringify(importedRecords) !== JSON.stringify(previousRecords);
+      const recordUpdates = Object.entries(importedRecords).filter(([number, rec]) => JSON.stringify(rec) !== JSON.stringify(previousRecords[number])).length;
       let changedR = 0, unchangedR = 0, newRankR = 0, unknownR = 0;
       for (const r of rows) {
         const current = teamMapR.get(r.number);
@@ -2537,10 +2624,15 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         { label: `${newRankR} new ranking${newRankR === 1 ? "" : "s"}` },
         { label: `${changedR} ranking${changedR === 1 ? "" : "s"} changed` },
         { label: `${unchangedR} unchanged` },
+        { label: `${recordUpdates} record${recordUpdates === 1 ? "" : "s"} / stat${recordUpdates === 1 ? "" : "s"} updated` },
         { label: `${unknownR} unknown team${unknownR === 1 ? "" : "s"}`, warn: unknownR > 0 },
       ];
       if (!(await confirmImport({ title: "Qualification rankings — change preview", chips: chipsR, warnings, noChanges: newRankR === 0 && changedR === 0 && unknownR === 0 && !recordsChanged }))) return;
       setImporting({ label: "Importing rankings…", done: 0, total: 0 });
+      // Teams missing from the roster are added once, with the name from the rankings export.
+      // Rankings then update each team's single row (event_id + number), never a new entry.
+      const missingTeams = rows.filter((r) => !teamMapR.has(r.number)).map((r) => ({ number: r.number, name: r.name || "" }));
+      if (missingTeams.length) await api.bulkUpsertTeams(eventId, missingTeams);
       await api.bulkUpsertRankings(eventId, rows);
       const savedRecords = await api.upsertEventSetting(eventId, "qualification_records", { records: importedRecords, importedAt: Date.now() }, meName);
       setEventSettings((current) => ({ ...current, qualification_records: savedRecords }));
@@ -2555,11 +2647,19 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const importSkillsFile = async (file) => {
     if (!file || !adminUnlocked) return;
     try {
-      const { rows, warnings } = parseSkillsRankingsFile(await file.text(), file.name);
+      const { rows, warnings, empty } = parseSkillsRankingsFile(await file.text(), file.name);
+      const previous = eventSettings?.skills_rankings?.value?.rows || [];
+      if (empty) {
+        // Valid Robot Skills export with no attempts yet. Nothing to write, not an error.
+        await confirmImport({ title: "Robot Skills — change preview", chips: [{ label: "0 skills rows detected" }],
+          warnings: previous.length ? [`Ref OS keeps the ${previous.length} skills score${previous.length === 1 ? "" : "s"} already imported. An empty export does not clear them.`] : ["No Robot Skills attempts have been recorded in Tournament Manager yet."],
+          noChanges: true });
+        if (!previous.length) markTMSync("skills");
+        return;
+      }
       if (!rows.length) { alert(warnings.join("\n")); return; }
       const known = new Set(teams.map((team) => team.number));
       const unknown = rows.filter((row) => !known.has(row.number)).length;
-      const previous = eventSettings?.skills_rankings?.value?.rows || [];
       const same = JSON.stringify(rows) === JSON.stringify(previous);
       if (!(await confirmImport({ title: "Skills Challenge — change preview", chips: [
         { label: `${rows.length} teams with scores` },
@@ -2742,12 +2842,16 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       const roster = new Set(teams.map((t) => t.number));
       const inFile = new Set(); for (const r of rows) { (r.red || []).forEach((x) => inFile.add(x)); (r.blue || []).forEach((x) => inFile.add(x)); }
       let unknown = 0; inFile.forEach((x) => { if (!roster.has(x)) unknown++; });
-      let addedMatches = 0, changedMatches = 0, unchangedMatches = 0;
+      let addedMatches = 0, changedMatches = 0, unchangedMatches = 0, scoreUpdates = 0;
+      // Matches are identified per event by (phase, number): TM Round + MatchNum, or Round +
+      // Instance for R16/QF/SF. A later export updates the same match instead of adding one.
+      const hasScore = (r) => r.scored && r.redScore != null && r.blueScore != null;
       for (const r of rows) {
         const current = matches[tmMatchKey(r.phase, r.num)];
         if (!current) addedMatches++;
         else if (tmScheduleChanged(current, r)) changedMatches++;
         else unchangedMatches++;
+        if (hasScore(r) && tmScoreChanged(current, r.redScore, r.blueScore, r.winner)) scoreUpdates++;
       }
       const inFileKeys = new Set(rows.map((r) => tmMatchKey(r.phase, r.num)));
       const existingNotInFile = Object.values(matches).filter((m) => !inFileKeys.has(tmMatchKey(m.phase || "qual", m.num))).length;
@@ -2755,14 +2859,21 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         { label: `${addedMatches} match${addedMatches === 1 ? "" : "es"} added` },
         { label: `${changedMatches} match${changedMatches === 1 ? "" : "es"} changed` },
         { label: `${unchangedMatches} unchanged` },
+        { label: `${scoreUpdates} score${scoreUpdates === 1 ? "" : "s"} updated` },
         { label: `${existingNotInFile} existing match${existingNotInFile === 1 ? "" : "es"} not in file remain untouched` },
         { label: `${unknown} unknown team${unknown === 1 ? "" : "s"}`, warn: unknown > 0 },
       ];
-      if (!(await confirmImport({ title: "Match schedule — change preview", chips, warnings, noChanges: addedMatches === 0 && changedMatches === 0 && unknown === 0 }))) return;
+      if (!(await confirmImport({ title: "Match schedule — change preview", chips, warnings, noChanges: addedMatches === 0 && changedMatches === 0 && scoreUpdates === 0 && unknown === 0 }))) return;
+      const elimLabel = { r16: "R16", qf: "QF", sf: "SF", final: "Final" };
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i];
         setImporting({ label: "Importing matches…", done: i + 1, total: rows.length });
-        await api.addMatch(eventId, { phase: r.phase, num: r.num, red: r.red, blue: r.blue, field: r.field });
+        const match = { phase: r.phase, num: r.num, red: r.red, blue: r.blue, field: r.field };
+        if (elimLabel[r.phase]) match.label = `${elimLabel[r.phase]} ${r.num}`;
+        // Scores are written only for matches TM marks as scored; unscored rows never clear
+        // an existing result.
+        if (hasScore(r)) Object.assign(match, { redScore: r.redScore, blueScore: r.blueScore, winner: r.winner || tmScoreWinner(r.redScore, r.blueScore) });
+        await api.addMatch(eventId, match);
       }
       const newTeams = [...inFile].filter((x) => !roster.has(x)).map((number) => ({ number, name: "" }));
       if (newTeams.length) { await api.bulkUpsertTeams(eventId, newTeams); const t = await api.listTeams(eventId); setTeams((cur) => { const pending = cur.filter((x) => x._pending && !t.some((s) => s.number === x.number)); return [...t, ...pending]; }); }
@@ -2799,10 +2910,12 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       const results = [];
       for (const file of files) results.push(await classifyTMExport(file));
       const byCategory = {};
+      const rowCounts = new Map();
       const skipped = [];
       for (const r of results) {
         if (!r.category) { skipped.push(r); continue; }
         (byCategory[r.category] = byCategory[r.category] || []).push(r.file);
+        rowCounts.set(r.file, r.rows || 0);
       }
       const skippedText = skipped.length
         ? "\n\nSkipped (not recognized):\n" + skipped.map((r) => `${r.file?.name || "unnamed file"} (${r.reason})`).join("\n")
@@ -2828,8 +2941,12 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         ? "\n\nHighlander Summit demo lock is on: matches, alliances, and scores will stay read only."
         : "";
       const summary =
-        "TM Event Package detected:\n\n" +
-        detected.map((c) => `${c}: ${byCategory[c][0].name}`).join("\n") +
+        "Tournament Manager Event Package\n\n" +
+        detected.map((c) => {
+          const file = byCategory[c][0];
+          const count = rowCounts.get(file) || 0;
+          return `${TM_CATEGORY_LABELS[c] || c}\n${count} detected (${file.name})`;
+        }).join("\n\n") +
         skippedText +
         `\n\nTarget event: ${eventName}\n` +
         "Each section opens the normal change preview before anything is written." +
@@ -6261,6 +6378,9 @@ function EventRankings({ teams, records, importedRecords, skills, onImportSkills
   const qualifications = teams.filter((team) => Number(team.rank) > 0).sort((a, b) => Number(a.rank) - Number(b.rank) || a.number.localeCompare(b.number, undefined, { numeric: true }));
   const rankedSkills = [...skills].sort((a, b) => Number(a.rank) - Number(b.rank) || b.total - a.total);
   const active = section === "qualification" ? qualifications : rankedSkills;
+  // WP / AP / SP columns appear only when the imported TM rankings include them.
+  const showPoints = section === "qualification" && Object.values(importedRecords || {}).some((r) => r && r.wp != null);
+  const fmtStat = (v) => v == null || !Number.isFinite(Number(v)) ? "—" : String(Number(v));
   return <section className="space-y-4">
     <div className="flex flex-wrap items-center gap-2">
       <button onClick={() => setSection("qualification")} aria-pressed={section === "qualification"} className={`px-4 py-2 rounded-lg text-sm font-bold ${section === "qualification" ? "bg-[#0D0F32] text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"}`}>Qualification rankings</button>
@@ -6269,8 +6389,8 @@ function EventRankings({ teams, records, importedRecords, skills, onImportSkills
     </div>
     {!active.length ? <Empty title={section === "skills" ? "No Skills Challenge scores yet" : "No qualification rankings yet"} sub="Import the Tournament Manager standings in the Sync Center." /> :
       <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-        <table className="w-full text-sm text-left"><thead className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200"><tr><th className="px-3 py-3">Rank</th><th className="px-3 py-3">Team</th><th className="px-3 py-3">Name</th>{section === "qualification" && <th className="px-3 py-3 text-right whitespace-nowrap" title="Wins, losses, ties">W L T</th>}{section === "skills" && <><th className="px-3 py-3 text-right">Driver</th><th className="px-3 py-3 text-right">Autonomous</th><th className="px-3 py-3 text-right">Total</th></>}</tr></thead>
-          <tbody>{active.map((row) => <tr key={row.number} className="border-t border-slate-100 dark:border-slate-700"><td className="px-3 py-3 font-bold">{row.rank}</td><td className="px-3 py-3 font-mono font-bold whitespace-nowrap">{row.number}</td><td className="px-3 py-3 text-slate-500 dark:text-slate-300">{names.get(row.number) || "—"}</td>{section === "qualification" && <td className="px-3 py-3 text-right font-mono tabular-nums whitespace-nowrap" title="Wins, losses, ties">{(() => { const r = importedRecords[row.number] || records[row.number]; return r ? `${r.w}-${r.l}-${r.t}` : "—"; })()}</td>}{section === "skills" && <><td className="px-3 py-3 text-right">{row.driver ?? "—"}</td><td className="px-3 py-3 text-right">{row.programming ?? "—"}</td><td className="px-3 py-3 text-right font-bold">{row.total}</td></>}</tr>)}</tbody>
+        <table className="w-full text-sm text-left"><thead className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200"><tr><th className="px-3 py-3">Rank</th><th className="px-3 py-3">Team</th><th className="px-3 py-3">Name</th>{section === "qualification" && <th className="px-3 py-3 text-right whitespace-nowrap" title="Wins, losses, ties">W L T</th>}{showPoints && <><th className="px-3 py-3 text-right" title="Win points">WP</th><th className="px-3 py-3 text-right" title="Autonomous points">AP</th><th className="px-3 py-3 text-right" title="Strength of schedule points">SP</th></>}{section === "skills" && <><th className="px-3 py-3 text-right">Driver</th><th className="px-3 py-3 text-right">Autonomous</th><th className="px-3 py-3 text-right">Total</th></>}</tr></thead>
+          <tbody>{active.map((row) => <tr key={row.number} className="border-t border-slate-100 dark:border-slate-700"><td className="px-3 py-3 font-bold">{row.rank}</td><td className="px-3 py-3 font-mono font-bold whitespace-nowrap">{row.number}</td><td className="px-3 py-3 text-slate-500 dark:text-slate-300">{names.get(row.number) || "—"}</td>{section === "qualification" && <td className="px-3 py-3 text-right font-mono tabular-nums whitespace-nowrap" title="Wins, losses, ties">{(() => { const imported = importedRecords[row.number]; const r = imported && imported.w != null ? imported : records[row.number]; return r && r.w != null ? `${r.w}-${r.l}-${r.t}` : "—"; })()}</td>}{showPoints && (() => { const r = importedRecords[row.number] || {}; return <><td className="px-3 py-3 text-right font-mono tabular-nums">{fmtStat(r.wp)}</td><td className="px-3 py-3 text-right font-mono tabular-nums">{fmtStat(r.ap)}</td><td className="px-3 py-3 text-right font-mono tabular-nums">{fmtStat(r.sp)}</td></>; })()}{section === "skills" && <><td className="px-3 py-3 text-right">{row.driver ?? "—"}</td><td className="px-3 py-3 text-right">{row.programming ?? "—"}</td><td className="px-3 py-3 text-right font-bold">{row.total}</td></>}</tr>)}</tbody>
         </table>
       </div>}
   </section>;
