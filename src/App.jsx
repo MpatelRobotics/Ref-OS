@@ -32,6 +32,7 @@ import FieldNameConfiguratorModal from "./components/modals/FieldNameConfigurato
 import EventSettingsModal from "./components/modals/EventSettingsModal.jsx";
 import EventManagementModal from "./components/modals/EventManagementModal.jsx";
 import DeleteEventModal from "./components/modals/DeleteEventModal.jsx";
+import LockDeviceModal from "./components/modals/LockDeviceModal.jsx";
 import EventLogo from "./components/EventLogo.jsx";
 import OfflineReadinessModal from "./components/modals/OfflineReadinessModal.jsx";
 import FeedbackModal from "./components/modals/FeedbackModal.jsx";
@@ -648,8 +649,8 @@ function readSavedEventId() {
 /* ==================================================================== */
 export default function App() {
   // A browser refresh restores the selected event from a valid ?event= UUID, then from the
-  // saved refosActiveEventId. Only "Choose or configure an event" and "Lock This Device"
-  // clear the selection. Access is never restored from these values: the server-side
+  // saved refosActiveEventId. Only "Choose or configure an event" and "Lock This Device ->
+  // Main Screen" clear the selection ("Lock This Device -> Event Main Page" keeps it). Access is never restored from these values: the server-side
   // event membership check below decides whether this device is still signed in.
   const [activeEventId, setActiveEventId] = useState(readSavedEventId);
   const [eventChoices, setEventChoices] = useState([]);
@@ -951,6 +952,26 @@ export default function App() {
     await api.clearAccessSession();
   }, []);
 
+  // Lock This Device -> Event Main Page. Signs this device out of its event role exactly like
+  // lock(), but keeps the selected event (refosActiveEventId and ?event=) so the same event's
+  // login screen, with its branding, appears next. The anonymous auth session that held the
+  // event membership is discarded first, so the previous role cannot come back without a code.
+  const lockToEventLogin = useCallback(async () => {
+    try {
+      await api.clearAccessSession();
+    } finally {
+      localStorage.removeItem("unlocked");
+      localStorage.removeItem("refosRole");
+      sessionStorage.removeItem("refosAdmin");
+      setUnlocked(false);
+      setIdentityChecked(false);
+      setEvent(null);
+      setLoadErr(false);
+      // accessChecked stays true: the access check for this event already ran, and the device
+      // is now signed out, so the login screen is the correct result without re-checking.
+    }
+  }, []);
+
   if (!configured) return <ConfigError />;
   if (!activeEventId) return (
     <EventSelector
@@ -994,7 +1015,7 @@ export default function App() {
   );
   if (!event) return <FullPage>Loading…</FullPage>;
 
-  return <Tracker key={event.id} initialEvent={event} meName={meName} meFullName={meFullName} mePhone={mePhone} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} onChooseEvent={chooseAnotherEvent}
+  return <Tracker key={event.id} initialEvent={event} meName={meName} meFullName={meFullName} mePhone={mePhone} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} onLockToEventLogin={lockToEventLogin} onChooseEvent={chooseAnotherEvent}
     onEventArchived={() => setArchivedNoticeId(event.id)} onArchivedBySelf={chooseAnotherEvent} />;
 }
 
@@ -1276,7 +1297,15 @@ const ConfigError = () => (
 /* ==================================================================== */
 /*  TRACKER (the main app, scoped to one event)                        */
 /* ==================================================================== */
-function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onChooseEvent, onEventArchived, onArchivedBySelf }) {
+function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf }) {
+  // Lock This Device asks where to go first (Main Screen / Event Main Page / Cancel).
+  const [showLockChoice, setShowLockChoice] = useState(false);
+  const [lockBusy, setLockBusy] = useState(false);
+  const runLock = async (action) => {
+    setLockBusy(true);
+    try { await action(); }
+    catch (error) { setLockBusy(false); alert(error?.message || "Could not lock this device."); }
+  };
   const isJudge = role === "judge";
   const isEmcee = role === "emcee";
   const isInspection = role === "inspection";
@@ -3785,7 +3814,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                     <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
                     <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
                     <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
-                    <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
+                    <button onClick={() => { setMenu(false); setShowLockChoice(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
                   </>
                 ) : isJudge ? (
                   <>
@@ -3804,7 +3833,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                 
                 <button onClick={() => { setMenu(false); setShowHelpRequest(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LifeBuoy size={16} /> Request Help</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
-                <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
+                <button onClick={() => { setMenu(false); setShowLockChoice(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
                   </>
                 ) : isEmcee ? (
                   <>
@@ -3818,7 +3847,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                     <button onClick={togglePushNotifications} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{pushState === "enabled" ? <Bell size={16} /> : <BellOff size={16} />} {pushState === "enabled" ? "Push alerts on" : pushState === "blocked" ? "Push alerts blocked" : "Enable push alerts"}</button>
                     <button onClick={() => { setMenu(false); setShowHelpRequest(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LifeBuoy size={16} /> Request Help</button>
                     <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
-                    <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
+                    <button onClick={() => { setMenu(false); setShowLockChoice(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
                   </>
                 ) : (
                 <>
@@ -3835,7 +3864,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                 
                 <button onClick={() => { setMenu(false); setShowHelpRequest(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LifeBuoy size={16} /> Request Help</button>
                 <button onClick={() => { setMenu(false); setShowShare(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Share2 size={16} /> Invite Other Key Volunteers</button>
-                <button onClick={() => { setMenu(false); onLock(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
+                <button onClick={() => { setMenu(false); setShowLockChoice(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
                 <div className="border-t border-slate-100 my-1" />
                 {!adminUnlocked ? (
                   <button onClick={() => { setMenu(false); pendingAdminAction.current = null; setShowAdminPassword(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><KeyRound size={16} /> Admin Login</button>
@@ -4266,6 +4295,10 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
         onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; importRulesFile(file); }} />
       <input ref={skillsFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importSkillsFile(f); }} />
+      {showLockChoice && <LockDeviceModal eventName={event?.name} busy={lockBusy}
+        onMainScreen={() => runLock(onLock)}
+        onEventMainPage={() => runLock(onLockToEventLogin)}
+        onCancel={() => { if (!lockBusy) setShowLockChoice(false); }} />}
       {importPreview && <ImportPreviewModal preview={importPreview}
         onImport={() => { const p = importPreview; setImportPreview(null); p.resolve(true); }}
         onCancel={() => { const p = importPreview; setImportPreview(null); p.resolve(false); }} />}
