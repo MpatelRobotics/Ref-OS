@@ -135,7 +135,7 @@ The TM Sync Center (Event Command Center → *TM Sync Center*) supports:
 - Alliance selection and elimination bracket information.
 
 **Rules**
-- Searchable rules reference. Events can import their own rules from CSV; the Highlander Summit event includes the bundled Override 2.0 Game Manual for offline use.
+- Searchable rules reference. Every new event starts with its own copy of the default rule library (currently the V5RC Override 2026-2027 rules, taken from Highlander Summit), so the Rules tab works immediately. Each event's rules are independent, and events can import their own rules from CSV. The Highlander Summit event includes the bundled Override 2.0 Game Manual for offline use.
 
 **Coordination**
 - **Request Help** from any role, with a location and category, visible live to the crew; an Admin acknowledgment is shown to everyone.
@@ -329,6 +329,7 @@ Run the SQL files in the Supabase SQL Editor in the order below. Each builds on 
 | `supabase/refos-2-phase6-event-settings.sql` | Public event branding and field names for every role |
 | `supabase/refos-2-phase7-event-management.sql` | Archive, restore, protected permanent deletion, and photo cleanup queue |
 | `supabase/refos-2-robot-photo-storage.sql` | Robot photo storage permissions |
+| `supabase/refos-2-default-rules-template.sql` | Default rule library copied into every new event. Run after the Highlander Summit rules exist (`seed_rules.sql`); it takes a one-time snapshot of them. Re-run it if `refos-2-phase3-create-event.sql` is ever run again. |
 
 Some other files in `supabase/` apply only to the Highlander Summit deployment or to earlier releases. They are not needed for a new deployment.
 

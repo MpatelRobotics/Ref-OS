@@ -1,6 +1,8 @@
 -- Ref OS 2.0 Phase 3
 -- Creates a new VEX event shell. Tournament Manager imports populate event data later.
 -- Safe to rerun.
+-- NOTE: refos-2-default-rules-template.sql redefines create_refos_vex_event so new events also
+-- receive the default rule library. If you re-run this file, run that file again afterwards.
 
 create extension if not exists pgcrypto;
 
