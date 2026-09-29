@@ -646,6 +646,37 @@ function readSavedEventId() {
   return "";
 }
 
+// ---- Local device lock (Lock This Device -> Event Main Page) ----
+// A device lock hides the event on THIS device while keeping its server session. It is stored
+// per event as refosDeviceLock:<eventId> = { role, lockedAt }. The role is only a label for the
+// "Unlock as <role>" button: unlocking always re-validates the session, membership, and role
+// with the server (api.verifyEventSession). An authenticated session never opens the event UI
+// while a lock record exists.
+const DEVICE_LOCK_PREFIX = "refosDeviceLock:";
+const DEVICE_LOCK_ROLE_LABELS = { admin: "Admin", ref: "Referee", inspection: "Inspection", judge: "Judge Advisor", emcee: "Emcee" };
+const deviceLockRoleKey = (serverRole) => {
+  const r = String(serverRole || "").trim().toLowerCase();
+  return r === "admin" ? "admin" : r.includes("inspection") ? "inspection" : r.includes("judge") ? "judge" : r.includes("emcee") ? "emcee" : "ref";
+};
+function readDeviceLock(eventId) {
+  if (!eventId) return null;
+  try {
+    const record = JSON.parse(localStorage.getItem(DEVICE_LOCK_PREFIX + eventId) || "null");
+    return record && DEVICE_LOCK_ROLE_LABELS[record.role] ? record : null;
+  } catch { return null; }
+}
+function clearDeviceLock(eventId) {
+  try { localStorage.removeItem(DEVICE_LOCK_PREFIX + eventId); } catch {}
+}
+// A full sign-out ends the device session for every event, so every remembered lock goes too.
+function clearAllDeviceLocks() {
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(DEVICE_LOCK_PREFIX)) keys.push(k); }
+    keys.forEach((k) => localStorage.removeItem(k));
+  } catch {}
+}
+
 /* ==================================================================== */
 export default function App() {
   // A browser refresh restores the selected event from a valid ?event= UUID, then from the
@@ -679,6 +710,9 @@ export default function App() {
 
   const [unlocked, setUnlocked] = useState(false);
   const [role, setRole] = useState("ref");
+  // Device lock for the selected event (see readDeviceLock). Separate from the server session.
+  const [deviceLock, setDeviceLock] = useState(() => readDeviceLock(activeEventId));
+  const [lockNotice, setLockNotice] = useState("");
   const [accessChecked, setAccessChecked] = useState(false);
   const [identityChecked, setIdentityChecked] = useState(false);
   const [theme, setTheme] = useState(() => localStorage.getItem("refosTheme") || "light");
@@ -779,6 +813,8 @@ export default function App() {
     setAccessChecked(false);
     setIdentityChecked(false);
     setUnlocked(false);
+    setDeviceLock(readDeviceLock(eventId));
+    setLockNotice("");
     setActiveEventId(eventId);
   };
 
@@ -795,6 +831,9 @@ export default function App() {
     setAccessChecked(false);
     setIdentityChecked(false);
     setActiveEventId("");
+    clearAllDeviceLocks();
+    setDeviceLock(null);
+    setLockNotice("");
     try { await api.clearAccessSession(); } catch {}
   }, []);
 
@@ -806,6 +845,17 @@ export default function App() {
     let live = true;
     (async () => {
       try {
+        // Authenticated session != UI unlocked. A locked device stays on the event login
+        // screen (even after a refresh) until "Unlock as <role>" re-validates with the server.
+        const lockRecord = readDeviceLock(activeEventId);
+        if (lockRecord) {
+          localStorage.removeItem("unlocked");
+          localStorage.removeItem("refosRole");
+          sessionStorage.removeItem("refosAdmin");
+          setUnlocked(false);
+          setDeviceLock(lockRecord);
+          return;
+        }
         const serverRole = await api.getMyEventRole(activeEventId);
         if (!live) return;
         if (serverRole) {
@@ -914,6 +964,9 @@ export default function App() {
     localStorage.setItem("refosRole", uiRole);
     if (admin || serverRole === "admin") sessionStorage.setItem("refosAdmin", "1");
     else sessionStorage.removeItem("refosAdmin");
+    clearDeviceLock(activeEventId);
+    setDeviceLock(null);
+    setLockNotice("");
     setRole(uiRole);
     setUnlocked(true);
   };
@@ -948,29 +1001,62 @@ export default function App() {
     setAccessChecked(false);
     setEvent(null);
     setActiveEventId("");
+    clearAllDeviceLocks();
+    setDeviceLock(null);
+    setLockNotice("");
 
     await api.clearAccessSession();
   }, []);
 
-  // Lock This Device -> Event Main Page. Signs this device out of its event role exactly like
-  // lock(), but keeps the selected event (refosActiveEventId and ?event=) so the same event's
-  // login screen, with its branding, appears next. The anonymous auth session that held the
-  // event membership is discarded first, so the previous role cannot come back without a code.
+  // Lock This Device -> Event Main Page: a LOCAL device lock. The server session, event
+  // membership, selected event, and volunteer identity are all kept; only this device's UI is
+  // locked. The role recorded here is a label for the unlock button, never a credential.
   const lockToEventLogin = useCallback(async () => {
+    const record = {
+      role: sessionStorage.getItem("refosAdmin") === "1" ? "admin" : deviceLockRoleKey(role),
+      lockedAt: Date.now(),
+    };
+    localStorage.setItem(DEVICE_LOCK_PREFIX + activeEventId, JSON.stringify(record));
+    localStorage.removeItem("unlocked");
+    localStorage.removeItem("refosRole");
+    sessionStorage.removeItem("refosAdmin");
+    setDeviceLock(record);
+    setLockNotice("");
+    setUnlocked(false);
+    setIdentityChecked(false);
+    setEvent(null);
+    setLoadErr(false);
+  }, [activeEventId, role]);
+
+  // "Unlock as <role>": re-validated with the server before anything opens.
+  const unlockRemembered = async () => {
+    const record = readDeviceLock(activeEventId);
+    if (!record) return { ok: false };
+    let check;
     try {
-      await api.clearAccessSession();
-    } finally {
+      check = await api.verifyEventSession(activeEventId);
+    } catch {
+      // Server unreachable: stay locked and keep the remembered sign-in for a retry.
+      return { ok: false, message: "Ref OS could not reach the server to confirm this device's sign-in. Check the connection and try again." };
+    }
+    if (check.status === "archived") {
+      setArchivedNoticeId(activeEventId);
+      return { ok: false };
+    }
+    if (check.status !== "valid" || deviceLockRoleKey(check.role) !== record.role) {
+      // Revoked, reset, expired, or a different role: forget it completely and require a code.
+      clearAllDeviceLocks();
+      setDeviceLock(null);
       localStorage.removeItem("unlocked");
       localStorage.removeItem("refosRole");
       sessionStorage.removeItem("refosAdmin");
-      setUnlocked(false);
-      setIdentityChecked(false);
-      setEvent(null);
-      setLoadErr(false);
-      // accessChecked stays true: the access check for this event already ran, and the device
-      // is now signed out, so the login screen is the correct result without re-checking.
+      try { await api.clearAccessSession(); } catch {}
+      setLockNotice("This device's previous sign-in is no longer valid. Enter an access code to continue.");
+      return { ok: false };
     }
-  }, []);
+    unlock(check.role, check.role === "admin", check.role);
+    return { ok: true };
+  };
 
   if (!configured) return <ConfigError />;
   if (!activeEventId) return (
@@ -994,7 +1080,9 @@ export default function App() {
     return <ArchivedEventScreen eventId={activeEventId} choice={activeChoice} event={event} onBack={chooseAnotherEvent} />;
   }
   if (!accessChecked) return <FullPage>Checking event access…</FullPage>;
-  if (!unlocked) return <LoginScreen eventId={activeEventId} eventName={event?.name || activeChoice?.name} branding={activeChoice?.branding} onUnlock={unlock} onChooseEvent={chooseAnotherEvent}
+  if (!unlocked) return <LoginScreen key={`${activeEventId}:${deviceLock ? "locked" : "open"}`} eventId={activeEventId} eventName={event?.name || activeChoice?.name} branding={activeChoice?.branding} onUnlock={unlock} onChooseEvent={chooseAnotherEvent}
+    remembered={deviceLock ? { role: deviceLock.role, label: DEVICE_LOCK_ROLE_LABELS[deviceLock.role] } : null}
+    onUnlockRemembered={unlockRemembered} notice={lockNotice}
     onEventDeleted={async (deletedId) => {
       // Emergency deletion succeeded: drop it from the list now, then leave the event
       // (clears refosActiveEventId, ?event=, and the access session) and reload the list.

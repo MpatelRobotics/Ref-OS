@@ -7,7 +7,10 @@ import DeleteEventModal from "../components/modals/DeleteEventModal.jsx";
 
 // Phase 6: `branding` is the selected event's PUBLIC branding only ({ shortName, logoUrl, accent }),
 // read before login. No admin settings or access credentials are available here.
-export default function LoginScreen({ eventId, eventName, branding = null, onUnlock, onChooseEvent, onEventDeleted }) {
+// `remembered` ({ role, label }) is set when this device was locked with Lock This Device ->
+// Event Main Page. The label is display only: onUnlockRemembered asks the server to confirm the
+// device's session, event membership, and role before anything opens.
+export default function LoginScreen({ eventId, eventName, branding = null, onUnlock, onChooseEvent, onEventDeleted, remembered = null, onUnlockRemembered, notice = "" }) {
   const profile = resolveEventBranding(eventId, eventName ? { name: eventName } : null, branding);
   const highlander = profile.highlander;
   const accent = profile.accent;
@@ -17,6 +20,23 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   const [checkingCode, setCheckingCode] = useState(false);
+  // Locked device: show "Unlock as <role>" until the user asks for a different access code.
+  const [useDifferentCode, setUseDifferentCode] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
+  const showRemembered = !!remembered && !useDifferentCode;
+  const unlockRemembered = async () => {
+    if (!onUnlockRemembered || unlocking) return;
+    setUnlocking(true);
+    setErr("");
+    try {
+      const result = await onUnlockRemembered();
+      if (result && !result.ok && result.message) setErr(result.message);
+    } catch (e) {
+      setErr(e?.message || "Could not unlock this device.");
+    } finally {
+      setUnlocking(false);
+    }
+  };
   // Emergency deletion (forgotten Admin code). Never offered for Highlander; the server also refuses it.
   const [showDelete, setShowDelete] = useState(false);
   const canEmergencyDelete = !highlander && !!eventName && !!onEventDeleted;
@@ -89,8 +109,34 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
           {highlander && <span className="mt-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-700">Highlander Summit Release</span>}
         </div>
 
-        {mode === "code" ? (
+        {notice && !showRemembered && (
+          <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 text-center">{notice}</p>
+        )}
+        {showRemembered ? (
           <>
+            <div className="text-center">
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-slate-600">Device Locked</span>
+              <p className="mt-4 text-sm text-slate-500">Previously signed in as</p>
+              <p className="text-2xl font-bold text-[#11172F]">{remembered.label}</p>
+            </div>
+            <button type="button" onClick={unlockRemembered} disabled={unlocking} style={{ backgroundColor: accent }}
+              className="w-full mt-5 py-3.5 rounded-xl font-semibold text-white hover:brightness-95 disabled:opacity-60">
+              {unlocking ? "Checking sign-in…" : `Unlock as ${remembered.label}`}
+            </button>
+            <button type="button" onClick={() => { setUseDifferentCode(true); setErr(""); setCode(""); setMode("code"); }} disabled={unlocking}
+              className="w-full mt-2.5 py-3 rounded-xl font-semibold border border-slate-300 bg-white text-[#11172F] hover:bg-slate-50 disabled:opacity-60">
+              Use Different Access Code
+            </button>
+            {err && <p className="text-sm text-red-500 mt-3 text-center">{err}</p>}
+          </>
+        ) : mode === "code" ? (
+          <>
+            {remembered && (
+              <button type="button" onClick={() => { setUseDifferentCode(false); setErr(""); setCode(""); }}
+                className="block mx-auto mb-3 text-xs font-semibold text-slate-500 hover:text-[#11172F] underline underline-offset-2">
+                Back to Unlock as {remembered.label}
+              </button>
+            )}
             <p className="text-sm text-slate-600 text-center">Enter the 4 character access code provided by event leadership.</p>
             <div className="flex justify-center gap-3 my-5">
               {[0,1,2,3].map((i) => (

@@ -1,9 +1,10 @@
 import React, { useEffect } from "react";
 import { LayoutGrid, LogIn, LogOut } from "lucide-react";
 
-// Lock This Device: both destinations sign this device out of its event role.
-//   Main Screen      -> Choose VEX Event (clears the selected event).
-//   Event Main Page  -> this event's login screen (keeps the selected event and its branding).
+// Lock This Device.
+//   Main Screen      -> full sign-out, back to Choose VEX Event.
+//   Event Main Page  -> local device lock: this event's login screen, sign-in remembered
+//                       ("Unlock as <role>" re-checks it with the server).
 // Cancel closes the dialog and changes nothing.
 export default function LockDeviceModal({ eventName, busy = false, onMainScreen, onEventMainPage, onCancel }) {
   useEffect(() => {
@@ -29,7 +30,7 @@ export default function LockDeviceModal({ eventName, busy = false, onMainScreen,
             <span className="w-10 h-10 shrink-0 rounded-lg grid place-items-center bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200"><LayoutGrid size={20} /></span>
             <span className="min-w-0">
               <span className="block font-semibold text-slate-900 dark:text-slate-100">Main Screen</span>
-              <span className="block text-xs text-slate-500 dark:text-slate-400">Choose another VEX event</span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">Sign out and return to Choose VEX Event.</span>
             </span>
           </button>
 
@@ -38,12 +39,13 @@ export default function LockDeviceModal({ eventName, busy = false, onMainScreen,
             <span className="w-10 h-10 shrink-0 rounded-lg grid place-items-center bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200"><LogIn size={20} /></span>
             <span className="min-w-0">
               <span className="block font-semibold text-slate-900 dark:text-slate-100">Event Main Page</span>
-              <span className="block text-xs text-slate-500 dark:text-slate-400 truncate">Return to {name}</span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">Lock this device and return to this event's login screen.</span>
+              <span className="block text-xs font-semibold text-slate-600 dark:text-slate-300 truncate mt-0.5">{name}</span>
             </span>
           </button>
         </div>
 
-        <p className="text-[11px] text-slate-400 mt-3">Either choice signs this device out. An access code is needed to sign in again.</p>
+        <p className="text-[11px] text-slate-400 mt-3">Main Screen signs this device out. Event Main Page keeps the sign-in, and unlocking checks it with the server first.</p>
 
         <button type="button" disabled={busy} onClick={onCancel}
           className="w-full mt-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300 disabled:opacity-60">

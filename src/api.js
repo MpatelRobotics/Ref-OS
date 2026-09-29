@@ -114,6 +114,46 @@ export async function clearAccessSession() {
   catch { await supabase.auth.signOut(); }
 }
 
+// Lock This Device -> Event Main Page keeps this device's session. Before "Unlock as <role>"
+// reopens the event, the server must confirm it again:
+//   1. the auth session is still accepted by Supabase Auth (getUser checks it server-side),
+//   2. this user still has an event_members row for THIS event (RLS, current role),
+//   3. the event is not archived.
+// Resolves { status: "valid", role } | { status: "invalid", reason } | { status: "archived" }.
+// Throws only when the server cannot be reached, so the caller can keep the device locked
+// and ask the user to try again instead of treating an outage as a sign-out.
+const isAuthFailure = (error) => {
+  const status = Number(error?.status || 0);
+  return status === 401 || status === 403 || /^PGRST30\d$/.test(String(error?.code || "")) ||
+    /jwt|refresh token|session (?:missing|not found|expired)|invalid claim/i.test(String(error?.message || ""));
+};
+export async function verifyEventSession(eventId) {
+  if (E2E_MOCK) return { status: "valid", role: "admin" };
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData?.session?.user) return { status: "invalid", reason: "session" };
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError) {
+    if (isAuthFailure(userError)) return { status: "invalid", reason: "session" };
+    throw userError;
+  }
+  const userId = userData?.user?.id;
+  if (!userId) return { status: "invalid", reason: "session" };
+  const { data, error } = await supabase
+    .from("event_members")
+    .select("role")
+    .eq("event_id", eventId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    if (isAuthFailure(error)) return { status: "invalid", reason: "session" };
+    throw error;
+  }
+  if (!data?.role) return { status: "invalid", reason: "membership" };
+  const lifecycle = await listEventLifecycle();
+  if (lifecycle?.get(eventId)?.archivedAt) return { status: "archived" };
+  return { status: "valid", role: data.role };
+}
+
 export async function hasCurrentEventAccess(eventId) {
   if (E2E_MOCK) return true;
   const { data, error } = await supabase.from("event_members").select("role").eq("event_id", eventId).maybeSingle();
