@@ -23,6 +23,7 @@ Ref OS was originally developed for the Highlander Summit Signature Event and ha
 - [Event Management](#event-management)
 - [Robot photos](#robot-photos)
 - [Offline and installable app](#offline-and-installable-app)
+- [Local Venue Server (optional)](#local-venue-server-optional)
 - [Security and event isolation](#security-and-event-isolation)
 - [Highlander Summit](#highlander-summit)
 - [Tech stack](#tech-stack)
@@ -135,7 +136,9 @@ The TM Sync Center (Event Command Center → *TM Sync Center*) supports:
 - Alliance selection and elimination bracket information.
 
 **Rules**
-- Searchable rules reference. Every new event starts with its own copy of the default rule library (currently the V5RC Override 2026-2027 rules, taken from Highlander Summit), so the Rules tab works immediately. Each event's rules are independent, and events can import their own rules from CSV. The Highlander Summit event includes the bundled Override 2.0 Game Manual for offline use.
+- Searchable rules reference. Every new event starts with its own copy of the default rule library (currently the V5RC Override 2026-2027 rules, taken from Highlander Summit), so the Rules tab works immediately. Each event's rules are independent, and events can import their own rules from CSV.
+- **Game Manual** opens the bundled Override 2.0 Game Manual, which is available offline.
+- **Official Q&A** opens the official VEX Q&A for the season in a new browser tab. It needs an internet connection; offline, Ref OS says so instead of opening it. The link is set per season in `src/officialResources.js`, not in individual components. Ref OS only links to the Q&A; it does not copy or download it.
 
 **Coordination**
 - **Request Help** from any role, with a location and category, visible live to the crew; an Admin acknowledgment is shown to everyone.
@@ -238,7 +241,21 @@ Ref OS is built for venues with unreliable Wi-Fi and cellular service.
 - **Cached reads.** Recently loaded teams, matches, and rules, previously viewed robot photos, and the app shell remain available offline. The Highlander event's bundled Game Manual is available offline.
 - **Live updates** arrive through Supabase Realtime when connected.
 
-Offline support protects work created on that device. Seeing new information entered by other volunteers, signing in, imports, exports, and administrative changes all require a connection.
+Offline support protects work created on that device. Seeing new information entered by other volunteers, signing in, imports, exports, and administrative changes all require a connection, unless the event uses the optional Local Venue Server described next.
+
+---
+
+## Local Venue Server (optional)
+
+For venues with poor internet, an event can run the **Ref OS Venue Server** on a computer at the venue, such as a Tournament in a Box mini PC or a Raspberry Pi. Devices on the venue network then keep sharing live operations data through that computer when the internet is down. Cloud (Supabase) remains the default; each device is switched individually by an Admin (Event Command Center → **Sync & Venue Server**), or automatically when it opens Ref OS from the venue server's own address.
+
+- **Shared through the venue server (Phase 1):** violations, field log entries (timeouts, faults, replays, AWP checks, help requests, announcements), the volunteer roster, and who is online.
+- **Still needs Supabase and the internet:** signing in, Developer sign-in, event creation and settings, Access Management and access codes, archive, restore and deletion, Tournament Manager imports, judging, robot and inspection photos, and push notifications.
+- **Offline queue:** each device keeps unsent changes and sends them when the venue server is reachable. Nothing is silently discarded.
+- **No automatic cloud copy yet.** Venue data is not copied into Supabase in this version. Use **Export Venue Data** after the event.
+- **Security:** the venue server never receives access codes, the Developer credential, or Supabase keys. Each event has its own venue sync key, which Supabase issues only to devices signed in to that event.
+
+Setup for Windows and Raspberry Pi, firewall steps, backups, and the API are in [`VENUE-SERVER.md`](VENUE-SERVER.md). The server is in `venue-server/`, needs Node.js 22.13 or newer, and has no npm dependencies.
 
 ---
 
@@ -282,6 +299,8 @@ Highlander Summit is a protected event: it cannot be archived or permanently del
 src/
   App.jsx                  Event selector, login flow, and the main event workspace
   api.js                   Supabase data access (events, teams, matches, photos, lifecycle)
+  officialResources.js     Per-season official links (Official Q&A)
+  sync/                    Sync mode (Cloud or Local Venue Server) and venue server sync
   eventProfiles.js         Built-in event profiles and branding resolution
   outbox.js                Offline write queue (IndexedDB)
   photoCache.js            Local robot photo cache (IndexedDB)
@@ -296,6 +315,7 @@ supabase/functions/        Edge Functions
 scripts/                   Build-time and setup helper scripts
 tests/                     Playwright tests
 tm-bridge/                 Optional Tournament Manager bridge utility
+venue-server/              Optional Local Venue Server (Node.js + SQLite); see VENUE-SERVER.md
 ```
 
 ---
@@ -330,6 +350,7 @@ Run the SQL files in the Supabase SQL Editor in the order below. Each builds on 
 | `supabase/refos-2-phase7-event-management.sql` | Archive, restore, protected permanent deletion, and photo cleanup queue |
 | `supabase/refos-2-robot-photo-storage.sql` | Robot photo storage permissions |
 | `supabase/refos-2-developer-access.sql` | Developer sign-in support for the `refos-developer-access` Edge Function (service-role only) |
+| `supabase/refos-2-venue-sync.sql` | Per-event venue sync keys for the optional Local Venue Server |
 | `supabase/refos-2-default-rules-template.sql` | Default rule library copied into every new event. Run after the Highlander Summit rules exist (`seed_rules.sql`); it takes a one-time snapshot of them. Re-run it if `refos-2-phase3-create-event.sql` is ever run again. |
 
 Some other files in `supabase/` apply only to the Highlander Summit deployment or to earlier releases. They are not needed for a new deployment.

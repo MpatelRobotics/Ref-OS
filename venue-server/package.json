@@ -1,0 +1,12 @@
+{
+  "name": "refos-venue-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ref OS Local Venue Server (Phase 1): shares live event operations data between Ref OS devices on a venue network.",
+  "type": "module",
+  "engines": { "node": ">=22.13.0" },
+  "scripts": {
+    "start": "node --no-warnings server.mjs",
+    "list-events": "node --no-warnings server.mjs --list-events"
+  }
+}

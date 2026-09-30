@@ -5,7 +5,12 @@ import {
   ClipboardCheck, X, Search, BarChart3, Users, Download, Save,
   Settings, ChevronRight, ImageOff, RefreshCw, UserCircle2, Share2, Check, Bell, BellOff,
   CalendarDays, ListOrdered, LogOut, Mail, Copy, CloudOff, Cloud, ShieldCheck, KeyRound, Upload, Wifi, BookOpen, Trophy, Star, Sun, Moon, Info, Flag, Clock, GitBranch, Type, Menu, Contact, GripVertical, QrCode, ScanLine, LifeBuoy, MapPin, RotateCcw,
+  ExternalLink, MessageCircleQuestion, Server,
 } from "lucide-react";
+import { officialResourcesFor } from "./officialResources.js";
+import { getSyncConfig, isVenueMode, onSyncConfigChange, shouldProbeServedByVenue, detectServedByVenue } from "./sync/syncConfig.js";
+import * as venueSync from "./sync/venueSync.js";
+import SyncStatusModal from "./components/modals/SyncStatusModal.jsx";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
 import * as outbox from "./outbox";
@@ -680,6 +685,34 @@ function clearAllDeviceLocks() {
   } catch {}
 }
 
+// ---- Venue mode: last server-confirmed sign-in (Local Venue Server only) ----
+// When this device is in Local Venue Server mode and Supabase cannot be REACHED (not when it
+// answers "no access"), the last role Supabase confirmed for this device on this event is reused
+// for up to VERIFIED_ACCESS_MAX_AGE so an event device keeps working through an internet outage.
+// It is written only after a successful server check, removed on a definitive "no access" and on
+// any full sign-out, and never used in Cloud mode.
+const VERIFIED_ACCESS_PREFIX = "refosVerifiedAccess:";
+const VERIFIED_ACCESS_MAX_AGE = 18 * 60 * 60 * 1000;
+function rememberVerifiedAccess(eventId, access) {
+  try {
+    if (access?.role) localStorage.setItem(VERIFIED_ACCESS_PREFIX + eventId, JSON.stringify({ role: access.role, developer: !!access.developer, userId: access.userId || null, at: Date.now() }));
+    else localStorage.removeItem(VERIFIED_ACCESS_PREFIX + eventId);
+  } catch {}
+}
+function readVerifiedAccess(eventId) {
+  try {
+    const value = JSON.parse(localStorage.getItem(VERIFIED_ACCESS_PREFIX + eventId) || "null");
+    return value?.role && Date.now() - Number(value.at || 0) < VERIFIED_ACCESS_MAX_AGE ? value : null;
+  } catch { return null; }
+}
+function clearVerifiedAccess() {
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(VERIFIED_ACCESS_PREFIX)) keys.push(k); }
+    keys.forEach((k) => localStorage.removeItem(k));
+  } catch {}
+}
+
 /* ==================================================================== */
 export default function App() {
   // A browser refresh restores the selected event from a valid ?event= UUID, then from the
@@ -715,6 +748,14 @@ export default function App() {
   const [role, setRole] = useState("ref");
   // Device lock for the selected event (see readDeviceLock). Separate from the server session.
   const [deviceLock, setDeviceLock] = useState(() => readDeviceLock(activeEventId));
+  // Sync mode (Cloud default). A page served by a Ref OS Venue Server switches to it on first load.
+  const [syncMode, setSyncMode] = useState(() => getSyncConfig().mode);
+  const [syncBooted, setSyncBooted] = useState(() => !shouldProbeServedByVenue());
+  useEffect(() => onSyncConfigChange((cfg) => setSyncMode(cfg.mode)), []);
+  useEffect(() => {
+    if (syncBooted) return;
+    detectServedByVenue().finally(() => setSyncBooted(true));
+  }, [syncBooted]);
   // True only when the server says this device's sign-in for the selected event came from the
   // Developer (Super Admin) path. Never stored on the device; re-read from the server.
   const [developer, setDeveloper] = useState(false);
@@ -842,6 +883,7 @@ export default function App() {
     setIdentityChecked(false);
     setActiveEventId("");
     clearAllDeviceLocks();
+    clearVerifiedAccess();
     setDeviceLock(null);
     setLockNotice("");
     setDeveloper(false);
@@ -868,7 +910,18 @@ export default function App() {
           setDeveloper(false);
           return;
         }
-        const access = await api.getMyEventAccess(activeEventId);
+        let access;
+        if (isVenueMode()) {
+          try {
+            access = await api.getMyEventAccessChecked(activeEventId);
+            rememberVerifiedAccess(activeEventId, access);
+          } catch {
+            // Supabase unreachable (not a refusal): reuse this device's last server-confirmed sign-in.
+            access = readVerifiedAccess(activeEventId);
+          }
+        } else {
+          access = await api.getMyEventAccess(activeEventId);
+        }
         const serverRole = access?.role || null;
         if (!live) return;
         setDeveloper(!!access?.developer && serverRole === "admin");
@@ -1021,6 +1074,7 @@ export default function App() {
     setEvent(null);
     setActiveEventId("");
     clearAllDeviceLocks();
+    clearVerifiedAccess();
     setDeviceLock(null);
     setLockNotice("");
     setDeveloper(false);
@@ -1068,6 +1122,7 @@ export default function App() {
     if (check.status !== "valid" || serverKey !== record.role) {
       // Revoked, reset, expired, or a different role: forget it completely and require a code.
       clearAllDeviceLocks();
+      clearVerifiedAccess();
       setDeviceLock(null);
       localStorage.removeItem("unlocked");
       localStorage.removeItem("refosRole");
@@ -1081,6 +1136,7 @@ export default function App() {
   };
 
   if (!configured) return <ConfigError />;
+  if (!syncBooted) return <FullPage>Connecting…</FullPage>;
   if (!activeEventId) return (
     <EventSelector
       events={eventChoices}
@@ -1125,7 +1181,7 @@ export default function App() {
   );
   if (!event) return <FullPage>Loading…</FullPage>;
 
-  return <Tracker key={event.id} initialEvent={event} meName={who.nickname} meFullName={who.fullName} mePhone={who.phone} isDeveloper={developer} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} onLockToEventLogin={lockToEventLogin} onChooseEvent={chooseAnotherEvent}
+  return <Tracker key={`${event.id}:${syncMode}`} initialEvent={event} meName={who.nickname} meFullName={who.fullName} mePhone={who.phone} isDeveloper={developer} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} onLockToEventLogin={lockToEventLogin} onChooseEvent={chooseAnotherEvent}
     onEventArchived={() => setArchivedNoticeId(event.id)} onArchivedBySelf={chooseAnotherEvent} />;
 }
 
@@ -1408,6 +1464,19 @@ const ConfigError = () => (
 /*  TRACKER (the main app, scoped to one event)                        */
 /* ==================================================================== */
 function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf }) {
+  // Local Venue Server (Phase 1): status for the header badge and the Sync Status panel.
+  const venueMode = isVenueMode();
+  const [venueStatus, setVenueStatus] = useState(() => venueSync.getStatus());
+  // Reopen the panel after a mode switch remounts this screen.
+  const [showSyncStatus, setShowSyncStatus] = useState(() => {
+    try { const reopen = sessionStorage.getItem("refosOpenSyncStatus") === "1"; sessionStorage.removeItem("refosOpenSyncStatus"); return reopen; } catch { return false; }
+  });
+  useEffect(() => {
+    if (!venueMode) return undefined;
+    venueSync.activate(initialEvent.id);
+    return venueSync.onStatus(setVenueStatus);
+  }, [venueMode, initialEvent.id]);
+  useEffect(() => { venueSync.setDeviceLabel(meName); }, [meName]);
   // Lock This Device asks where to go first (Main Screen / Event Main Page / Cancel).
   const [showLockChoice, setShowLockChoice] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
@@ -2062,9 +2131,21 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
     try { setQueuedWrites((await outbox.loadQueue(eventId)).length); } catch {}
   }, [eventId]);
 
+  // Venue mode: venue data must refresh even when a cloud read in the batch below fails offline.
+  const applyViolationList = useCallback((v) => {
+    setViols((cur) => {
+      const visible = v.filter((item) => !undoneViolationIdsRef.current.has(item.id));
+      const pend = cur.filter((x) => x._pending && !undoneViolationIdsRef.current.has(x.id) && !visible.some((s) => s.id === x.id));
+      return [...pend, ...visible];
+    });
+  }, []);
   const refresh = useCallback(async () => {
     setSyncing(true);
     setAlliancesLoaded(false);
+    if (isVenueMode() && !isInspection) {
+      api.listViolations(eventId).then(applyViolationList).catch(() => {});
+      api.listFieldLog(eventId).then(setFieldLog).catch(() => {});
+    }
     try {
       if (isInspection) {
         const [ev, t, queuedOps] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), outbox.loadQueue(eventId)]);
@@ -2095,11 +2176,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
           _pendingRobotPhotos: queuedPhotos.filter((op) => op.number === team.number).map((op) => ({ id: op.id, angle: op.angle, dataUrl: op.dataUrl })),
         }));
       });
-      setViols((cur) => {
-        const visible = v.filter((item) => !undoneViolationIdsRef.current.has(item.id));
-        const pend = cur.filter((x) => x._pending && !undoneViolationIdsRef.current.has(x.id) && !visible.some((s) => s.id === x.id));
-        return [...pend, ...visible];
-      });
+      applyViolationList(v);
       setNoms(nm);
       setFinalists(new Set(sl.map((s) => `${s.award}::${s.team}`)));
       setWatchNotes(wn);
@@ -2120,7 +2197,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
       setSyncing(false);
       refreshQueueHealth();
     }
-  }, [eventId, isInspection, refreshQueueHealth]);
+  }, [eventId, isInspection, refreshQueueHealth, applyViolationList]);
 
   const doFlush = useCallback(async () => {
     await outbox.flush(eventId, {
@@ -3905,6 +3982,15 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
                     connectionHealth.tone === "amber" ? `${queuedWrites} queued` : "Checking"}
                 </span>
               </button>
+              {venueMode && (
+                <button
+                  onClick={() => adminUnlocked && setShowSyncStatus(true)}
+                  title={venueStatus.connected === false ? "Venue server disconnected — changes are saved on this device and will sync when it returns" : `Local Venue Server${venueStatus.pending ? ` · ${venueStatus.pending} pending` : ""}`}
+                  className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${venueStatus.connected === false || venueStatus.state === "error" ? "text-red-200 bg-red-700/70" : venueStatus.connected ? "text-emerald-300 bg-emerald-900/40" : "text-slate-300 bg-slate-700/60"} ${adminUnlocked ? "hover:ring-1 hover:ring-white/30" : "cursor-default"}`}>
+                  <Server size={10} />
+                  <span>{venueStatus.connected === false ? "Venue offline" : venueStatus.state === "error" ? "Venue error" : "Venue"}{venueStatus.pending ? ` · ${venueStatus.pending}` : ""}</span>
+                </button>
+              )}
             </div>
             <button onClick={() => { refresh(); doFlush(); }} className="text-[11px] text-slate-400 leading-tight mt-0.5 flex items-center gap-1 hover:text-slate-200">
               <RefreshCw size={10} className={syncing ? "animate-spin" : ""} />
@@ -4220,7 +4306,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
             onNominate={(award) => setNominating(award || "sportsmanship")} onDeleteNom={removeNomination}
             onExport={isEmcee ? undefined : () => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
         ) : view === "rulebook" ? (
-          <RuleBook rules={rules} />
+          <RuleBook rules={rules} online={online} accent={brand.accent}
+            qaUrl={officialResourcesFor(eventSettings?.rules_template?.value?.ruleset).qaUrl} />
         ) : view === "rankings" && adminUnlocked ? (
           <EventRankings teams={teams} records={teamRecords} importedRecords={eventSettings?.qualification_records?.value?.records || {}} skills={eventSettings?.skills_rankings?.value?.rows || []} onImportSkills={() => skillsFileRef.current?.click()} />
         ) : view === "awp" ? (
@@ -4403,6 +4490,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
         onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; importRulesFile(file); }} />
       <input ref={skillsFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importSkillsFile(f); }} />
+      {showSyncStatus && adminUnlocked && <SyncStatusModal eventId={eventId} eventName={event?.name} onClose={() => setShowSyncStatus(false)} />}
       {showLockChoice && <LockDeviceModal eventName={event?.name} busy={lockBusy}
         onMainScreen={() => runLock(onLock)}
         onEventMainPage={() => runLock(onLockToEventLogin)}
@@ -4490,6 +4578,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
         brand={brand}
         onEventSettings={() => openCommandCenterTool(() => setShowEventSettings(true))}
         onEventManagement={() => openCommandCenterTool(() => setShowEventManagement(true))}
+        onSyncStatus={() => openCommandCenterTool(() => setShowSyncStatus(true))} syncModeLabel={venueMode ? "Local Venue Server" : "Cloud"}
         onPreEventTest={() => openCommandCenterTool(() => setShowPreEventTest(true))}
         onTwoDeviceSyncTest={() => openCommandCenterTool(() => setShowTwoDeviceSyncTest(true))}
         onDiagnosticReport={() => openCommandCenterTool(() => setShowDiagnosticReport(true))}
@@ -7416,7 +7505,9 @@ const RULE_MANUAL_PAGES = Object.fromEntries([
   [77, ["T19", "T20", "T21", "T22"]], [78, ["T23"]], [79, ["T24"]],
 ].flatMap(([page, codes]) => codes.map((code) => [code, page])));
 
-function RuleBook({ rules, hasBundledManual = false }) {
+// showGameManual: the bundled offline Game Manual viewer (unchanged). hasBundledManual still gates
+// the Highlander-specific referee notes only. qaUrl comes from officialResources.js.
+function RuleBook({ rules, hasBundledManual = false, showGameManual = true, qaUrl = "", online = true, accent = "" }) {
   const [query, setQuery] = useState("");
   const [manualQuery, setManualQuery] = useState("");
   const [selected, setSelected] = useState(null); // rule object shown in the notes popup
@@ -7449,7 +7540,7 @@ function RuleBook({ rules, hasBundledManual = false }) {
       return [{ page, directRule: page === directRulePage, exactRule, firstMatch, snippet: `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}` }];
     }).sort((a, b) => Number(b.directRule) - Number(a.directRule) || Number(b.exactRule) - Number(a.exactRule) || a.firstMatch - b.firstMatch || a.page - b.page).slice(0, 40);
   }, [manualQuery]);
-  if (!rules.length) return <Empty title="No rulebook loaded" sub="Ask an Admin to import this event’s rule CSV." />;
+  const noRules = !rules.length;
   const q = query.trim().toUpperCase();
   const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
   const groups = [];
@@ -7460,16 +7551,42 @@ function RuleBook({ rules, hasBundledManual = false }) {
   }
   return (
     <>
-      {hasBundledManual && <button onClick={() => openManualAt(1)} className="mb-4 w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
-        <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#0D0F32] text-white dark:bg-slate-950"><BookOpen size={21} /></span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-bold text-slate-900 dark:text-slate-100">Open Game Manual</span>
-            <span className="block text-xs text-slate-500 dark:text-slate-400">Override 2.0 is saved for offline event access</span>
-          </span>
-          <ChevronRight size={20} className="shrink-0 text-slate-400" />
-        </div>
-      </button>}
+      {(showGameManual || qaUrl) && <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {showGameManual && <button onClick={() => openManualAt(1)} className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
+          <div className="flex items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#0D0F32] text-white dark:bg-slate-950"><BookOpen size={21} /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-bold text-slate-900 dark:text-slate-100">Game Manual</span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">Override 2.0 is saved for offline event access</span>
+            </span>
+            <ChevronRight size={20} className="shrink-0 text-slate-400" />
+          </div>
+        </button>}
+        {qaUrl && (online ? (
+          <a href={qaUrl} target="_blank" rel="noopener noreferrer" className="block w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: accent || "#2563EB" }}><MessageCircleQuestion size={21} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold text-slate-900 dark:text-slate-100">Official Q&amp;A</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400">Opens the official VEX Q&amp;A in a new tab</span>
+              </span>
+              <ExternalLink size={18} className="shrink-0 text-slate-400" />
+            </div>
+          </a>
+        ) : (
+          <div role="note" aria-disabled="true" className="w-full rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-left dark:border-slate-600 dark:bg-slate-800/60">
+            <div className="flex items-center gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-300 text-white dark:bg-slate-600"><MessageCircleQuestion size={21} /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold text-slate-500 dark:text-slate-300">Official Q&amp;A</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400">Official Q&amp;A requires an internet connection.</span>
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>}
+      {noRules && <Empty title="No rulebook loaded" sub="Ask an Admin to import this event’s rule CSV." />}
+      {!noRules && <>
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search rules — code or wording"
@@ -7500,6 +7617,7 @@ function RuleBook({ rules, hasBundledManual = false }) {
           ))}
         </div>
       )}
+      </>}
       {selected && createPortal(
         <div className="fixed inset-0 z-[155] bg-black/40 flex items-start sm:items-center justify-center p-0 sm:p-4" onClick={() => setSelected(null)}>
           <div className="bg-white dark:bg-slate-800 w-full h-full sm:h-auto sm:max-w-lg sm:rounded-2xl sm:max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>

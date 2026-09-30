@@ -1,6 +1,8 @@
 import { supabase } from "./supabaseClient";
 import { OFFLINE_RULES } from "./offlineRules";
 import { putCachedBlob, deletePaths as deleteCachedPhotos } from "./photoCache";
+import { isVenueMode } from "./sync/syncConfig";
+import * as venue from "./sync/venueSync";
 
 const E2E_MOCK = import.meta.env.VITE_E2E_MOCK === "1";
 const e2eState = { teams: [], violations: [] };
@@ -104,6 +106,27 @@ export async function getMyEventAccess(eventId) {
   const { data, error } = await readMyMembership(eventId, sessionData.session.user.id);
   if (error) return null;
   return data;
+}
+
+// Like getMyEventAccess, but THROWS when Supabase cannot be reached instead of answering "no
+// access". Used only in Local Venue Server mode, so a signed-in device can keep working through an
+// internet outage (see App: verified access cache). Resolves { role, developer, userId } or null.
+const isNetworkFailure = (error) => {
+  const text = `${error?.name || ""} ${error?.message || ""}`;
+  return error instanceof TypeError || /AuthRetryableFetchError|failed to fetch|networkerror|network error|load failed|timed out|timeout/i.test(text);
+};
+export async function getMyEventAccessChecked(eventId) {
+  if (E2E_MOCK) return null;
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError && isNetworkFailure(sessionError)) throw sessionError;
+  const userId = sessionData?.session?.user?.id;
+  if (!userId) return null;
+  const { data, error } = await readMyMembership(eventId, userId);
+  if (error) {
+    if (isNetworkFailure(error)) throw Object.assign(new TypeError(error.message || "Failed to fetch"), { cause: error });
+    return null;
+  }
+  return data ? { ...data, userId } : null;
 }
 
 export async function getCurrentUserId() {
@@ -803,17 +826,20 @@ export async function deleteEventSetting(eventId, key) {
 const mapFieldLog = (r) => ({ id: r.id, kind: r.kind, field: r.field || "", matchRef: r.match_ref || "", matchId: r.match_id || "", alliance: r.alliance || "", team: r.team || "", teams: r.teams || [], note: r.note || "", by: r.logged_by || "", createdAt: new Date(r.created_at).getTime() });
 export async function listFieldLog(eventId) {
   if (E2E_MOCK) return [];
+  if (isVenueMode()) return venueListFieldLog(eventId);
   const { data } = await supabase.from("field_log").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
   return (data || []).map(mapFieldLog);
 }
 export async function addFieldLog(eventId, e) {
   const id = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
   const row = { id, event_id: eventId, kind: e.kind, field: e.field || null, match_ref: e.matchRef || null, match_id: e.matchId || null, alliance: e.alliance || null, team: e.team || null, teams: (e.teams && e.teams.length) ? e.teams : null, note: (e.note || "").trim(), logged_by: e.by || "" };
+  if (isVenueMode() && !VENUE_CLOUD_ONLY_FIELD_LOG_KINDS.has(row.kind)) return venueAddFieldLog(eventId, row);
   const { data, error } = await supabase.from("field_log").upsert(row, { onConflict: "id" }).select().single();
   if (error) throw error;
   return mapFieldLog(data);
 }
 export async function deleteFieldLog(id) {
+  if (isVenueMode() && await venueOwns("field_log", id)) return venue.write(venue.currentEventId(), "field_log", id, "delete");
   const { error } = await supabase.from("field_log").delete().eq("id", id);
   if (error) throw error;
 }
@@ -985,6 +1011,7 @@ const mapViol = (r) => {
 };
 export async function listViolations(eventId) {
   if (E2E_MOCK) return e2eState.violations.map((v) => ({ ...v }));
+  if (isVenueMode()) return venueListViolations(eventId);
   const { data } = await supabase.from("violations").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
   return (data || []).map(mapViol);
 }
@@ -999,6 +1026,7 @@ export function buildViolationRow(eventId, v) {
 // Upload photos then upsert the row. Safe to call more than once for the same
 // row (same id) — a retry after a lost ack just overwrites identically.
 export async function addViolationRow(eventId, row, photoDataUrls = []) {
+  if (!E2E_MOCK && isVenueMode()) return venueSaveViolation(eventId, row, photoDataUrls);
   if (E2E_MOCK) {
     if (typeof navigator !== "undefined" && navigator.onLine === false) throw new TypeError("Failed to fetch");
     if (String(row.rule_desc || "").includes("PERMANENT_FAIL")) throw new Error("E2E simulated RLS rejection");
@@ -1041,6 +1069,7 @@ export async function addViolation(eventId, v, photoDataUrls) {
 // Edit an existing violation. keepKeys = existing photo paths to retain;
 // newPhotoDataUrls = freshly added photos to upload; dropped keys are deleted from storage.
 export async function updateViolation(eventId, row, keepKeys = [], newPhotoDataUrls = [], allOldKeys = []) {
+  if (isVenueMode() && await venueOwns("violation", row.id, eventId)) return venueSaveViolation(eventId, row, newPhotoDataUrls, { edit: true });
   const removed = allOldKeys.filter((k) => !keepKeys.includes(k));
   const paths = [...keepKeys];
   for (let i = 0; i < newPhotoDataUrls.length; i++) {
@@ -1060,6 +1089,10 @@ export async function updateViolation(eventId, row, keepKeys = [], newPhotoDataU
 export async function deleteViolation(v) {
   if (E2E_MOCK) {
     e2eState.violations = e2eState.violations.filter((x) => x.id !== v.id);
+    return;
+  }
+  if (isVenueMode() && (v._source === "venue" || await venueOwns("violation", v.id))) {
+    await venue.write(venue.currentEventId(), "violation", v.id, "delete");
     return;
   }
   const { error } = await supabase.from("violations").delete().eq("id", v.id);
@@ -1110,6 +1143,15 @@ function dataURLtoBlob(dataURL) {
 /* ================= realtime ================= */
 export function subscribeEvent(eventId, onChange) {
   if (E2E_MOCK) return () => {};
+  if (isVenueMode()) {
+    // Cloud changes still arrive when the internet is up; venue changes arrive from the venue server.
+    const offCloud = subscribeCloudEvent(eventId, onChange);
+    const offVenue = venue.subscribe(eventId, () => onChange({ source: "venue" }));
+    return () => { offCloud(); offVenue(); };
+  }
+  return subscribeCloudEvent(eventId, onChange);
+}
+function subscribeCloudEvent(eventId, onChange) {
   const ch = supabase
     .channel(`event-${eventId}-${Math.random().toString(36).slice(2)}`)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "violations", filter: `event_id=eq.${eventId}` }, onChange)
@@ -1133,6 +1175,7 @@ export function subscribeEvent(eventId, onChange) {
 /* live presence — who's currently on the log. onChange gets an array of {name, ...} */
 export async function listRefRoster(eventId) {
   if (E2E_MOCK) return [];
+  if (isVenueMode()) return venueListRoster(eventId);
   const { data, error } = await supabase.from("ref_roster").select("name,last_seen,role").eq("event_id", eventId).order("name");
   if (error) { console.warn("Could not load ref roster", error); return []; }
   return (data || []).map((r) => ({ name: r.name, lastSeen: r.last_seen ? new Date(r.last_seen).getTime() : 0, role: r.role || "" }));
@@ -1142,6 +1185,7 @@ export async function touchRefRoster(eventId, name, role) {
   if (E2E_MOCK) return undefined;
   const clean = (name || "Ref").trim();
   if (!clean) return;
+  if (isVenueMode()) { await venue.write(eventId, "roster", rosterId(clean), "upsert", { name: clean, role: role || null, last_seen: new Date().toISOString() }); return; }
   const row = { event_id: eventId, name: clean, last_seen: new Date().toISOString() };
   if (role) row.role = role;
   const { error } = await supabase.from("ref_roster").upsert(
@@ -1152,12 +1196,14 @@ export async function touchRefRoster(eventId, name, role) {
 }
 
 export async function deleteRefRoster(eventId, name) {
+  if (isVenueMode()) { await venue.write(eventId, "roster", rosterId(name), "delete"); return; }
   const { error } = await supabase.from("ref_roster").delete().eq("event_id", eventId).eq("name", name);
   if (error) throw error;
 }
 
 export function joinPresence(eventId, meta, onChange) {
   if (E2E_MOCK) { onChange?.([]); return () => {}; }
+  if (isVenueMode()) return venueJoinPresence(eventId, meta, onChange);
   const key = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
   const ch = supabase.channel(`presence-${eventId}`, { config: { presence: { key } } });
   ch.on("presence", { event: "sync" }, () => onChange(Object.values(ch.presenceState()).flat()));
@@ -1184,4 +1230,134 @@ export async function finishConfiguredEvent(eventId, { branding, roleCodes }) {
     const entry = roleCodes?.codes?.[key];
     return entry?.hash ? setEventAccessCredentialHash(eventId, `${key}_code`, serverRole, entry.hash, entry.enabled !== false) : Promise.resolve();
   }));
+}
+
+/* ================= Local Venue Server (Phase 1) =================
+   Only used when this device is in Local Venue Server mode (sync/syncConfig.js). Violations,
+   field log entries, the volunteer roster and presence go to the venue server; records made in
+   Cloud mode stay in Supabase and are still shown (cloud reads use a short timeout and fall back
+   to the last successful cloud read). Cloud mode never reaches this code. */
+const VENUE_CLOUD_TIMEOUT_MS = 4000;
+// Access-code entries (role_code_update carries the new code) always stay in Supabase.
+const VENUE_CLOUD_ONLY_FIELD_LOG_KINDS = new Set(["role_code_update", "role_code_request"]);
+const withTimeout = (promise, ms) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new TypeError("Cloud request timed out")), ms))]);
+
+async function cloudRowsOrSnapshot(eventId, kind, query) {
+  try {
+    const { data, error } = await withTimeout(query(), VENUE_CLOUD_TIMEOUT_MS);
+    if (error) throw error;
+    const rows = data || [];
+    venue.saveCloudSnapshot(eventId, kind, rows).catch(() => {});
+    return rows;
+  } catch {
+    return venue.cloudSnapshot(eventId, kind);
+  }
+}
+
+async function venueOwns(kind, recordId, eventId = venue.currentEventId()) {
+  if (!eventId || !recordId) return false;
+  return !!(await venue.get(eventId, kind, recordId));
+}
+
+const venueViolation = (rec) => ({
+  ...mapViol({ id: rec.recordId, ...rec.data, photo_paths: [] }),
+  _source: "venue",
+  _venuePending: !!rec.pending,
+  venuePhotoCount: (rec.data?.venue_photos || []).length,
+});
+
+async function venueListViolations(eventId) {
+  const [cloudRows, local] = await Promise.all([
+    cloudRowsOrSnapshot(eventId, "violation", () => supabase.from("violations").select("*").eq("event_id", eventId).order("created_at", { ascending: false })),
+    venue.list(eventId, "violation"),
+  ]);
+  const byId = new Map(cloudRows.map((r) => [r.id, { ...mapViol(r), _source: "cloud" }]));
+  for (const id of local.deletedIds) byId.delete(id);
+  for (const rec of local.records) byId.set(rec.recordId, venueViolation(rec));
+  return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
+}
+
+async function venueSaveViolation(eventId, row, photoDataUrls = [], { edit = false } = {}) {
+  const existing = await venue.get(eventId, "violation", row.id);
+  const prior = existing?.data || {};
+  const photos = [...(edit ? prior.venue_photos || [] : []), ...(photoDataUrls || [])].slice(0, 6);
+  const data = {
+    team: row.team, type: row.type, code: row.code ?? null, rule_desc: row.rule_desc ?? null, notes: row.notes ?? null,
+    match_info: row.match_info ?? null, logged_by: row.logged_by ?? null, logged_by_user: row.logged_by_user ?? null,
+    photo_paths: [], created_at: prior.created_at || new Date().toISOString(),
+  };
+  if (photos.length) data.venue_photos = photos;
+  await venue.write(eventId, "violation", row.id, "upsert", data);
+  return venueViolation({ recordId: row.id, data, pending: true });
+}
+
+async function venueListFieldLog(eventId) {
+  const [cloudRows, local] = await Promise.all([
+    cloudRowsOrSnapshot(eventId, "field_log", () => supabase.from("field_log").select("*").eq("event_id", eventId).order("created_at", { ascending: false })),
+    venue.list(eventId, "field_log"),
+  ]);
+  const byId = new Map(cloudRows.map((r) => [r.id, mapFieldLog(r)]));
+  for (const id of local.deletedIds) byId.delete(id);
+  for (const rec of local.records) byId.set(rec.recordId, { ...mapFieldLog({ id: rec.recordId, ...rec.data }), _source: "venue" });
+  return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
+}
+
+async function venueAddFieldLog(eventId, row) {
+  const { id, event_id: _event, ...rest } = row;
+  const data = { ...rest, created_at: new Date().toISOString() };
+  for (const key of Object.keys(data)) if (data[key] === null) delete data[key];
+  await venue.write(eventId, "field_log", id, "upsert", data);
+  return { ...mapFieldLog({ id, ...data }), _source: "venue" };
+}
+
+// Deterministic record id for a roster name (names contain spaces and punctuation).
+function rosterId(name) {
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (const ch of String(name || "")) {
+    const c = ch.codePointAt(0);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ c, 0x5bd1e995) >>> 0;
+  }
+  return `roster-${h1.toString(16).padStart(8, "0")}${h2.toString(16).padStart(8, "0")}`;
+}
+
+async function venueListRoster(eventId) {
+  const [cloudRows, local] = await Promise.all([
+    cloudRowsOrSnapshot(eventId, "roster", () => supabase.from("ref_roster").select("name,last_seen,role").eq("event_id", eventId).order("name")),
+    venue.list(eventId, "roster"),
+  ]);
+  const byName = new Map(cloudRows.map((r) => [r.name, { name: r.name, lastSeen: r.last_seen ? new Date(r.last_seen).getTime() : 0, role: r.role || "" }]));
+  for (const rec of local.records) {
+    const d = rec.data || {};
+    if (d.name) byName.set(d.name, { name: d.name, lastSeen: d.last_seen ? new Date(d.last_seen).getTime() : 0, role: d.role || "" });
+  }
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Presence over the venue server: a heartbeat record per device; devices seen in the last 75 s are online.
+function venueJoinPresence(eventId, meta, onChange) {
+  const presenceKey = `presence-${venueDeviceKey()}`;
+  let stopped = false;
+  const beat = async () => {
+    if (stopped) return;
+    let userId = null;
+    try { const { data } = await supabase.auth.getSession(); userId = data?.session?.user?.id || null; } catch {}
+    await venue.write(eventId, "presence", presenceKey, "upsert", {
+      name: meta?.name || null, role: meta?.role || null, user_id: userId, online_at: Number(meta?.online_at) || Date.now(), last_seen: new Date().toISOString(),
+    }).catch(() => {});
+  };
+  const report = async () => {
+    if (stopped) return;
+    const { records } = await venue.list(eventId, "presence");
+    const cutoff = Date.now() - 75_000;
+    onChange?.(records.filter((r) => r.data?.last_seen && Date.parse(r.data.last_seen) >= cutoff).map((r) => ({ ...r.data })));
+  };
+  beat().then(report);
+  const beatTimer = setInterval(beat, 25_000);
+  const off = venue.subscribe(eventId, report);
+  const reportTimer = setInterval(report, 15_000);
+  return () => { stopped = true; clearInterval(beatTimer); clearInterval(reportTimer); off(); };
+}
+function venueDeviceKey() {
+  try { return localStorage.getItem("refosDeviceId") || "unknown"; } catch { return "unknown"; }
 }
