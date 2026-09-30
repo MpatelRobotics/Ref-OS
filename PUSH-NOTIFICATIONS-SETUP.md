@@ -58,20 +58,11 @@ On iPhone or iPad, Ref OS must first be installed with Safari's **Add to Home Sc
 
 Each phone, tablet, or computer must enable alerts once. All subscribed event roles receive code and help request alerts so nearby volunteers can notify an Admin if needed.
 
-## 7. Add optional Admin email alerts
+## 7. Email alerts are disabled
 
-Create a Resend account, verify a sending domain, and create an API key. Store the API key, verified sender, and up to two Admin recipients as Supabase secrets:
+Ref OS no longer sends email notifications for any event. The `send-code-request-push` function delivers web push only and never contacts an email provider, whatever an event's saved alert delivery setting says:
 
-```cmd
-npx supabase secrets set RESEND_API_KEY="re_YOUR_API_KEY" RESEND_FROM_EMAIL="Ref OS <alerts@YOUR_VERIFIED_DOMAIN>" ADMIN_ALERT_EMAILS="FIRST_ADMIN_EMAIL,SECOND_ADMIN_EMAIL"
-```
+- Push only or Push + email: push is sent.
+- Email only: nothing is sent.
 
-Deploy the notification function again:
-
-```cmd
-npx supabase functions deploy send-code-request-push
-```
-
-Admin email alerts are a backup for web push. A missing or unavailable Resend configuration does not prevent browser push delivery.
-
-After both channels are configured, an Admin can open **Access → Alert delivery** and choose **Push only**, **Email only**, or **Both**. Both is the default and the selection is shared across the event.
+The `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `ADMIN_ALERT_EMAILS` secrets are no longer read and can be removed from Supabase.

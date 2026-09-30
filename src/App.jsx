@@ -1773,8 +1773,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   // Phase 6: saved event setting -> built-in event profile -> Ref OS default.
   const brand = useMemo(() => resolveEventBranding(eventId, event, eventBranding), [eventId, event?.name, eventSettings?.event_branding]);
   useEffect(() => { document.title = `Ref OS · ${brand.name}`; }, [brand.name]);
-  const notificationDelivery = isHighlander ? { push: true, email: true } : { push: true, email: false };
-  const notificationDeliveryLabel = isHighlander ? "Push + email" : "Push only";
+  // Email alerts are disabled for every event (the Edge Function no longer sends email).
+  const notificationDeliveryLabel = "Push only";
   const refreshPushState = useCallback(async () => {
     if (!pushSupported) { setPushState("unsupported"); return; }
     if (Notification.permission === "denied") { setPushState("blocked"); return; }
@@ -4306,22 +4306,15 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
             <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
               <div>
                 <h2 className="font-bold text-slate-900 dark:text-slate-100">Alert delivery</h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Choose how new help and access code requests notify Admins.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">How new help and access code requests notify Admins.</p>
               </div>
               <button onClick={() => setShowNotificationPreferences(false)} aria-label="Close" className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-100"><X size={22} /></button>
             </div>
             <div className="p-4 space-y-2" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
-              {[
-                { mode: "push", title: "Push only", detail: "Send device and watch push alerts without email." },
-                { mode: "email", title: "Email only", detail: "Email the configured Admin addresses without device push." },
-                { mode: "both", title: "Both", detail: "Send push alerts and Admin emails together." },
-              ].map((option) => {
-                const selected = option.mode === (notificationDelivery.push && notificationDelivery.email ? "both" : notificationDelivery.email ? "email" : "push");
-                return <button key={option.mode} onClick={() => saveNotificationDelivery(option.mode)} className={`w-full rounded-xl border p-4 text-left flex items-center gap-3 ${selected ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/30" : "border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-700"}`}>
-                  <span className={`h-5 w-5 rounded-full border-2 grid place-items-center ${selected ? "border-blue-600" : "border-slate-300 dark:border-slate-500"}`}>{selected && <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />}</span>
-                  <span className="min-w-0 flex-1"><span className="block font-bold text-slate-900 dark:text-slate-100">{option.title}</span><span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">{option.detail}</span></span>
-                </button>;
-              })}
+              <div className="w-full rounded-xl border border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/30 p-4 flex items-center gap-3">
+                <Bell size={18} className="text-blue-600 shrink-0" />
+                <span className="min-w-0 flex-1"><span className="block font-bold text-slate-900 dark:text-slate-100">Push notifications</span><span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">Help and access code requests alert subscribed Admin devices and watches by push.</span></span>
+              </div>
             </div>
           </div>
         </div>,
@@ -7191,7 +7184,7 @@ function FeaturesGuide({ isHighlander = true }) {
           <Li><b>Locations</b> — identify Field 1, Field 2, Field 3, Pit Floor, Competition Floor, Skills, Judging, or another location.</Li>
           <Li><b>Acknowledgment</b> — one Admin can acknowledge a request for the crew so everyone knows it is being handled.</Li>
           <Li><b>Code requests</b> — volunteers can ask an Admin to regenerate their own role code, and the replacement appears without closing the app.</Li>
-          <Li><b>Admin alerts</b> — help requests and replacement code requests notify subscribed Admin devices. Highlander also retains its configured Admin email alerts; other events are push only.</Li>
+          <Li><b>Admin alerts</b> — help requests and replacement code requests notify subscribed Admin devices by push notification.</Li>
           <Li><b>Event alert counter</b> — Admin tools shows total sent alerts and requests. Admins can reset the count after testing.</Li>
         </ul>
       </Section>

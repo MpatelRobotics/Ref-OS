@@ -1,6 +1,14 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 
+// Email notifications are permanently disabled. This function delivers web push only.
+// The former Resend email path has been removed, so no request can reach the email
+// provider whatever an event's saved notification_delivery setting says.
+// Legacy notification_delivery values are read as:
+//   push only / push + email ("both") -> push
+//   email only                       -> no delivery
+//   missing setting                  -> push (unchanged default)
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -44,10 +52,7 @@ Deno.serve(async (request) => {
       .eq("key", "notification_delivery")
       .maybeSingle();
     if (deliveryError) throw deliveryError;
-    const delivery = deliverySetting?.value || { push: true, email: true };
-    const pushEnabled = delivery.push !== false;
-    // ADMIN_ALERT_EMAILS belongs to Highlander. Other events must never mail its admins.
-    const emailEnabled = eventRequest.event_id === "11111111-1111-4111-8111-111111111111" && delivery.email !== false;
+    const pushEnabled = pushDeliveryEnabled(deliverySetting?.value);
 
     const { data: subscriptions, error: subscriptionError } = await serviceClient
       .from("push_subscriptions")
@@ -91,13 +96,6 @@ Deno.serve(async (request) => {
       url: `/?event=${encodeURIComponent(eventRequest.event_id)}&open=code-requests&role=${encodeURIComponent(details.role || "")}`,
     });
 
-    const emailSubject = isHelp
-      ? `Ref OS help request: ${category}`
-      : `Ref OS code request: ${role}`;
-    const emailText = isHelp
-      ? `REF OS HELP\n\nCategory: ${category}\nLocation: ${location}\nRequested by: ${requester}${extra ? `\nDetails: ${extra}` : ""}`
-      : `REF OS CODE REQUEST\n\n${requester} requested a new ${role} join code.`;
-
     let sent = 0;
     const expired: string[] = [];
     await Promise.all((pushEnabled ? memberSubscriptions : []).map(async (subscription) => {
@@ -115,81 +113,32 @@ Deno.serve(async (request) => {
     }));
 
     if (expired.length) await serviceClient.from("push_subscriptions").delete().in("endpoint", expired);
-    const email = emailEnabled ? await sendAdminEmail(emailSubject, emailText) : { sent: 0, failed: 0 };
+    // Email columns stay in push_dispatches for history; new rows always record zero email.
     await serviceClient.from("push_dispatches").update({
-      sent_count: sent + email.sent,
+      sent_count: sent,
       push_count: sent,
-      email_count: email.sent,
-      email_failed_count: email.failed,
+      email_count: 0,
+      email_failed_count: 0,
     }).eq("request_id", eventRequest.id);
-    return json({ sent, expired: expired.length, emailSent: email.sent, emailFailed: email.failed, delivery });
+    return json({ sent, expired: expired.length, emailSent: 0, emailFailed: 0, emailDisabled: true, delivery: { push: pushEnabled, email: false } });
   } catch (error) {
     console.error(error);
     return json({ error: (error as Error).message || "Push delivery failed" }, 500);
   }
 });
 
-async function sendAdminEmail(subject: string, text: string) {
-  const apiKey = Deno.env.get("RESEND_API_KEY") || "";
-  const from = Deno.env.get("RESEND_FROM_EMAIL") || "";
-  const recipients = (Deno.env.get("ADMIN_ALERT_EMAILS") || "")
-    .split(",")
-    .map((email) => email.trim())
-    .filter(Boolean)
-    .slice(0, 2);
-
-  if (!apiKey || !from || recipients.length === 0) {
-    console.log("Resend email is not configured; web push delivery will continue.");
-    return { sent: 0, failed: 0 };
+// Reads a stored notification_delivery value. Email is never enabled; only whether push is
+// allowed is decided here. Accepts the object form ({ push, email }) and plain mode strings.
+function pushDeliveryEnabled(value: unknown): boolean {
+  if (value == null) return true;
+  const mode = typeof value === "string" ? value : (value as { mode?: unknown })?.mode;
+  if (typeof mode === "string") {
+    const m = mode.trim().toLowerCase();
+    if (m === "email" || m === "email_only" || m === "none" || m === "off") return false;
+    return true; // "push", "both", "push_email", or anything unrecognised
   }
-
-  let sent = 0;
-  let failed = 0;
-  await Promise.all(recipients.map(async (to) => {
-    try {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from,
-          to: [to],
-          subject,
-          text,
-          html: renderEmail(subject, text),
-        }),
-      });
-      if (!response.ok) {
-        const detail = await response.text();
-        console.error("Resend email delivery failed", response.status, detail.slice(0, 500));
-        failed += 1;
-        return;
-      }
-      sent += 1;
-    } catch (error) {
-      console.error("Resend email delivery failed", (error as Error).message);
-      failed += 1;
-    }
-  }));
-  return { sent, failed };
-}
-
-function renderEmail(subject: string, text: string) {
-  const safeSubject = escapeHtml(subject);
-  const safeBody = escapeHtml(text).replace(/\n/g, "<br>");
-  return `<!doctype html><html><body style="margin:0;background:#f4f6fa;font-family:Arial,sans-serif;color:#111827"><div style="max-width:620px;margin:24px auto;padding:28px;background:#ffffff;border-radius:16px;border:1px solid #e5e7eb"><div style="font-size:13px;font-weight:700;letter-spacing:.08em;color:#b83232">REF OS</div><h1 style="font-size:24px;margin:10px 0 20px">${safeSubject}</h1><div style="font-size:16px;line-height:1.6">${safeBody}</div><p style="margin-top:24px;font-size:13px;color:#6b7280">This operational alert was sent to a configured Highlander Summit administrator.</p></div></body></html>`;
-}
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#039;",
-  }[character] || character));
+  if (typeof value === "object") return (value as { push?: unknown }).push !== false;
+  return true;
 }
 
 function json(value: unknown, status = 200) {

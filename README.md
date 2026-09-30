@@ -142,7 +142,7 @@ The TM Sync Center (Event Command Center → *TM Sync Center*) supports:
 - **Key volunteer announcements** and a shared **event countdown**.
 - **Key Volunteer Status**: who is online, their role, and their assignment (fields, pit, skills, judging, and other locations).
 - **Event Contact Directory** built from volunteer profiles, plus Admin-managed leadership and support contacts.
-- **Push notifications** for help requests and access-code requests on devices that enable them. On iPhone and iPad, Ref OS must first be added to the Home Screen. The Highlander Summit event also sends configured Admin email alerts.
+- **Push notifications** for help requests and access-code requests on devices that enable them. On iPhone and iPad, Ref OS must first be added to the Home Screen. Ref OS does not send email notifications.
 
 ---
 
