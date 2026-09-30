@@ -653,7 +653,10 @@ function readSavedEventId() {
 // with the server (api.verifyEventSession). An authenticated session never opens the event UI
 // while a lock record exists.
 const DEVICE_LOCK_PREFIX = "refosDeviceLock:";
-const DEVICE_LOCK_ROLE_LABELS = { admin: "Admin", ref: "Referee", inspection: "Inspection", judge: "Judge Advisor", emcee: "Emcee" };
+const DEVICE_LOCK_ROLE_LABELS = { developer: "Developer", admin: "Admin", ref: "Referee", inspection: "Inspection", judge: "Judge Advisor", emcee: "Emcee" };
+// Fixed identity for a Developer (Super Admin) sign-in. Used only while the SERVER reports this
+// device session as a Developer sign-in (event_members.developer); never inferred from a name.
+const DEVELOPER_IDENTITY = { nickname: "Maharshi", fullName: "Maharshi Patel", phone: "" };
 const deviceLockRoleKey = (serverRole) => {
   const r = String(serverRole || "").trim().toLowerCase();
   return r === "admin" ? "admin" : r.includes("inspection") ? "inspection" : r.includes("judge") ? "judge" : r.includes("emcee") ? "emcee" : "ref";
@@ -712,6 +715,9 @@ export default function App() {
   const [role, setRole] = useState("ref");
   // Device lock for the selected event (see readDeviceLock). Separate from the server session.
   const [deviceLock, setDeviceLock] = useState(() => readDeviceLock(activeEventId));
+  // True only when the server says this device's sign-in for the selected event came from the
+  // Developer (Super Admin) path. Never stored on the device; re-read from the server.
+  const [developer, setDeveloper] = useState(false);
   const [lockNotice, setLockNotice] = useState("");
   const [accessChecked, setAccessChecked] = useState(false);
   const [identityChecked, setIdentityChecked] = useState(false);
@@ -738,6 +744,9 @@ export default function App() {
   const [meName, setMeName] = useState(() => readIdentity(activeEventId).nickname || "");
   const [meFullName, setMeFullName] = useState(() => readIdentity(activeEventId).fullName || "");
   const [mePhone, setMePhone] = useState(() => readIdentity(activeEventId).phone || "");
+  // A Developer sign-in always uses the fixed developer identity and never reads or overwrites
+  // the volunteer profile saved on this device.
+  const who = developer ? DEVELOPER_IDENTITY : { nickname: meName, fullName: meFullName, phone: mePhone };
   const [event, setEvent] = useState(null);
   const [loadErr, setLoadErr] = useState(false);
 
@@ -815,6 +824,7 @@ export default function App() {
     setUnlocked(false);
     setDeviceLock(readDeviceLock(eventId));
     setLockNotice("");
+    setDeveloper(false);
     setActiveEventId(eventId);
   };
 
@@ -834,6 +844,7 @@ export default function App() {
     clearAllDeviceLocks();
     setDeviceLock(null);
     setLockNotice("");
+    setDeveloper(false);
     try { await api.clearAccessSession(); } catch {}
   }, []);
 
@@ -854,10 +865,13 @@ export default function App() {
           sessionStorage.removeItem("refosAdmin");
           setUnlocked(false);
           setDeviceLock(lockRecord);
+          setDeveloper(false);
           return;
         }
-        const serverRole = await api.getMyEventRole(activeEventId);
+        const access = await api.getMyEventAccess(activeEventId);
+        const serverRole = access?.role || null;
         if (!live) return;
+        setDeveloper(!!access?.developer && serverRole === "admin");
         if (serverRole) {
           const roleText = String(serverRole || "").trim().toLowerCase();
           const uiRole = serverRole === "admin" ? "ref" : roleText.includes("inspection") ? "inspection" : roleText.includes("judge") ? "judge" : roleText.includes("emcee") ? "emcee" : "ref";
@@ -879,6 +893,7 @@ export default function App() {
           localStorage.removeItem("unlocked");
           localStorage.removeItem("refosRole");
           sessionStorage.removeItem("refosAdmin");
+          setDeveloper(false);
           setUnlocked(false);
         }
       } finally {
@@ -889,9 +904,9 @@ export default function App() {
   }, [activeEventId]);
 
   useEffect(() => {
-    if (!unlocked || !meName) return;
-    api.setEventMemberName(activeEventId, meName).catch(() => {});
-  }, [unlocked, meName, activeEventId]);
+    if (!unlocked || !who.nickname) return;
+    api.setEventMemberName(activeEventId, who.nickname).catch(() => {});
+  }, [unlocked, who.nickname, activeEventId]);
 
   useEffect(() => {
     if (!unlocked) {
@@ -929,14 +944,14 @@ export default function App() {
   }, [unlocked, activeEventId]);
 
   useEffect(() => {
-    if (!unlocked || !meName) return;
+    if (!unlocked || !who.nickname) return;
     let live = true;
     setLoadErr(false);
     api.getEvent(activeEventId)
       .then((ev) => { if (live) { ev ? setEvent(ev) : setLoadErr(true); } })
       .catch(() => { if (live) setLoadErr(true); });
     return () => { live = false; };
-  }, [unlocked, meName, activeEventId]);
+  }, [unlocked, who.nickname, activeEventId]);
 
   // Phase 6: public branding for the selected event (from the pre-login event list).
   const activeChoice = eventChoices.find((ev) => ev.id === activeEventId) || null;
@@ -953,7 +968,9 @@ export default function App() {
     favicon.href = profile.favicon;
   }, [activeEventId, event?.name, activeChoice?.name]);
 
-  const unlock = (r, admin, serverRole, credential = "") => {
+  // `developerSession` is true only when the server-side Developer check (or the server's own
+  // sign-in row) says so; it is never derived from the typed code, a name, or device storage.
+  const unlock = (r, admin, serverRole, credential = "", developerSession = false) => {
     const roleText = String(r || serverRole || "").trim().toLowerCase();
     const uiRole = roleText.includes("inspection") ? "inspection" : roleText.includes("judge") ? "judge" : roleText.includes("emcee") ? "emcee" : "ref";
     const enteredCode = String(credential || "").trim().toUpperCase();
@@ -967,11 +984,13 @@ export default function App() {
     clearDeviceLock(activeEventId);
     setDeviceLock(null);
     setLockNotice("");
+    setDeveloper(!!developerSession && serverRole === "admin");
     setRole(uiRole);
     setUnlocked(true);
   };
 
   const saveIdentity = async ({ nickname, fullName, phone = "" }) => {
+    if (developer) return; // the Developer identity is fixed
     const cleanNickname = String(nickname || "").trim();
     const cleanFullName = String(fullName || "").trim();
     if (activeEventId === EVENT_ID) {
@@ -1004,6 +1023,7 @@ export default function App() {
     clearAllDeviceLocks();
     setDeviceLock(null);
     setLockNotice("");
+    setDeveloper(false);
 
     await api.clearAccessSession();
   }, []);
@@ -1013,7 +1033,7 @@ export default function App() {
   // locked. The role recorded here is a label for the unlock button, never a credential.
   const lockToEventLogin = useCallback(async () => {
     const record = {
-      role: sessionStorage.getItem("refosAdmin") === "1" ? "admin" : deviceLockRoleKey(role),
+      role: developer ? "developer" : sessionStorage.getItem("refosAdmin") === "1" ? "admin" : deviceLockRoleKey(role),
       lockedAt: Date.now(),
     };
     localStorage.setItem(DEVICE_LOCK_PREFIX + activeEventId, JSON.stringify(record));
@@ -1022,11 +1042,12 @@ export default function App() {
     sessionStorage.removeItem("refosAdmin");
     setDeviceLock(record);
     setLockNotice("");
+    setDeveloper(false);
     setUnlocked(false);
     setIdentityChecked(false);
     setEvent(null);
     setLoadErr(false);
-  }, [activeEventId, role]);
+  }, [activeEventId, role, developer]);
 
   // "Unlock as <role>": re-validated with the server before anything opens.
   const unlockRemembered = async () => {
@@ -1043,7 +1064,8 @@ export default function App() {
       setArchivedNoticeId(activeEventId);
       return { ok: false };
     }
-    if (check.status !== "valid" || deviceLockRoleKey(check.role) !== record.role) {
+    const serverKey = check.status === "valid" && check.developer === true && check.role === "admin" ? "developer" : deviceLockRoleKey(check.role);
+    if (check.status !== "valid" || serverKey !== record.role) {
       // Revoked, reset, expired, or a different role: forget it completely and require a code.
       clearAllDeviceLocks();
       setDeviceLock(null);
@@ -1054,7 +1076,7 @@ export default function App() {
       setLockNotice("This device's previous sign-in is no longer valid. Enter an access code to continue.");
       return { ok: false };
     }
-    unlock(check.role, check.role === "admin", check.role);
+    unlock(check.role, check.role === "admin", check.role, "", serverKey === "developer");
     return { ok: true };
   };
 
@@ -1092,7 +1114,7 @@ export default function App() {
       await chooseAnotherEvent();
     }} />;
   if (!identityChecked) return <FullPage>Checking volunteer profile…</FullPage>;
-  if (!meName || !meFullName) return <NameScreen onIdentity={saveIdentity} />;
+  if (!developer && (!meName || !meFullName)) return <NameScreen onIdentity={saveIdentity} />;
   if (loadErr) return (
     <FullPage>
       <div className="max-w-sm">
@@ -1103,7 +1125,7 @@ export default function App() {
   );
   if (!event) return <FullPage>Loading…</FullPage>;
 
-  return <Tracker key={event.id} initialEvent={event} meName={meName} meFullName={meFullName} mePhone={mePhone} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} onLockToEventLogin={lockToEventLogin} onChooseEvent={chooseAnotherEvent}
+  return <Tracker key={event.id} initialEvent={event} meName={who.nickname} meFullName={who.fullName} mePhone={who.phone} isDeveloper={developer} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} onLockToEventLogin={lockToEventLogin} onChooseEvent={chooseAnotherEvent}
     onEventArchived={() => setArchivedNoticeId(event.id)} onArchivedBySelf={chooseAnotherEvent} />;
 }
 
@@ -1385,7 +1407,7 @@ const ConfigError = () => (
 /* ==================================================================== */
 /*  TRACKER (the main app, scoped to one event)                        */
 /* ==================================================================== */
-function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf }) {
+function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf }) {
   // Lock This Device asks where to go first (Main Screen / Event Main Page / Cancel).
   const [showLockChoice, setShowLockChoice] = useState(false);
   const [lockBusy, setLockBusy] = useState(false);
@@ -1601,7 +1623,11 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   const [lastSystemTest, setLastSystemTest] = useState(null);
   const [pushState, setPushState] = useState("checking");
   const [adminUnlocked, setAdminUnlocked] = useState(() => sessionStorage.getItem("refosAdmin") === "1");
-  const myRole = isInspection ? "Inspection" : isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? "Admin" : "Referee";
+  // Display role only. Permissions still use adminUnlocked (server role 'admin'); a Developer
+  // is an Admin that the server marked as signed in through the Developer path.
+  const myRole = isInspection ? "Inspection" : isEmcee ? "Emcee" : isJudge ? "Judge Advisor" : adminUnlocked ? (isDeveloper ? "Developer" : "Admin") : "Referee";
+  // The Developer identity is fixed, so its profile editor never opens.
+  const openIdentityEditor = () => { if (!isDeveloper) setShowIdentity(true); };
 
   const openCommandCenterTool = (openTool) => {
     setShowCommandCenter(false);
@@ -1698,14 +1724,15 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
   useEffect(() => {
     if (!ready || !currentUserId || !meName || !meFullName) return;
     const profile = {
-      userId: currentUserId,
+      // A Developer sign-in keeps ONE directory entry (fixed key) instead of one per session.
+      userId: isDeveloper ? "refos-developer" : currentUserId,
       nickname: meName.trim(),
       fullName: meFullName.trim(),
       role: myRole,
       phone: String(mePhone || "").trim(),
     };
     const signature = JSON.stringify(profile);
-    const storageKey = `refosVolunteerContactSynced:${eventId}:${currentUserId}`;
+    const storageKey = `refosVolunteerContactSynced:${eventId}:${isDeveloper ? "refos-developer" : currentUserId}`;
     try { if (localStorage.getItem(storageKey) === signature) return; } catch {}
     let cancelled = false;
     api.addFieldLog(eventId, { kind: "volunteer_contact", note: signature, by: meName })
@@ -1716,7 +1743,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [ready, currentUserId, eventId, meName, meFullName, mePhone, myRole]);
+  }, [ready, currentUserId, eventId, meName, meFullName, mePhone, myRole, isDeveloper]);
   const baseRoleCodeConfig = eventSettings?.role_access_codes?.value || latestRoleAccessConfig(fieldLog).config;
   const roleCodeLabels = { ref: "Referee", judge: "Judge Advisor", emcee: "Emcee" };
   const latestRoleCodeUpdates = (() => {
@@ -3886,7 +3913,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
           </div>
           {!isInspection && <OnlineCluster presence={presence} onClick={openVolunteerStatus} />}
           {!isInspection && !isJudge && !isEmcee && <button onClick={() => setShowByRule(true)} title="By rule" className="p-1.5 rounded hover:bg-white/10"><BarChart3 size={18} /></button>}
-          <button onClick={() => setShowIdentity(true)} title="Your full name"
+          <button onClick={() => openIdentityEditor()} title="Your full name"
             className="refos-user-chip flex items-center gap-1.5 bg-white/10 hover:bg-white/20 rounded-full pl-1 pr-2.5 py-1">
             <span className="w-6 h-6 rounded-full bg-[#D7212B] text-white text-[11px] font-bold grid place-items-center">{meName ? initials(meName) : "?"}</span>
             <span className="refos-user-name text-xs font-medium max-w-[70px] truncate">{meName || "Set name"}</span>
@@ -3899,7 +3926,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                 {isInspection ? (
                   <>
                     <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><ClipboardCheck size={12} /> Inspection</div>
-                    <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
+                    <button onClick={() => { setMenu(false); openIdentityEditor(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
                     <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
                     <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                     <button onClick={() => { setMenu(false); setShowLockChoice(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><LogOut size={16} /> Lock This Device</button>
@@ -3908,7 +3935,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                   <>
                     <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><Trophy size={12} /> Judge Advisor</div>
                     <button onClick={() => { setMenu(false); exportNominations(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Export nominations</button>
-                    <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
+                    <button onClick={() => { setMenu(false); openIdentityEditor(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
 <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
 <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                     <div className="border-t border-slate-100 my-1" />
@@ -3926,7 +3953,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                 ) : isEmcee ? (
                   <>
                     <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><Trophy size={12} /> Emcee</div>
-                    <button onClick={() => { setMenu(false); setShowIdentity(true); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
+                    <button onClick={() => { setMenu(false); openIdentityEditor(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><UserCircle2 size={16} /> Change name</button>
                     <button onClick={onToggleTheme} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2">{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />} {theme === "dark" ? "Light Mode" : "Dark Mode"}</button>
                     <button onClick={onCycleTextSize} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Type size={16} /> Text Size: {textScale === "large" ? "Large" : textScale === "xl" ? "Extra large" : "Normal"}</button>
                     {isAndroid && !isInstalled && <button onClick={() => { setMenu(false); installRefOS(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 dark:bg-slate-900 flex items-center gap-2"><Download size={16} /> Install app</button>}
@@ -4004,7 +4031,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
                   {!isInspection && <button onClick={() => setShowContactDirectory(true)} className="refos-sidebar-tool"><Contact size={16} /> Contacts</button>}
                 </div>
                 <div className="refos-sidebar-footer">
-                  <span>{adminUnlocked ? "Admin" : isInspection ? "Inspection" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
+                  <span>{adminUnlocked ? (isDeveloper ? "Developer" : "Admin") : isInspection ? "Inspection" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
                   <span>v{APP_VERSION}{isHighlander ? " · Highlander Summit Release" : ""}</span>
                 </div>
               </nav>
@@ -4166,7 +4193,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
           </button>}
           <p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: "Alliance selection", rankings: "Rankings"}[view] || "Event workspace"}</h2>
           <p className="refos-description">{{teams: "Find a team. Review its history. Keep your crew informed.", matches: "Your schedule, field activity, and match details in one place.", robots: "A shared visual reference for every robot.", judging: "Capture the moments that deserve recognition.", rulebook: "Find the right rule when you need it.", awp: "Review autonomous observations across the event.", alliances: "Follow the path from selection to the final.", rankings: "Qualification standings and Skills Challenge scores."}[view]}</p></div>
-          <span className="refos-role">{adminUnlocked ? "Admin" : isInspection ? "Inspection" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
+          <span className="refos-role">{adminUnlocked ? (isDeveloper ? "Developer" : "Admin") : isInspection ? "Inspection" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
         </section>}
         {!openTeam && !openMatch && !openRobot && view === "teams" && <dl className="refos-stats">
           <div><dt>Event roster</dt><dd>{teams.length}<span> teams</span></dd></div>
@@ -4278,12 +4305,12 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       />}
       {logFor !== null && (
         <LogModal teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules} onOpenPhoto={setLightbox} fieldNames={fieldNames}
-          onSetName={() => setShowIdentity(true)} onClose={() => { setLogFor(null); setLogMatch(null); }}
+          onSetName={() => openIdentityEditor()} onClose={() => { setLogFor(null); setLogMatch(null); }}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await saveViolation({ ...form, team }); setLogFor(null); setLogMatch(null); }} />
       )}
       {editing && (
         <LogModal teams={teams} viols={viols} presetTeam={editing.team} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} rules={rules} onOpenPhoto={setLightbox} edit={editing} fieldNames={fieldNames}
-          onSetName={() => setShowIdentity(true)} onClose={() => setEditing(null)}
+          onSetName={() => openIdentityEditor()} onClose={() => setEditing(null)}
           onSave={async (form) => {
             const team = await upsertTeam(form.team || form.newNumber, form.newName);
             const [first, ...additional] = form.ruleGroups?.length ? form.ruleGroups : [{ type: form.type, code: form.code, desc: form.desc }];
@@ -4294,7 +4321,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, role, theme, onTog
       )}
       {nominating && (
         <NominateModal teams={teams} presetAward={nominating} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches}
-          onSetName={() => setShowIdentity(true)} onClose={() => setNominating(null)}
+          onSetName={() => openIdentityEditor()} onClose={() => setNominating(null)}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await addNomination({ ...form, team }); setNominating(null); }} />
       )}
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
@@ -5981,7 +6008,8 @@ function OnlineCluster({ presence, onClick }) {
 
 function roleChip(role) {
   switch (role) {
-    case "Admin": return "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800";
+    case "Admin":
+    case "Developer": return "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800";
     case "Judge Advisor": return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800";
     case "Emcee": return "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800";
     default: return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600";
@@ -6019,7 +6047,7 @@ function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onS
             (m.name || "").trim().toLowerCase() === (r.name || "").trim().toLowerCase()
           );
           const adminTarget = member || (presenceUserId ? { user_id: presenceUserId, role: String(roleByName[r.name] || r.role || "").toLowerCase() } : null);
-          const role = member?.role === "admin" ? "Admin" : (roleByName[r.name] || r.role || "");
+          const role = member?.developer === true && member?.role === "admin" ? "Developer" : member?.role === "admin" ? "Admin" : (roleByName[r.name] || r.role || "");
           const assignment = member?.user_id ? assignments[member.user_id]?.location || "" : "";
           return (
             <li key={r.name} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex flex-wrap items-center gap-3">

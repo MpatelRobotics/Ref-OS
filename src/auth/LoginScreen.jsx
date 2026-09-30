@@ -54,7 +54,8 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
     setErr("");
     try {
       const result = await api.claimEventAccess(eventId, credential);
-      onUnlock(result.role, result.isAdmin, result.serverRole, credential);
+      // result.developer comes from the server-side Developer check, never from this screen.
+      onUnlock(result.role, result.isAdmin, result.serverRole, credential, result.developer === true);
     } catch (e) {
       setCode("");
       setErr(e?.message?.includes("Invalid event credential") ? "Incorrect event credential." : (e.message || "Could not sign in."));

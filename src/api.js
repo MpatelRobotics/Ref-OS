@@ -39,10 +39,47 @@ export async function claimEventAccess(eventId, credential) {
     p_event: eventId,
     p_credential: String(credential || ""),
   });
-  if (error) throw error;
+  if (error) {
+    // The event's own codes refused it. Ask the trusted server-side Developer check next; a
+    // refusal there looks exactly like any other wrong code.
+    if (!/Invalid event credential/i.test(String(error.message || ""))) throw error;
+    const developer = await claimDeveloperAccess(eventId, credential);
+    if (developer === "ok") return { role: "ref", serverRole: "admin", isAdmin: true, developer: true };
+    if (developer === "locked") throw new Error("Too many incorrect codes. Wait a few minutes and try again.");
+    if (developer === "archived") throw new Error("This event has been archived");
+    throw error;
+  }
   const row = Array.isArray(data) ? data[0] : data;
   if (!row?.role) throw new Error("Invalid event credential.");
-  return { role: row.role === "admin" ? "ref" : row.role, serverRole: row.role, isAdmin: !!row.is_admin };
+  return { role: row.role === "admin" ? "ref" : row.role, serverRole: row.role, isAdmin: !!row.is_admin, developer: false };
+}
+
+// Server-side Developer check (refos-developer-access Edge Function). The browser never knows the
+// Developer credential; it only forwards the code that was typed. Resolves "ok", "invalid",
+// "locked", or "archived". An unavailable function counts as "invalid".
+async function claimDeveloperAccess(eventId, credential) {
+  try {
+    const { data, error } = await supabase.functions.invoke("refos-developer-access", {
+      body: { eventId, credential: String(credential || "") },
+    });
+    if (error || !data) return "invalid";
+    if (data.ok === true) return "ok";
+    return ["locked", "archived"].includes(data.reason) ? data.reason : "invalid";
+  } catch {
+    return "invalid";
+  }
+}
+
+// This device session's own sign-in row for an event: { role, developer } or null.
+// Works before refos-2-developer-access.sql is installed (developer is then always false).
+async function readMyMembership(eventId, userId) {
+  const query = (columns) => supabase.from("event_members").select(columns).eq("event_id", eventId).eq("user_id", userId).maybeSingle();
+  let { data, error } = await query("role,developer");
+  if (error && (error.code === "42703" || /developer/i.test(String(error.message || "")))) {
+    ({ data, error } = await query("role"));
+  }
+  if (error) return { error };
+  return { data: data?.role ? { role: data.role, developer: data.developer === true && data.role === "admin" } : null };
 }
 
 export async function getMyEventRole(eventId) {
@@ -57,6 +94,16 @@ export async function getMyEventRole(eventId) {
     .maybeSingle();
   if (error) return null;
   return data?.role || null;
+}
+
+// Role plus the server-side Developer flag for this device session ({ role, developer } or null).
+export async function getMyEventAccess(eventId) {
+  if (E2E_MOCK) return null;
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData?.session?.user) return null;
+  const { data, error } = await readMyMembership(eventId, sessionData.session.user.id);
+  if (error) return null;
+  return data;
 }
 
 export async function getCurrentUserId() {
@@ -119,7 +166,7 @@ export async function clearAccessSession() {
 //   1. the auth session is still accepted by Supabase Auth (getUser checks it server-side),
 //   2. this user still has an event_members row for THIS event (RLS, current role),
 //   3. the event is not archived.
-// Resolves { status: "valid", role } | { status: "invalid", reason } | { status: "archived" }.
+// Resolves { status: "valid", role, developer } | { status: "invalid", reason } | { status: "archived" }.
 // Throws only when the server cannot be reached, so the caller can keep the device locked
 // and ask the user to try again instead of treating an outage as a sign-out.
 const isAuthFailure = (error) => {
@@ -138,12 +185,7 @@ export async function verifyEventSession(eventId) {
   }
   const userId = userData?.user?.id;
   if (!userId) return { status: "invalid", reason: "session" };
-  const { data, error } = await supabase
-    .from("event_members")
-    .select("role")
-    .eq("event_id", eventId)
-    .eq("user_id", userId)
-    .maybeSingle();
+  const { data, error } = await readMyMembership(eventId, userId);
   if (error) {
     if (isAuthFailure(error)) return { status: "invalid", reason: "session" };
     throw error;
@@ -151,7 +193,7 @@ export async function verifyEventSession(eventId) {
   if (!data?.role) return { status: "invalid", reason: "membership" };
   const lifecycle = await listEventLifecycle();
   if (lifecycle?.get(eventId)?.archivedAt) return { status: "archived" };
-  return { status: "valid", role: data.role };
+  return { status: "valid", role: data.role, developer: data.developer };
 }
 
 export async function hasCurrentEventAccess(eventId) {

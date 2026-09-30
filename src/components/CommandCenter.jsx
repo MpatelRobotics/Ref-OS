@@ -138,7 +138,7 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
                     <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{person.name}</span>
                     <div className="ml-auto flex items-center gap-2">
                       {(memberForName(person.name)?.role || person.role) && (
-                        <span className="text-xs text-slate-500 dark:text-slate-400">{memberForName(person.name)?.role === "admin" ? "Admin" : (person.role || memberForName(person.name)?.role)}</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">{memberForName(person.name)?.role === "admin" ? (memberForName(person.name)?.developer === true ? "Developer" : "Admin") : (person.role || memberForName(person.name)?.role)}</span>
                       )}
                       {adminButton(person.name)}
                     </div>
@@ -161,7 +161,7 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
                       <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isOnline ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"}`} />
                       <span className="font-semibold text-sm text-slate-900 dark:text-slate-100">{person.name || "Unknown volunteer"}</span>
                       <div className="ml-auto flex items-center gap-2">
-                        {(memberForName(person.name)?.role || person.role) && <span className="text-xs text-slate-500 dark:text-slate-400">{memberForName(person.name)?.role === "admin" ? "Admin" : (person.role || memberForName(person.name)?.role)}</span>}
+                        {(memberForName(person.name)?.role || person.role) && <span className="text-xs text-slate-500 dark:text-slate-400">{memberForName(person.name)?.role === "admin" ? (memberForName(person.name)?.developer === true ? "Developer" : "Admin") : (person.role || memberForName(person.name)?.role)}</span>}
                         <span className={`text-[11px] font-semibold ${isOnline ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
                           {isOnline ? "ONLINE" : "OFFLINE"}
                         </span>

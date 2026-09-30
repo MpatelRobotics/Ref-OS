@@ -329,6 +329,7 @@ Run the SQL files in the Supabase SQL Editor in the order below. Each builds on 
 | `supabase/refos-2-phase6-event-settings.sql` | Public event branding and field names for every role |
 | `supabase/refos-2-phase7-event-management.sql` | Archive, restore, protected permanent deletion, and photo cleanup queue |
 | `supabase/refos-2-robot-photo-storage.sql` | Robot photo storage permissions |
+| `supabase/refos-2-developer-access.sql` | Developer sign-in support for the `refos-developer-access` Edge Function (service-role only) |
 | `supabase/refos-2-default-rules-template.sql` | Default rule library copied into every new event. Run after the Highlander Summit rules exist (`seed_rules.sql`); it takes a one-time snapshot of them. Re-run it if `refos-2-phase3-create-event.sql` is ever run again. |
 
 Some other files in `supabase/` apply only to the Highlander Summit deployment or to earlier releases. They are not needed for a new deployment.
@@ -342,7 +343,10 @@ npx supabase login
 npx supabase link --project-ref <your-project-ref>
 npx supabase functions deploy send-code-request-push
 npx supabase functions deploy purge-deleted-event-photos
+npx supabase functions deploy refos-developer-access
 ```
+
+`refos-developer-access` reads its credential from the `REFOS_SUPER_ADMIN_CODE` Supabase secret (`npx supabase secrets set REFOS_SUPER_ADMIN_CODE=<code>`). The value is never stored in this repository, the database, or the app.
 
 - `send-code-request-push` delivers push alerts for help and access-code requests. It requires VAPID secrets; see [`PUSH-NOTIFICATIONS-SETUP.md`](PUSH-NOTIFICATIONS-SETUP.md).
 - `purge-deleted-event-photos` removes cloud photo objects for permanently deleted events. It uses the service role that Supabase provides to Edge Functions; no additional secrets are required.
