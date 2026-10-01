@@ -1,10 +1,23 @@
 import React from "react";
-import { AlertTriangle, Archive, BarChart3, Bell, CalendarDays, ClipboardCheck, Clock, CloudOff, Contact, Download, Flag, KeyRound, ListOrdered, Mail, MapPin, RefreshCw, Server, Settings, ShieldCheck, Trash2, Trophy, Users, Wifi, X } from "lucide-react";
+import { AlertTriangle, Archive, BarChart3, Bell, CalendarDays, ChevronRight, ClipboardCheck, Clock, CloudOff, Contact, Download, Flag, KeyRound, ListOrdered, Mail, MapPin, RefreshCw, Server, Settings, ShieldCheck, Trash2, Trophy, Users, Wifi, X } from "lucide-react";
 import EventLogo from "./EventLogo.jsx";
 
 const fmtTime = (ms) => ms ? new Date(ms).toLocaleString() : "—";
 
+// Standard tool button (two per row on wider screens, one per row on phones).
+const tool = "w-full min-h-[2.75rem] py-2.5 px-3 rounded-lg border border-slate-200 dark:border-slate-700 font-semibold text-sm text-left flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-700";
+// A subtle labelled group of tools, separated by a divider (no extra card).
+function ToolSection({ title, children, first = false, danger = false }) {
+  return (
+    <section aria-label={title} className={first ? "mt-4" : "mt-4 pt-4 border-t border-slate-200 dark:border-slate-700"}>
+      <h3 className={`mb-2 text-[11px] font-bold uppercase tracking-wide ${danger ? "text-red-600 dark:text-red-400" : "text-slate-500 dark:text-slate-400"}`}>{title}</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{children}</div>
+    </section>
+  );
+}
+
 export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onFieldNames, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, brand = null, onEventSettings, onEventManagement, onSyncStatus, syncModeLabel = "Cloud", league = null, onLeagueSessions, onClose }) {
+  const accent = brand?.accent || "#0D0F32";
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
@@ -67,7 +80,6 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
               {league.date && <span className="text-xs text-slate-500 dark:text-slate-400">{league.date}</span>}
             </div>
             {!league.isActive && <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{league.activeName ? `${league.activeName} is the Active session.` : "No session is Active."} The counts below are for {league.sessionName}.</p>}
-            {onLeagueSessions && <button onClick={onLeagueSessions} className="mt-2 w-full py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><CalendarDays size={16}/> League Sessions</button>}
           </div>
         )}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -115,30 +127,51 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
               if (confirm("Reset the event alert counter to zero? This only clears alert totals and cannot be undone.")) onResetAlertStats?.();
             }} disabled={alertStatsLoading} className="mt-2 w-full py-2 rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50"><Trash2 size={15}/> Reset count</button>
           </div>
-          <div className="grid sm:grid-cols-2 gap-2 mt-3">
-            {onAlertDelivery && <button onClick={onAlertDelivery} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Mail size={16}/> Alert delivery <span className="ml-auto text-[10px] font-bold text-slate-400">{alertDeliveryLabel}</span></button>}
-            <button onClick={onContactDirectory} className="w-full text-left px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><Contact size={16}/> Event Contact Directory</button>
-            <button onClick={onRoleCodes} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><KeyRound size={16}/> Volunteer Access Codes</button>
-            {onEventSettings && <button onClick={onEventSettings} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Settings size={16}/> Event Settings</button>}
-            {onEventManagement && <button onClick={onEventManagement} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Archive size={16}/> Event Management</button>}
-            {onSyncStatus && <button onClick={onSyncStatus} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Server size={16}/> Sync &amp; Venue Server <span className="ml-auto text-[10px] font-bold text-slate-400">{syncModeLabel}</span></button>}
-            <button onClick={onPreEventTest} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ClipboardCheck size={16}/> Pre Event System Test</button>
-            <button onClick={onTwoDeviceSyncTest} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Wifi size={16}/> Two Device Sync Test</button>
-            <button onClick={onDiagnosticReport} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ShieldCheck size={16}/> Admin Diagnostics</button>
-            <button onClick={onEventSetup} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><CalendarDays size={16}/> Event setup</button>
-            <button onClick={onTMSync} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><RefreshCw size={16}/> TM Sync Center</button>
-            <button onClick={onExportViolations} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Download size={16}/> Export violations</button>
-            <button onClick={onExportNominations} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Trophy size={16}/> Export nominations</button>
-            <button onClick={onExportEventReport} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><BarChart3 size={16}/> Export event report</button>
-            <button onClick={onBackupAll} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><Download size={16}/> Backup all JSON</button>
-            <button onClick={onActivityFeed} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ListOrdered size={16}/> Activity feed</button>
-            <button onClick={onRankings} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><BarChart3 size={16}/> Rankings</button>
-            <button onClick={onAwpHistory} className="py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><ClipboardCheck size={16}/> AWP History and Analytics</button>
-          </div>
-          <button onClick={onClearData} className="mt-2 w-full py-2.5 px-3 rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-semibold text-sm text-left flex items-center gap-2"><Trash2 size={16}/> Clear event data</button>
-          <button onClick={() => {
-            if (confirm("Sign out every volunteer and require everyone to enter their nickname, first name, and last name again? Teams, matches, violations, pictures, and event data will not be deleted.")) onResetVolunteerSignIns?.();
-          }} className="mt-2 w-full py-2.5 px-3 rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-semibold text-sm text-left flex items-center gap-2"><Users size={16}/> Reset Volunteer Sign Ins</button>
+          {/* Tools, grouped by purpose. Every handler is unchanged; only order, grouping, and labels changed. */}
+          <ToolSection title="Event Setup & Management" first>
+            {onTMSync && (
+              <button type="button" onClick={onTMSync} data-tool="tm-sync"
+                className="sm:col-span-2 w-full min-h-[4.5rem] rounded-xl border-2 bg-white dark:bg-slate-900 px-4 py-3.5 text-left flex items-center gap-3 shadow-sm transition hover:shadow-md hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                style={{ borderColor: accent }}>
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-white" style={{ backgroundColor: accent }}><RefreshCw size={22}/></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-bold text-slate-900 dark:text-slate-100">TM Sync Center</span>
+                  <span className="block text-xs text-slate-500 dark:text-slate-400">{league?.sessionName ? `Import Tournament Manager data for ${league.sessionName}` : "Import and update Tournament Manager event data"}</span>
+                </span>
+                <ChevronRight size={20} className="shrink-0 text-slate-400"/>
+              </button>
+            )}
+            <button onClick={onEventSetup} className={tool}><CalendarDays size={16}/> Event Setup</button>
+            {onEventSettings && <button onClick={onEventSettings} className={tool}><Settings size={16}/> Event Settings</button>}
+            <button onClick={onRoleCodes} className={tool}><KeyRound size={16}/> Volunteer Access Codes</button>
+            {onEventManagement && <button onClick={onEventManagement} className={tool}><Archive size={16}/> Event Management</button>}
+            {onLeagueSessions && <button onClick={onLeagueSessions} className={tool}><CalendarDays size={16}/> League Sessions</button>}
+          </ToolSection>
+          <ToolSection title="Event Operations">
+            <button onClick={onContactDirectory} className={tool}><Contact size={16}/> Event Contact Directory</button>
+            <button onClick={onRankings} className={tool}><BarChart3 size={16}/> Rankings</button>
+            <button onClick={onActivityFeed} className={tool}><ListOrdered size={16}/> Activity Feed</button>
+            <button onClick={onAwpHistory} className={tool}><ClipboardCheck size={16}/> AWP History and Analytics</button>
+            {onAlertDelivery && <button onClick={onAlertDelivery} className={tool}><Mail size={16}/> Alert delivery <span className="ml-auto text-[10px] font-bold text-slate-400">{alertDeliveryLabel}</span></button>}
+          </ToolSection>
+          <ToolSection title="System & Devices">
+            {onSyncStatus && <button onClick={onSyncStatus} className={tool}><Server size={16}/> Sync &amp; Venue Server <span className="ml-auto text-[10px] font-bold text-slate-400">{syncModeLabel}</span></button>}
+            <button onClick={onPreEventTest} className={tool}><ClipboardCheck size={16}/> Pre Event System Test</button>
+            <button onClick={onTwoDeviceSyncTest} className={tool}><Wifi size={16}/> Two Device Sync Test</button>
+            <button onClick={onDiagnosticReport} className={tool}><ShieldCheck size={16}/> Admin Diagnostics</button>
+          </ToolSection>
+          <ToolSection title="Exports & Backups">
+            <button onClick={onExportViolations} className={tool}><Download size={16}/> Export Violations</button>
+            <button onClick={onExportNominations} className={tool}><Trophy size={16}/> Export Nominations</button>
+            <button onClick={onExportEventReport} className={tool}><BarChart3 size={16}/> Export Event Report</button>
+            <button onClick={onBackupAll} className={tool}><Download size={16}/> Backup All JSON</button>
+          </ToolSection>
+          <ToolSection title="Danger Zone" danger>
+            <button onClick={onClearData} className="sm:col-span-2 w-full min-h-[2.75rem] py-2.5 px-3 rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-semibold text-sm text-left flex items-center gap-2"><Trash2 size={16}/> Clear Event Data</button>
+            <button onClick={() => {
+              if (confirm("Sign out every volunteer and require everyone to enter their nickname, first name, and last name again? Teams, matches, violations, pictures, and event data will not be deleted.")) onResetVolunteerSignIns?.();
+            }} className="sm:col-span-2 w-full min-h-[2.75rem] py-2.5 px-3 rounded-lg border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 font-semibold text-sm text-left flex items-center gap-2"><Users size={16}/> Reset Volunteer Sign Ins</button>
+          </ToolSection>
         </div>
         <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
           <div className="font-bold flex items-center gap-2"><Users size={17}/> Key Volunteer Status</div>
