@@ -12,6 +12,54 @@ export const uid = () =>
   (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) ||
   Date.now().toString(36) + Math.random().toString(36).slice(2);
 
+/* ================= League sessions: device context =================
+   A League event holds several sessions (Session 1, Session 2, ..., League Finals). While this
+   device works in a league session, the session-scoped reads and writes in this file are limited
+   to that session and new records are stamped with it. Tournament events never set a session, so
+   every function below behaves exactly as before for them.
+   EVENT-SCOPED (league-wide): teams, rules, access codes, event members and volunteer profiles,
+   event settings (except the snapshot keys below), watch notes, ref roster, branding.
+   SESSION-SCOPED: matches, violations, field log (except the league-wide kinds below), field
+   reset checks, alliances, nominations, finalists, attendance, robot inspection photos, and the
+   imported rankings / skills / qualification-record snapshots. */
+export const LEAGUE_SESSION_SETTING_KEYS = new Set(["skills_rankings", "qualification_records", "judging_rank_order", "rank_snapshot"]);
+export const LEAGUE_EVENT_SCOPED_FIELD_LOG_KINDS = new Set(["role_code_update", "role_code_request", "volunteer_contact", "sync_probe", "sync_ack", "system_test"]);
+let leagueContext = { eventId: "", sessionId: "" };
+export function setLeagueContext(eventId, sessionId) {
+  leagueContext = { eventId: String(eventId || ""), sessionId: String(sessionId || "") };
+}
+export function leagueSessionFor(eventId) {
+  return eventId && leagueContext.eventId === eventId && leagueContext.sessionId ? leagueContext.sessionId : null;
+}
+export const leagueSettingKey = (key, sessionId) => `${key}@${sessionId}`;
+export const leagueSessionPhotoMarker = (sessionId) => `/s-${sessionId}/`;
+// Session that a robot photo path belongs to (<event>/team/<TEAM>/s-<session>/<angle>-<id>.webp), or null.
+export function photoSessionId(path) {
+  const m = String(path || "").match(/\/s-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\//i);
+  return m ? m[1].toLowerCase() : null;
+}
+// Robot photos shown for the current view: in a league session, only that session's photos.
+function viewPhotoKeys(eventId, paths) {
+  const list = paths || [];
+  const sid = leagueSessionFor(eventId);
+  return sid ? list.filter((path) => String(path).includes(leagueSessionPhotoMarker(sid))) : list;
+}
+const isMissingConflictTarget = (error) =>
+  error?.code === "42P10" || error?.code === "42703" || /no unique or exclusion constraint|session_key/i.test(error?.message || "");
+// matches, field_reset_checks, alliances and shortlist gained session_key in their primary key
+// (refos-2-league-events.sql). Until that file runs, tournaments keep using the old conflict target.
+const conflictTargetMode = {};
+async function upsertSessionKeyed(table, rows, newTarget, oldTarget, { sessionId = null, finish = (q) => q } = {}) {
+  const run = (target) => finish(supabase.from(table).upsert(rows, { onConflict: target }));
+  if (conflictTargetMode[table] !== "old" || sessionId) {
+    const result = await run(newTarget);
+    if (!result.error) { conflictTargetMode[table] = "new"; return result; }
+    if (sessionId || !isMissingConflictTarget(result.error)) return result;
+    conflictTargetMode[table] = "old";
+  }
+  return run(oldTarget);
+}
+
 /* ================= server enforced event access ================= */
 export async function ensureAnonymousSession() {
   if (E2E_MOCK) return { user: { id: "e2e-user" } };
@@ -349,6 +397,8 @@ const mapEvent = (r) => r && {
   // Phase 7 lifecycle (null archivedAt = ACTIVE). Undefined until the Phase 7 SQL is installed.
   createdAt: r.created_at || null,
   archivedAt: r.archived_at || null,
+  // League events (refos-2-league-events.sql). Missing or unknown values are Tournaments.
+  format: r.event_format === "league" ? "league" : "tournament",
 };
 export async function listMyEvents() {
   const { data } = await supabase.from("events").select("*").order("created_at", { ascending: false });
@@ -373,11 +423,14 @@ export async function listSelectableEvents() {
   });
   // Phase 7: archive status and creation date, merged onto every event (active and archived).
   const withLifecycle = async (choices) => {
-    const lifecycle = await listEventLifecycle();
+    const [lifecycle, formats] = await Promise.all([listEventLifecycle(), listEventFormats()]);
     return choices.map((choice) => ({
       ...choice,
       archivedAt: lifecycle?.get(choice.id)?.archivedAt || null,
       createdAt: lifecycle?.get(choice.id)?.createdAt || null,
+      format: formats?.get(choice.id)?.format || "tournament",
+      activeSessionName: formats?.get(choice.id)?.activeSessionName || "",
+      sessionCount: formats?.get(choice.id)?.sessionCount || 0,
     }));
   };
   // Phase 6 branding function (supabase/refos-2-phase6-event-settings.sql).
@@ -397,6 +450,18 @@ export async function listEventLifecycle() {
   const { data, error } = await supabase.rpc("list_refos_event_lifecycle");
   if (error) return null;
   return new Map((data || []).map((r) => [r.event_id, { archivedAt: r.archived_at || null, createdAt: r.created_at || null }]));
+}
+// League events: Map(eventId -> { format, activeSessionName, sessionCount }), or null before
+// refos-2-league-events.sql is installed (every event is then a Tournament).
+export async function listEventFormats() {
+  if (E2E_MOCK) return null;
+  const { data, error } = await supabase.rpc("list_refos_event_formats");
+  if (error) return null;
+  return new Map((data || []).map((r) => [r.event_id, {
+    format: r.event_format === "league" ? "league" : "tournament",
+    activeSessionName: r.active_session_name || "",
+    sessionCount: Number(r.session_count) || 0,
+  }]));
 }
 // Archive: server allows only an Admin member of this event, and never Highlander.
 export async function archiveEvent(eventId) {
@@ -446,16 +511,126 @@ export async function getEvent(id) {
   const { data } = await supabase.from("events").select("*").eq("id", id).maybeSingle();
   return mapEvent(data);
 }
-export async function createVexEvent(name, adminCredential) {
+export async function createVexEvent(name, adminCredential, format = "tournament") {
   await ensureAnonymousSession();
   const cleanName = String(name || "").trim();
   const cleanCredential = String(adminCredential || "").trim().toUpperCase();
+  if (format === "league") {
+    const { data, error } = await supabase.rpc("create_refos_vex_event_with_format", {
+      p_name: cleanName,
+      p_admin_credential: cleanCredential,
+      p_format: "league",
+    });
+    if (error) {
+      if (/create_refos_vex_event_with_format/i.test(error.message || "")) throw new Error("League events are not installed in Supabase yet. Run supabase/refos-2-league-events.sql.");
+      throw error;
+    }
+    return mapEvent(Array.isArray(data) ? data[0] : data);
+  }
   const { data, error } = await supabase.rpc("create_refos_vex_event", {
     p_name: cleanName,
     p_admin_credential: cleanCredential,
   });
   if (error) throw error;
   return mapEvent(Array.isArray(data) ? data[0] : data);
+}
+
+/* ================= League sessions (refos-2-league-events.sql) ================= */
+const mapLeagueSession = (r) => r && ({
+  id: r.id,
+  eventId: r.event_id,
+  name: r.name || "",
+  type: r.session_type === "finals" ? "finals" : "session",
+  order: Number(r.ord) || 0,
+  date: r.session_date || "",
+  startTime: r.start_time ? String(r.start_time).slice(0, 5) : "",
+  endTime: r.end_time ? String(r.end_time).slice(0, 5) : "",
+  status: ["active", "completed"].includes(r.status) ? r.status : "upcoming",
+  startedAt: r.started_at || null,
+  completedAt: r.completed_at || null,
+});
+export async function listLeagueSessions(eventId) {
+  if (E2E_MOCK) return [];
+  try {
+    const { data, error } = await supabase.from("league_sessions").select("*").eq("event_id", eventId).order("ord").order("created_at");
+    if (error) throw error;
+    const sessions = (data || []).map(mapLeagueSession);
+    saveReadCache(eventId, "league_sessions", sessions);
+    return sessions;
+  } catch (error) {
+    const cached = loadReadCache(eventId, "league_sessions");
+    if (cached) return cached;
+    throw error;
+  }
+}
+const leagueSessionArgs = (s) => ({
+  p_name: String(s.name || "").trim(),
+  p_type: s.type === "finals" ? "finals" : "session",
+  p_date: s.date || null,
+  p_start: s.startTime || null,
+  p_end: s.endTime || null,
+});
+export async function createLeagueSession(eventId, session) {
+  const { data, error } = await supabase.rpc("create_league_session", { p_event: eventId, ...leagueSessionArgs(session) });
+  if (error) throw error;
+  return mapLeagueSession(Array.isArray(data) ? data[0] : data);
+}
+export async function updateLeagueSession(sessionId, session) {
+  const { data, error } = await supabase.rpc("update_league_session", { p_session: sessionId, ...leagueSessionArgs(session) });
+  if (error) throw error;
+  return mapLeagueSession(Array.isArray(data) ? data[0] : data);
+}
+export async function reorderLeagueSessions(eventId, orderedIds) {
+  const { error } = await supabase.rpc("reorder_league_sessions", { p_event: eventId, p_order: orderedIds });
+  if (error) throw error;
+}
+// status: "active" (Start Session), "completed" (Complete Session) or "upcoming".
+export async function setLeagueSessionStatus(sessionId, status) {
+  const { data, error } = await supabase.rpc("set_league_session_status", { p_session: sessionId, p_status: status });
+  if (error) throw error;
+  return mapLeagueSession(Array.isArray(data) ? data[0] : data);
+}
+export async function leagueSessionRecordCounts(sessionId) {
+  const { data, error } = await supabase.rpc("league_session_record_counts", { p_session: sessionId });
+  if (error) throw error;
+  return data || {};
+}
+// Resolves { status: "deleted" | "confirm_required", counts }. A session that holds records is
+// deleted only when confirmName matches its name exactly. Photo files are removed afterwards.
+export async function deleteLeagueSession(sessionId, confirmName = null) {
+  const { data, error } = await supabase.rpc("delete_league_session", { p_session: sessionId, p_confirm_name: confirmName });
+  if (error) throw error;
+  const result = data || {};
+  const paths = Array.isArray(result.paths) ? result.paths : [];
+  for (let i = 0; i < paths.length; i += 100) {
+    const { error: storageError } = await supabase.storage.from("robot-photos").remove(paths.slice(i, i + 100));
+    if (storageError) console.warn("Session deleted; some photo files still need cleanup.", storageError);
+  }
+  if (paths.length) await deleteCachedPhotos(paths).catch(() => {});
+  return { status: result.status || "", counts: result.counts || {} };
+}
+const mapAttendance = (r) => ({ sessionId: r.session_id, team: r.team, status: r.status, by: r.updated_by || "", updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : 0 });
+// Attendance for one session (sessionId) or for every session of the league (no sessionId).
+export async function listLeagueAttendance(eventId, sessionId = null) {
+  if (E2E_MOCK) return [];
+  let query = supabase.from("league_session_attendance").select("*").eq("event_id", eventId);
+  if (sessionId) query = query.eq("session_id", sessionId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).map(mapAttendance);
+}
+// status: "present", "absent", or null to clear.
+export async function setLeagueAttendance(eventId, sessionId, team, status, by = "") {
+  const number = String(team || "").trim().toUpperCase();
+  if (!status) {
+    const { error } = await supabase.from("league_session_attendance").delete().eq("event_id", eventId).eq("session_id", sessionId).eq("team", number);
+    if (error) throw error;
+    return null;
+  }
+  const row = { event_id: eventId, session_id: sessionId, team: number, status, updated_by: by || "", updated_at: new Date().toISOString() };
+  const { data, error } = await supabase.from("league_session_attendance").upsert(row, { onConflict: "event_id,session_id,team" }).select().single();
+  if (error) throw error;
+  return mapAttendance(data);
 }
 export async function createEvent(d) {
   await ensureAnonymousSession();
@@ -530,14 +705,28 @@ function saveReadCache(eventId, kind, data) {
 
 export async function listTeams(eventId) {
   if (E2E_MOCK) return e2eState.teams.map((t) => ({ ...t }));
+  const sessionId = leagueSessionFor(eventId);
+  const cacheKind = sessionId ? `teams@${sessionId}` : "teams";
   try {
     const { data, error } = await supabase.from("teams").select("*").eq("event_id", eventId);
     if (error) throw error;
-    const teams = (data || []).map(mapTeam);
-    saveReadCache(eventId, "teams", teams);
+    let teams = (data || []).map(mapTeam);
+    if (sessionId) {
+      // League: teams are league-wide; the rank comes from this session's imported ranking
+      // snapshot, and the robot photos shown are this session's (all sessions kept in allPhotoKeys).
+      const snapshot = await supabase.from("event_settings").select("value").eq("event_id", eventId).eq("key", leagueSettingKey("rank_snapshot", sessionId)).maybeSingle();
+      const ranks = snapshot.data?.value?.ranks || {};
+      teams = teams.map((team) => ({
+        ...team,
+        rank: ranks[team.number] == null ? null : Number(ranks[team.number]),
+        allPhotoKeys: team.photoKeys,
+        photoKeys: viewPhotoKeys(eventId, team.photoKeys),
+      }));
+    }
+    saveReadCache(eventId, cacheKind, teams);
     return teams;
   } catch (error) {
-    const cached = loadReadCache(eventId, "teams");
+    const cached = loadReadCache(eventId, cacheKind);
     if (cached) {
       console.warn("Teams unavailable from Supabase; using last synced local cache.", error);
       return cached;
@@ -606,6 +795,14 @@ export async function bulkUpsertRankings(eventId, rankings) {
     .map((r) => ({ event_id: eventId, number: (r.number || "").trim().toUpperCase(), rank: Number(r.rank) }))
     .filter((r) => r.number && Number.isFinite(r.rank) && r.rank > 0);
   if (!rows.length) return 0;
+  if (leagueSessionFor(eventId)) {
+    // League: the imported rankings are stored as THIS session's snapshot (earlier sessions keep
+    // theirs). Teams stay league-wide; missing teams are added without a rank.
+    const { error: teamError } = await supabase.from("teams").upsert(rows.map((r) => ({ event_id: eventId, number: r.number })), { onConflict: "event_id,number", ignoreDuplicates: true });
+    if (teamError) throw teamError;
+    await upsertEventSetting(eventId, "rank_snapshot", { ranks: Object.fromEntries(rows.map((r) => [r.number, r.rank])), importedAt: Date.now() });
+    return rows.length;
+  }
   const { error } = await supabase.from("teams").upsert(rows, { onConflict: "event_id,number" });
   if (error) throw error;
   return rows.length;
@@ -616,6 +813,7 @@ export async function deleteTeam(eventId, number) {
   if (paths.length) await supabase.storage.from("robot-photos").remove(paths);
   await supabase.from("violations").delete().eq("event_id", eventId).eq("team", number);
   await supabase.from("teams").delete().eq("event_id", eventId).eq("number", number);
+  if (leagueSessionFor(eventId)) await supabase.from("league_session_attendance").delete().eq("event_id", eventId).eq("team", number);
 }
 
 /* ---- robot inspection photos (stored on the team) ---- */
@@ -640,22 +838,28 @@ export async function getRobotPhotoGeneration(eventId, allowCached = false) {
 // The extension follows the compressed image type (WebP, or JPEG where WebP encoding is unavailable).
 const ROBOT_PHOTO_ANGLES = ["front", "back", "side", "tag", "lexan"];
 export const robotPhotoAngleKey = (angle) => (ROBOT_PHOTO_ANGLES.includes(String(angle).toLowerCase()) ? String(angle).toLowerCase() : "other");
-export function robotPhotoPath(eventId, number, angle, id, mime = "image/jpeg") {
+// League sessions add a session folder so each session keeps its own inspection evidence:
+// <event-id>/team/<TEAM>/s-<session-id>/<angle>-<upload-id>.<webp|jpg>
+export function robotPhotoPath(eventId, number, angle, id, mime = "image/jpeg", sessionId = leagueSessionFor(eventId)) {
   const num = String(number || "").trim().toUpperCase();
   const ext = /webp/i.test(String(mime)) ? "webp" : "jpg";
-  return `${eventId}/team/${num}/${robotPhotoAngleKey(angle)}-${id}.${ext}`;
+  const sessionFolder = sessionId ? `s-${sessionId}/` : "";
+  return `${eventId}/team/${num}/${sessionFolder}${robotPhotoAngleKey(angle)}-${id}.${ext}`;
 }
 const dataUrlMimeType = (dataUrl) => (String(dataUrl).match(/^data:([^;,]+)/) || [])[1] || "image/jpeg";
 const pathAngle = (path) => (String(path || "").match(/\/(front|back|side|tag|lexan|other)-[^/]+\.(?:jpe?g|webp)$/i) || [])[1]?.toLowerCase() || "";
 
-export async function addTeamPhoto(eventId, number, dataUrl, angle = "other", uploadId = "", generation = "0") {
+export async function addTeamPhoto(eventId, number, dataUrl, angle = "other", uploadId = "", generation = "0", photoSessionIdArg) {
+  // A queued photo keeps the session it was taken in (photoSessionIdArg), even if this device has
+  // moved to another session before the upload runs. Older queued photos use the current session.
+  const sessionId = photoSessionIdArg === undefined ? leagueSessionFor(eventId) : (photoSessionIdArg || null);
   const currentGeneration = await getRobotPhotoGeneration(eventId);
   if (currentGeneration !== generation) return null;
   const num = (number || "").trim().toUpperCase();
   const safeAngle = robotPhotoAngleKey(angle);
   const id = uploadId || ((self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2));
   const mime = dataUrlMimeType(dataUrl);
-  const path = robotPhotoPath(eventId, num, safeAngle, id, mime);
+  const path = robotPhotoPath(eventId, num, safeAngle, id, mime, sessionId);
   const blob = dataURLtoBlob(dataUrl);
   const up = await supabase.storage.from("robot-photos").upload(path, blob, { contentType: mime, upsert: true });
   if (up.error) throw up.error;
@@ -671,13 +875,14 @@ export async function addTeamPhoto(eventId, number, dataUrl, angle = "other", up
   // (cloud object, shared reference, and local cache). "Other" pictures are never replaced.
   let current = paths || [];
   if (safeAngle !== "other") {
-    const older = current.filter((existing) => existing !== path && pathAngle(existing) === safeAngle);
+    // Only photos of the same session are replaced; earlier sessions' evidence is never overwritten.
+    const older = current.filter((existing) => existing !== path && pathAngle(existing) === safeAngle && photoSessionId(existing) === (sessionId || null));
     for (const oldPath of older) {
       try { current = await removeTeamPhoto(eventId, num, oldPath); }
       catch (cleanupError) { console.warn("Older robot photo could not be removed yet", cleanupError); }
     }
   }
-  return current;
+  return viewPhotoKeys(eventId, current);
 }
 export async function removeTeamPhoto(eventId, number, path) {
   const num = (number || "").trim().toUpperCase();
@@ -686,7 +891,7 @@ export async function removeTeamPhoto(eventId, number, path) {
   const { error: storageError } = await supabase.storage.from("robot-photos").remove([path]);
   if (storageError) throw storageError;
   await deleteCachedPhotos([path]);
-  return paths || [];
+  return viewPhotoKeys(eventId, paths || []);
 }
 // Removes cloud photo objects for permanently deleted events. Runs server-side in the
 // purge-deleted-event-photos Edge Function; no service-role key exists in the browser.
@@ -696,11 +901,26 @@ export async function purgeDeletedEventPhotos() {
   if (error) throw error;
   return data;
 }
-export async function resetTeamPhotos(eventId) {
+export async function resetTeamPhotos(eventId, { allSessions = false } = {}) {
   if (E2E_MOCK) {
     e2eState.teams = e2eState.teams.map((team) => ({ ...team, photoKeys: [] }));
     e2eRobotGeneration = uid();
     return { version: e2eRobotGeneration, paths: [] };
+  }
+  const sessionId = leagueSessionFor(eventId);
+  if (sessionId && !allSessions) {
+    // League: Clear Data removes only this session's inspection photos; earlier sessions keep theirs.
+    const { data: teamRows, error: teamError } = await supabase.from("teams").select("number,photo_paths").eq("event_id", eventId);
+    if (teamError) throw teamError;
+    const paths = [];
+    for (const team of teamRows || []) {
+      for (const path of viewPhotoKeys(eventId, team.photo_paths || [])) {
+        const { error: removeError } = await supabase.rpc("remove_team_photo_path", { p_event: eventId, p_team: team.number, p_path: path });
+        if (removeError) throw removeError;
+        paths.push(path);
+      }
+    }
+    return { league: true, version: null, paths };
   }
   const { data, error } = await supabase.rpc("reset_event_robot_photos", { p_event: eventId });
   if (error) throw error;
@@ -714,6 +934,7 @@ export async function finishTeamPhotoCleanup(eventId, reset) {
     const { error } = await supabase.storage.from("robot-photos").remove(paths.slice(i, i + 100));
     if (error) throw error;
   }
+  if (reset.league) { await deleteCachedPhotos(paths).catch(() => {}); return; }
   const { error } = await supabase.rpc("finish_robot_photo_cleanup", { p_event: eventId, p_version: reset.version });
   if (error) throw error;
 }
@@ -721,17 +942,23 @@ export async function finishTeamPhotoCleanup(eventId, reset) {
 /* ================= matches (qualification schedule) ================= */
 export async function listMatches(eventId) {
   if (E2E_MOCK) return [];
+  const sessionId = leagueSessionFor(eventId);
+  const cacheKind = sessionId ? `matches@${sessionId}` : "matches";
   try {
-    const { data, error } = await supabase.from("matches").select("num,red,blue,field,phase,label,winner,red_score,blue_score").eq("event_id", eventId).order("num");
+    let query = supabase.from("matches").select("num,red,blue,field,phase,label,winner,red_score,blue_score").eq("event_id", eventId);
+    // League: only this session's schedule. Match numbers repeat between sessions (Session 1 Q1,
+    // Session 2 Q1), and within one session they are unique, so match ids below stay unique.
+    if (sessionId) query = query.eq("session_id", sessionId);
+    const { data, error } = await query.order("num");
     if (error) throw error;
     const matches = (data || []).map((m) => {
       const phase = m.phase || "qual";
       return { id: phase === "qual" ? String(m.num) : `${phase}-${m.num}`, phase, num: m.num, label: m.label || "", winner: m.winner || "", redScore: m.red_score, blueScore: m.blue_score, red: m.red || [], blue: m.blue || [], field: m.field || "" };
     });
-    saveReadCache(eventId, "matches", matches);
+    saveReadCache(eventId, cacheKind, matches);
     return matches;
   } catch (error) {
-    const cached = loadReadCache(eventId, "matches");
+    const cached = loadReadCache(eventId, cacheKind);
     if (cached) {
       console.warn("Matches unavailable from Supabase; using last synced local cache.", error);
       return cached;
@@ -744,9 +971,17 @@ export async function addMatch(eventId, m) {
   if (m.redScore != null) row.red_score = Number(m.redScore);
   if (m.blueScore != null) row.blue_score = Number(m.blueScore);
   if (m.winner) row.winner = m.winner;
-  const { error } = await supabase.from("matches").upsert(row, { onConflict: "event_id,phase,num" });
+  const sessionId = leagueSessionFor(eventId);
+  if (sessionId) row.session_id = sessionId;
+  // Re-importing a match updates that match in the same session only (event + session + phase + number).
+  const { error } = await upsertSessionKeyed("matches", row, "event_id,session_key,phase,num", "event_id,phase,num", { sessionId });
   if (error) throw error;
 }
+// League sessions: restrict a match / alliance / check query to the current session.
+const inSession = (query, eventId) => {
+  const sessionId = leagueSessionFor(eventId);
+  return sessionId ? query.eq("session_id", sessionId) : query;
+};
 export async function updateMatchScore(eventId, phase, num, redScore, blueScore, winner) {
   const { error } = await supabase
     .from("matches")
@@ -757,16 +992,17 @@ export async function updateMatchScore(eventId, phase, num, redScore, blueScore,
     })
     .eq("event_id", eventId)
     .eq("phase", phase)
-    .eq("num", Number(num));
+    .eq("num", Number(num))
+    .match(leagueSessionFor(eventId) ? { session_id: leagueSessionFor(eventId) } : {});
   if (error) throw error;
 }
 
 export async function setMatchWinner(eventId, phase, num, winner) {
-  const { error } = await supabase.from("matches").update({ winner: winner || null }).eq("event_id", eventId).eq("phase", phase).eq("num", Number(num));
+  const { error } = await inSession(supabase.from("matches").update({ winner: winner || null }).eq("event_id", eventId).eq("phase", phase).eq("num", Number(num)), eventId);
   if (error) throw error;
 }
 export async function deleteMatch(eventId, phase, num) {
-  const { error } = await supabase.from("matches").delete().eq("event_id", eventId).eq("phase", phase).eq("num", Number(num));
+  const { error } = await inSession(supabase.from("matches").delete().eq("event_id", eventId).eq("phase", phase).eq("num", Number(num)), eventId);
   if (error) throw error;
 }
 
@@ -776,8 +1012,25 @@ export async function listEventSettings(eventId) {
   if (E2E_MOCK) return {};
   const { data, error } = await supabase.from("event_settings").select("*").eq("event_id", eventId);
   if (error) throw error;
-  return Object.fromEntries((data || []).map((r) => [r.key, mapEventSetting(r)]));
+  const sessionId = leagueSessionFor(eventId);
+  if (!sessionId) return Object.fromEntries((data || []).map((r) => [r.key, mapEventSetting(r)]));
+  // League: snapshot keys are stored per session as "<key>@<session id>". This session's value is
+  // exposed under the plain key; other sessions' snapshots stay available under their full key.
+  const settings = {};
+  for (const r of data || []) {
+    if (LEAGUE_SESSION_SETTING_KEYS.has(r.key)) continue;
+    settings[r.key] = mapEventSetting(r);
+  }
+  for (const key of LEAGUE_SESSION_SETTING_KEYS) {
+    const own = settings[leagueSettingKey(key, sessionId)];
+    if (own) settings[key] = { ...own, key };
+  }
+  return settings;
 }
+const storedSettingKey = (eventId, key) => {
+  const sessionId = leagueSessionFor(eventId);
+  return sessionId && LEAGUE_SESSION_SETTING_KEYS.has(key) ? leagueSettingKey(key, sessionId) : key;
+};
 // Phase 6: the selected event's public branding ({ shortName, logoUrl, accent }), read through the
 // existing list_refos_event_branding() function that already serves Choose VEX Event and the login
 // screen. Used by roles that cannot read event_settings (Inspection). Returns null if unavailable.
@@ -805,34 +1058,41 @@ export async function getEventFieldNames(eventId) {
   return { key: "field_names", value: row.field_names || {}, updatedBy: "", updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : 0 };
 }
 export async function getEventSetting(eventId, key) {
-  const { data, error } = await supabase.from("event_settings").select("*").eq("event_id", eventId).eq("key", key).maybeSingle();
+  const { data, error } = await supabase.from("event_settings").select("*").eq("event_id", eventId).eq("key", storedSettingKey(eventId, key)).maybeSingle();
   if (error) throw error;
-  return data ? mapEventSetting(data) : null;
+  return data ? { ...mapEventSetting(data), key } : null;
 }
 export async function upsertEventSetting(eventId, key, value, by = "") {
   if (E2E_MOCK) return { key, value, updatedBy: by || "", updatedAt: Date.now() };
-  const row = { event_id: eventId, key, value, updated_by: by || "", updated_at: new Date().toISOString() };
+  const row = { event_id: eventId, key: storedSettingKey(eventId, key), value, updated_by: by || "", updated_at: new Date().toISOString() };
   const { data, error } = await supabase.from("event_settings").upsert(row, { onConflict: "event_id,key" }).select().single();
   if (error) throw error;
-  return mapEventSetting(data);
+  return { ...mapEventSetting(data), key };
 }
 export async function deleteEventSetting(eventId, key) {
   if (E2E_MOCK) return;
-  const { error } = await supabase.from("event_settings").delete().eq("event_id", eventId).eq("key", key);
+  const { error } = await supabase.from("event_settings").delete().eq("event_id", eventId).eq("key", storedSettingKey(eventId, key));
   if (error) throw error;
 }
 
 /* ================= field log (timeouts / faults / replays) ================= */
-const mapFieldLog = (r) => ({ id: r.id, kind: r.kind, field: r.field || "", matchRef: r.match_ref || "", matchId: r.match_id || "", alliance: r.alliance || "", team: r.team || "", teams: r.teams || [], note: r.note || "", by: r.logged_by || "", createdAt: new Date(r.created_at).getTime() });
+const mapFieldLog = (r) => ({ id: r.id, kind: r.kind, field: r.field || "", matchRef: r.match_ref || "", matchId: r.match_id || "", alliance: r.alliance || "", team: r.team || "", teams: r.teams || [], note: r.note || "", by: r.logged_by || "", createdAt: new Date(r.created_at).getTime(), sessionId: r.session_id || null });
+// League sessions: this session's entries plus league-wide ones (volunteer profiles, access-code requests).
+const fieldLogInSession = (query, eventId) => {
+  const sessionId = leagueSessionFor(eventId);
+  return sessionId ? query.or(`session_id.eq.${sessionId},session_id.is.null`) : query;
+};
 export async function listFieldLog(eventId) {
   if (E2E_MOCK) return [];
   if (isVenueMode()) return venueListFieldLog(eventId);
-  const { data } = await supabase.from("field_log").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
+  const { data } = await fieldLogInSession(supabase.from("field_log").select("*").eq("event_id", eventId), eventId).order("created_at", { ascending: false });
   return (data || []).map(mapFieldLog);
 }
 export async function addFieldLog(eventId, e) {
   const id = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
   const row = { id, event_id: eventId, kind: e.kind, field: e.field || null, match_ref: e.matchRef || null, match_id: e.matchId || null, alliance: e.alliance || null, team: e.team || null, teams: (e.teams && e.teams.length) ? e.teams : null, note: (e.note || "").trim(), logged_by: e.by || "" };
+  const sessionId = leagueSessionFor(eventId);
+  if (sessionId && !LEAGUE_EVENT_SCOPED_FIELD_LOG_KINDS.has(row.kind)) row.session_id = sessionId;
   if (isVenueMode() && !VENUE_CLOUD_ONLY_FIELD_LOG_KINDS.has(row.kind)) return venueAddFieldLog(eventId, row);
   const { data, error } = await supabase.from("field_log").upsert(row, { onConflict: "id" }).select().single();
   if (error) throw error;
@@ -857,10 +1117,10 @@ const mapFieldResetCheck = (r) => ({
 
 export async function listFieldResetChecks(eventId) {
   if (E2E_MOCK) return [];
-  const { data, error } = await supabase
+  const { data, error } = await inSession(supabase
     .from("field_reset_checks")
     .select("*")
-    .eq("event_id", eventId)
+    .eq("event_id", eventId), eventId)
     .order("match_id")
     .order("quadrant");
   if (error) throw error;
@@ -881,28 +1141,27 @@ export async function verifyFieldResetQuadrant(eventId, matchId, matchRef, quadr
     verified_at: now,
     updated_at: now,
   };
-  const { data, error } = await supabase
-    .from("field_reset_checks")
-    .upsert(row, { onConflict: "event_id,match_id,quadrant" })
-    .select()
-    .single();
+  const sessionId = leagueSessionFor(eventId);
+  if (sessionId) row.session_id = sessionId;
+  const { data, error } = await upsertSessionKeyed("field_reset_checks", row, "event_id,session_key,match_id,quadrant", "event_id,match_id,quadrant",
+    { sessionId, finish: (q) => q.select().single() });
   if (error) throw error;
   return mapFieldResetCheck(data);
 }
 
 export async function clearFieldResetMatch(eventId, matchId) {
   if (E2E_MOCK) return;
-  const { error } = await supabase
+  const { error } = await inSession(supabase
     .from("field_reset_checks")
     .delete()
     .eq("event_id", eventId)
-    .eq("match_id", String(matchId));
+    .eq("match_id", String(matchId)), eventId);
   if (error) throw error;
 }
 
 export async function clearFieldResetChecks(eventId) {
   if (E2E_MOCK) return;
-  const { error } = await supabase.from("field_reset_checks").delete().eq("event_id", eventId);
+  const { error } = await inSession(supabase.from("field_reset_checks").delete().eq("event_id", eventId), eventId);
   if (error) throw error;
 }
 
@@ -910,16 +1169,18 @@ export async function clearFieldResetChecks(eventId) {
 const mapAlliance = (r) => ({ seed: r.seed, teams: r.teams || [] });
 export async function listAlliances(eventId) {
   if (E2E_MOCK) return [];
-  const { data } = await supabase.from("alliances").select("seed,teams").eq("event_id", eventId).order("seed");
+  const { data } = await inSession(supabase.from("alliances").select("seed,teams").eq("event_id", eventId), eventId).order("seed");
   return (data || []).map(mapAlliance);
 }
 export async function upsertAlliance(eventId, seed, teams) {
   const row = { event_id: eventId, seed: Number(seed), teams: teams || [], updated_at: new Date().toISOString() };
-  const { error } = await supabase.from("alliances").upsert(row, { onConflict: "event_id,seed" });
+  const sessionId = leagueSessionFor(eventId);
+  if (sessionId) row.session_id = sessionId;
+  const { error } = await upsertSessionKeyed("alliances", row, "event_id,session_key,seed", "event_id,seed", { sessionId });
   if (error) throw error;
 }
 export async function clearAlliances(eventId) {
-  const { error } = await supabase.from("alliances").delete().eq("event_id", eventId);
+  const { error } = await inSession(supabase.from("alliances").delete().eq("event_id", eventId), eventId);
   if (error) throw error;
 }
 
@@ -962,13 +1223,14 @@ const mapNom = (r) => {
 };
 export async function listNominations(eventId) {
   if (E2E_MOCK) return [];
-  const { data } = await supabase.from("nominations").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
+  const { data } = await inSession(supabase.from("nominations").select("*").eq("event_id", eventId), eventId).order("created_at", { ascending: false });
   return (data || []).map(mapNom);
 }
 export async function addNomination(eventId, n) {
   const id = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
   const cleanMatch = n.match && n.match.phase && n.match.phase !== "none" ? { phase: n.match.phase, num: (n.match.num || "").trim() } : null;
   const row = { id, event_id: eventId, award: n.award, team: (n.team || "").trim().toUpperCase(), match_info: cleanMatch, reason: (n.reason || "").trim(), criteria: (n.criteria && n.criteria.length) ? n.criteria : null, where_when: (n.whereWhen || "").trim() || null, nominated_by: encodeAttribution(n.by, n.byFullName), nominated_role: n.byRole || null };
+  if (leagueSessionFor(eventId)) row.session_id = leagueSessionFor(eventId);
   const { data, error } = await supabase.from("nominations").upsert(row, { onConflict: "id" }).select().single();
   if (error) throw error;
   return mapNom(data);
@@ -977,9 +1239,9 @@ export async function deleteNomination(id) {
   await supabase.from("nominations").delete().eq("id", id);
 }
 export async function clearJudging(eventId) {
-  const { error: nomError } = await supabase.from("nominations").delete().eq("event_id", eventId);
+  const { error: nomError } = await inSession(supabase.from("nominations").delete().eq("event_id", eventId), eventId);
   if (nomError) throw nomError;
-  const { error: shortlistError } = await supabase.from("shortlist").delete().eq("event_id", eventId);
+  const { error: shortlistError } = await inSession(supabase.from("shortlist").delete().eq("event_id", eventId), eventId);
   if (shortlistError) throw shortlistError;
 }
 
@@ -987,15 +1249,18 @@ export async function clearJudging(eventId) {
 /* ---- award shortlist / finalists ---- */
 export async function listShortlist(eventId) {
   if (E2E_MOCK) return [];
-  const { data } = await supabase.from("shortlist").select("award,team").eq("event_id", eventId);
+  const { data } = await inSession(supabase.from("shortlist").select("award,team").eq("event_id", eventId), eventId);
   return (data || []).map((r) => ({ award: r.award, team: r.team }));
 }
 export async function setShortlist(eventId, award, team, on) {
   if (on) {
-    const { error } = await supabase.from("shortlist").upsert({ event_id: eventId, award, team }, { onConflict: "event_id,award,team" });
+    const sessionId = leagueSessionFor(eventId);
+    const row = { event_id: eventId, award, team };
+    if (sessionId) row.session_id = sessionId;
+    const { error } = await upsertSessionKeyed("shortlist", row, "event_id,session_key,award,team", "event_id,award,team", { sessionId });
     if (error) throw error;
   } else {
-    const { error } = await supabase.from("shortlist").delete().eq("event_id", eventId).eq("award", award).eq("team", team);
+    const { error } = await inSession(supabase.from("shortlist").delete().eq("event_id", eventId).eq("award", award).eq("team", team), eventId);
     if (error) throw error;
   }
 }
@@ -1007,13 +1272,32 @@ const mapViol = (r) => {
     id: r.id, team: r.team, type: r.type, code: r.code, desc: r.rule_desc || "",
     notes: r.notes || "", match: r.match_info || null, by: attribution.nickname, byFullName: attribution.fullName, byUserId: r.logged_by_user || null,
     photoKeys: r.photo_paths || [], createdAt: new Date(r.created_at).getTime(),
+    sessionId: r.session_id || null,
   };
 };
 export async function listViolations(eventId) {
   if (E2E_MOCK) return e2eState.violations.map((v) => ({ ...v }));
   if (isVenueMode()) return venueListViolations(eventId);
-  const { data } = await supabase.from("violations").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
+  const { data } = await inSession(supabase.from("violations").select("*").eq("event_id", eventId), eventId).order("created_at", { ascending: false });
   return (data || []).map(mapViol);
+}
+// League team history: every session's violations (each carries sessionId). History only; the
+// current session's own list (listViolations) is what drives escalation and match views.
+export async function listLeagueViolations(eventId, team = "") {
+  if (E2E_MOCK) return [];
+  const number = String(team || "").trim().toUpperCase();
+  let query = supabase.from("violations").select("*").eq("event_id", eventId);
+  if (number) query = query.eq("team", number);
+  const cloud = isVenueMode()
+    ? await cloudRowsOrSnapshot(eventId, `violation-league-${number || "all"}`, () => query.order("created_at", { ascending: false }))
+    : ((await query.order("created_at", { ascending: false })).data || []);
+  const byId = new Map(cloud.map((r) => [r.id, { ...mapViol(r), _source: "cloud" }]));
+  if (isVenueMode()) {
+    const local = await venue.list(eventId, "violation");
+    for (const id of local.deletedIds) byId.delete(id);
+    for (const rec of local.records) if (!number || rec.data?.team === number) byId.set(rec.recordId, venueViolation(rec));
+  }
+  return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
 }
 // Build the DB row (with a client-generated UUID) without touching the network.
 // The UUID lets us show the violation immediately and retry the write idempotently.
@@ -1021,6 +1305,8 @@ export function buildViolationRow(eventId, v) {
   return {
     id: uid(), event_id: eventId, team: v.team, type: v.type, code: v.code,
     rule_desc: v.desc, notes: v.notes, match_info: v.match, logged_by: encodeAttribution(v.by, v.byFullName), logged_by_user: v.byUserId,
+    // League: stamped when the violation is logged, so a queued violation keeps its session.
+    ...(leagueSessionFor(eventId) ? { session_id: leagueSessionFor(eventId) } : {}),
   };
 }
 // Upload photos then upsert the row. Safe to call more than once for the same
@@ -1107,10 +1393,10 @@ export async function deleteViolation(v) {
 }
 export async function clearViolations(eventId) {
   if (E2E_MOCK) { e2eState.violations = []; return; }
-  const { data: vs } = await supabase.from("violations").select("photo_paths").eq("event_id", eventId);
+  const { data: vs } = await inSession(supabase.from("violations").select("photo_paths").eq("event_id", eventId), eventId);
   const paths = (vs || []).flatMap((v) => v.photo_paths || []);
   if (paths.length) await supabase.storage.from("robot-photos").remove(paths);
-  await supabase.from("violations").delete().eq("event_id", eventId);
+  await inSession(supabase.from("violations").delete().eq("event_id", eventId), eventId);
 }
 export async function clearTeams(eventId) {
   if (E2E_MOCK) { e2eState.teams = []; return; }
@@ -1118,9 +1404,10 @@ export async function clearTeams(eventId) {
   if (error) throw error;
 }
 export async function clearMatches(eventId) {
-  await supabase.from("matches").delete().eq("event_id", eventId);
+  await inSession(supabase.from("matches").delete().eq("event_id", eventId), eventId);
 }
 export async function clearRankings(eventId) {
+  if (leagueSessionFor(eventId)) return deleteEventSetting(eventId, "rank_snapshot");
   const { error } = await supabase.from("teams").update({ rank: null }).eq("event_id", eventId);
   if (error) throw error;
 }
@@ -1167,8 +1454,13 @@ function subscribeCloudEvent(eventId, onChange) {
     .on("postgres_changes", { event: "*", schema: "public", table: "field_log", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "field_reset_checks", filter: `event_id=eq.${eventId}` }, onChange)
     .on("postgres_changes", { event: "*", schema: "public", table: "event_settings", filter: `event_id=eq.${eventId}` }, onChange)
-    .on("postgres_changes", { event: "*", schema: "public", table: "alliances", filter: `event_id=eq.${eventId}` }, onChange)
-    .subscribe();
+    .on("postgres_changes", { event: "*", schema: "public", table: "alliances", filter: `event_id=eq.${eventId}` }, onChange);
+  // League events only (these tables exist once refos-2-league-events.sql has run).
+  if (leagueSessionFor(eventId)) {
+    ch.on("postgres_changes", { event: "*", schema: "public", table: "league_sessions", filter: `event_id=eq.${eventId}` }, (payload) => onChange({ ...payload, leagueSessions: true }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "league_session_attendance", filter: `event_id=eq.${eventId}` }, (payload) => onChange({ ...payload, leagueAttendance: true }));
+  }
+  ch.subscribe();
   return () => supabase.removeChannel(ch);
 }
 
@@ -1205,7 +1497,9 @@ export function joinPresence(eventId, meta, onChange) {
   if (E2E_MOCK) { onChange?.([]); return () => {}; }
   if (isVenueMode()) return venueJoinPresence(eventId, meta, onChange);
   const key = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
-  const ch = supabase.channel(`presence-${eventId}`, { config: { presence: { key } } });
+  // League: who is online in THIS session (volunteer profiles stay league-wide).
+  const sessionId = leagueSessionFor(eventId);
+  const ch = supabase.channel(sessionId ? `presence-${eventId}-${sessionId}` : `presence-${eventId}`, { config: { presence: { key } } });
   ch.on("presence", { event: "sync" }, () => onChange(Object.values(ch.presenceState()).flat()));
   ch.subscribe(async (status) => {
     if (status === "SUBSCRIBED") {
@@ -1266,14 +1560,23 @@ const venueViolation = (rec) => ({
   venuePhotoCount: (rec.data?.venue_photos || []).length,
 });
 
+// League sessions: venue records carry session_id in their data; a device only shows its session's.
+const venueRecordInSession = (eventId, rec, eventScopedKinds = null) => {
+  const sessionId = leagueSessionFor(eventId);
+  if (!sessionId) return true;
+  const recordSession = rec.data?.session_id || null;
+  if (recordSession) return recordSession === sessionId;
+  return !!eventScopedKinds?.has(rec.data?.kind);
+};
 async function venueListViolations(eventId) {
+  const sessionId = leagueSessionFor(eventId);
   const [cloudRows, local] = await Promise.all([
-    cloudRowsOrSnapshot(eventId, "violation", () => supabase.from("violations").select("*").eq("event_id", eventId).order("created_at", { ascending: false })),
+    cloudRowsOrSnapshot(eventId, sessionId ? `violation@${sessionId}` : "violation", () => inSession(supabase.from("violations").select("*").eq("event_id", eventId), eventId).order("created_at", { ascending: false })),
     venue.list(eventId, "violation"),
   ]);
   const byId = new Map(cloudRows.map((r) => [r.id, { ...mapViol(r), _source: "cloud" }]));
   for (const id of local.deletedIds) byId.delete(id);
-  for (const rec of local.records) byId.set(rec.recordId, venueViolation(rec));
+  for (const rec of local.records) if (venueRecordInSession(eventId, rec)) byId.set(rec.recordId, venueViolation(rec));
   return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
 }
 
@@ -1286,19 +1589,22 @@ async function venueSaveViolation(eventId, row, photoDataUrls = [], { edit = fal
     match_info: row.match_info ?? null, logged_by: row.logged_by ?? null, logged_by_user: row.logged_by_user ?? null,
     photo_paths: [], created_at: prior.created_at || new Date().toISOString(),
   };
+  const sessionId = row.session_id || prior.session_id || leagueSessionFor(eventId);
+  if (sessionId) data.session_id = sessionId;
   if (photos.length) data.venue_photos = photos;
   await venue.write(eventId, "violation", row.id, "upsert", data);
   return venueViolation({ recordId: row.id, data, pending: true });
 }
 
 async function venueListFieldLog(eventId) {
+  const sessionId = leagueSessionFor(eventId);
   const [cloudRows, local] = await Promise.all([
-    cloudRowsOrSnapshot(eventId, "field_log", () => supabase.from("field_log").select("*").eq("event_id", eventId).order("created_at", { ascending: false })),
+    cloudRowsOrSnapshot(eventId, sessionId ? `field_log@${sessionId}` : "field_log", () => fieldLogInSession(supabase.from("field_log").select("*").eq("event_id", eventId), eventId).order("created_at", { ascending: false })),
     venue.list(eventId, "field_log"),
   ]);
   const byId = new Map(cloudRows.map((r) => [r.id, mapFieldLog(r)]));
   for (const id of local.deletedIds) byId.delete(id);
-  for (const rec of local.records) byId.set(rec.recordId, { ...mapFieldLog({ id: rec.recordId, ...rec.data }), _source: "venue" });
+  for (const rec of local.records) if (venueRecordInSession(eventId, rec, LEAGUE_EVENT_SCOPED_FIELD_LOG_KINDS)) byId.set(rec.recordId, { ...mapFieldLog({ id: rec.recordId, ...rec.data }), _source: "venue" });
   return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
 }
 
@@ -1342,15 +1648,17 @@ function venueJoinPresence(eventId, meta, onChange) {
     if (stopped) return;
     let userId = null;
     try { const { data } = await supabase.auth.getSession(); userId = data?.session?.user?.id || null; } catch {}
-    await venue.write(eventId, "presence", presenceKey, "upsert", {
+    const presence = {
       name: meta?.name || null, role: meta?.role || null, user_id: userId, online_at: Number(meta?.online_at) || Date.now(), last_seen: new Date().toISOString(),
-    }).catch(() => {});
+    };
+    if (leagueSessionFor(eventId)) presence.session_id = leagueSessionFor(eventId);
+    await venue.write(eventId, "presence", presenceKey, "upsert", presence).catch(() => {});
   };
   const report = async () => {
     if (stopped) return;
     const { records } = await venue.list(eventId, "presence");
     const cutoff = Date.now() - 75_000;
-    onChange?.(records.filter((r) => r.data?.last_seen && Date.parse(r.data.last_seen) >= cutoff).map((r) => ({ ...r.data })));
+    onChange?.(records.filter((r) => r.data?.last_seen && Date.parse(r.data.last_seen) >= cutoff && venueRecordInSession(eventId, r)).map((r) => ({ ...r.data })));
   };
   beat().then(report);
   const beatTimer = setInterval(beat, 25_000);

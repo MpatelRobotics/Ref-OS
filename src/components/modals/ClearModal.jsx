@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Check, Trash2, X } from "lucide-react";
 
-export default function ClearModal({ counts, onClear, onClose, protectedKeys = [] }) {
+export default function ClearModal({ counts, onClear, onClose, protectedKeys = [], leagueSessionName = "" }) {
   const [sel, setSel] = useState({ violations: false, robotPhotos: false, teams: false, schedule: false, replays: false, judging: false, alliances: false, watchlist: false, quadrants: false });
   const opts = [
     { key: "violations", label: "Violations", desc: `${counts.violations} logged`, note: "Clears every violation and its photos." },
@@ -14,6 +14,22 @@ export default function ClearModal({ counts, onClear, onClose, protectedKeys = [
     { key: "alliances", label: "Alliances", desc: `${counts.alliances} alliances`, note: "Clears all alliance captain and first-pick assignments." },
     { key: "watchlist", label: "Watchlist", desc: `${counts.watchlist} entries`, note: "Removes all teams and notes from the watchlist." },
   ];
+  // League events: everything except Teams and Watchlist belongs to the current session only.
+  if (leagueSessionName) {
+    const S = leagueSessionName;
+    const leagueNotes = {
+      violations: `Clears every violation logged in ${S}, and its photos. Other sessions are not changed.`,
+      robotPhotos: `Removes ${S}'s inspection pictures, including pictures queued on this device. Other sessions keep theirs.`,
+      replays: `Clears ${S}'s matches marked to re-run (does not delete the matches).`,
+      quadrants: `Clears ${S}'s Q1–Q4 progress and Field Ready status.`,
+      teams: "Removes the LEAGUE team roster (every session) and inspection pictures from every session.",
+      schedule: `Removes ${S}'s matches, its imported ranking snapshot, and W-L-T. Other sessions are not changed.`,
+      judging: `Clears ${S}'s award nominations and finalist selections.`,
+      alliances: `Clears ${S}'s alliance captain and first-pick assignments.`,
+      watchlist: "Removes watchlist notes for the whole league (watch notes are league-wide).",
+    };
+    for (const o of opts) if (leagueNotes[o.key]) o.note = leagueNotes[o.key];
+  }
   const any = opts.some((o) => sel[o.key] && !protectedKeys.includes(o.key));
   const toggle = (k) => { if (!protectedKeys.includes(k)) setSel((s) => ({ ...s, [k]: !s[k] })); };
   const doClear = () => {
@@ -29,6 +45,7 @@ export default function ClearModal({ counts, onClear, onClose, protectedKeys = [
         </div>
         <div className="p-4 space-y-2 flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y">
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Choose what to delete. Anything you leave unchecked is kept.</p>
+          {leagueSessionName && <p className="text-xs rounded-lg bg-sky-50 dark:bg-sky-950/40 text-sky-900 dark:text-sky-100 px-3 py-2 mb-1">League: session data is cleared for <b>{leagueSessionName}</b> only. Earlier sessions are not changed.</p>}
           {opts.map((o) => {
             const on = sel[o.key];
             return (

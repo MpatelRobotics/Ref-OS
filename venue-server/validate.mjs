@@ -13,6 +13,8 @@ const str = (value, max) => (value == null ? null : typeof value === "string" &&
 const isoDate = (value) => (value == null ? null : typeof value === "string" && value.length <= 40 && !Number.isNaN(Date.parse(value)) ? value : undefined);
 const strArray = (value, maxItems, maxLen) =>
   value == null ? null : Array.isArray(value) && value.length <= maxItems && value.every((v) => typeof v === "string" && v.length <= maxLen) ? value : undefined;
+// League session a record belongs to (League events only); absent for tournaments.
+const sessionId = (value) => (value == null ? null : isEventId(value) ? value.toLowerCase() : undefined);
 const plainObject = (value, maxBytes) =>
   value == null ? null : value && typeof value === "object" && !Array.isArray(value) && JSON.stringify(value).length <= maxBytes ? value : undefined;
 
@@ -30,6 +32,7 @@ const SCHEMAS = {
       team: (v) => str(v, 16), type: (v) => str(v, 24), code: (v) => str(v, 120), rule_desc: (v) => str(v, 2000),
       notes: (v) => str(v, 4000), match_info: (v) => plainObject(v, 500), logged_by: (v) => str(v, 400),
       logged_by_user: (v) => str(v, 64), photo_paths: (v) => strArray(v, 12, 300), created_at: isoDate, venue_photos: photos,
+      session_id: sessionId,
     },
     required: ["team", "type", "created_at"],
   },
@@ -38,7 +41,7 @@ const SCHEMAS = {
     fields: {
       kind: (v) => str(v, 40), field: (v) => str(v, 80), match_ref: (v) => str(v, 80), match_id: (v) => str(v, 80),
       alliance: (v) => str(v, 16), team: (v) => str(v, 16), teams: (v) => strArray(v, 12, 16), note: (v) => str(v, 8000),
-      logged_by: (v) => str(v, 200), created_at: isoDate,
+      logged_by: (v) => str(v, 200), created_at: isoDate, session_id: sessionId,
     },
     required: ["kind", "created_at"],
   },
@@ -51,7 +54,7 @@ const SCHEMAS = {
     maxBytes: 4_000,
     fields: {
       name: (v) => str(v, 80), role: (v) => str(v, 40), user_id: (v) => str(v, 64), online_at: (v) => (v == null || Number.isFinite(v) ? v ?? null : undefined),
-      last_seen: isoDate,
+      last_seen: isoDate, session_id: sessionId,
     },
     required: ["last_seen"],
   },

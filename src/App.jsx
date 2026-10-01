@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback, useContext } from "react";
 import { createPortal } from "react-dom";
 import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
@@ -11,6 +11,8 @@ import { officialResourcesFor } from "./officialResources.js";
 import { getSyncConfig, isVenueMode, onSyncConfigChange, shouldProbeServedByVenue, detectServedByVenue } from "./sync/syncConfig.js";
 import * as venueSync from "./sync/venueSync.js";
 import SyncStatusModal from "./components/modals/SyncStatusModal.jsx";
+import LeagueOverview from "./league/LeagueOverview.jsx";
+import { LeagueUiContext, activeSessionOf, sortSessions, formatSessionDate, SESSION_STATUS_LABELS } from "./league/leagueFormat.js";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
 import * as outbox from "./outbox";
@@ -1181,8 +1183,112 @@ export default function App() {
   );
   if (!event) return <FullPage>Loading…</FullPage>;
 
-  return <Tracker key={`${event.id}:${syncMode}`} initialEvent={event} meName={who.nickname} meFullName={who.fullName} mePhone={who.phone} isDeveloper={developer} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} onLockToEventLogin={lockToEventLogin} onChooseEvent={chooseAnotherEvent}
+  const renderTracker = (league = null) => <Tracker key={`${event.id}:${syncMode}${league ? `:${league.session.id}` : ""}`} league={league} initialEvent={event} meName={who.nickname} meFullName={who.fullName} mePhone={who.phone} isDeveloper={developer} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} onLockToEventLogin={lockToEventLogin} onChooseEvent={chooseAnotherEvent}
     onEventArchived={() => setArchivedNoticeId(event.id)} onArchivedBySelf={chooseAnotherEvent} />;
+  // League events choose (or follow) a session before the workspace opens. Tournaments are unchanged.
+  if (event.format === "league") return <LeagueShell key={event.id} event={event} renderTracker={renderTracker} onChooseEvent={chooseAnotherEvent} onLockToEventLogin={lockToEventLogin} />;
+  api.setLeagueContext("", "");
+  return renderTracker(null);
+}
+
+// ============================ LEAGUE EVENTS ============================
+// A League is one Ref OS event with several sessions. This device works in ONE session at a time:
+// the Active session by default. An Admin can open another session (kept for this browser tab).
+// With no Active session, the League Overview is shown instead of the workspace, so records are
+// never put into an arbitrary session.
+const leaguePinKey = (eventId) => `refosLeagueSession:${eventId}`;
+function LeagueShell({ event, renderTracker, onChooseEvent, onLockToEventLogin }) {
+  const eventId = event.id;
+  const [sessions, setSessions] = useState(null);
+  const [loadError, setLoadError] = useState("");
+  const [teamCount, setTeamCount] = useState(null);
+  const [followId, setFollowId] = useState("");
+  const [pinnedId, setPinnedId] = useState(() => { try { return sessionStorage.getItem(leaguePinKey(eventId)) || ""; } catch { return ""; } });
+  const [overview, setOverview] = useState(null); // { isAdmin } while the League Overview is open over the workspace
+  const admin = (() => { try { return sessionStorage.getItem("refosAdmin") === "1"; } catch { return false; } })();
+
+  const reload = useCallback(async () => {
+    try {
+      const list = await api.listLeagueSessions(eventId);
+      setSessions(list);
+      setLoadError("");
+      return list;
+    } catch (e) {
+      setLoadError(e?.message || "Could not load the league sessions.");
+      setSessions((current) => current || []);
+      return null;
+    }
+  }, [eventId]);
+  useEffect(() => {
+    reload();
+    const timer = setInterval(reload, 30000);
+    const onFocus = () => reload();
+    window.addEventListener("focus", onFocus);
+    return () => { clearInterval(timer); window.removeEventListener("focus", onFocus); };
+  }, [reload]);
+
+  const list = sessions || [];
+  const active = activeSessionOf(list);
+  const exists = (id) => !!id && list.some((s) => s.id === id);
+  // Follow the Active session when this device has not chosen one (first open, or its session was removed).
+  useEffect(() => {
+    if (active && !exists(followId)) setFollowId(active.id);
+  }, [active?.id, followId, sessions]);
+  const workingId = admin && exists(pinnedId) ? pinnedId : exists(followId) ? followId : "";
+  const working = list.find((s) => s.id === workingId) || null;
+
+  useEffect(() => {
+    if (working) return;
+    api.setLeagueContext(eventId, "");
+    api.listTeams(eventId).then((teams) => setTeamCount(teams.length)).catch(() => {});
+  }, [eventId, working?.id, sessions]);
+
+  const openSession = (id) => {
+    const target = list.find((s) => s.id === id);
+    if (!target) return;
+    if (admin && target.status !== "active") {
+      try { sessionStorage.setItem(leaguePinKey(eventId), id); } catch {}
+      setPinnedId(id);
+    } else {
+      try { sessionStorage.removeItem(leaguePinKey(eventId)); } catch {}
+      setPinnedId("");
+    }
+    setFollowId(id);
+    setOverview(null);
+  };
+  const switchToActive = () => { if (active) openSession(active.id); };
+
+  if (sessions === null) return <FullPage>Loading league…</FullPage>;
+  const overviewProps = { eventId, eventName: event.name, sessions: list, workingSessionId: workingId, teamCount, onReload: reload, onOpenSession: openSession };
+  if (!working) {
+    api.setLeagueContext(eventId, "");
+    return (
+      <>
+        {loadError && <div className="bg-red-50 text-red-800 text-sm px-4 py-2 text-center">{loadError}</div>}
+        <LeagueOverview mode="page" {...overviewProps} isAdmin={admin} onChooseEvent={onChooseEvent} onLock={onLockToEventLogin} />
+      </>
+    );
+  }
+  api.setLeagueContext(eventId, working.id);
+  const league = {
+    eventId,
+    eventName: event.name,
+    sessions: sortSessions(list),
+    session: working,
+    activeSession: active,
+    isActiveSession: working.status === "active",
+    sessionName: (id) => list.find((s) => s.id === id)?.name || "",
+    openOverview: (isAdmin) => setOverview({ isAdmin: !!isAdmin }),
+    switchSession: openSession,
+    switchToActive,
+    reload,
+  };
+  return (
+    <LeagueUiContext.Provider value={league}>
+      {renderTracker(league)}
+      {overview && <LeagueOverview mode="modal" {...overviewProps} teamCount={teamCount} isAdmin={overview.isAdmin} onClose={() => setOverview(null)} />}
+    </LeagueUiContext.Provider>
+  );
 }
 
 // Phase 7: shown for an old link or restored selection that points at an archived event.
@@ -1279,6 +1385,8 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
   };
   const [name, setName] = useState("");
   const [adminCode, setAdminCode] = useState("");
+  const [format, setFormat] = useState("tournament");
+  const [firstSession, setFirstSession] = useState({ name: "Session 1", date: "" });
   const [createError, setCreateError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -1290,8 +1398,18 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
     setSaving(true);
     setCreateError("");
     try {
-      const ev = await api.createVexEvent(cleanName, cleanCode);
-      onCreated(ev);
+      const ev = await api.createVexEvent(cleanName, cleanCode, format);
+      // League: optionally create (and start) the first session now. Later sessions are added
+      // from the League Overview; they are never required up front.
+      if (format === "league" && firstSession.name.trim()) {
+        try {
+          const created = await api.createLeagueSession(ev.id, { name: firstSession.name.trim(), type: "session", date: firstSession.date || null });
+          await api.setLeagueSessionStatus(created.id, "active");
+        } catch (sessionError) {
+          alert(`The league was created, but its first session could not be: ${sessionError?.message || sessionError}. Create it from the League Overview.`);
+        }
+      }
+      onCreated({ ...ev, format });
     } catch (e) {
       setCreateError(e?.message || "Could not create the event.");
     } finally {
@@ -1340,7 +1458,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
                       </div>
                       {showShort && <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{profile.shortName}</div>}
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        Archived {formatEventDate(ev.archivedAt)}{ev.createdAt ? ` · Created ${formatEventDate(ev.createdAt)}` : ""}
+                        {ev.format === "league" ? `League${ev.sessionCount ? ` · ${ev.sessionCount} session${ev.sessionCount === 1 ? "" : "s"}` : ""} · ` : ""}Archived {formatEventDate(ev.archivedAt)}{ev.createdAt ? ` · Created ${formatEventDate(ev.createdAt)}` : ""}
                       </div>
                     </div>
                   </div>
@@ -1398,7 +1516,11 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
               <EventLogo src={profile.logo} fallback={profile.highlander ? "/logo.svg" : "/refos-logo.svg"} className="w-12 h-12 object-contain rounded-lg shrink-0" />
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold text-slate-900 dark:text-white truncate">{profile.name}</span>
-                <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">{showShort ? `${profile.shortName} · VEX Robotics event` : "VEX Robotics event"}</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
+                  {ev.format === "league"
+                    ? <><span className="font-semibold text-slate-700 dark:text-slate-200">League</span>{ev.activeSessionName ? ` • ${ev.activeSessionName} Active` : " • No session active"}{showShort ? ` · ${profile.shortName}` : ""}</>
+                    : showShort ? `${profile.shortName} · Tournament` : "Tournament"}
+                </span>
               </span>
               <ChevronRight size={20} className="text-slate-400" />
             </button>
@@ -1423,6 +1545,30 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Event name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Example: NJ State Championship"
               className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-3 text-slate-900 dark:text-white mb-3" />
+            <fieldset className="mb-3">
+              <legend className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Event Format</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {[["tournament", "Tournament", "One event day or weekend"], ["league", "League", "Several league sessions"]].map(([value, label, hint]) => (
+                  <button key={value} type="button" role="radio" aria-checked={format === value} onClick={() => setFormat(value)}
+                    className={`rounded-xl border-2 px-3 py-2.5 text-left ${format === value ? "border-blue-600 bg-blue-50 dark:bg-blue-950/30" : "border-slate-200 dark:border-slate-700"}`}>
+                    <span className="block font-semibold text-slate-900 dark:text-white">{label}</span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400">{hint}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            {format === "league" && (
+              <div className="mb-3 rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Create First Session</div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Optional. More sessions can be added later from the League Overview. Clear the name to skip.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={firstSession.name} onChange={(e) => setFirstSession((cur) => ({ ...cur, name: e.target.value }))} maxLength={80} placeholder="Session 1" aria-label="First session name"
+                    className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-900 dark:text-white" />
+                  <input type="date" value={firstSession.date} onChange={(e) => setFirstSession((cur) => ({ ...cur, date: e.target.value }))} aria-label="First session date"
+                    className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-900 dark:text-white" />
+                </div>
+              </div>
+            )}
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Admin access code</label>
             <input value={adminCode} onChange={(e) => setAdminCode(e.target.value.toUpperCase())} maxLength={4} placeholder="3S23"
               className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-3 text-slate-900 dark:text-white" />
@@ -1463,7 +1609,14 @@ const ConfigError = () => (
 /* ==================================================================== */
 /*  TRACKER (the main app, scoped to one event)                        */
 /* ==================================================================== */
-function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf }) {
+function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf }) {
+  // League events: this workspace is bound to ONE league session (league.session). Session-scoped
+  // reads and writes are limited to it by api.js; null for Tournament events.
+  const leagueSessionId = league?.session?.id || null;
+  const leagueReloadRef = useRef(null);
+  leagueReloadRef.current = league?.reload || null;
+  // Queued writes made in another session of this league are kept and synced, but not shown here.
+  const opInSession = (op, sessionOf) => !leagueSessionId || !sessionOf(op) || sessionOf(op) === leagueSessionId;
   // Local Venue Server (Phase 1): status for the header badge and the Sync Status panel.
   const venueMode = isVenueMode();
   const [venueStatus, setVenueStatus] = useState(() => venueSync.getStatus());
@@ -1533,7 +1686,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
   }, [eventId, onLock]);
 
   const [lastMatch, setLastMatch] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(`lastMatch:${eventId}`)) || { phase: "qual", num: "" }; }
+    try { return JSON.parse(localStorage.getItem(`lastMatch:${eventId}${leagueSessionId ? `:${leagueSessionId}` : ""}`)) || { phase: "qual", num: "" }; }
     catch { return { phase: "qual", num: "" }; }
   });
 
@@ -1549,7 +1702,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
   const [footerVisible, setFooterVisible] = useState(false);
   const workspaceFooterRef = useRef(null);
   const [importPreview, setImportPreview] = useState(null); // { title, chips, warnings, resolve }
-  const confirmImport = (p) => new Promise((resolve) => setImportPreview({ ...p, resolve }));
+  // League: every import preview names the session the files go into.
+  const confirmImport = (p) => new Promise((resolve) => setImportPreview({ ...p, chips: league ? [{ label: `Into ${league.session.name}` }, ...(p.chips || [])] : p.chips, resolve }));
   const [importing, setImporting] = useState(null); // { label, done, total } | null while an import is writing
   const menuRef = useRef(null);
   const menuTimer = useRef(null);
@@ -1665,7 +1819,10 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
   const [showActivity, setShowActivity] = useState(false);
   const [showFeatures, setShowFeatures] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [showTMSync, setShowTMSync] = useState(false);
+  // League: choosing another session in the TM Sync Center reopens it in that session.
+  const [showTMSync, setShowTMSync] = useState(() => {
+    try { const reopen = sessionStorage.getItem("refosOpenTMSync") === "1"; sessionStorage.removeItem("refosOpenTMSync"); return reopen; } catch { return false; }
+  });
   const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [showCountdownSetup, setShowCountdownSetup] = useState(false);
   const [showFieldNameConfigurator, setShowFieldNameConfigurator] = useState(false);
@@ -1961,10 +2118,11 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
   })() : "";
   const [announcementAckTick, setAnnouncementAckTick] = useState(0);
   const [tmSyncStatus, setTmSyncStatus] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(`refosTmSync:${eventId}`)) || {}; }
+    try { return JSON.parse(localStorage.getItem(`refosTmSync:${eventId}${leagueSessionId ? `:${leagueSessionId}` : ""}`)) || {}; }
     catch { return {}; }
   });
   const [showRankings, setShowRankings] = useState(false);
+  const [rankingsSessionId, setRankingsSessionId] = useState("");
   const [eventMembers, setEventMembers] = useState([]);
   const [alertStats, setAlertStats] = useState(null);
   const [alertStatsLoading, setAlertStatsLoading] = useState(false);
@@ -2124,7 +2282,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
   const markTMSync = (key) => {
     const next = { ...tmSyncStatus, [key]: Date.now() };
     setTmSyncStatus(next);
-    try { localStorage.setItem(`refosTmSync:${eventId}`, JSON.stringify(next)); } catch {}
+    try { localStorage.setItem(`refosTmSync:${eventId}${leagueSessionId ? `:${leagueSessionId}` : ""}`, JSON.stringify(next)); } catch {}
   };
 
   const refreshQueueHealth = useCallback(async () => {
@@ -2151,7 +2309,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
         const [ev, t, queuedOps] = await Promise.all([api.getEvent(eventId), api.listTeams(eventId), outbox.loadQueue(eventId)]);
         if (ev) setEvent(ev);
         if (ev?.archivedAt) onEventArchived?.();
-        const queuedPhotos = (queuedOps || []).filter((op) => op.kind === "robot_photo");
+        const queuedPhotos = (queuedOps || []).filter((op) => op.kind === "robot_photo" && opInSession(op, (o) => o.sessionId));
         setTeams(t.map((team) => ({
           ...team,
           _pendingRobotPhotos: queuedPhotos.filter((op) => op.number === team.number).map((op) => ({ id: op.id, angle: op.angle, dataUrl: op.dataUrl })),
@@ -2170,7 +2328,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
       if (ev?.archivedAt) onEventArchived?.();
       setTeams((cur) => {
         const pending = cur.filter((x) => x._pending && !t.some((s) => s.number === x.number));
-        const queuedPhotos = (queuedOps || []).filter((op) => op.kind === "robot_photo");
+        const queuedPhotos = (queuedOps || []).filter((op) => op.kind === "robot_photo" && opInSession(op, (o) => o.sessionId));
         return [...t, ...pending].map((team) => ({
           ...team,
           _pendingRobotPhotos: queuedPhotos.filter((op) => op.number === team.number).map((op) => ({ id: op.id, angle: op.angle, dataUrl: op.dataUrl })),
@@ -2255,16 +2413,19 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
         const have = new Set(cur.map((t) => t.number));
         return [...cur, ...pendingTeams.filter((t) => !have.has(t.number))];
       });
-      const pend = isInspection ? [] : q.filter((o) => o.kind === "violation").map((o) => ({
+      const pend = isInspection ? [] : q.filter((o) => o.kind === "violation" && opInSession(o, (op) => op.row?.session_id)).map((o) => ({
         id: o.row.id, team: o.row.team, type: o.row.type, code: o.row.code, desc: o.row.rule_desc || "",
         notes: o.row.notes || "", match: o.row.match_info || null, by: api.decodeAttribution(o.row.logged_by).nickname, byFullName: api.decodeAttribution(o.row.logged_by).fullName,
-        photoKeys: [], createdAt: o.createdAt || Date.now(), _pending: true, _localPhotos: o.photos || [],
+        photoKeys: [], createdAt: o.createdAt || Date.now(), _pending: true, _localPhotos: o.photos || [], sessionId: o.row.session_id || null,
       }));
       if (pend.length) setViols((cur) => { const have = new Set(cur.map((v) => v.id)); return [...pend.filter((p) => !have.has(p.id)), ...cur]; });
       setReady(true);
       doFlush();
     })();
-    const unsub = api.subscribeEvent(eventId, () => refresh());
+    const unsub = api.subscribeEvent(eventId, (payload) => {
+      if (payload?.leagueSessions) leagueReloadRef.current?.();
+      refresh();
+    });
     const onFocus = () => { refresh(); doFlush(); };
     const goOnline = () => { setOnline(true); setCloudReachable(null); refresh().catch(() => {}); doFlush(); };
     const goOffline = () => { setOnline(false); setCloudReachable(false); };
@@ -2340,7 +2501,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
       notes: row.notes, match: row.match_info, by: meName || "", byFullName: meFullName || meName || "", byUserId: authorId, photoKeys: [],
       createdAt, _pending: true, _localPhotos: photos,
     })), ...cur]);
-    if (cleanMatch) { setLastMatch(cleanMatch); localStorage.setItem(`lastMatch:${eventId}`, JSON.stringify(cleanMatch)); }
+    if (cleanMatch) { setLastMatch(cleanMatch); localStorage.setItem(`lastMatch:${eventId}${leagueSessionId ? `:${leagueSessionId}` : ""}`, JSON.stringify(cleanMatch)); }
     for (const row of rows) await outbox.enqueue(eventId, { id: row.id, kind: "violation", eventId, row, photos, createdAt });
     doFlush();
     offerUndo(`${rows.length > 1 ? `${rows.length} violations` : "Violation"} saved for ${team}`, async () => {
@@ -2409,14 +2570,15 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
   // team references anymore (replaced, deleted, or reset on another device). Skipped offline.
   useEffect(() => {
     if (!syncedAt || (typeof navigator !== "undefined" && navigator.onLine === false)) return;
-    photoCache.pruneEventRobotPhotos(eventId, teams.flatMap((team) => team.photoKeys || []));
+    // League teams carry every session's photos in allPhotoKeys; only this session's are shown.
+    photoCache.pruneEventRobotPhotos(eventId, teams.flatMap((team) => team.allPhotoKeys || team.photoKeys || []));
   }, [syncedAt, eventId]);
   const addRobotPhoto = async (number, dataUrl, angle) => {
     const generation = await api.getRobotPhotoGeneration(eventId, true);
     const id = api.uid();
     const pendingPhoto = { id, angle, dataUrl };
     setTeams((cur) => cur.map((team) => team.number === number ? { ...team, _pendingRobotPhotos: [...(team._pendingRobotPhotos || []), pendingPhoto] } : team));
-    await outbox.enqueue(eventId, { id, kind: "robot_photo", eventId, number, angle, dataUrl, generation, createdAt: Date.now() });
+    await outbox.enqueue(eventId, { id, kind: "robot_photo", eventId, number, angle, dataUrl, generation, createdAt: Date.now(), ...(leagueSessionId ? { sessionId: leagueSessionId } : {}) });
     await refreshQueueHealth();
     doFlush();
     const uploadedPath = api.robotPhotoPath(eventId, number, angle, id, (String(dataUrl).match(/^data:([^;,]+)/) || [])[1]);
@@ -3066,6 +3228,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
       let addedMatches = 0, changedMatches = 0, unchangedMatches = 0, scoreUpdates = 0;
       // Matches are identified per event by (phase, number): TM Round + MatchNum, or Round +
       // Instance for R16/QF/SF. A later export updates the same match instead of adding one.
+      // In a League, identity also includes the session (api.addMatch), so this import only
+      // adds or updates matches in the session this device is working in.
       const hasScore = (r) => r.scored && r.redScore != null && r.blueScore != null;
       for (const r of rows) {
         const current = matches[tmMatchKey(r.phase, r.num)];
@@ -3424,7 +3588,9 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
         for (const op of pending) await outbox.cancelOp(eventId, op.id);
         const failed = (await outbox.loadFailed(eventId)).filter((item) => item.op?.kind === "robot_photo");
         for (const item of failed) await outbox.discardFailed(eventId, item.failedId);
-        const reset = await api.resetTeamPhotos(eventId);
+        // League: Robot pictures alone clears only this session's pictures; clearing Teams (league-wide)
+        // also clears every session's pictures, since the team records holding them are removed.
+        const reset = await api.resetTeamPhotos(eventId, { allSessions: !!league && !!sel.teams });
         setTeams((cur) => cur.map((team) => ({ ...team, photoKeys: [], _pendingRobotPhotos: [] })));
         setFailedSyncItems((cur) => cur.filter((item) => item.op?.kind !== "robot_photo"));
         await refreshQueueHealth();
@@ -3992,6 +4158,14 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
                 </button>
               )}
             </div>
+            {league && (
+              <button type="button" onClick={() => league.openOverview(adminUnlocked)} title="League Overview"
+                className="mt-0.5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-white/15 hover:bg-white/25 px-2 py-0.5 text-[12px] font-bold text-white">
+                <CalendarDays size={12} className="shrink-0" />
+                <span className="truncate">{league.session.name}</span>
+                {!league.isActiveSession && <span className="shrink-0 rounded bg-amber-400/90 px-1 text-[9px] font-bold uppercase text-slate-900">{SESSION_STATUS_LABELS[league.session.status]}</span>}
+              </button>
+            )}
             <button onClick={() => { refresh(); doFlush(); }} className="text-[11px] text-slate-400 leading-tight mt-0.5 flex items-center gap-1 hover:text-slate-200">
               <RefreshCw size={10} className={syncing ? "animate-spin" : ""} />
               {isInspection ? `${teams.length} teams · inspection access` : `${teams.length} teams · ${viols.length} violations`} · synced {ago(syncedAt)}
@@ -4271,6 +4445,12 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
         </div>
       )}
       <main id="workspace" tabIndex={-1} className="refos-workspace mx-auto px-4 pb-28 pt-4">
+        {league && !league.isActiveSession && (
+          <div role="status" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100 flex flex-wrap items-center gap-2">
+            <span className="flex-1 min-w-[12rem]"><b>{league.session.name}</b> is {SESSION_STATUS_LABELS[league.session.status].toLowerCase()}, not the Active session. Anything recorded here belongs to {league.session.name}.</span>
+            {league.activeSession && <button type="button" onClick={league.switchToActive} className="rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-bold text-white">Go to {league.activeSession.name}</button>}
+          </div>
+        )}
         {highlanderDemoLocked && <div role="status" className="mb-4 rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-900 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-100">Highlander Summit demo archive: matches, alliances, and violations are read only.</div>}
         {!openTeam && !openMatch && !openRobot && <section className="refos-page-heading" aria-label="Workspace overview">
           <div>
@@ -4309,7 +4489,29 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
           <RuleBook rules={rules} online={online} accent={brand.accent}
             qaUrl={officialResourcesFor(eventSettings?.rules_template?.value?.ruleset).qaUrl} />
         ) : view === "rankings" && adminUnlocked ? (
-          <EventRankings teams={teams} records={teamRecords} importedRecords={eventSettings?.qualification_records?.value?.records || {}} skills={eventSettings?.skills_rankings?.value?.rows || []} onImportSkills={() => skillsFileRef.current?.click()} />
+          league ? (() => {
+            // League: rankings and skills are the IMPORTED snapshot of one session. Ref OS never
+            // combines sessions into league standings; earlier snapshots are shown as imported.
+            const snapshotId = rankingsSessionId && rankingsSessionId !== leagueSessionId && league.sessions.some((s) => s.id === rankingsSessionId) ? rankingsSessionId : leagueSessionId;
+            const isCurrent = snapshotId === leagueSessionId;
+            const snapshot = (key) => eventSettings?.[isCurrent ? key : api.leagueSettingKey(key, snapshotId)]?.value;
+            const ranks = snapshot("rank_snapshot")?.ranks || {};
+            const snapshotTeams = isCurrent ? teams : teams.map((team) => ({ ...team, rank: ranks[team.number] == null ? null : Number(ranks[team.number]) }));
+            const importedAt = snapshot("rank_snapshot")?.importedAt || snapshot("skills_rankings")?.importedAt || 0;
+            return (
+              <>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <label htmlFor="league-rankings-session" className="text-sm font-semibold text-slate-700 dark:text-slate-200">Session</label>
+                  <select id="league-rankings-session" value={snapshotId} onChange={(e) => setRankingsSessionId(e.target.value)}
+                    className="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm">
+                    {league.sessions.map((s) => <option key={s.id} value={s.id}>{s.name}{s.id === leagueSessionId ? " (current session)" : ""}</option>)}
+                  </select>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Imported Tournament Manager snapshot from {league.sessionName(snapshotId)}{importedAt ? ` · ${new Date(importedAt).toLocaleString()}` : " · not imported"}</span>
+                </div>
+                <EventRankings teams={snapshotTeams} records={isCurrent ? teamRecords : {}} importedRecords={snapshot("qualification_records")?.records || {}} skills={snapshot("skills_rankings")?.rows || []} onImportSkills={isCurrent ? () => skillsFileRef.current?.click() : null} />
+              </>
+            );
+          })() : <EventRankings teams={teams} records={teamRecords} importedRecords={eventSettings?.qualification_records?.value?.records || {}} skills={eventSettings?.skills_rankings?.value?.rows || []} onImportSkills={() => skillsFileRef.current?.click()} />
         ) : view === "awp" ? (
           <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} fieldNames={fieldNames} />
         ) : view === "alliances" ? (
@@ -4434,7 +4636,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
         </div>,
         document.body
       )}
-      {showClear && <ClearModal protectedKeys={highlanderDemoLocked ? ["violations", "teams", "schedule", "alliances"] : []} counts={{ violations: viols.length, robotPhotos: teams.reduce((total, team) => total + (team.photoKeys || []).length + (team._pendingRobotPhotos || []).length, 0), teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length, quadrantChecks: fieldResetChecks.length }} onClear={clearSelected} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowClear(false)} />}
+      {showClear && <ClearModal leagueSessionName={league?.session?.name || ""} protectedKeys={highlanderDemoLocked ? ["violations", "teams", "schedule", "alliances"] : []} counts={{ violations: viols.length, robotPhotos: teams.reduce((total, team) => total + (team.photoKeys || []).length + (team._pendingRobotPhotos || []).length, 0), teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length, quadrantChecks: fieldResetChecks.length }} onClear={clearSelected} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowClear(false)} />}
       {showOnline && (
         <div className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
           <div className="bg-white dark:bg-slate-800 w-full max-h-[100dvh] sm:max-w-md sm:max-h-[90vh] sm:rounded-2xl rounded-t-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -4467,6 +4669,20 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
           onImportScores={() => scoreFileRef.current?.click()}
           onImportPackage={() => tmPackageFileRef.current?.click()}
           packageRunning={tmPackageRunning}
+          leagueImport={league ? {
+            leagueName: league.eventName,
+            sessions: league.sessions,
+            currentId: leagueSessionId,
+            activeId: league.activeSession?.id || "",
+            canChoose: adminUnlocked,
+            onChange: (id) => {
+              if (id === leagueSessionId) return;
+              const target = league.sessions.find((s) => s.id === id);
+              if (!target || !confirm(`Import into ${target.name}?\n\nThis device will switch to ${target.name}, then reopen the Sync Center.`)) return;
+              try { sessionStorage.setItem("refosOpenTMSync", "1"); } catch {}
+              league.switchSession(id);
+            },
+          } : null}
           stats={{
             teams: teams.length,
             matches: Object.keys(matches).length,
@@ -4579,6 +4795,8 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
         onEventSettings={() => openCommandCenterTool(() => setShowEventSettings(true))}
         onEventManagement={() => openCommandCenterTool(() => setShowEventManagement(true))}
         onSyncStatus={() => openCommandCenterTool(() => setShowSyncStatus(true))} syncModeLabel={venueMode ? "Local Venue Server" : "Cloud"}
+        league={league ? { name: league.eventName, sessionName: league.session.name, sessionStatus: SESSION_STATUS_LABELS[league.session.status], activeName: league.activeSession?.name || "", isActive: league.isActiveSession, date: formatSessionDate(league.session.date) } : null}
+        onLeagueSessions={league ? () => { setShowCommandCenter(false); league.openOverview(true); } : undefined}
         onPreEventTest={() => openCommandCenterTool(() => setShowPreEventTest(true))}
         onTwoDeviceSyncTest={() => openCommandCenterTool(() => setShowTwoDeviceSyncTest(true))}
         onDiagnosticReport={() => openCommandCenterTool(() => setShowDiagnosticReport(true))}
@@ -4693,6 +4911,7 @@ function Tracker({ initialEvent, meName, meFullName, mePhone, isDeveloper = fals
 /* ============================ TEAM DETAIL ============================ */
 function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViolation, canManageViolation, onDeleteTeam, canDeleteTeam, watch = [], meName, onAddWatch, onRemoveWatch, onOpenPhoto, emcee }) {
   const [wnote, setWnote] = useState("");
+  const league = useContext(LeagueUiContext);
   const addWatch = () => { const n = wnote.trim(); if (!n) return; onAddWatch(team.number, n); setWnote(""); };
   if (!team) return null;
   const sorted = [...viols].sort((a, b) => b.createdAt - a.createdAt);
@@ -4768,8 +4987,9 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
           </div>
         </div>
       )}
+      {league && team && <LeagueTeamPanel team={team} emcee={emcee} meName={meName} onOpenPhoto={onOpenPhoto} />}
       {!emcee && (<>
-      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">Log ({viols.length})</h2>
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">{league ? `${league.session.name} log` : "Log"} ({viols.length})</h2>
       {sorted.length === 0 ? <Empty title="No violations" sub="This team has a clean record." /> : (
         <ul className="space-y-2">{sorted.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} canManage={canManageViolation(v)} />)}</ul>
       )}
@@ -4778,8 +4998,89 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
   );
 }
 
+// League events: this session's attendance and the team's league-wide history. History is context
+// only: violations from earlier sessions never count toward the current session.
+function LeagueTeamPanel({ team, emcee, meName, onOpenPhoto }) {
+  const league = useContext(LeagueUiContext);
+  const [attendance, setAttendance] = useState(null);
+  const [savingAttendance, setSavingAttendance] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState("");
+  const [history, setHistory] = useState(null);
+  const [historyError, setHistoryError] = useState("");
+  const sessionId = league.session.id;
+  useEffect(() => {
+    let live = true;
+    api.listLeagueAttendance(league.eventId, sessionId).then((rows) => {
+      if (live) setAttendance(rows.find((r) => r.team === team.number)?.status || "");
+    }).catch(() => { if (live) setAttendance(""); });
+    return () => { live = false; };
+  }, [league.eventId, sessionId, team.number]);
+  useEffect(() => {
+    if (!historyFilter) return undefined;
+    let live = true;
+    setHistoryError("");
+    api.listLeagueViolations(league.eventId, team.number)
+      .then((rows) => { if (live) setHistory(rows); })
+      .catch((e) => { if (live) setHistoryError(e?.message || "League history is unavailable offline."); });
+    return () => { live = false; };
+  }, [historyFilter, league.eventId, team.number]);
+  const markAttendance = async (status) => {
+    const next = attendance === status ? null : status;
+    setSavingAttendance(true);
+    try { await api.setLeagueAttendance(league.eventId, sessionId, team.number, next, meName); setAttendance(next || ""); }
+    catch (e) { alert(e?.message || "Could not save attendance."); }
+    finally { setSavingAttendance(false); }
+  };
+  const order = new Map(league.sessions.map((s, i) => [s.id, i]));
+  const shown = (history || [])
+    .filter((v) => historyFilter === "all" || v.sessionId === historyFilter)
+    .sort((a, b) => ((order.get(a.sessionId) ?? -1) - (order.get(b.sessionId) ?? -1)) || (a.createdAt - b.createdAt));
+  return (
+    <div className="mb-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
+      {!emcee && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{league.session.name} attendance</span>
+          {attendance === null ? <span className="text-xs text-slate-400">Loading…</span> : (
+            <div className="ml-auto flex gap-1.5">
+              {[["present", "Present"], ["absent", "Absent"]].map(([value, label]) => (
+                <button key={value} type="button" disabled={savingAttendance} aria-pressed={attendance === value} onClick={() => markAttendance(value)}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${attendance === value ? (value === "present" ? "bg-emerald-600 border-emerald-600 text-white" : "bg-slate-700 border-slate-700 text-white") : "border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300"}`}>{label}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {!emcee && (
+        <div className={`${emcee ? "" : "mt-3 pt-3 border-t border-slate-100 dark:border-slate-700"}`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor={`league-history-${team.number}`} className="text-sm font-semibold text-slate-700 dark:text-slate-200">League history</label>
+            <select id={`league-history-${team.number}`} value={historyFilter} onChange={(e) => setHistoryFilter(e.target.value)}
+              className="ml-auto rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1.5 text-sm">
+              <option value="">Hidden</option>
+              <option value="all">Entire League</option>
+              {league.sessions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          {historyFilter && (
+            <div className="mt-3">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">History for context only. Violations from other sessions do not count toward {league.session.name}.</p>
+              {historyError ? <p className="text-sm text-red-600">{historyError}</p>
+                : history === null ? <p className="text-sm text-slate-400">Loading…</p>
+                : shown.length === 0 ? <p className="text-sm text-slate-500">No violations{historyFilter === "all" ? " in this league" : ` in ${league.sessionName(historyFilter)}`}.</p>
+                : <ul className="space-y-2">{shown.map((v) => <ViolationCard key={v.id} v={v} onDelete={() => {}} onOpenPhoto={onOpenPhoto} canManage={false} />)}</ul>}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ViolationCard({ v, onDelete, onOpenPhoto, onEdit, showTeam, canManage = false }) {
   const T = TYPES[v.type];
+  // League events: every violation shows the session it belongs to.
+  const league = useContext(LeagueUiContext);
+  const sessionLabel = league ? (league.sessionName(v.sessionId) || (v.sessionId ? "" : league.session.name)) : "";
   const canEdit = onEdit && canManage && !v._pending;
   return (
     <li className={`rounded-xl border p-3 ${T.soft}`}>
@@ -4787,6 +5088,7 @@ function ViolationCard({ v, onDelete, onOpenPhoto, onEdit, showTeam, canManage =
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold border ${T.badge}`}><T.Icon size={12} /> {T.label}</span>
         {showTeam && <span className="font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-200 dark:bg-slate-600 px-1.5 py-0.5 rounded-md text-sm">{v.team}</span>}
         <div className="flex flex-wrap gap-1.5">{splitRuleCodes(v.code).map((code) => <span key={code} className="font-mono font-bold text-slate-900 dark:text-slate-100">{fmtRule(code)}</span>)}</div>
+        {sessionLabel && <span className="text-xs font-semibold px-1.5 py-0.5 rounded-md bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-200">{sessionLabel}</span>}
         {fmtMatch(v.match) && <span className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded-md bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200">{fmtMatch(v.match)}</span>}
         {v._pending && <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 border border-amber-300"><RefreshCw size={9} className="animate-spin" /> Saving</span>}
         <span className="text-[11px] text-slate-400 ml-auto">{fmtTime(v.createdAt)}</span>
@@ -6245,7 +6547,33 @@ function RobotList({ teams, query, setQuery, onOpen }) {
   );
 }
 
+// League events: inspection pictures from other sessions, read only. Each session keeps its own.
+function LeagueEarlierRobotPhotos({ team, league, onOpenPhoto }) {
+  const bySession = new Map();
+  for (const path of team.allPhotoKeys || []) {
+    const sid = api.photoSessionId(path);
+    if (!sid || sid === league.session.id) continue;
+    if (!bySession.has(sid)) bySession.set(sid, []);
+    bySession.get(sid).push(path);
+  }
+  if (!bySession.size) return null;
+  const ordered = league.sessions.filter((s) => bySession.has(s.id));
+  return (
+    <section className="mt-5">
+      <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-1">Other sessions</h3>
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Inspection pictures taken in other league sessions. They are kept as they were taken.</p>
+      {ordered.map((s) => (
+        <div key={s.id} className="mb-3">
+          <div className="text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">{s.name}</div>
+          <div className="flex gap-2 overflow-x-auto">{bySession.get(s.id).map((path) => <Thumb key={path} pkey={path} onOpen={onOpenPhoto} />)}</div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, canTakePhotos = true, canDeletePhotos = true }) {
+  const league = useContext(LeagueUiContext);
   const [busy, setBusy] = useState(false);
   const [captureAngle, setCaptureAngle] = useState("");
   const [sequenceIndex, setSequenceIndex] = useState(-1);
@@ -6343,6 +6671,7 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
       </div>
       {canTakePhotos && <button type="button" onClick={() => chooseAngle("other")} disabled={busy} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"><Camera size={18}/>{busy && captureAngle === "other" ? "Saving…" : "Add optional picture"}</button>}
       {pendingPhotos.length > 0 && <div className="mt-4 rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 px-3 py-2 text-xs font-semibold text-sky-800 dark:text-sky-200">{pendingPhotos.length} inspection {pendingPhotos.length === 1 ? "picture is" : "pictures are"} saved on this device and will upload automatically when connected.</div>}
+      {league && <LeagueEarlierRobotPhotos team={team} league={league} onOpenPhoto={onOpenPhoto} />}
       {(extraPhotos.length > 0 || extraPendingPhotos.length > 0) && <section className="mt-5"><h3 className="text-sm font-bold text-slate-800 dark:text-slate-100 mb-2">Additional pictures</h3><div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{extraPendingPhotos.map((photo) => <div key={photo.id} className="relative aspect-square rounded-lg overflow-hidden border border-sky-300 bg-slate-100 dark:bg-slate-700"><button onClick={() => onOpenPhoto(photo.dataUrl)} className="h-full w-full"><img src={photo.dataUrl} alt="Additional robot picture queued for upload" className="h-full w-full object-cover" /></button><span className="absolute bottom-1 left-1 rounded bg-sky-900/80 px-1.5 py-0.5 text-xs font-bold text-white">Queued</span>{canDeletePhotos && <button onClick={() => onRemovePendingPhoto(team.number, photo.id)} className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1" title="Remove queued picture"><Trash2 size={13}/></button>}</div>)}{extraPhotos.map((path) => <div key={path} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700"><Thumb pkey={path} onOpen={onOpenPhoto} full />{canDeletePhotos && <button onClick={() => { if (confirm("Delete this robot picture?")) onRemovePhoto(team.number, path); }} className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1"><Trash2 size={13}/></button>}</div>)}</div></section>}
     </>
   );
@@ -6616,7 +6945,7 @@ function EventRankings({ teams, records, importedRecords, skills, onImportSkills
     <div className="flex flex-wrap items-center gap-2">
       <button onClick={() => setSection("qualification")} aria-pressed={section === "qualification"} className={`px-4 py-2 rounded-lg text-sm font-bold ${section === "qualification" ? "bg-[#0D0F32] text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"}`}>Qualification rankings</button>
       <button onClick={() => setSection("skills")} aria-pressed={section === "skills"} className={`px-4 py-2 rounded-lg text-sm font-bold ${section === "skills" ? "bg-[#0D0F32] text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"}`}>Skills Challenge</button>
-      {section === "skills" && <button onClick={onImportSkills} className="ml-auto px-4 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-semibold">Import skills rankings</button>}
+      {section === "skills" && onImportSkills && <button onClick={onImportSkills} className="ml-auto px-4 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-semibold">Import skills rankings</button>}
     </div>
     {!active.length ? <Empty title={section === "skills" ? "No Skills Challenge scores yet" : "No qualification rankings yet"} sub="Import the Tournament Manager standings in the Sync Center." /> :
       <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
@@ -6698,7 +7027,7 @@ function ImportPreviewModal({ preview, onImport, onCancel }) {
   );
 }
 
-function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRankings, onImportSkills, onImportAlliances, onImportScores, onImportPackage, packageRunning = false, stats, syncStatus }) {
+function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRankings, onImportSkills, onImportAlliances, onImportScores, onImportPackage, packageRunning = false, stats, syncStatus, leagueImport = null }) {
   const items = [
     { key: "teams", title: "Teams", detail: `${stats.teams} teams loaded`, action: "Import teams", onClick: onImportTeams, Icon: Users },
     { key: "matches", title: "Match schedule", detail: `${stats.matches} matches loaded`, action: "Import matches", onClick: onImportMatches, Icon: ListOrdered },
@@ -6723,6 +7052,18 @@ function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRanking
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-3">
+          {leagueImport && (
+            <div className="bg-white dark:bg-slate-800 rounded-xl border-2 border-sky-300 dark:border-sky-800 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">League</div>
+              <div className="font-semibold text-slate-900 dark:text-slate-100">{leagueImport.leagueName}</div>
+              <label htmlFor="tm-import-session" className="mt-3 block text-sm font-semibold text-slate-700 dark:text-slate-200">Import Into</label>
+              <select id="tm-import-session" value={leagueImport.currentId} disabled={!leagueImport.canChoose} onChange={(e) => leagueImport.onChange(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm font-semibold">
+                {leagueImport.sessions.map((s) => <option key={s.id} value={s.id}>{s.name}{s.id === leagueImport.activeId ? " (Active)" : ` (${SESSION_STATUS_LABELS[s.status]})`}</option>)}
+              </select>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Matches, rankings, skills, alliances, and results go into this session only. Other sessions are not changed. Teams are added to the league roster.</p>
+            </div>
+          )}
           {onImportPackage && (
             <div className="bg-white dark:bg-slate-800 rounded-xl border-2 border-red-200 dark:border-red-900 p-4">
               <div className="flex items-start gap-3">

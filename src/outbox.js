@@ -120,7 +120,8 @@ export async function flush(eventId, handlers = {}) {
           if (cancelledOps.has(opCancelKey)) await api.deleteViolation(saved);
           else handlers.onSynced && handlers.onSynced(saved);
         } else if (op.kind === "robot_photo") {
-          const paths = await api.addTeamPhoto(op.eventId, op.number, op.dataUrl, op.angle, op.id, op.generation || "0");
+          // op.sessionId: the league session the photo was taken in (absent for tournaments).
+          const paths = await api.addTeamPhoto(op.eventId, op.number, op.dataUrl, op.angle, op.id, op.generation || "0", op.sessionId);
           if (!paths) {
             handlers.onRobotPhotoDiscarded && handlers.onRobotPhotoDiscarded(op);
           } else if (cancelledOps.has(opCancelKey)) {

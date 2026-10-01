@@ -28,6 +28,8 @@ Cloud (Supabase) stays the default. Nothing changes for a device until an Admin 
 - Push notifications (a help request made in venue mode is shown on devices through the venue server, but no push alert is sent).
 - Clear Data (it clears Supabase data only).
 
+**League events:** violations, field log entries, and presence carry their league session (`session_id`). A device shows only the records of the session it is working in (plus league-wide field log entries), so a venue server used for Session 3 never mixes its data with Session 1. Exports keep each record's `session_id`.
+
 **Cloud reconciliation is not implemented.** Data entered in venue mode stays on the venue server and on the devices. It is **not** copied into Supabase automatically. After the event, use **Export Venue Data** to keep a JSON copy (see [Backup and export](#backup-and-export)).
 
 ---

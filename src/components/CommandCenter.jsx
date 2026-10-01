@@ -4,7 +4,7 @@ import EventLogo from "./EventLogo.jsx";
 
 const fmtTime = (ms) => ms ? new Date(ms).toLocaleString() : "—";
 
-export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onFieldNames, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, brand = null, onEventSettings, onEventManagement, onSyncStatus, syncModeLabel = "Cloud", onClose }) {
+export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onFieldNames, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, brand = null, onEventSettings, onEventManagement, onSyncStatus, syncModeLabel = "Cloud", league = null, onLeagueSessions, onClose }) {
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
   const faults = fieldLog.filter(e=>e.kind==="field_fault").length;
@@ -54,6 +54,20 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
                 <div className="text-xs text-slate-500 dark:text-slate-400 truncate">{brand.shortName}</div>
               </div>
             </div>
+          </div>
+        )}
+        {league && (
+          <div className="bg-white dark:bg-slate-800 border rounded-xl p-3">
+            <div className="text-[11px] uppercase text-slate-400 font-semibold">League</div>
+            <div className="font-bold truncate">{league.name}</div>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+              <CalendarDays size={14} className="text-slate-400" />
+              <span className="font-semibold">{league.sessionName}</span>
+              <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${league.isActive ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200" : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200"}`}>{league.sessionStatus}</span>
+              {league.date && <span className="text-xs text-slate-500 dark:text-slate-400">{league.date}</span>}
+            </div>
+            {!league.isActive && <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{league.activeName ? `${league.activeName} is the Active session.` : "No session is Active."} The counts below are for {league.sessionName}.</p>}
+            {onLeagueSessions && <button onClick={onLeagueSessions} className="mt-2 w-full py-2.5 px-3 rounded-lg border font-semibold text-sm text-left flex items-center gap-2"><CalendarDays size={16}/> League Sessions</button>}
           </div>
         )}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

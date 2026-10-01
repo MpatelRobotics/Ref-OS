@@ -14,6 +14,7 @@ Ref OS was originally developed for the Highlander Summit Signature Event and ha
 
 - [Ref OS 2.0: multi-event platform](#ref-os-20-multi-event-platform)
 - [Event lifecycle](#event-lifecycle)
+- [League events](#league-events)
 - [Roles](#roles)
 - [Tournament Manager Sync Center](#tournament-manager-sync-center)
 - [Referee and field operations](#referee-and-field-operations)
@@ -51,6 +52,21 @@ Every VEX event in Ref OS is an independent workspace identified by its own UUID
 | **Tournament Manager driven setup** | A new event starts as an empty shell and is populated from Tournament Manager exports. |
 | **Archiving and restoration** | Finished events can be archived out of the active list and restored later with all data intact. |
 | **Protected permanent deletion** | Archived events can be permanently deleted only through confirmation-protected workflows. |
+
+---
+
+## League events
+
+Every event is either a **Tournament** (the original format, and the default for every existing event, including Highlander Summit) or a **League**: one event that holds several league sessions, such as *Session 1 … Session 4* and *League Finals*. The format is chosen in **Create VEX Event** and stored on the server.
+
+- **League-wide:** teams (imported once, with per-session attendance), rules, access codes, volunteer profiles, branding, and settings.
+- **Per session:** matches, violations, field log, field reset checks, alliances, judging, inspection photos, and imported ranking and skills snapshots.
+- **Active session:** devices open straight into the Active session, shown under the event name. With no Active session, the League Overview is shown instead, so records never land in an arbitrary session.
+- **Session management:** Admins (and the Developer) create, edit, reorder, start, complete, and delete sessions from the League Overview or **Command Center → League Sessions**.
+- **Tournament Manager imports:** the existing CSV imports go into the selected session (**TM Sync Center → Import Into**). Session 1 Q1 and Session 2 Q1 are separate matches, and reimports update only their own session.
+- **History:** team history can show the entire league or one session. Rankings and skills show each session's imported snapshot. Ref OS never invents cumulative standings.
+
+Details, including the full league-wide versus session table, are in [`LEAGUE-EVENTS.md`](LEAGUE-EVENTS.md).
 
 ---
 
@@ -301,6 +317,7 @@ src/
   api.js                   Supabase data access (events, teams, matches, photos, lifecycle)
   officialResources.js     Per-season official links (Official Q&A)
   sync/                    Sync mode (Cloud or Local Venue Server) and venue server sync
+  league/                  League Overview, session management, and league display helpers
   eventProfiles.js         Built-in event profiles and branding resolution
   outbox.js                Offline write queue (IndexedDB)
   photoCache.js            Local robot photo cache (IndexedDB)
@@ -352,6 +369,7 @@ Run the SQL files in the Supabase SQL Editor in the order below. Each builds on 
 | `supabase/refos-2-developer-access.sql` | Developer sign-in support for the `refos-developer-access` Edge Function (service-role only) |
 | `supabase/refos-2-venue-sync.sql` | Per-event venue sync keys for the optional Local Venue Server |
 | `supabase/refos-2-default-rules-template.sql` | Default rule library copied into every new event. Run after the Highlander Summit rules exist (`seed_rules.sql`); it takes a one-time snapshot of them. Re-run it if `refos-2-phase3-create-event.sql` is ever run again. |
+| `supabase/refos-2-league-events.sql` | League events: event format, league sessions, attendance, and session-scoped records. Run after `refos-2-default-rules-template.sql`, and deploy the matching build at the same time. |
 
 Some other files in `supabase/` apply only to the Highlander Summit deployment or to earlier releases. They are not needed for a new deployment.
 
