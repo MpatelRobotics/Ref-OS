@@ -15,6 +15,8 @@
 -- Run after schema.sql, refos-2-phase7-event-management.sql and
 -- refos-2-default-rules-template.sql. Safe to re-run.
 --
+-- Also adds the one-way Tournament -> League conversion (convert_refos_tournament_to_league).
+--
 -- IMPORTANT: run this file and deploy the matching Ref OS build together. Devices still running an
 -- older build cannot save match schedules, alliances, field-reset checks or award finalists after
 -- this file runs, until they refresh to the new build.
@@ -28,8 +30,13 @@ alter table public.events add column if not exists event_format text not null de
 alter table public.events drop constraint if exists events_event_format_check;
 alter table public.events add constraint events_event_format_check check (event_format in ('tournament', 'league'));
 
--- The format is chosen when the event is created and cannot be changed afterwards
--- (changing it would orphan or mix session data). Highlander Summit is always a Tournament.
+-- When a Tournament was converted into a League (NULL = never converted).
+alter table public.events add column if not exists converted_to_league_at timestamptz;
+
+-- The format cannot be edited. It changes only inside create_refos_vex_event_with_format (new
+-- League) and convert_refos_tournament_to_league (one-way Tournament -> League), which set a
+-- transaction-local flag. A League never becomes a Tournament, and Highlander Summit is always a
+-- Tournament, even with the flag set.
 create or replace function public.guard_refos_event_format()
 returns trigger
 language plpgsql
@@ -37,12 +44,19 @@ set search_path = public
 as $$
 begin
   if new.event_format is distinct from old.event_format then
+    if old.event_format = 'league' then
+      raise exception 'A League cannot be converted back to a Tournament' using errcode = 'P0001';
+    end if;
+    if new.id = '11111111-1111-4111-8111-111111111111'::uuid then
+      raise exception 'Highlander Summit is a Tournament event and cannot be converted' using errcode = 'P0001';
+    end if;
     if coalesce(current_setting('refos.format_change', true), '') <> 'on' then
       raise exception 'The event format cannot be changed after the event is created' using errcode = 'P0001';
     end if;
-    if new.id = '11111111-1111-4111-8111-111111111111'::uuid and new.event_format <> 'tournament' then
-      raise exception 'Highlander Summit is a Tournament event' using errcode = 'P0001';
-    end if;
+  end if;
+  if new.converted_to_league_at is distinct from old.converted_to_league_at
+     and coalesce(current_setting('refos.format_change', true), '') <> 'on' then
+    raise exception 'The conversion time cannot be edited' using errcode = 'P0001';
   end if;
   return new;
 end;
@@ -50,7 +64,7 @@ $$;
 
 drop trigger if exists refos_event_format_guard on public.events;
 create trigger refos_event_format_guard
-before update of event_format on public.events
+before update of event_format, converted_to_league_at on public.events
 for each row execute function public.guard_refos_event_format();
 
 -- ---------------------------------------------------------------------------
@@ -75,6 +89,12 @@ create table if not exists public.league_sessions (
   constraint league_sessions_type_check check (session_type in ('session', 'finals')),
   constraint league_sessions_status_check check (status in ('upcoming', 'active', 'completed'))
 );
+-- 'converted' marks the session created by converting a Tournament: it owns the Tournament-era
+-- records and photos. At most one per league.
+alter table public.league_sessions add column if not exists origin text not null default 'created';
+alter table public.league_sessions drop constraint if exists league_sessions_origin_check;
+alter table public.league_sessions add constraint league_sessions_origin_check check (origin in ('created', 'converted'));
+create unique index if not exists league_sessions_one_converted on public.league_sessions(event_id) where origin = 'converted';
 -- Only one Active session per league.
 create unique index if not exists league_sessions_one_active on public.league_sessions(event_id) where status = 'active';
 create index if not exists league_sessions_event_ord_idx on public.league_sessions(event_id, ord);
@@ -423,6 +443,18 @@ begin
 end;
 $$;
 
+-- True when a robot photo path belongs to a session. Session photos live in a session folder
+-- (<event>/team/<TEAM>/s-<session>/...). Photos taken while a converted league was still a
+-- Tournament have no session folder; they belong to the session created by the conversion.
+create or replace function public.refos_photo_in_session(p_path text, p_session uuid, p_converted boolean)
+returns boolean
+language sql
+immutable
+as $$
+  select p_path like '%/s-' || p_session::text || '/%'
+      or (coalesce(p_converted, false) and p_path !~ '/team/[^/]+/s-[0-9a-fA-F-]{36}/');
+$$;
+
 -- Counts of the records stored in a session (shown before a destructive delete).
 create or replace function public.league_session_record_counts(p_session uuid)
 returns jsonb
@@ -432,9 +464,10 @@ set search_path = public
 as $$
 declare
   v_event uuid;
+  v_converted boolean;
   v_result jsonb;
 begin
-  select event_id into v_event from public.league_sessions where id = p_session;
+  select event_id, origin = 'converted' into v_event, v_converted from public.league_sessions where id = p_session;
   if v_event is null then
     raise exception 'Session not found' using errcode = 'P0001';
   end if;
@@ -449,7 +482,7 @@ begin
     'alliances',    (select count(*) from public.alliances where session_id = p_session),
     'attendance',   (select count(*) from public.league_session_attendance where session_id = p_session),
     'robot_photos', (select count(*) from public.teams t cross join lateral unnest(coalesce(t.photo_paths, '{}'::text[])) p(path)
-                      where t.event_id = v_event and p.path like '%/s-' || p_session::text || '/%'),
+                      where t.event_id = v_event and public.refos_photo_in_session(p.path, p_session, v_converted)),
     'snapshots',    (select count(*) from public.event_settings where event_id = v_event and key like '%@' || p_session::text)
   ) into v_result;
   return v_result;
@@ -470,13 +503,14 @@ declare
   v_counts jsonb;
   v_has_records boolean;
   v_paths text[];
-  v_marker text := '%/s-' || p_session::text || '/%';
+  v_converted boolean;
 begin
   select * into v_row from public.league_sessions where id = p_session;
   if v_row.id is null then
     raise exception 'Session not found' using errcode = 'P0001';
   end if;
   perform public.refos_require_league_admin(v_row.event_id);
+  v_converted := v_row.origin = 'converted';
   if v_row.status = 'active' then
     raise exception 'Complete or reset this session before deleting it' using errcode = 'P0001';
   end if;
@@ -491,12 +525,12 @@ begin
    where v.session_id = p_session;
   select v_paths || coalesce(array_agg(p.path), '{}'::text[]) into v_paths
     from public.teams t cross join lateral unnest(coalesce(t.photo_paths, '{}'::text[])) p(path)
-   where t.event_id = v_row.event_id and p.path like v_marker;
+   where t.event_id = v_row.event_id and public.refos_photo_in_session(p.path, p_session, v_converted);
 
   update public.teams t
-     set photo_paths = coalesce((select array_agg(p.path order by p.ord) from unnest(t.photo_paths) with ordinality p(path, ord) where p.path not like v_marker), '{}'::text[])
+     set photo_paths = coalesce((select array_agg(p.path order by p.ord) from unnest(t.photo_paths) with ordinality p(path, ord) where not public.refos_photo_in_session(p.path, p_session, v_converted)), '{}'::text[])
    where t.event_id = v_row.event_id
-     and exists (select 1 from unnest(coalesce(t.photo_paths, '{}'::text[])) p(path) where p.path like v_marker);
+     and exists (select 1 from unnest(coalesce(t.photo_paths, '{}'::text[])) p(path) where public.refos_photo_in_session(p.path, p_session, v_converted));
   delete from public.event_settings where event_id = v_row.event_id and key like '%@' || p_session::text;
   -- Session-scoped rows are removed by the foreign keys (on delete cascade).
   delete from public.league_sessions where id = p_session;
@@ -531,5 +565,198 @@ begin
     end if;
   end if;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- 8. One-way conversion: Tournament -> League
+--
+-- The existing event becomes the first league session. Everything happens in ONE function call
+-- (one transaction): if any step fails, nothing changes and the event stays a Tournament.
+-- Teams, rules, access codes, members, branding and other event settings are NOT copied; they
+-- simply become league-wide because their event is now a League.
+-- ---------------------------------------------------------------------------
+
+-- Session-scoped tables whose Tournament rows move into the first session. Kept in one place so
+-- the preview and the conversion always cover the same tables.
+create or replace function public.refos_session_scoped_tables()
+returns text[]
+language sql
+immutable
+as $$
+  select array['matches','violations','field_log','field_reset_checks','alliances','nominations','shortlist'];
+$$;
+-- Event settings that are kept per session in a League (imported snapshots).
+create or replace function public.refos_session_setting_keys()
+returns text[]
+language sql
+immutable
+as $$
+  select array['skills_rankings','qualification_records','judging_rank_order'];
+$$;
+
+-- Shared checks: signed-in Admin (Developer sign-ins are Admin members), not Highlander, not
+-- protected, not archived.
+create or replace function public.refos_require_convertible_event(p_event uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Authentication required' using errcode = 'P0001';
+  end if;
+  if p_event = '11111111-1111-4111-8111-111111111111'::uuid then
+    raise exception 'Highlander Summit cannot be converted to a League' using errcode = 'P0001';
+  end if;
+  if not public.has_event_role(p_event, array['admin']) then
+    raise exception 'Admin role required' using errcode = 'P0001';
+  end if;
+  if not exists (select 1 from public.events where id = p_event) then
+    raise exception 'Event not found' using errcode = 'P0001';
+  end if;
+  if coalesce((select (s.value->>'protected')::boolean from public.event_settings s
+               where s.event_id = p_event and s.key = 'system_protection'), false) then
+    raise exception 'This is a protected event and cannot be converted' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from public.events where id = p_event and archived_at is not null) then
+    raise exception 'Restore this event before converting it' using errcode = 'P0001';
+  end if;
+end;
+$$;
+revoke all on function public.refos_require_convertible_event(uuid) from public, anon, authenticated;
+
+-- What a conversion would move (real counts only; shown before confirming).
+create or replace function public.tournament_conversion_preview(p_event uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_event public.events%rowtype;
+begin
+  perform public.refos_require_convertible_event(p_event);
+  select * into v_event from public.events where id = p_event;
+  return jsonb_build_object(
+    'event_name', v_event.name,
+    'event_format', v_event.event_format,
+    'move', jsonb_build_object(
+      'matches',            (select count(*) from public.matches where event_id = p_event and session_id is null),
+      'scored_matches',     (select count(*) from public.matches where event_id = p_event and session_id is null and red_score is not null and blue_score is not null),
+      'violations',         (select count(*) from public.violations where event_id = p_event and session_id is null),
+      'field_log',          (select count(*) from public.field_log where event_id = p_event and session_id is null
+                               and kind not in ('role_code_update','role_code_request','volunteer_contact','sync_probe','sync_ack','system_test')),
+      'field_reset_checks', (select count(*) from public.field_reset_checks where event_id = p_event and session_id is null),
+      'alliances',          (select count(*) from public.alliances where event_id = p_event and session_id is null),
+      'nominations',        (select count(*) from public.nominations where event_id = p_event and session_id is null),
+      'finalists',          (select count(*) from public.shortlist where event_id = p_event and session_id is null),
+      'inspection_photos',  (select count(*) from public.teams t cross join lateral unnest(coalesce(t.photo_paths, '{}'::text[])) p(path) where t.event_id = p_event),
+      'violation_photos',   (select count(*) from public.violations v cross join lateral unnest(coalesce(v.photo_paths, '{}'::text[])) p(path) where v.event_id = p_event and v.session_id is null),
+      'ranked_teams',       (select count(*) from public.teams where event_id = p_event and rank is not null),
+      'skills_rows',        (select coalesce(jsonb_array_length(value->'rows'), 0) from public.event_settings where event_id = p_event and key = 'skills_rankings'),
+      'qualification_records', (select count(*) from public.event_settings s cross join lateral jsonb_object_keys(coalesce(s.value->'records', '{}'::jsonb)) k
+                                 where s.event_id = p_event and s.key = 'qualification_records' and jsonb_typeof(s.value->'records') = 'object'),
+      'judging_rank_order', exists (select 1 from public.event_settings where event_id = p_event and key = 'judging_rank_order')
+    ),
+    'keep', jsonb_build_object(
+      'teams',        (select count(*) from public.teams where event_id = p_event),
+      'rules',        (select count(*) from public.rules where event_id = p_event),
+      'access_codes', (select count(*) from public.event_access_credentials where event_id = p_event and enabled),
+      'members',      (select count(*) from public.event_members where event_id = p_event),
+      'volunteer_profiles', (select count(*) from public.field_log where event_id = p_event and kind = 'volunteer_contact'),
+      'settings',     (select count(*) from public.event_settings where event_id = p_event and key <> all (public.refos_session_setting_keys()))
+    )
+  );
+end;
+$$;
+
+-- Converts a Tournament into a League. Returns:
+--   { status: 'converted', session_id, moved: {...} }
+--   { status: 'already_league', session_id }      (second click, second tab, second Admin, retry)
+--   { status: 'name_mismatch' }                    (p_confirm_name is not the exact event name)
+create or replace function public.convert_refos_tournament_to_league(
+  p_event uuid,
+  p_confirm_name text,
+  p_session_name text default 'Session 1',
+  p_session_date date default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_event public.events%rowtype;
+  v_session uuid;
+  v_name text := trim(coalesce(p_session_name, ''));
+  v_table text;
+  v_count bigint;
+  v_moved jsonb := '{}'::jsonb;
+  v_ranks jsonb;
+begin
+  perform public.refos_require_convertible_event(p_event);
+  -- Row lock: a second conversion (double click, other tab, other Admin, network retry) waits
+  -- here until the first commits, then sees a League and stops.
+  select * into v_event from public.events where id = p_event for update;
+  if v_event.event_format = 'league' then
+    select id into v_session from public.league_sessions where event_id = p_event and origin = 'converted';
+    return jsonb_build_object('status', 'already_league', 'session_id', v_session);
+  end if;
+  if coalesce(p_confirm_name, '') <> coalesce(v_event.name, '') then
+    return jsonb_build_object('status', 'name_mismatch');
+  end if;
+  if v_name = '' then v_name := 'Session 1'; end if;
+  if length(v_name) > 80 then
+    raise exception 'Session name must be 80 characters or fewer' using errcode = 'P0001';
+  end if;
+
+  -- 1-2. The first session, Active, marked as the converted session (unique per league).
+  insert into public.league_sessions(event_id, name, session_type, ord, session_date, status, started_at, origin)
+  values (p_event, v_name, 'session', 1, p_session_date, 'active', now(), 'converted')
+  returning id into v_session;
+
+  -- 3. Every session-scoped Tournament row joins the first session. Only session_id changes:
+  --    match numbers, scores, alliances, teams, rules and violation details are untouched. All
+  --    rows move to the same session, so the session-keyed primary keys stay unique.
+  foreach v_table in array public.refos_session_scoped_tables() loop
+    if v_table = 'field_log' then
+      update public.field_log set session_id = v_session
+       where event_id = p_event and session_id is null
+         and kind not in ('role_code_update','role_code_request','volunteer_contact','sync_probe','sync_ack','system_test');
+    else
+      execute format('update public.%I set session_id = $1 where event_id = $2 and session_id is null', v_table)
+        using v_session, p_event;
+    end if;
+    get diagnostics v_count = row_count;
+    v_moved := v_moved || jsonb_build_object(v_table, v_count);
+  end loop;
+
+  -- Imported snapshots become the first session's snapshots (same values, new owner).
+  update public.event_settings
+     set key = key || '@' || v_session::text
+   where event_id = p_event and key = any (public.refos_session_setting_keys());
+  -- Tournament rankings live on the team rows; a League reads them from the session snapshot.
+  -- The team rows themselves (including rank) are left exactly as they are.
+  select jsonb_object_agg(number, rank) into v_ranks from public.teams where event_id = p_event and rank is not null;
+  if v_ranks is not null then
+    insert into public.event_settings(event_id, key, value, updated_by, updated_at)
+    values (p_event, 'rank_snapshot@' || v_session::text,
+            jsonb_build_object('ranks', v_ranks, 'importedAt', floor(extract(epoch from now()) * 1000), 'source', 'converted_tournament'),
+            'Tournament conversion', now());
+  end if;
+
+  -- 4. The event becomes a League (through the format guard's one-way path).
+  perform set_config('refos.format_change', 'on', true);
+  update public.events set event_format = 'league', converted_to_league_at = now() where id = p_event;
+  perform set_config('refos.format_change', 'off', true);
+
+  return jsonb_build_object('status', 'converted', 'session_id', v_session, 'moved', v_moved);
+end;
+$$;
+
+revoke all on function public.tournament_conversion_preview(uuid) from public, anon;
+revoke all on function public.convert_refos_tournament_to_league(uuid, text, text, date) from public, anon;
+grant execute on function public.tournament_conversion_preview(uuid) to authenticated;
+grant execute on function public.convert_refos_tournament_to_league(uuid, text, text, date) to authenticated;
 
 commit;

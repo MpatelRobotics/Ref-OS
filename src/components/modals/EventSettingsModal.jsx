@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ImageOff, MapPin, Palette, RotateCcw, Save, Settings, X } from "lucide-react";
+import { CalendarDays, ImageOff, MapPin, Palette, RotateCcw, Save, Settings, X } from "lucide-react";
 import { HEX_COLOR_RE, isHttpUrl, normalizeHexColor } from "../../eventProfiles.js";
 
 // Field keys are the stored/internal identifiers. Only the display names change.
@@ -21,7 +21,7 @@ function FieldError({ children }) {
   return <p className="mt-1 text-xs font-semibold text-red-700 dark:text-red-300">{children}</p>;
 }
 
-export default function EventSettingsModal({ event, brand, fieldNames = {}, onSave, onClose }) {
+export default function EventSettingsModal({ event, brand, fieldNames = {}, onSave, onClose, eventFormat = "tournament", canConvertToLeague = false, onConvertToLeague }) {
   const initial = useMemo(() => ({
     name: String(event?.name || brand?.name || "").trim(),
     shortName: String(brand?.shortName || event?.name || "").trim(),
@@ -193,6 +193,20 @@ export default function EventSettingsModal({ event, brand, fieldNames = {}, onSa
               className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
               <RotateCcw size={15} /> Restore Field 1, Field 2, and Field 3
             </button>
+          </section>
+
+          <section className="space-y-2">
+            <SectionTitle icon={CalendarDays}>Event Format</SectionTitle>
+            <div className="text-base font-bold text-slate-900 dark:text-slate-100">{eventFormat === "league" ? "League" : "Tournament"}</div>
+            {eventFormat === "league"
+              ? <p className="text-sm text-slate-600 dark:text-slate-300">This event is a League. A League cannot be converted back to a Tournament.</p>
+              : canConvertToLeague && onConvertToLeague && (
+                <>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">Convert this event into a League when it continues over several league sessions. Its current data becomes the first session.</p>
+                  <button type="button" onClick={onConvertToLeague} disabled={saving}
+                    className="rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2.5 text-sm font-semibold text-slate-800 dark:text-slate-100 disabled:opacity-50">Convert to League</button>
+                </>
+              )}
           </section>
 
           <div className="flex items-center gap-2 text-xs text-slate-400"><Palette size={13} /> Settings apply to this event only.</div>

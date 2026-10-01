@@ -24,9 +24,15 @@ export const uid = () =>
    imported rankings / skills / qualification-record snapshots. */
 export const LEAGUE_SESSION_SETTING_KEYS = new Set(["skills_rankings", "qualification_records", "judging_rank_order", "rank_snapshot"]);
 export const LEAGUE_EVENT_SCOPED_FIELD_LOG_KINDS = new Set(["role_code_update", "role_code_request", "volunteer_contact", "sync_probe", "sync_ack", "system_test"]);
-let leagueContext = { eventId: "", sessionId: "" };
-export function setLeagueContext(eventId, sessionId) {
-  leagueContext = { eventId: String(eventId || ""), sessionId: String(sessionId || "") };
+let leagueContext = { eventId: "", sessionId: "", legacySessionId: "" };
+// legacySessionId: for a League converted from a Tournament, the session that owns the
+// Tournament-era records that have no session of their own (robot photos without a session
+// folder, Local Venue Server records, offline caches).
+export function setLeagueContext(eventId, sessionId, legacySessionId = "") {
+  leagueContext = { eventId: String(eventId || ""), sessionId: String(sessionId || ""), legacySessionId: String(legacySessionId || "") };
+}
+export function leagueLegacySessionFor(eventId) {
+  return eventId && leagueContext.eventId === eventId && leagueContext.legacySessionId ? leagueContext.legacySessionId : null;
 }
 export function leagueSessionFor(eventId) {
   return eventId && leagueContext.eventId === eventId && leagueContext.sessionId ? leagueContext.sessionId : null;
@@ -38,11 +44,16 @@ export function photoSessionId(path) {
   const m = String(path || "").match(/\/s-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\//i);
   return m ? m[1].toLowerCase() : null;
 }
+// Session a robot photo belongs to in this event: its session folder, or (no folder) the session
+// created when the event was converted from a Tournament. null for tournaments.
+export function photoSessionFor(eventId, path) {
+  return photoSessionId(path) || leagueLegacySessionFor(eventId);
+}
 // Robot photos shown for the current view: in a league session, only that session's photos.
 function viewPhotoKeys(eventId, paths) {
   const list = paths || [];
   const sid = leagueSessionFor(eventId);
-  return sid ? list.filter((path) => String(path).includes(leagueSessionPhotoMarker(sid))) : list;
+  return sid ? list.filter((path) => photoSessionFor(eventId, path) === sid) : list;
 }
 const isMissingConflictTarget = (error) =>
   error?.code === "42P10" || error?.code === "42703" || /no unique or exclusion constraint|session_key/i.test(error?.message || "");
@@ -399,6 +410,7 @@ const mapEvent = (r) => r && {
   archivedAt: r.archived_at || null,
   // League events (refos-2-league-events.sql). Missing or unknown values are Tournaments.
   format: r.event_format === "league" ? "league" : "tournament",
+  convertedAt: r.converted_to_league_at || null,
 };
 export async function listMyEvents() {
   const { data } = await supabase.from("events").select("*").order("created_at", { ascending: false });
@@ -548,6 +560,7 @@ const mapLeagueSession = (r) => r && ({
   status: ["active", "completed"].includes(r.status) ? r.status : "upcoming",
   startedAt: r.started_at || null,
   completedAt: r.completed_at || null,
+  converted: r.origin === "converted",
 });
 export async function listLeagueSessions(eventId) {
   if (E2E_MOCK) return [];
@@ -609,6 +622,55 @@ export async function deleteLeagueSession(sessionId, confirmName = null) {
   if (paths.length) await deleteCachedPhotos(paths).catch(() => {});
   return { status: result.status || "", counts: result.counts || {} };
 }
+/* ---- Tournament -> League conversion (one way; server-side, one transaction) ---- */
+// Real counts of what would move into the first session, and what stays league-wide.
+export async function tournamentConversionPreview(eventId) {
+  const { data, error } = await supabase.rpc("tournament_conversion_preview", { p_event: eventId });
+  if (error) throw error;
+  return data || {};
+}
+// Resolves { status: "converted" | "already_league" | "name_mismatch", sessionId, moved }.
+export async function convertTournamentToLeague(eventId, { confirmName, sessionName = "Session 1", sessionDate = null }) {
+  const { data, error } = await supabase.rpc("convert_refos_tournament_to_league", {
+    p_event: eventId,
+    p_confirm_name: String(confirmName ?? ""),
+    p_session_name: String(sessionName || "").trim() || "Session 1",
+    p_session_date: sessionDate || null,
+  });
+  if (error) {
+    if (/convert_refos_tournament_to_league/i.test(error.message || "")) throw new Error("League events are not installed in Supabase yet. Run supabase/refos-2-league-events.sql.");
+    throw error;
+  }
+  const result = data || {};
+  return { status: result.status || "", sessionId: result.session_id || null, moved: result.moved || {} };
+}
+// Where a write queued on this device WITHOUT a session belongs (used by the outbox):
+//   { sessionId: null }  Tournament (or League never converted): upload unchanged.
+//   { sessionId: id }    a converted League: the write was made while it was still a Tournament,
+//                        or before this device noticed, while the first session is still Active.
+//   { hold: message }    anything else: kept for review instead of guessing.
+// Read fresh every time (not cached): the answer depends on which session is Active right now.
+async function conversionInfo(eventId) {
+  const { data: ev, error } = await supabase.from("events").select("event_format,converted_to_league_at").eq("id", eventId).maybeSingle();
+  if (error) throw error;
+  let info = { format: ev?.event_format === "league" ? "league" : "tournament", convertedAt: ev?.converted_to_league_at ? Date.parse(ev.converted_to_league_at) : null, session: null };
+  if (info.format === "league" && info.convertedAt) {
+    const { data: sessions, error: sessionError } = await supabase.from("league_sessions").select("id,status,origin").eq("event_id", eventId);
+    if (sessionError) throw sessionError;
+    info.session = (sessions || []).find((s) => s.origin === "converted") || null;
+  }
+  return info;
+}
+export async function queuedRecordSession(eventId, createdAt) {
+  if (E2E_MOCK) return { sessionId: null };
+  const info = await conversionInfo(eventId);
+  if (info.format !== "league" || !info.convertedAt) return { sessionId: null };
+  if (!info.session) return { hold: "Held for review: this was saved while the event was a Tournament, and its first league session no longer exists." };
+  if (Number(createdAt) && Number(createdAt) <= info.convertedAt) return { sessionId: info.session.id };
+  if (info.session.status === "active") return { sessionId: info.session.id };
+  return { hold: "Held for review: saved without a league session after this event became a League, and its first session is no longer Active. An Admin can discard it or re-enter it in the right session." };
+}
+
 const mapAttendance = (r) => ({ sessionId: r.session_id, team: r.team, status: r.status, by: r.updated_by || "", updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : 0 });
 // Attendance for one session (sessionId) or for every session of the league (no sessionId).
 export async function listLeagueAttendance(eventId, sessionId = null) {
@@ -726,7 +788,8 @@ export async function listTeams(eventId) {
     saveReadCache(eventId, cacheKind, teams);
     return teams;
   } catch (error) {
-    const cached = loadReadCache(eventId, cacheKind);
+    // A converted League's first session can still use the Tournament-era offline copy.
+    const cached = loadReadCache(eventId, cacheKind) || (sessionId && sessionId === leagueLegacySessionFor(eventId) ? loadReadCache(eventId, "teams") : null);
     if (cached) {
       console.warn("Teams unavailable from Supabase; using last synced local cache.", error);
       return cached;
@@ -876,7 +939,7 @@ export async function addTeamPhoto(eventId, number, dataUrl, angle = "other", up
   let current = paths || [];
   if (safeAngle !== "other") {
     // Only photos of the same session are replaced; earlier sessions' evidence is never overwritten.
-    const older = current.filter((existing) => existing !== path && pathAngle(existing) === safeAngle && photoSessionId(existing) === (sessionId || null));
+    const older = current.filter((existing) => existing !== path && pathAngle(existing) === safeAngle && photoSessionFor(eventId, existing) === (sessionId || null));
     for (const oldPath of older) {
       try { current = await removeTeamPhoto(eventId, num, oldPath); }
       catch (cleanupError) { console.warn("Older robot photo could not be removed yet", cleanupError); }
@@ -958,7 +1021,7 @@ export async function listMatches(eventId) {
     saveReadCache(eventId, cacheKind, matches);
     return matches;
   } catch (error) {
-    const cached = loadReadCache(eventId, cacheKind);
+    const cached = loadReadCache(eventId, cacheKind) || (sessionId && sessionId === leagueLegacySessionFor(eventId) ? loadReadCache(eventId, "matches") : null);
     if (cached) {
       console.warn("Matches unavailable from Supabase; using last synced local cache.", error);
       return cached;
@@ -1536,7 +1599,7 @@ const VENUE_CLOUD_TIMEOUT_MS = 4000;
 const VENUE_CLOUD_ONLY_FIELD_LOG_KINDS = new Set(["role_code_update", "role_code_request"]);
 const withTimeout = (promise, ms) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new TypeError("Cloud request timed out")), ms))]);
 
-async function cloudRowsOrSnapshot(eventId, kind, query) {
+async function cloudRowsOrSnapshot(eventId, kind, query, legacyKind = "") {
   try {
     const { data, error } = await withTimeout(query(), VENUE_CLOUD_TIMEOUT_MS);
     if (error) throw error;
@@ -1544,7 +1607,10 @@ async function cloudRowsOrSnapshot(eventId, kind, query) {
     venue.saveCloudSnapshot(eventId, kind, rows).catch(() => {});
     return rows;
   } catch {
-    return venue.cloudSnapshot(eventId, kind);
+    const rows = await venue.cloudSnapshot(eventId, kind);
+    // A converted League's first session can still show the Tournament-era cloud copy offline.
+    if (!rows.length && legacyKind && leagueSessionFor(eventId) && leagueSessionFor(eventId) === leagueLegacySessionFor(eventId)) return venue.cloudSnapshot(eventId, legacyKind);
+    return rows;
   }
 }
 
@@ -1566,12 +1632,14 @@ const venueRecordInSession = (eventId, rec, eventScopedKinds = null) => {
   if (!sessionId) return true;
   const recordSession = rec.data?.session_id || null;
   if (recordSession) return recordSession === sessionId;
-  return !!eventScopedKinds?.has(rec.data?.kind);
+  if (eventScopedKinds?.has(rec.data?.kind)) return true;
+  // Venue records made while a converted League was still a Tournament belong to its first session.
+  return sessionId === leagueLegacySessionFor(eventId);
 };
 async function venueListViolations(eventId) {
   const sessionId = leagueSessionFor(eventId);
   const [cloudRows, local] = await Promise.all([
-    cloudRowsOrSnapshot(eventId, sessionId ? `violation@${sessionId}` : "violation", () => inSession(supabase.from("violations").select("*").eq("event_id", eventId), eventId).order("created_at", { ascending: false })),
+    cloudRowsOrSnapshot(eventId, sessionId ? `violation@${sessionId}` : "violation", () => inSession(supabase.from("violations").select("*").eq("event_id", eventId), eventId).order("created_at", { ascending: false }), "violation"),
     venue.list(eventId, "violation"),
   ]);
   const byId = new Map(cloudRows.map((r) => [r.id, { ...mapViol(r), _source: "cloud" }]));
@@ -1599,7 +1667,7 @@ async function venueSaveViolation(eventId, row, photoDataUrls = [], { edit = fal
 async function venueListFieldLog(eventId) {
   const sessionId = leagueSessionFor(eventId);
   const [cloudRows, local] = await Promise.all([
-    cloudRowsOrSnapshot(eventId, sessionId ? `field_log@${sessionId}` : "field_log", () => fieldLogInSession(supabase.from("field_log").select("*").eq("event_id", eventId), eventId).order("created_at", { ascending: false })),
+    cloudRowsOrSnapshot(eventId, sessionId ? `field_log@${sessionId}` : "field_log", () => fieldLogInSession(supabase.from("field_log").select("*").eq("event_id", eventId), eventId).order("created_at", { ascending: false }), "field_log"),
     venue.list(eventId, "field_log"),
   ]);
   const byId = new Map(cloudRows.map((r) => [r.id, mapFieldLog(r)]));

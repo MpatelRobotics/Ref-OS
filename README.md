@@ -64,6 +64,7 @@ Every event is either a **Tournament** (the original format, and the default for
 - **Active session:** devices open straight into the Active session, shown under the event name. With no Active session, the League Overview is shown instead, so records never land in an arbitrary session.
 - **Session management:** Admins (and the Developer) create, edit, reorder, start, complete, and delete sessions from the League Overview or **Command Center → League Sessions**.
 - **Tournament Manager imports:** the existing CSV imports go into the selected session (**TM Sync Center → Import Into**). Session 1 Q1 and Session 2 Q1 are separate matches, and reimports update only their own session.
+- **Converting a Tournament:** an Admin can convert an existing Tournament into a League (**Event Settings → Event Format → Convert to League**). Its data becomes the first session. The conversion is one-way, runs as a single server-side transaction, and is never available for Highlander Summit.
 - **History:** team history can show the entire league or one session. Rankings and skills show each session's imported snapshot. Ref OS never invents cumulative standings.
 
 Details, including the full league-wide versus session table, are in [`LEAGUE-EVENTS.md`](LEAGUE-EVENTS.md).

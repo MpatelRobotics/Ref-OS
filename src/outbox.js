@@ -116,16 +116,31 @@ export async function flush(eventId, handlers = {}) {
           await api.upsertTeam(op.eventId, op.number, op.name);
           handlers.onTeamSynced && handlers.onTeamSynced(op.number);
         } else if (op.kind === "violation") {
-          const saved = await api.addViolationRow(op.eventId, op.row, op.photos || []);
+          // A violation queued without a league session (made while the event was a Tournament,
+          // or by a device that had not yet seen it become a League) is placed in the converted
+          // League's first session only when that is certain; otherwise it is held for review.
+          let row = op.row;
+          if (!row.session_id) {
+            const target = await api.queuedRecordSession(op.eventId, op.createdAt);
+            if (target.hold) throw new Error(target.hold);
+            if (target.sessionId) row = { ...row, session_id: target.sessionId };
+          }
+          const saved = await api.addViolationRow(op.eventId, row, op.photos || []);
           if (cancelledOps.has(opCancelKey)) await api.deleteViolation(saved);
           else handlers.onSynced && handlers.onSynced(saved);
         } else if (op.kind === "robot_photo") {
           // op.sessionId: the league session the photo was taken in (absent for tournaments).
-          const paths = await api.addTeamPhoto(op.eventId, op.number, op.dataUrl, op.angle, op.id, op.generation || "0", op.sessionId);
+          let photoSession = op.sessionId;
+          if (photoSession === undefined) {
+            const target = await api.queuedRecordSession(op.eventId, op.createdAt);
+            if (target.hold) throw new Error(target.hold);
+            photoSession = target.sessionId || null;
+          }
+          const paths = await api.addTeamPhoto(op.eventId, op.number, op.dataUrl, op.angle, op.id, op.generation || "0", photoSession);
           if (!paths) {
             handlers.onRobotPhotoDiscarded && handlers.onRobotPhotoDiscarded(op);
           } else if (cancelledOps.has(opCancelKey)) {
-            await api.removeTeamPhoto(op.eventId, op.number, api.robotPhotoPath(op.eventId, op.number, op.angle, op.id, (String(op.dataUrl).match(/^data:([^;,]+)/) || [])[1]));
+            await api.removeTeamPhoto(op.eventId, op.number, api.robotPhotoPath(op.eventId, op.number, op.angle, op.id, (String(op.dataUrl).match(/^data:([^;,]+)/) || [])[1], photoSession));
           } else {
             handlers.onRobotPhotoSynced && handlers.onRobotPhotoSynced(op, paths);
           }

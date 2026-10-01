@@ -7,7 +7,7 @@ Ref OS supports two event formats:
 | **Tournament** | One event: one schedule, one set of rankings. This is how every existing event works, including Highlander Summit, and it is unchanged. |
 | **League** | One event that holds several **league sessions**, for example *Session 1, Session 2, Session 3, Session 4, League Finals*. Teams, rules, access codes, and volunteer profiles belong to the whole league. What happens during a session belongs to that session. |
 
-The format is chosen when the event is created (**Create VEX Event → Event Format**). It is stored on the server (`events.event_format`). It cannot be changed afterwards, because changing it would mix or orphan session data. Events created before this feature have no stored format and are Tournaments.
+The format is chosen when the event is created (**Create VEX Event → Event Format**). It is stored on the server (`events.event_format`). It cannot be edited afterwards. The only change allowed is the one-way [Tournament → League conversion](#converting-a-tournament-into-a-league). A League can never become a Tournament. Events created before this feature have no stored format and are Tournaments.
 
 Setup: run `supabase/refos-2-league-events.sql` once in the Supabase SQL Editor (see the README's SQL table). Run it and deploy the matching build together: see [Deploying](#deploying).
 
@@ -138,6 +138,88 @@ League Finals is a session with the type **League Finals**, inside the same leag
 
 ---
 
+## Converting a Tournament into a League
+
+An Admin or the Developer can turn an existing Tournament into a League. The conversion is **one-way**: there is no League → Tournament. Highlander Summit can never be converted.
+
+### In the app
+
+1. Open **Event Command Center → Event Settings → Event Format**.
+   - Tournaments show **Tournament** and **Convert to League**.
+   - Leagues show **League** and say a League cannot be converted back.
+   - Highlander Summit shows **Tournament** with no button.
+2. **Convert to League** opens **Convert Tournament to League**. The modal shows:
+   - the permanent-conversion warning
+   - the current event
+   - an editable **First Session** name (default *Session 1*) and an optional **Session Date**
+   - **Existing data to move into Session 1**, with real counts from the database: matches (and how many have scores), violations, violation photos, field log entries, field reset checks, alliances, award nominations, award finalists, robot inspection photos, the ranking snapshot, imported W-L-T records, the skills snapshot, and the judging rank order
+   - **League-wide data retained**: teams, rules, access codes, signed-in volunteers and roles, volunteer profiles, and branding and other settings
+3. Type the event's exact name. **Convert to League** stays disabled until it matches.
+4. After the conversion, the Admin lands in the **League Overview** with the first session Active, and can add Session 2, Session 3, and League Finals.
+
+### On the server
+
+Everything runs in one database function, `convert_refos_tournament_to_league(p_event uuid, p_confirm_name text, p_session_name text default 'Session 1', p_session_date date default null)`. It is a single transaction: if any step fails, nothing changes and the event stays a Tournament.
+
+1. It checks that the caller is signed in and is an **Admin** of the event (`has_event_role(..., ['admin'])`; a Developer sign-in is an Admin membership), and that the event:
+   - is not Highlander Summit
+   - is not protected (`system_protection`)
+   - is not archived
+2. It locks the event row (`select … for update`). A second attempt (double click, second tab, second Admin, network retry) waits for the first one, then sees a League and returns `already_league` with the same first session.
+   - A unique index allows only one converted session per league.
+   - Only one session can be Active at a time.
+3. It returns `name_mismatch` if `p_confirm_name` is not exactly the event name.
+4. It creates the first session: Active, order 1, marked `origin = 'converted'`.
+5. It sets `session_id` to the first session on every Tournament row of every session-scoped table: `matches`, `violations`, `field_log`, `field_reset_checks`, `alliances`, `nominations`, `shortlist`.
+   - Nothing else on those rows changes: match numbers, teams, fields, scores, winners, alliance teams, and violation details stay the same.
+   - Every row moves to the same session, so the session-keyed primary keys stay unique: Q1 becomes Session 1 → Q1.
+   - League-wide field log kinds (volunteer profiles, access-code requests and updates, sync and system tests) stay league-wide.
+   - `league_session_attendance` is not involved: Tournaments have none.
+6. Imported snapshots become the first session's:
+   - `skills_rankings`, `qualification_records`, and `judging_rank_order` are renamed to `<key>@<session>`. The values are not touched (scores, attempt counts, W-L-T, WP/AP/SP).
+   - Tournament ranks are copied into a `rank_snapshot@<session>` with exactly the same numbers. The team rows, including their rank, are not changed.
+7. It sets `event_format = 'league'` and `converted_to_league_at = now()`, through the format guard's one-way path.
+
+`tournament_conversion_preview(p_event)` returns the counts shown in the modal. It uses the same Admin, Highlander, protection, and archive checks.
+
+### League-wide data (left untouched)
+
+These are not copied or rewritten; they belong to the League simply because their event is now a League:
+
+- `teams`
+- `rules`
+- `event_access_credentials`
+- `event_members` (roles and the Developer flag)
+- `event_settings` (branding, field names, rules template, countdown, contacts, assignments, robot photo generation)
+- `watch_notes`
+- `ref_roster`
+- volunteer profile field log entries
+
+### Inspection photos
+
+Tournament robot photos stay exactly where they are in storage (`<event>/team/<TEAM>/<angle>-<id>.webp`), and their references on the team rows are unchanged. Nothing is copied or moved, so there is no step that could leave a broken reference. Storage and the database do not share a transaction, and none is needed.
+
+A photo **without** a session folder belongs to the converted first session:
+
+- It is shown in that session's robot pages and counted in its records.
+- Retaking that angle in that session replaces it, as in a Tournament.
+- Deleting that session removes it.
+- Other sessions do not see it. Their photos always use a session folder.
+
+### Queued writes, offline copies, and open devices
+
+- **Queued writes:** violations and robot photos queued on a device without a session (made while it was a Tournament) are checked before upload.
+  - If the write was made before the conversion, it goes to the first session.
+  - If it was made after the conversion and the first session is still Active, it also goes to the first session.
+  - Otherwise it is **held for review**: kept on the device in the failed sync list with an explanation, never uploaded to a guessed session. An Admin can discard it and re-enter it in the right session.
+- **Offline copies:** the first session can use the Tournament-era offline copy of teams, matches, and venue cloud reads until its own copy exists. Photo caches are keyed by storage path and keep working.
+- **Open devices:** a device that has the Tournament open notices the change on its next refresh (realtime event change, focus, reconnect). It shows **"This event has been converted to a League." [Continue to Session 1]**. If a violation or nomination form is open, it warns first and offers **Finish my entry first**, keeping a Continue banner. An entry saved meanwhile is placed in the Active (first) session by the server.
+- **Older builds:** a device still on an older build that writes without a session is placed in the Active session by the database trigger.
+
+### Local Venue Server
+
+No restart or re-pairing is needed: the event id and venue key do not change. Records the venue server stored while the event was a Tournament have no `session_id`. Devices show them in the converted first session and not in later sessions. New records carry their session, so nothing is duplicated or mixed.
+
 ## Event Command Center
 
 For Leagues only, the Command Center shows:
@@ -179,6 +261,9 @@ Between steps 1 and 2, devices still running the old build cannot save match sch
 A new build deployed **before** the SQL is run keeps working for Tournaments, using the old keys automatically. Creating a League then explains that the SQL file must be run first.
 
 ## Known limitations
+
+- Conversion is one-way and cannot be undone. Deleting the converted first session (with name confirmation) removes the Tournament-era records and photos with it.
+- A held queued write (made after conversion, once the first session is no longer Active) must be re-entered by hand in the right session.
 
 - Cumulative league standings are not calculated by design. Only imported snapshots are shown.
 - Bracket size, best-of, and match-count setup values are league-wide, not per session.

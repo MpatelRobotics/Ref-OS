@@ -12,6 +12,7 @@ import { getSyncConfig, isVenueMode, onSyncConfigChange, shouldProbeServedByVenu
 import * as venueSync from "./sync/venueSync.js";
 import SyncStatusModal from "./components/modals/SyncStatusModal.jsx";
 import LeagueOverview from "./league/LeagueOverview.jsx";
+import ConvertToLeagueModal from "./league/ConvertToLeagueModal.jsx";
 import { LeagueUiContext, activeSessionOf, sortSessions, formatSessionDate, SESSION_STATUS_LABELS } from "./league/leagueFormat.js";
 import { configured } from "./supabaseClient";
 import * as api from "./api";
@@ -1184,7 +1185,8 @@ export default function App() {
   if (!event) return <FullPage>Loading…</FullPage>;
 
   const renderTracker = (league = null) => <Tracker key={`${event.id}:${syncMode}${league ? `:${league.session.id}` : ""}`} league={league} initialEvent={event} meName={who.nickname} meFullName={who.fullName} mePhone={who.phone} isDeveloper={developer} role={role} theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} textScale={textScale} onCycleTextSize={cycleTextSize} onEditName={saveIdentity} onLock={lock} onLockToEventLogin={lockToEventLogin} onChooseEvent={chooseAnotherEvent}
-    onEventArchived={() => setArchivedNoticeId(event.id)} onArchivedBySelf={chooseAnotherEvent} />;
+    onEventArchived={() => setArchivedNoticeId(event.id)} onArchivedBySelf={chooseAnotherEvent}
+    onEventFormatChanged={(updated) => setEvent((current) => ({ ...current, ...(updated || {}), format: "league" }))} />;
   // League events choose (or follow) a session before the workspace opens. Tournaments are unchanged.
   if (event.format === "league") return <LeagueShell key={event.id} event={event} renderTracker={renderTracker} onChooseEvent={chooseAnotherEvent} onLockToEventLogin={lockToEventLogin} />;
   api.setLeagueContext("", "");
@@ -1204,7 +1206,10 @@ function LeagueShell({ event, renderTracker, onChooseEvent, onLockToEventLogin }
   const [teamCount, setTeamCount] = useState(null);
   const [followId, setFollowId] = useState("");
   const [pinnedId, setPinnedId] = useState(() => { try { return sessionStorage.getItem(leaguePinKey(eventId)) || ""; } catch { return ""; } });
-  const [overview, setOverview] = useState(null); // { isAdmin } while the League Overview is open over the workspace
+  // Opened right after this device converted a Tournament into this League.
+  const [overview, setOverview] = useState(() => {
+    try { const open = sessionStorage.getItem("refosOpenLeagueOverview") === eventId; sessionStorage.removeItem("refosOpenLeagueOverview"); return open ? { isAdmin: true } : null; } catch { return null; }
+  }); // { isAdmin } while the League Overview is open over the workspace
   const admin = (() => { try { return sessionStorage.getItem("refosAdmin") === "1"; } catch { return false; } })();
 
   const reload = useCallback(async () => {
@@ -1236,10 +1241,12 @@ function LeagueShell({ event, renderTracker, onChooseEvent, onLockToEventLogin }
   }, [active?.id, followId, sessions]);
   const workingId = admin && exists(pinnedId) ? pinnedId : exists(followId) ? followId : "";
   const working = list.find((s) => s.id === workingId) || null;
+  // A League converted from a Tournament: its first session owns the Tournament-era records.
+  const legacyId = list.find((s) => s.converted)?.id || "";
 
   useEffect(() => {
     if (working) return;
-    api.setLeagueContext(eventId, "");
+    api.setLeagueContext(eventId, "", legacyId);
     api.listTeams(eventId).then((teams) => setTeamCount(teams.length)).catch(() => {});
   }, [eventId, working?.id, sessions]);
 
@@ -1261,7 +1268,7 @@ function LeagueShell({ event, renderTracker, onChooseEvent, onLockToEventLogin }
   if (sessions === null) return <FullPage>Loading league…</FullPage>;
   const overviewProps = { eventId, eventName: event.name, sessions: list, workingSessionId: workingId, teamCount, onReload: reload, onOpenSession: openSession };
   if (!working) {
-    api.setLeagueContext(eventId, "");
+    api.setLeagueContext(eventId, "", legacyId);
     return (
       <>
         {loadError && <div className="bg-red-50 text-red-800 text-sm px-4 py-2 text-center">{loadError}</div>}
@@ -1269,8 +1276,9 @@ function LeagueShell({ event, renderTracker, onChooseEvent, onLockToEventLogin }
       </>
     );
   }
-  api.setLeagueContext(eventId, working.id);
+  api.setLeagueContext(eventId, working.id, legacyId);
   const league = {
+    legacySessionId: legacyId,
     eventId,
     eventName: event.name,
     sessions: sortSessions(list),
@@ -1609,7 +1617,7 @@ const ConfigError = () => (
 /* ==================================================================== */
 /*  TRACKER (the main app, scoped to one event)                        */
 /* ==================================================================== */
-function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf }) {
+function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf, onEventFormatChanged }) {
   // League events: this workspace is bound to ONE league session (league.session). Session-scoped
   // reads and writes are limited to it by api.js; null for Tournament events.
   const leagueSessionId = league?.session?.id || null;
@@ -1617,6 +1625,12 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   leagueReloadRef.current = league?.reload || null;
   // Queued writes made in another session of this league are kept and synced, but not shown here.
   const opInSession = (op, sessionOf) => !leagueSessionId || !sessionOf(op) || sessionOf(op) === leagueSessionId;
+  // Per-session device keys; a converted League's first session reuses its Tournament-era value.
+  const sessionStoreKey = (base) => `${base}${leagueSessionId ? `:${leagueSessionId}` : ""}`;
+  const readSessionStore = (base) => {
+    try { return localStorage.getItem(sessionStoreKey(base)) ?? (leagueSessionId && leagueSessionId === league?.legacySessionId ? localStorage.getItem(base) : null); }
+    catch { return null; }
+  };
   // Local Venue Server (Phase 1): status for the header badge and the Sync Status panel.
   const venueMode = isVenueMode();
   const [venueStatus, setVenueStatus] = useState(() => venueSync.getStatus());
@@ -1686,7 +1700,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   }, [eventId, onLock]);
 
   const [lastMatch, setLastMatch] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(`lastMatch:${eventId}${leagueSessionId ? `:${leagueSessionId}` : ""}`)) || { phase: "qual", num: "" }; }
+    try { return JSON.parse(readSessionStore(`lastMatch:${eventId}`)) || { phase: "qual", num: "" }; }
     catch { return { phase: "qual", num: "" }; }
   });
 
@@ -2118,11 +2132,13 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   })() : "";
   const [announcementAckTick, setAnnouncementAckTick] = useState(0);
   const [tmSyncStatus, setTmSyncStatus] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(`refosTmSync:${eventId}${leagueSessionId ? `:${leagueSessionId}` : ""}`)) || {}; }
+    try { return JSON.parse(readSessionStore(`refosTmSync:${eventId}`)) || {}; }
     catch { return {}; }
   });
   const [showRankings, setShowRankings] = useState(false);
   const [rankingsSessionId, setRankingsSessionId] = useState("");
+  const [showConvertLeague, setShowConvertLeague] = useState(false);
+  const [convertNoticeDeferred, setConvertNoticeDeferred] = useState(false);
   const [eventMembers, setEventMembers] = useState([]);
   const [alertStats, setAlertStats] = useState(null);
   const [alertStatsLoading, setAlertStatsLoading] = useState(false);
@@ -4444,6 +4460,35 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           </div>
         </div>
       )}
+      {!league && initialEvent.format !== "league" && event?.format === "league" && (() => {
+        // Another device converted this Tournament into a League. Stop working in Tournament mode;
+        // records saved meanwhile are placed in the League's first session by the server.
+        const entryOpen = !!(logFor || editing || nominating);
+        const proceed = () => onEventFormatChanged?.(event);
+        if (convertNoticeDeferred && entryOpen) {
+          return (
+            <div role="status" className="refos-desktop-strip max-w-2xl mx-auto px-4 pt-3">
+              <div className="rounded-xl border-2 border-sky-300 bg-sky-50 dark:border-sky-800 dark:bg-sky-950/40 p-3 flex flex-wrap items-center gap-2 text-sm text-sky-900 dark:text-sky-100">
+                <span className="flex-1 min-w-[12rem]">This event has been converted to a League. Finish your entry, then continue.</span>
+                <button type="button" onClick={proceed} className="rounded-lg bg-sky-700 px-3 py-1.5 text-xs font-bold text-white">Continue to Session 1</button>
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div className="fixed inset-0 z-[120] bg-black/60 flex items-center justify-center p-4">
+            <div role="alertdialog" aria-modal="true" aria-labelledby="converted-league-title" className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-800 p-5 shadow-2xl">
+              <h2 id="converted-league-title" className="text-lg font-bold text-slate-900 dark:text-white">This event has been converted to a League.</h2>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Its existing matches, violations, and other records are now the first league session. Continue to keep working there.</p>
+              {entryOpen && <p className="mt-2 text-sm font-semibold text-amber-700 dark:text-amber-300">You have an unsaved entry open. Finish it first, or continuing now will discard it.</p>}
+              <div className="mt-4 flex flex-col gap-2">
+                <button type="button" onClick={proceed} className="w-full rounded-lg bg-[#0D0F32] text-white px-4 py-2.5 font-semibold">Continue to Session 1</button>
+                {entryOpen && <button type="button" onClick={() => setConvertNoticeDeferred(true)} className="w-full rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2.5 font-semibold">Finish my entry first</button>}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       <main id="workspace" tabIndex={-1} className="refos-workspace mx-auto px-4 pb-28 pt-4">
         {league && !league.isActiveSession && (
           <div role="status" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100 flex flex-wrap items-center gap-2">
@@ -4769,8 +4814,22 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         onArchive={archiveCurrentEvent}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEventManagement(false)} />}
       {showEventSettings && adminUnlocked && <EventSettingsModal event={event} brand={brand} fieldNames={fieldNames}
+        eventFormat={league || event?.format === "league" ? "league" : "tournament"}
+        canConvertToLeague={!league && !isHighlander && event?.format !== "league"}
+        onConvertToLeague={() => setShowConvertLeague(true)}
         onSave={saveEventSettings}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEventSettings(false)} />}
+      {showConvertLeague && adminUnlocked && !league && !isHighlander && (
+        <ConvertToLeagueModal eventId={eventId} eventName={event?.name || ""}
+          onClose={() => setShowConvertLeague(false)}
+          onConverted={() => {
+            // Open the League Overview once the workspace reloads as a League.
+            try { sessionStorage.setItem("refosOpenLeagueOverview", eventId); } catch {}
+            setShowConvertLeague(false);
+            setShowEventSettings(false);
+            onEventFormatChanged?.({ ...event, format: "league" });
+          }} />
+      )}
       {showFieldNameConfigurator && adminUnlocked && <FieldNameConfiguratorModal current={fieldNames}
         onSave={saveFieldNames}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowFieldNameConfigurator(false)} />}
@@ -6551,7 +6610,7 @@ function RobotList({ teams, query, setQuery, onOpen }) {
 function LeagueEarlierRobotPhotos({ team, league, onOpenPhoto }) {
   const bySession = new Map();
   for (const path of team.allPhotoKeys || []) {
-    const sid = api.photoSessionId(path);
+    const sid = api.photoSessionFor(league.eventId, path);
     if (!sid || sid === league.session.id) continue;
     if (!bySession.has(sid)) bySession.set(sid, []);
     bySession.get(sid).push(path);
