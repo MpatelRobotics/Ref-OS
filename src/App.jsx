@@ -22,6 +22,7 @@ import { APP_VERSION } from "./appVersion";
 import { compressRobotPhoto } from "./photoCompression";
 import * as photoCache from "./photoCache";
 import CommandCenter from "./components/CommandCenter.jsx";
+import UserGuide from "./components/UserGuide.jsx";
 import EventContactDirectory from "./components/EventContactDirectory.jsx";
 import LoginScreen from "./auth/LoginScreen.jsx";
 import NameScreen from "./auth/NameScreen.jsx";
@@ -1832,6 +1833,8 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   const [showByRule, setShowByRule] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const [showFeatures, setShowFeatures] = useState(false);
+  const [showUserGuide, setShowUserGuide] = useState(false);
+  const [guideArticleId, setGuideArticleId] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
   // League: choosing another session in the TM Sync Center reopens it in that session.
   const [showTMSync, setShowTMSync] = useState(() => {
@@ -4490,6 +4493,10 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         );
       })()}
       <main id="workspace" tabIndex={-1} className="refos-workspace mx-auto px-4 pb-28 pt-4">
+        <button type="button" onClick={() => {
+          setGuideArticleId(({ teams: "teams", matches: "matches", rulebook: "rules", robots: isEmcee ? "emcee-start" : "photos", alliances: "alliances", judging: "judging", rankings: "rankings" })[view] || "navigation");
+          setShowUserGuide(true); setShowFeatures(true);
+        }} className="min-h-[44px] mb-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 inline-flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600"><BookOpen size={17} aria-hidden="true" />Help with this section</button>
         {league && !league.isActiveSession && (
           <div role="status" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100 flex flex-wrap items-center gap-2">
             <span className="flex-1 min-w-[12rem]"><b>{league.session.name}</b> is {SESSION_STATUS_LABELS[league.session.status].toLowerCase()}, not the Active session. Anything recorded here belongs to {league.session.name}.</span>
@@ -4900,7 +4907,14 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                 </div>
                 <button onClick={() => setShowFeedback(true)} className="px-3 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-semibold shrink-0">Send Feedback</button>
               </div>
-              <FeaturesGuide isHighlander={isHighlander} />
+              {showUserGuide ? <UserGuide role={myRole} initialArticleId={guideArticleId} onClose={() => { setShowUserGuide(false); setGuideArticleId(null); }} /> : <>
+                <button type="button" onClick={() => { setGuideArticleId(null); setShowUserGuide(true); }} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 dark:border-sky-700 bg-sky-50 dark:bg-sky-950/30 p-4 flex items-center gap-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600">
+                  <BookOpen size={24} aria-hidden="true" />
+                  <span className="flex-1"><span className="block font-bold">User Guide</span><span className="block text-sm text-slate-600 dark:text-slate-300">Search step-by-step instructions for your role. Available offline after the app is cached.</span></span>
+                  <ChevronRight size={20} aria-hidden="true" />
+                </button>
+                <FeaturesGuide isHighlander={isHighlander} />
+              </>}
               <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 text-sm"><div className="font-bold text-slate-900 dark:text-slate-100">Ref OS support & release</div><div className="mt-1 text-slate-600 dark:text-slate-300">Version v{APP_VERSION}{isHighlander ? " · Highlander Summit Release" : " · Multi Event Release"}</div><div className="mt-1 text-xs text-slate-500">Use Send Feedback above to report a bug or request a feature. Include the event name, device, and what you were doing when the issue occurred.</div></div>
             </div>
           </div>
