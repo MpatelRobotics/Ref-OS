@@ -33,6 +33,11 @@ test('Inspection hides administration and disciplinary entry articles', async ({
   await openGuide(page, 'Inspection');
   await expect(page.getByRole('button', { name: /^Clear Event Data safely/ })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /^Log and correct a violation/ })).toHaveCount(0);
+  await page.getByLabel('Search the guide').fill('Maharshi Patel');
+  await expect(page.getByRole('heading', { name: 'About the Founder' })).toBeVisible();
+  await expect(page.getByRole('status')).toHaveText('1 result');
+  await expect(page.getByText(/2022 VEX World Championship/)).toBeVisible();
+  await page.getByLabel('Search the guide').fill('');
   await page.getByLabel('Category').selectOption('Inspection');
   await page.getByRole('button', { name: /^Robot pictures and completion/ }).click();
   await expect(page.getByText(/Inspection can capture or retake pictures but cannot delete them/)).toBeVisible();
@@ -60,6 +65,8 @@ test('Features & Help and contextual help open the guide in the real workspace',
   await page.getByRole('button', { name: 'Close Quick Start' }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: /Features & Help/i }).click();
+  await expect(page.getByRole('heading', { name: 'About the Founder' })).toBeVisible();
+  await expect(page.getByText(/test engineer at Lockheed Martin/)).toBeVisible();
   await page.getByRole('button', { name: /^User Guide/ }).click();
   await expect(page.getByRole('heading', { name: 'Ref OS User Guide', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back to Features & Help' }).click();

@@ -23,6 +23,7 @@ import { compressRobotPhoto } from "./photoCompression";
 import * as photoCache from "./photoCache";
 import CommandCenter from "./components/CommandCenter.jsx";
 import UserGuide from "./components/UserGuide.jsx";
+import AboutFounder from "./components/AboutFounder.jsx";
 import EventContactDirectory from "./components/EventContactDirectory.jsx";
 import LoginScreen from "./auth/LoginScreen.jsx";
 import NameScreen from "./auth/NameScreen.jsx";
@@ -4913,7 +4914,8 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                   <span className="flex-1"><span className="block font-bold">User Guide</span><span className="block text-sm text-slate-600 dark:text-slate-300">Search step-by-step instructions for your role. Available offline after the app is cached.</span></span>
                   <ChevronRight size={20} aria-hidden="true" />
                 </button>
-                <FeaturesGuide isHighlander={isHighlander} />
+                <AboutFounder />
+                <div className="mt-4"><FeaturesGuide isHighlander={isHighlander} /></div>
               </>}
               <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 text-sm"><div className="font-bold text-slate-900 dark:text-slate-100">Ref OS support & release</div><div className="mt-1 text-slate-600 dark:text-slate-300">Version v{APP_VERSION}{isHighlander ? " · Highlander Summit Release" : " · Multi Event Release"}</div><div className="mt-1 text-xs text-slate-500">Use Send Feedback above to report a bug or request a feature. Include the event name, device, and what you were doing when the issue occurred.</div></div>
             </div>
