@@ -36,7 +36,8 @@ test('Inspection hides administration and disciplinary entry articles', async ({
   await page.getByLabel('Search the guide').fill('Maharshi Patel');
   await expect(page.getByRole('heading', { name: 'About the Founder' })).toBeVisible();
   await expect(page.getByRole('status')).toHaveText('1 result');
-  await expect(page.getByText(/2022 VEX World Championship/)).toBeVisible();
+  await expect(page.getByText(/My VEX journey started/)).toBeVisible();
+  await expect(page.getByText(/Excellence Award/)).toHaveCount(0);
   await page.getByLabel('Search the guide').fill('');
   await page.getByLabel('Category').selectOption('Inspection');
   await page.getByRole('button', { name: /^Robot pictures and completion/ }).click();
