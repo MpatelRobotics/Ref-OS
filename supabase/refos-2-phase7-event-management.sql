@@ -380,7 +380,7 @@ begin
          and c.credential_hash = encode(extensions.digest(v_code, 'sha256'::text), 'hex')
     )
     or encode(extensions.digest(v_code, 'sha256'::text), 'hex')
-       = 'eff2e136933cf23f058b6c99d558a9f2a06d291bd8f505e56c176d085b6e84bf';
+       = '6f2c53c4ccadf9cf527bfb28012762f525820091bbc3f54b3a8e3be752069406';
   end if;
 
   -- A wrong Admin/override code counts toward the same lockout as restore and login attempts.
@@ -501,7 +501,7 @@ begin
   -- Override only. Same hash as the permanent-delete override; no event access code is accepted.
   if v_code !~ '^[0-9][A-Z][0-9][0-9]$'
      or encode(extensions.digest(v_code, 'sha256'::text), 'hex')
-        <> 'eff2e136933cf23f058b6c99d558a9f2a06d291bd8f505e56c176d085b6e84bf' then
+        <> '6f2c53c4ccadf9cf527bfb28012762f525820091bbc3f54b3a8e3be752069406' then
     if v_attempt.user_id is null or v_attempt.window_started < now() - interval '5 minutes' then
       v_failed := 1;
       insert into public.event_access_attempts(event_id, user_id, failed_count, window_started, locked_until)
