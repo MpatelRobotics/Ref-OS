@@ -137,18 +137,21 @@ export async function pruneMissingEvents(existingEventIds) {
 //   1. IndexedDB hit: display immediately (works offline).
 //   2. Otherwise, when online: signed URL -> download -> cache -> display.
 //   3. Offline and never cached: report "offline"; never pretend it is available.
-export async function loadPhoto(path, getSignedUrl) {
+export async function loadPhoto(path, getSignedUrl, { refresh = false } = {}) {
   if (!path) return { status: "missing" };
+  // Discard only this downloaded cache entry, never the cloud photo or upload queue.
+  if (refresh) await deletePaths([path]);
   if (objectUrls.has(path)) return { url: objectUrls.get(path) };
-  const cached = await getCachedBlob(path);
+  const cached = refresh ? null : await getCachedBlob(path);
   if (cached) return { url: objectUrlFor(path, cached) };
   if (typeof navigator !== "undefined" && navigator.onLine === false) return { status: "offline" };
   try {
     const signed = await getSignedUrl(path);
     if (!signed) return { status: "missing" };
-    const response = await fetch(signed);
+    const response = await fetch(signed, { cache: "no-store" });
     if (!response.ok) return { status: response.status === 404 || response.status === 400 ? "missing" : "offline" };
     const blob = await response.blob();
+    if (!blob.size) return { status: "missing" };
     await putCachedBlob(path, blob);
     return { url: objectUrlFor(path, blob) };
   } catch {

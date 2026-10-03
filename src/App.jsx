@@ -1,3 +1,4 @@
+import Thumb from "./components/PhotoThumbnail.jsx";
 import React, { useState, useEffect, useMemo, useRef, useCallback, useContext } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -608,39 +609,6 @@ const ago = (ts) => {
 /* ---------- lazy photo thumbnail ----------
    Local IndexedDB cache first (works offline), otherwise a signed URL from Supabase Storage,
    which is then cached. Offline and never cached: an explicit "offline" state, not a fake image. */
-function Thumb({ pkey, onOpen, full = false, compact = false }) {
-  const [src, setSrc] = useState(null);
-  const [gone, setGone] = useState(false);
-  const [offline, setOffline] = useState(false);
-  const [retry, setRetry] = useState(0);
-  useEffect(() => {
-    let live = true;
-    setSrc(null);
-    setGone(false);
-    setOffline(false);
-    photoCache.loadPhoto(pkey, api.photoUrl).then((result) => {
-      if (!live) return;
-      if (result.url) setSrc(result.url);
-      else if (result.status === "offline") setOffline(true);
-      else setGone(true);
-    });
-    return () => { live = false; };
-  }, [pkey, retry]);
-  useEffect(() => {
-    if (!offline) return undefined;
-    const back = () => setRetry((n) => n + 1);
-    window.addEventListener("online", back);
-    return () => window.removeEventListener("online", back);
-  }, [offline]);
-  const size = full ? "w-full h-full" : compact ? "w-12 h-12" : "w-16 h-16";
-  if (offline) return <div title="Offline: this picture has not been downloaded on this device yet" className={`${size} rounded-lg bg-slate-100 dark:bg-slate-700 border border-dashed border-slate-300 dark:border-slate-600 grid place-items-center text-slate-400`}><CloudOff size={18} /></div>;
-  if (gone) return <div className={`${size} rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 grid place-items-center text-slate-300`}><ImageOff size={18} /></div>;
-  if (!src) return <div className={`${size} rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 animate-pulse`} />;
-  const image = <img src={src} alt="robot" className={`${size} rounded-lg object-cover border border-slate-200 dark:border-slate-700`} />;
-  if (!onOpen) return image;
-  return <button type="button" onClick={() => onOpen(src)} className={`${size} shrink-0`}>{image}</button>;
-}
-
 /* ==================================================================== */
 /*  ROOT: auth -> event selection -> tracker                            */
 const EVENT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
