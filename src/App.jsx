@@ -4478,8 +4478,8 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           {view === "awp" && <button onClick={() => { if (commandCenterChildOpen) return returnToCommandCenter(); setView("matches"); setQuery(""); }} className="refos-back-button mb-3" aria-label={commandCenterChildOpen ? "Back to Command Center" : "Back to Matches"}>
             <ChevronLeft size={18} /> Back
           </button>}
-          <p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: "Alliance selection", rankings: "Rankings"}[view] || "Event workspace"}</h2>
-          <p className="refos-description">{{teams: "Find a team. Review its history. Keep your crew informed.", matches: "Your schedule, field activity, and match details in one place.", robots: "A shared visual reference for every robot.", judging: "Capture the moments that deserve recognition.", rulebook: "Find the right rule when you need it.", awp: "Review autonomous observations across the event.", alliances: "Follow the path from selection to the final.", rankings: "Qualification standings and Skills Challenge scores."}[view]}</p></div>
+          <p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: "Alliances & bracket", rankings: "Rankings"}[view] || "Event workspace"}</h2>
+          <p className="refos-description">{{teams: "Find a team. Review its history. Keep your crew informed.", matches: "Your schedule, field activity, and match details in one place.", robots: "A shared visual reference for every robot.", judging: "Capture the moments that deserve recognition.", rulebook: "Find the right rule when you need it.", awp: "Review autonomous observations across the event.", alliances: "Import official alliances, then follow the bracket to the final.", rankings: "Qualification standings and Skills Challenge scores."}[view]}</p></div>
           <span className="refos-role">{adminUnlocked ? (isDeveloper ? "Developer" : "Admin") : isInspection ? "Inspection" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
         </section>}
         {!openTeam && !openMatch && !openRobot && view === "teams" && <dl className="refos-stats">
@@ -4536,7 +4536,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         ) : view === "awp" ? (
           <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} fieldNames={fieldNames} />
         ) : view === "alliances" ? (
-          <AllianceSelection teams={teams} alliances={alliances} matches={matches} canEditAlliances={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!isJudge && !isEmcee && !highlanderDemoLocked} onSet={setAllianceTeam} onFinalize={finalizeAlliances} onSetWinner={setMatchWinner} onClear={() => requireAdmin(() => { if (confirm("Clear all alliance picks? (This does not delete any matches already generated.)")) clearAlliances(); })} />
+          <AllianceSelection matches={matches} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
         ) : (
           <>
             {!event?.quals ? (
@@ -7152,35 +7152,10 @@ function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRanking
 }
 
 /* ============================ ALLIANCE SELECTION (admin) ============================ */
-function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSetWinner, onClear, canEditAlliances = false, canEditBracket = false }) {
-  const opts = [...teams].sort((a, b) => (Number(a.rank ?? 999999) - Number(b.rank ?? 999999)) || a.number.localeCompare(b.number, undefined, { numeric: true })).map((t) => t.number);
-  const SEEDS = Array.from({ length: 16 }, (_, i) => i + 1);
-  const filled = SEEDS.filter((s) => (alliances[s] || []).filter(Boolean).length > 0).length;
-  const selectedPicks = new Set();
-  for (const s of SEEDS) {
-    const pick = (alliances[s] || [])[1];
-    if (pick) selectedPicks.add(pick);
-  }
-  const Sel = ({ seed, idx, label }) => {
-    const v = (alliances[seed] || [])[idx] || "";
-    const captain = (alliances[seed] || [])[0] || "";
-    return (
-      <select value={v} onChange={(e) => onSet(seed, idx, e.target.value)}
-        disabled={!canEditAlliances || idx === 0}
-        className="flex-1 min-w-0 px-2 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm disabled:bg-slate-100 dark:disabled:bg-slate-700 disabled:text-slate-500">
-        <option value="">{label}</option>
-        {opts.map((n) => {
-          const usedAsPick = selectedPicks.has(n) && n !== v;
-          const isSelf = idx === 1 && n === captain;
-          const disabled = usedAsPick || isSelf;
-          return <option key={n} value={n} disabled={disabled}>{n}{usedAsPick ? " ✓" : ""}</option>;
-        })}
-      </select>
-    );
-  };
+function AllianceSelection({ matches, onImport, onSetWinner, canImport = false, canEditBracket = false }) {
   const ROUNDS = [["r16", "Round of 16"], ["qf", "Quarterfinals"], ["sf", "Semifinals"], ["final", "Finals (best of 3)"]];
   const byPhase = (p) => Object.values(matches || {}).filter((m) => m.phase === p).sort((a, b) => a.num - b.num);
-  const hasBracket = byPhase("r16").length > 0;
+  const hasBracket = ROUNDS.some(([phase]) => byPhase(phase).length > 0);
   // finals champion: an alliance that wins 2 of the 3 final games
   const finals = byPhase("final");
   let champion = null;
@@ -7203,29 +7178,18 @@ function AllianceSelection({ teams, alliances, matches, onSet, onFinalize, onSet
   return (
     <>
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
-        <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><GitBranch size={18} className="text-[#D7212B]" /> Alliance selection</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{canEditAlliances ? "Enter each alliance as it's picked (captain + 1st pick). Finalize to create the Round of 16. Bracket winners can then be advanced live." : "View the current alliance selections. Admin access is required to edit captains or picks."}</p>
-        <div className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">{filled} / 16 alliances entered{!canEditAlliances ? " · alliance picks view only" : ""}</div>
+        <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><GitBranch size={18} className="text-[#D7212B]" /> Import alliances</h2>
+        <ol className="list-decimal pl-5 mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+          <li>Complete and finalize alliance selection in Tournament Manager.</li>
+          <li>In Tournament Manager, export <b>Match List and Results</b> as a CSV file after the elimination match list has been created.</li>
+          <li>Choose <b>Import Alliances</b> below and select that CSV.</li>
+          <li>Review the change preview and the target event or League session, then choose <b>Apply changes</b>.</li>
+          <li>In the bracket below, select the winning alliance in each match to advance it to the next round. Select it again to clear a mistaken winner.</li>
+        </ol>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">This import currently requires a full Round of 16: eight Round 6 rows, with Instance 1 through 8 and the Round, Instance, Red1, Red2, Blue1, and Blue2 columns. Applying it replaces the current Round of 16 and all 16 alliance assignments.</p>
+        {canImport ? <button onClick={onImport} className="w-full sm:w-auto mt-4 px-5 py-3 rounded-xl bg-[#D7212B] hover:bg-[#B42024] text-white font-bold flex items-center justify-center gap-2"><GitBranch size={18} /> Import Alliances</button> : <p className="text-sm text-slate-500 dark:text-slate-400 mt-3">An event Admin imports alliances. Your available bracket controls appear below.</p>}
       </div>
-      <div className="space-y-2">
-        {SEEDS.map((seed) => {
-          const done = (alliances[seed] || []).filter(Boolean).length >= 2;
-          return (
-            <div key={seed} className={`rounded-xl border p-3 flex items-center gap-3 ${done ? "border-emerald-300 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20" : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"}`}>
-              <span className="w-8 shrink-0 text-center font-mono font-bold text-slate-900 dark:text-slate-100">A{seed}</span>
-              <Sel seed={seed} idx={0} label="Captain" />
-              <Sel seed={seed} idx={1} label="1st pick" />
-            </div>
-          );
-        })}
-      </div>
-      {canEditAlliances && (
-        <>
-          <button onClick={onFinalize} className="w-full mt-4 py-3 rounded-xl bg-[#D7212B] hover:bg-[#B42024] text-white font-bold flex items-center justify-center gap-2"><GitBranch size={18} /> Finalize alliances → create Round of 16</button>
-          <button onClick={onClear} className="w-full mt-2 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-medium">Clear all picks</button>
-        </>
-      )}
-      <p className="text-[11px] text-slate-400 mt-3 text-center">Bracket: 1v16, 8v9, 5v12, 4v13, 3v14, 6v11, 7v10, 2v15 (higher seed = red).</p>
+      {!hasBracket && <p className="text-sm text-slate-500 dark:text-slate-400">No elimination bracket loaded yet. Import the Tournament Manager file to get started.</p>}
 
       {hasBracket && (
         <div className="mt-6">
@@ -7791,12 +7755,11 @@ function FeaturesGuide({ isHighlander = true }) {
         </ul>
       </Section>
 
-      <Section icon={Trophy} title="Alliance selection & elimination bracket">
+      <Section icon={Trophy} title="Alliance import & elimination bracket">
         <ul className="space-y-1.5">
-          <Li><b>Ranking seeded captains</b> — uploaded Tournament Manager rankings automatically seed alliance captains before the official elimination bracket is imported.</Li>
-          <Li><b>Captain shifting</b> — if a higher seed selects a team that would have been a later captain, that team drops from the captain list and the remaining ranked teams move up.</Li>
-          <Li><b>Admin selection controls</b> — alliance captain and pick editing is Admin only.</Li>
-          <Li><b>Bracket permissions</b> — regular Referee and Emcee access can use their permitted bracket workflow; Judge Advisor access is view only.</Li>
+          <Li><b>Import alliances</b> — finalize alliance selection in Tournament Manager, export Match List and Results as CSV, then use Import Alliances on the Alliances page. An Admin reviews the preview before applying it.</Li>
+          <Li><b>Supported file</b> — a complete Round of 16 with Round 6, Instances 1–8 is required. The import replaces the existing Round of 16 and all 16 alliance assignments.</Li>
+          <Li><b>Bracket permissions</b> — Referees and Admins can select winners in permitted bracket controls. Judge Advisor and Emcee access is view only.</Li>
           <Li><b>Tournament Manager source of truth</b> — after a Round of 16 bracket is imported, Ref-OS preserves the imported alliances instead of overwriting them from rankings.</Li>
         </ul>
       </Section>
