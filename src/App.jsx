@@ -1,3 +1,4 @@
+import useMenuViewport from "./useMenuViewport.js";
 import Thumb from "./components/PhotoThumbnail.jsx";
 import React, { useState, useEffect, useMemo, useRef, useCallback, useContext } from "react";
 import { createPortal } from "react-dom";
@@ -1691,16 +1692,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   const confirmImport = (p) => new Promise((resolve) => setImportPreview({ ...p, chips: league ? [{ label: `Into ${league.session.name}` }, ...(p.chips || [])] : p.chips, resolve }));
   const [importing, setImporting] = useState(null); // { label, done, total } | null while an import is writing
   const menuRef = useRef(null);
-  const menuTimer = useRef(null);
-  useEffect(() => {
-    if (!menu) return;
-    const el = menuRef.current;
-    const reset = () => { clearTimeout(menuTimer.current); menuTimer.current = setTimeout(() => setMenu(false), 3500); };
-    reset();
-    const evs = ["pointerdown", "pointermove", "touchstart", "wheel", "scroll", "keydown"];
-    evs.forEach((ev) => el && el.addEventListener(ev, reset, { passive: true }));
-  return () => { clearTimeout(menuTimer.current); evs.forEach((ev) => el && el.removeEventListener(ev, reset)); };
-  }, [menu]);
+  useMenuViewport(menuRef, menu);
 
   useEffect(() => {
     const footer = workspaceFooterRef.current;
@@ -4171,7 +4163,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           <div className="relative">
             <button aria-label="Settings" onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
-              <div ref={menuRef} className="refos-menu-pop absolute right-0 mt-2 w-56 max-h-[75vh] overflow-y-auto overscroll-contain bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
+              <div ref={menuRef} className="refos-menu-pop absolute right-0 mt-2 w-56 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
                 {adminUnlocked && !isHighlander && <button onClick={() => { setMenu(false); ruleImportRef.current?.click(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><BookOpen size={16} /> Import event rules CSV</button>}
                 {isInspection ? (
                   <>
@@ -6846,7 +6838,8 @@ function JudgingView({ noms, viols, teamName, finalists, rankOrder = {}, canReor
 
 function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSetName, onClose, onSave }) {
   const [award, setAward] = useState(presetAward || "sportsmanship");
-  const [team, setTeam] = useState(teams[0]?.number ?? "");
+  const sortedTeams = useMemo(() => [...teams].sort((a, b) => String(a.number).localeCompare(String(b.number), "en", { numeric: true, sensitivity: "base" })), [teams]);
+  const [team, setTeam] = useState(sortedTeams[0]?.number ?? "");
   const [creatingNew, setCreatingNew] = useState(teams.length === 0);
   const [newNumber, setNewNumber] = useState("");
   const [newName, setNewName] = useState("");
@@ -6913,8 +6906,8 @@ function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSe
                 {teams.length > 0 && <button onClick={() => setCreatingNew(false)} className="text-sm text-slate-500 dark:text-slate-400 underline">Pick an existing team instead</button>}
               </div>
             ) : (
-              <select value={team} onChange={(e) => setTeam(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
-                {teams.map((t) => <option key={t.number} value={t.number}>{t.number}{t.name ? ` — ${t.name}` : ""}</option>)}
+              <select aria-label="Team to nominate" value={team} onChange={(e) => setTeam(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                {sortedTeams.map((t) => <option key={t.number} value={t.number}>{t.number}{t.name ? ` — ${t.name}` : ""}</option>)}
               </select>
             )}
           </div>
@@ -7174,14 +7167,14 @@ function AllianceSelection({ matches, onImport, onSetWinner, canImport = false, 
     const won = m.winner === side;
     return (
       <button disabled={!canEditBracket} onClick={() => canEditBracket && onSetWinner(m, side)}
-        className={`flex-1 min-w-0 px-2 py-1.5 rounded-lg border text-left disabled:cursor-default ${won ? (side === "red" ? "bg-red-600 text-white border-red-600" : "bg-blue-600 text-white border-blue-600") : `bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 ${side === "red" ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}`}>
+        className={`flex-1 min-w-0 min-h-[44px] px-2 py-2 rounded-lg border text-left break-words disabled:cursor-default ${won ? (side === "red" ? "bg-red-600 text-white border-red-600" : "bg-blue-600 text-white border-blue-600") : `bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 ${side === "red" ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}`}>
         <span className="font-mono text-xs font-bold">{teamsArr.join(" ") || "—"}</span>
         {won && <Check size={13} className="inline ml-1" />}
       </button>
     );
   };
   return (
-    <>
+    <section className="refos-alliances min-w-0" aria-label="Alliances and elimination bracket">
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><GitBranch size={18} className="text-[#D7212B]" /> Import alliances</h2>
         <ol className="list-decimal pl-5 mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
@@ -7215,8 +7208,8 @@ function AllianceSelection({ matches, onImport, onSetWinner, canImport = false, 
                 <div className="space-y-2">
                   {ms.map((m) => (
                     <div key={m.id} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[11px] font-bold text-slate-400 w-16 shrink-0">{phase === "final" ? `Final ${m.num}` : fmtMatch({ phase: m.phase, num: m.num })}</span>
+                      <div className="refos-bracket-match">
+                        <span className="refos-bracket-label font-mono text-[11px] font-bold text-slate-400 w-16 shrink-0">{phase === "final" ? `Final ${m.num}` : fmtMatch({ phase: m.phase, num: m.num })}</span>
                         <Side m={m} side="red" />
                         <span className="text-slate-300 text-xs font-sans shrink-0">vs</span>
                         <Side m={m} side="blue" />
@@ -7229,7 +7222,7 @@ function AllianceSelection({ matches, onImport, onSetWinner, canImport = false, 
           })}
         </div>
       )}
-    </>
+    </section>
   );
 }
 

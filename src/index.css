@@ -276,3 +276,24 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
   .refos-stats>div { scroll-snap-align:start; }
 }
 @media(prefers-reduced-motion:reduce) { .refos-mobile-sheet,.refos-mobile-sheet-backdrop { animation:none!important; } }
+
+/* Keep short mobile viewports usable without shrinking text or touch targets. */
+.refos-menu-pop { touch-action:pan-y; padding-bottom:max(.5rem, env(safe-area-inset-bottom)); }
+.refos-bracket-match { display:grid; grid-template-columns:4rem minmax(0,1fr) auto minmax(0,1fr); gap:8px; align-items:center; }
+.refos-alliances { overflow-wrap:anywhere; }
+@media (min-width:640px) and (max-width:1099px) {
+  .refos-desktop-nav { overflow-x:auto; overscroll-behavior-x:contain; }
+  .refos-desktop-nav>button { flex-shrink:0; }
+  .refos-desktop-utilities { display:flex; flex-shrink:0; align-items:center; gap:8px; }
+  .refos-sidebar-subtitle,.refos-sidebar-section-label,.refos-sidebar-footer { display:none; }
+}
+@media (max-width:1099px) and (max-height:500px) and (orientation:landscape) {
+  .refos-header-inner { min-height:56px; padding-top:6px; padding-bottom:6px; }
+  .refos-workspace { padding-top:16px; }
+  .refos-page-heading { margin-bottom:16px; }
+  .refos-page-heading h2 { font-size:1.5rem; }
+}
+@media (max-width:480px) {
+  .refos-bracket-match { grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); }
+  .refos-bracket-label { grid-column:1 / -1; }
+}
