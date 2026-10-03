@@ -9,7 +9,7 @@ const GitBranch = () => null, Check = () => null, Trophy = () => null;
 const fmtMatch = (phase, num) => phase + ' ' + num;
 ${component}
 export default AllianceSelection;`, {loader:'jsx',format:'esm'}).code;
-async function mount(page, {canImport=true, canEditBracket=true, phase='r16', empty=false} = {}) {
+async function mount(page, {canImport=true, canEditBracket=true, phase='r16', empty=false, finalsBestOf=1, finalWins=0} = {}) {
   await page.route('**/alliance-test-component.js', route => route.fulfill({contentType:'text/javascript',body:compiled}));
   await page.route('**/alliance-import-test', route => route.fulfill({contentType:'text/html',body:`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
     import React from '/node_modules/.vite/deps/react.js';
@@ -17,8 +17,8 @@ async function mount(page, {canImport=true, canEditBracket=true, phase='r16', em
     import Alliances from '/alliance-test-component.js';
     window.importClicks=0; window.selectedWinner=null;
     ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Alliances, {
-      matches: ${JSON.stringify(empty?{}:{test:{id:'test',phase,num:1,red:['1A','2B'],blue:['3C','4D']}})},
-      canImport:${canImport},canEditBracket:${canEditBracket},
+      matches: ${JSON.stringify(empty?{}:phase==='final'?Object.fromEntries([1,2,3].map(num=>['final-'+num,{id:'final-'+num,phase,num,red:['1A','2B'],blue:['3C','4D'],winner:num<=finalWins?'red':''}])):{test:{id:'test',phase,num:1,red:['1A','2B'],blue:['3C','4D']}})},
+      finalsBestOf:${finalsBestOf},canImport:${canImport},canEditBracket:${canEditBracket},
       onImport:()=>window.importClicks++,onSetWinner:(match,side)=>window.selectedWinner={id:match.id,side}
     }));
   </script></body></html>`}));
@@ -47,4 +47,28 @@ test('empty bracket provides an import starting point', async ({page}) => {
   await mount(page,{empty:true});
   await expect(page.getByText('No elimination bracket loaded yet.',{exact:false})).toBeVisible();
   await expect(page.getByRole('button',{name:'Import Alliances',exact:true})).toBeVisible();
+});
+
+test('best of 1 shows one final and names champion after one win', async ({page}) => {
+  await mount(page,{phase:'final',finalsBestOf:1,finalWins:1});
+  await expect(page.getByRole('heading',{name:'Finals (best of 1)',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'1A 2B',exact:true})).toHaveCount(1);
+  await expect(page.getByText('Champion alliance:',{exact:false})).toContainText('1A 2B');
+  await expect(page.getByText('Final 2',{exact:true})).toHaveCount(0);
+});
+test('best of 3 shows three finals and needs two wins', async ({page}) => {
+  await mount(page,{phase:'final',finalsBestOf:3,finalWins:1});
+  await expect(page.getByRole('heading',{name:'Finals (best of 3)',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'1A 2B',exact:true})).toHaveCount(3);
+  await expect(page.getByText('Champion alliance:',{exact:false})).toHaveCount(0);
+  await mount(page,{phase:'final',finalsBestOf:3,finalWins:2});
+  await expect(page.getByText('Champion alliance:',{exact:false})).toContainText('1A 2B');
+});
+test('automatic advancement creates the configured number of finals',async()=>{
+  const start=source.indexOf('  const advanceBracket = async (map) =>');
+  const fn=source.slice(start,source.indexOf('  const setMatchWinner =',start));
+  const run=new Function('event','map',`return (async()=>{const created=[];const api={addMatch:async(_,match)=>created.push(match)};const eventId='test';const reloadMatches=async()=>{};const winnerTeams=m=>m&&m.winner?(m.winner==='red'?m.red:m.blue):null;${fn}await advanceBracket(map);return created;})();`);
+  const map={'sf-1':{winner:'red',red:['1A','2B'],blue:[]},'sf-2':{winner:'blue',red:[],blue:['3C','4D']}};
+  expect((await run({finalsBestOf:1},map)).filter(m=>m.phase==='final').map(m=>m.num)).toEqual([1]);
+  expect((await run({finalsBestOf:3},map)).filter(m=>m.phase==='final').map(m=>m.num)).toEqual([1,2,3]);
 });

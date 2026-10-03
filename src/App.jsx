@@ -3370,7 +3370,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
     };
     for (let i = 1; i <= 4; i++) { const w1 = winnerTeams(get("r16", 2 * i - 1)), w2 = winnerTeams(get("r16", 2 * i)); if (w1 && w2) push("qf", i, w1, w2, `QF ${i}`); }
     for (let i = 1; i <= 2; i++) { const w1 = winnerTeams(get("qf", 2 * i - 1)), w2 = winnerTeams(get("qf", 2 * i)); if (w1 && w2) push("sf", i, w1, w2, `SF ${i}`); }
-    { const w1 = winnerTeams(get("sf", 1)), w2 = winnerTeams(get("sf", 2)); if (w1 && w2) for (let g = 1; g <= 3; g++) push("final", g, w1, w2, `Final ${g}`); }
+    { const w1 = winnerTeams(get("sf", 1)), w2 = winnerTeams(get("sf", 2)); if (w1 && w2) for (let g = 1; g <= (Number(event?.finalsBestOf) === 3 ? 3 : 1); g++) push("final", g, w1, w2, `Final ${g}`); }
     if (toCreate.length) { for (const mm of toCreate) await api.addMatch(eventId, mm); await reloadMatches(); }
   };
   const setMatchWinner = async (m, winner) => {
@@ -4530,7 +4530,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         ) : view === "awp" ? (
           <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} fieldNames={fieldNames} />
         ) : view === "alliances" ? (
-          <AllianceSelection matches={matches} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
+          <AllianceSelection matches={matches} finalsBestOf={event?.finalsBestOf} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
         ) : (
           <>
             {!event?.quals ? (
@@ -7150,17 +7150,19 @@ function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRanking
 }
 
 /* ============================ ALLIANCE SELECTION (admin) ============================ */
-function AllianceSelection({ matches, onImport, onSetWinner, canImport = false, canEditBracket = false }) {
-  const ROUNDS = [["r16", "Round of 16"], ["qf", "Quarterfinals"], ["sf", "Semifinals"], ["final", "Finals (best of 3)"]];
-  const byPhase = (p) => Object.values(matches || {}).filter((m) => m.phase === p).sort((a, b) => a.num - b.num);
+function AllianceSelection({ matches, finalsBestOf = 1, onImport, onSetWinner, canImport = false, canEditBracket = false }) {
+  const finalGames = Number(finalsBestOf) === 3 ? 3 : 1;
+  const winsNeeded = Math.floor(finalGames / 2) + 1;
+  const ROUNDS = [["r16", "Round of 16"], ["qf", "Quarterfinals"], ["sf", "Semifinals"], ["final", `Finals (best of ${finalGames})`]];
+  const byPhase = (p) => Object.values(matches || {}).filter((m) => m.phase === p && (p !== "final" || Number(m.num) <= finalGames)).sort((a, b) => a.num - b.num);
   const hasBracket = ROUNDS.some(([phase]) => byPhase(phase).length > 0);
-  // finals champion: an alliance that wins 2 of the 3 final games
+  // Count only finals in the configured series; preserve other saved matches.
   const finals = byPhase("final");
   let champion = null;
   if (finals.length) {
     const tally = {};
     for (const f of finals) { const w = f.winner ? (f.winner === "red" ? f.red : f.blue) : null; if (w) { const key = w.join(" "); tally[key] = (tally[key] || 0) + 1; } }
-    for (const k in tally) if (tally[k] >= 2) champion = k;
+    for (const k in tally) if (tally[k] >= winsNeeded) champion = k;
   }
   const Side = ({ m, side }) => {
     const teamsArr = side === "red" ? m.red : m.blue;
@@ -7192,7 +7194,7 @@ function AllianceSelection({ matches, onImport, onSetWinner, canImport = false, 
       {hasBracket && (
         <div className="mt-6">
           <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-1"><Trophy size={18} className="text-[#D7212B]" /> Bracket</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{canEditBracket ? "Tap the winning alliance in each match. Winners auto-advance — QF from R16, SF from QF, and a best-of-3 Final from SF. Tap a winner again to clear it." : "Current elimination bracket and winners — view only."}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{canEditBracket ? `Tap the winning alliance in each match. Winners auto-advance — QF from R16, SF from QF, and a best-of-${finalGames} Final from SF. Tap a winner again to clear it.` : "Current elimination bracket and winners — view only."}</p>
           {champion && (
             <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3 mb-3 flex items-center gap-2">
               <Trophy size={18} className="text-amber-500" />
