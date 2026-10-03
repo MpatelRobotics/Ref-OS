@@ -282,6 +282,12 @@ add('trouble', 'Troubleshooting', 'Missing tabs, stale data, and support', ALL,
   'Role restrictions, event protection, missing imported data, and network failures have different remedies.',
   'Do not include passwords, access cards, protected identifiers, private photos, or raw unreviewed diagnostics in public feedback.', ['roles', 'connection', 'offline']);
 
+add('view-feedback', 'Developer', 'View feedback submissions', ['Developer'],
+  'Read feedback sent from Features & Help for the current event or League session.', 'When reviewing bugs, requests, or general feedback.',
+  ['Sign in with Developer access and select the event and working League session.', 'Open Features & Help and choose View Feedback.', 'Search by message or sender, and review the submission date.', 'Use Back to Features & Help when finished.'],
+  'The screen lists saved feedback messages, newest first. New submissions appear as event data syncs. Other field log entries are excluded.',
+  'This screen is available only to Developers. It shows the current event or session, not a combined inbox across events. Older submissions may contain only the message, sender, and date.', ['trouble']);
+
 export const GUIDE_ARTICLES = articles;
 export function visibleArticles(role) {
   return articles.filter((a) => a.roles.includes(role));

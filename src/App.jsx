@@ -47,6 +47,7 @@ import LockDeviceModal from "./components/modals/LockDeviceModal.jsx";
 import EventLogo from "./components/EventLogo.jsx";
 import OfflineReadinessModal from "./components/modals/OfflineReadinessModal.jsx";
 import FeedbackModal from "./components/modals/FeedbackModal.jsx";
+import FeedbackViewer from "./components/FeedbackViewer.jsx";
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
 import HelpRequestModal from "./components/modals/HelpRequestModal.jsx";
 import manualQuickLinks from "./manualQuickLinks.json";
@@ -1805,6 +1806,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   const [showUserGuide, setShowUserGuide] = useState(false);
   const [guideArticleId, setGuideArticleId] = useState(null);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showFeedbackViewer, setShowFeedbackViewer] = useState(false);
   // League: choosing another session in the TM Sync Center reopens it in that session.
   const [showTMSync, setShowTMSync] = useState(() => {
     try { const reopen = sessionStorage.getItem("refosOpenTMSync") === "1"; sessionStorage.removeItem("refosOpenTMSync"); return reopen; } catch { return false; }
@@ -4876,6 +4878,8 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                 </div>
                 <button onClick={() => setShowFeedback(true)} className="px-3 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-semibold shrink-0">Send Feedback</button>
               </div>
+              {isDeveloper && !showFeedbackViewer && <button type="button" onClick={() => setShowFeedbackViewer(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 dark:border-sky-700 bg-sky-50 dark:bg-sky-950/30 p-4 text-left font-bold">View Feedback <span className="font-normal text-sm">· Developer only · {fieldLog.filter(entry => entry.kind === "feedback").length} submissions</span></button>}
+              {isDeveloper && showFeedbackViewer ? <FeedbackViewer isDeveloper={isDeveloper} entries={fieldLog} eventName={event?.name || "Current event"} sessionName={league ? league.sessionName(leagueSessionId) : ""} onClose={() => setShowFeedbackViewer(false)} /> : <>
               {showUserGuide ? <UserGuide role={myRole} initialArticleId={guideArticleId} onClose={() => { setShowUserGuide(false); setGuideArticleId(null); }} /> : <>
                 <button type="button" onClick={() => { setGuideArticleId(null); setShowUserGuide(true); }} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 dark:border-sky-700 bg-sky-50 dark:bg-sky-950/30 p-4 flex items-center gap-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600">
                   <BookOpen size={24} aria-hidden="true" />
@@ -4884,6 +4888,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                 </button>
                 <AboutFounder />
                 <div className="mt-4"><FeaturesGuide isHighlander={isHighlander} /></div>
+              </>}
               </>}
               <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 text-sm"><div className="font-bold text-slate-900 dark:text-slate-100">Ref OS support & release</div><div className="mt-1 text-slate-600 dark:text-slate-300">Version v{APP_VERSION}{isHighlander ? " · Highlander Summit Release" : " · Multi Event Release"}</div><div className="mt-1 text-xs text-slate-500">Use Send Feedback above to report a bug or request a feature. Include the event name, device, and what you were doing when the issue occurred.</div></div>
             </div>
