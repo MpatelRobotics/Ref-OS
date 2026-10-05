@@ -122,23 +122,6 @@ The code is retained in the event settings after a successful lookup. Automatic 
 
 At the bottom of team history, **Registered & Past Events** retrieves the exact team's associated events in a bounded past-year to next-year window. Upcoming events appear first. Successful results are cached on the device for offline viewing and reused for 15 minutes; **Refresh events** requests an update. The API's associated-event list does not guarantee registration status or include every future registration. Ambiguous team numbers show an error instead of selecting a different program's team.
 
-### Setup
-
-1. In the Supabase project's Edge Function secrets, add **`VEX_EVENTS_API_TOKEN`** with the approved VEX API token. Never put it in a `VITE_` variable, committed file, or frontend code.
-2. Sign in to the Supabase CLI and deploy the function. Replace `YOUR_PROJECT_REF` with the reference of the Supabase project used by that deployment:
-
-```bat
-npx supabase login
-npx supabase functions deploy vex-event-lookup --project-ref YOUR_PROJECT_REF --no-verify-jwt
-```
-
-The function validates the caller's Supabase session itself. `--no-verify-jwt` supports modern signing keys without removing that session check. Supabase anonymous sign-ins must be enabled, as for the rest of Ref OS.
-
-3. Publish the matching frontend build. Redeploy the function when its server code changes; frontend-only changes do not require redeployment. The existing token secret remains configured.
-4. Verify a known event, full team roster, selected division, and rankings with the live account. Local automated tests use fixtures and do not prove live API access.
-
-No additional database migration is required for the API integration. Detailed setup and limitations are in [`VEX-API-SETUP.md`](VEX-API-SETUP.md).
-
 ---
 
 ## Event lifecycle
@@ -307,10 +290,10 @@ Links to an archived event show an *event archived* screen instead of that event
 
 Robot photos are shared across every device signed in to the same event.
 
-- **Compressed in the browser before upload.** Photos are resized (longest side up to 1440 px), orientation-corrected, re-encoded as WebP where the browser supports it (JPEG otherwise), and stripped of camera metadata. The full-resolution original is never uploaded, and a photo that cannot be compressed is rejected with an error rather than uploaded as-is. Compression substantially reduces storage compared with full-resolution uploads; actual savings vary by photo.
+- **Compressed in the browser before upload.** Photos are resized (longest side up to 1440 px), orientation-corrected, re-encoded as WebP where the browser supports it (JPEG otherwise), and stripped of camera metadata. The full-resolution original is never uploaded, and the system rejects photos it can't compress with an error rather than uploading them as-is. Compression substantially reduces storage compared with full-resolution uploads; actual savings vary by photo.
 - **Shared cloud copy.** Supabase Storage is the source of truth, so every device at the event sees the same photos.
 - **Local device cache.** Each device keeps an IndexedDB cache of photos it has viewed or uploaded, so repeat views don't download again.
-- **Offline viewing.** Previously cached photos stay visible offline. A photo the device has never downloaded is clearly shown as unavailable while offline.
+- **Offline viewing.** Previously cached photos stay visible offline. A photo the device has never downloaded shows as unavailable while offline.
 - **Replacements.** Retaking a required photo (front, back, side, inspection tag, Lexan diagram) replaces the previous one across devices and removes the old cloud copy.
 - **Event-scoped storage.** Photo objects are stored under the event's ID, so they are isolated per event and can be identified for cleanup.
 - **Deletion cleanup.** Permanently deleting an event removes that event's cached photos from the deleting device and triggers a server-side cleanup of its cloud photo objects.
@@ -337,7 +320,7 @@ Offline support protects work created on that device. Seeing new information ent
 For venues with poor internet, an event can run the **Ref OS Venue Server** on a computer at the venue, such as a Tournament in a Box mini PC or a Raspberry Pi. Devices on the venue network then keep sharing live operations data through that computer when the internet is down. Cloud (Supabase) remains the default; each device is switched individually by an Admin (Event Command Center → **Sync & Venue Server**), or automatically when it opens Ref OS from the venue server's own address.
 
 - **Shared through the venue server (Phase 1):** violations, field log entries (timeouts, faults, replays, AWP checks, help requests, announcements), the volunteer roster, and who is online.
-- **Still needs Supabase and the internet:** signing in, Developer sign-in, event creation and settings, Access Management and access codes, archive, restore and deletion, Tournament Manager imports, judging, robot and inspection photos, and push notifications.
+- **Still needs Supabase and the internet:** signing in, Developer sign-in, event creation and settings, Access Management and access codes, archive, restore, and deletion, Tournament Manager imports, judging, robot and inspection photos, and push notifications.
 - **Offline queue:** each device keeps unsent changes and sends them when the venue server is reachable. Nothing is silently discarded.
 - **No automatic cloud copy yet.** Venue data is not copied into Supabase in this version. Use **Export Venue Data** after the event.
 - **Security:** the venue server never receives access codes, the Developer credential, or Supabase keys. Each event has its own venue sync key, which Supabase issues only to devices signed in to that event.
@@ -355,13 +338,13 @@ Setup for Windows and Raspberry Pi, firewall steps, backups, and the API are in 
 - **Protected lifecycle operations.** Archive, restore, and permanent deletion are enforced server-side, including Admin authorization, the archived-before-delete rule, and protection for protected events.
 - **Privileged keys stay on the server.** Service-role and notification credentials are used only by Supabase Edge Functions and are never included in the frontend.
 
-Access codes should be shared only with volunteers assigned to the corresponding role at that event.
+Share access codes only with volunteers assigned to the corresponding role at that event.
 
 ---
 
 ## Highlander Summit
 
-Highlander Summit was the original production event for Ref OS. It keeps a built-in event profile (name, logo, and branding), its bundled Override 2.0 Game Manual and rules, and its existing historical data.
+Highlander Summit was Ref OS's original production event. It keeps a built-in event profile (name, logo, and branding), its bundled Override 2.0 Game Manual and rules, and its existing historical data.
 
 Highlander Summit is a protected event: it cannot be archived or permanently deleted.
 
@@ -406,100 +389,6 @@ tests/                     Playwright tests
 tm-bridge/                 Optional Tournament Manager bridge utility
 venue-server/              Optional Local Venue Server (Node.js + SQLite); see VENUE-SERVER.md
 ```
-
----
-
-## Supabase setup
-
-Run the SQL files in the Supabase SQL Editor in the order below. Each builds on the ones before it, and the app calls functions defined in all of them. Review each file before running it against a production project.
-
-**1. Base schema and core features**
-
-| File | Purpose |
-|---|---|
-| `supabase/schema.sql` | Tables, row-level security, event roles, access validation, and the private `robot-photos` storage bucket |
-| `supabase/add-inspection-role.sql` | Inspection role and its permissions |
-| `supabase/reset-robot-pictures-safely.sql` | Robot photo references and safe photo resets |
-| `supabase/admin-role-assignment.sql` | Granting Admin to a signed-in volunteer |
-| `supabase/feedback.sql` | In-app feedback |
-| `supabase/push-notifications.sql` | Push notification subscriptions |
-| `supabase/all-role-push-help-requests.sql` | Push alerts for every role (run after `push-notifications.sql`) |
-| `supabase/alert-counter.sql` | Event alert counter |
-| `supabase/reset-volunteer-sign-ins.sql` | Reset Volunteer Sign Ins |
-
-**2. Multi-event platform**
-
-| File | Purpose |
-|---|---|
-| `supabase/refos-2-phase3-create-event.sql` | Create VEX Event |
-| `supabase/refos-2-phase3-credential-claim-fix.sql` | Current access-code validation |
-| `supabase/refos-2-phase3-event-discovery.sql` | Event list for *Choose VEX Event* |
-| `supabase/refos-2-phase4-event-access.sql` | Per-event access code management |
-| `supabase/refos-2-phase6-event-settings.sql` | Public event branding and field names for every role |
-| `supabase/refos-2-phase7-event-management.sql` | Archive, restore, protected permanent deletion, and photo cleanup queue |
-| `supabase/refos-2-robot-photo-storage.sql` | Robot photo storage permissions |
-| `supabase/refos-2-developer-access.sql` | Developer sign-in support for the `refos-developer-access` Edge Function (service-role only) |
-| `supabase/refos-2-venue-sync.sql` | Per-event venue sync keys for the optional Local Venue Server |
-| `supabase/refos-2-default-rules-template.sql` | Default rule library copied into every new event. Run after the Highlander Summit rules exist (`seed_rules.sql`); it takes a one-time snapshot of them. Re-run it if `refos-2-phase3-create-event.sql` is ever run again. |
-| `supabase/refos-2-league-events.sql` | League events: event format, league sessions, attendance, and session-scoped records. Run after `refos-2-default-rules-template.sql`, and deploy the matching build at the same time. |
-
-Some other files in `supabase/` apply only to the Highlander Summit deployment or to earlier releases. They are not needed for a new deployment.
-
-**3. Edge Functions**
-
-Deploy with the Supabase CLI:
-
-```bash
-npx supabase login
-npx supabase link --project-ref <your-project-ref>
-npx supabase functions deploy send-code-request-push
-npx supabase functions deploy purge-deleted-event-photos
-npx supabase functions deploy refos-developer-access
-```
-
-`refos-developer-access` reads its credential from the `REFOS_SUPER_ADMIN_CODE` Supabase secret (`npx supabase secrets set REFOS_SUPER_ADMIN_CODE=<code>`). The value is never stored in this repository, the database, or the app.
-
-- `send-code-request-push` delivers push alerts for help and access-code requests. It requires VAPID secrets; see [`PUSH-NOTIFICATIONS-SETUP.md`](PUSH-NOTIFICATIONS-SETUP.md).
-- `vex-event-lookup` supports event autofill, USA event search, qualification rankings, and team event history. It requires the server-only `VEX_EVENTS_API_TOKEN` secret; see [VEX Events API integration](#vex-events-api-integration).
-- `purge-deleted-event-photos` removes cloud photo objects for permanently deleted events. It uses the service role that Supabase provides to Edge Functions; no additional secrets are required.
-
-Anonymous sign-ins must be enabled in Supabase Auth, because each device uses an anonymous session before claiming an event role.
-
----
-
-## Local development
-
-Requirements: Node.js and npm, and a Supabase project set up as described above.
-
-```bash
-npm install
-cp .env.example .env   # then fill in the values below
-npm run dev
-```
-
-| Variable | Purpose |
-|---|---|
-| `VITE_SUPABASE_URL` | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anonymous (public) key |
-| `VITE_VAPID_PUBLIC_KEY` | Public VAPID key for push notifications (optional) |
-| `VITE_APP_VERSION` | Displayed version label (optional) |
-
-Other scripts:
-
-| Command | Purpose |
-|---|---|
-| `npm run build` | Production build (runs a schema check first) |
-| `npm run preview` | Preview the production build locally |
-| `npm run test:e2e` | Playwright end-to-end tests |
-| `npm run push:vapid-keys` | Generate VAPID keys for push notifications |
-
-Never commit `.env`, service-role keys, or other secrets.
-
----
-
-## Deployment
-
-The frontend is a static Vite build and can be deployed to Vercel (or any static host). Set the `VITE_` environment variables in the hosting provider. Supabase provides the database, authentication, realtime updates, file storage, and Edge Functions. See [`DEPLOY.md`](DEPLOY.md) for a step-by-step walkthrough.
 
 ---
 
