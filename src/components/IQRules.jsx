@@ -1,0 +1,9 @@
+import React,{useMemo,useState} from 'react';
+import IQManual from './IQManual.jsx';
+import rules from '../iqLevelUpRules.json';
+export default function IQRules(){
+ const [query,setQuery]=useState('');
+ const filtered=useMemo(()=>{const words=query.toLowerCase().replace(/[<>]/g,'').trim().split(/\s+/).filter(Boolean);return rules.filter(rule=>words.every(word=>`${rule.code} ${rule.desc} ${rule.category}`.toLowerCase().includes(word)));},[query]);
+ const categories=[...new Set(filtered.map(rule=>rule.category))];
+ return <section aria-label="IQ rules"><IQManual/><label className="block font-semibold text-sm mb-2" htmlFor="iq-rule-search">Search IQ rules</label><input id="iq-rule-search" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Rule code or keywords" className="w-full min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 mb-3"/><p className="text-sm text-slate-500 mb-4">{filtered.length} of {rules.length} rules · Level Up manual v2.0 quick-reference descriptions. These are brief guides; read the full manual for criteria, exceptions and rulings.</p>{categories.map(category=><div key={category} className="mb-5"><h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">{category}</h2><ul className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700">{filtered.filter(rule=>rule.category===category).map(rule=><li key={rule.code} className="flex items-start gap-3 px-4 py-3"><span className="font-mono font-bold shrink-0 w-20">&lt;{rule.code}&gt;</span><span className="text-sm text-slate-600 dark:text-slate-300">{rule.desc}</span></li>)}</ul></div>)}{!filtered.length&&<p role="status">No IQ rules match this search.</p>}</section>;
+}

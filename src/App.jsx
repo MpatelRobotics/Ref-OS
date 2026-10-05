@@ -1,3 +1,4 @@
+import IQRules from "./components/IQRules.jsx";
 import IQManual from "./components/IQManual.jsx";
 import EventProgramChoice, {detectEventProgram, programLabel} from "./components/EventProgramChoice.jsx";
 import TeamRegisteredEvents from "./components/TeamRegisteredEvents.jsx";
@@ -4550,7 +4551,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
             onNominate={(award) => setNominating(award || "sportsmanship")} onDeleteNom={removeNomination}
             onExport={isEmcee ? undefined : () => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
         ) : view === "rulebook" ? (
-          (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq" ? <IQManual /> : <RuleBook rules={rules} online={online} accent={brand.accent}
+          (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq" ? <IQRules /> : <RuleBook rules={rules} online={online} accent={brand.accent}
             qaUrl={officialResourcesFor(eventSettings?.rules_template?.value?.ruleset).qaUrl} />
         ) : view === "rankings" && adminUnlocked ? (
           league ? (() => {
@@ -8115,6 +8116,7 @@ const Label = ({ children }) => <label className="block text-xs font-semibold up
 const Empty = ({ title, sub }) => (
   <div className="text-center py-14 px-6"><p className="font-semibold text-slate-700 dark:text-slate-200">{title}</p><p className="text-sm text-slate-400 mt-1">{sub}</p></div>
 );
+
 
 
 

@@ -1,0 +1,470 @@
+[
+  {
+    "code": "SC1",
+    "desc": "All scoring statuses are evaluated after the Match ends",
+    "category": "Scoring",
+    "ord": 1
+  },
+  {
+    "code": "SC2",
+    "desc": "All scoring statuses are evaluated visually by a Head Referee",
+    "category": "Scoring",
+    "ord": 2
+  },
+  {
+    "code": "SC3",
+    "desc": "Scored Bean Bag in a Floor Goal criteria",
+    "category": "Scoring",
+    "ord": 3
+  },
+  {
+    "code": "SC4",
+    "desc": "Scored Bean Bag in a L1, L2, or L3 Goal criteria",
+    "category": "Scoring",
+    "ord": 4
+  },
+  {
+    "code": "SC5",
+    "desc": "Scored Bean Bag on a L4 Goal criteria",
+    "category": "Scoring",
+    "ord": 5
+  },
+  {
+    "code": "SG1",
+    "desc": "Starting a Match",
+    "category": "Specific Game",
+    "ord": 6
+  },
+  {
+    "code": "SG2",
+    "desc": "Horizontal expansion is limited",
+    "category": "Specific Game",
+    "ord": 7
+  },
+  {
+    "code": "SG3",
+    "desc": "Vertical expansion is unlimited",
+    "category": "Specific Game",
+    "ord": 8
+  },
+  {
+    "code": "SG4",
+    "desc": "Keep Scoring Objects in the Field",
+    "category": "Specific Game",
+    "ord": 9
+  },
+  {
+    "code": "SG5",
+    "desc": "Each Robot gets one yellow Bean Bag as a Preload",
+    "category": "Specific Game",
+    "ord": 10
+  },
+  {
+    "code": "SG6",
+    "desc": "Possession / Plowing is limited to a maximum of one (1) Bean Bag",
+    "category": "Specific Game",
+    "ord": 11
+  },
+  {
+    "code": "SG7",
+    "desc": "Using the Load Zone",
+    "category": "Specific Game",
+    "ord": 12
+  },
+  {
+    "code": "S1",
+    "desc": "Stay safe, don’t damage the Field",
+    "category": "Safety",
+    "ord": 13
+  },
+  {
+    "code": "S2",
+    "desc": "Students must be accompanied by an Adult",
+    "category": "Safety",
+    "ord": 14
+  },
+  {
+    "code": "S3",
+    "desc": "Each Student Team member must have a completed participant release form on file",
+    "category": "Safety",
+    "ord": 15
+  },
+  {
+    "code": "G1",
+    "desc": "Participants must follow the Code of Conduct",
+    "category": "General",
+    "ord": 16
+  },
+  {
+    "code": "G2",
+    "desc": "Participants must follow the Student Centered Policy",
+    "category": "General",
+    "ord": 17
+  },
+  {
+    "code": "G3",
+    "desc": "Use common sense",
+    "category": "General",
+    "ord": 18
+  },
+  {
+    "code": "G4",
+    "desc": "Students must meet the Student Eligibility Policy requirements",
+    "category": "General",
+    "ord": 19
+  },
+  {
+    "code": "G5",
+    "desc": "There is a difference between accidentally and willfully violating a Robot rule",
+    "category": "General",
+    "ord": 20
+  },
+  {
+    "code": "GG1",
+    "desc": "Drivers drive your Robot, and stay in the Driver Station",
+    "category": "General Game",
+    "ord": 21
+  },
+  {
+    "code": "GG2",
+    "desc": "A Team’s Robot should attend every Match",
+    "category": "General Game",
+    "ord": 22
+  },
+  {
+    "code": "GG3",
+    "desc": "Robots on the Field must be ready to play",
+    "category": "General Game",
+    "ord": 23
+  },
+  {
+    "code": "GG4",
+    "desc": "Hands out of the Field",
+    "category": "General Game",
+    "ord": 24
+  },
+  {
+    "code": "GG5",
+    "desc": "Match Replays are allowed, but rare",
+    "category": "General Game",
+    "ord": 25
+  },
+  {
+    "code": "GG6",
+    "desc": "Disqualifications",
+    "category": "General Game",
+    "ord": 26
+  },
+  {
+    "code": "GG7",
+    "desc": "Time-outs",
+    "category": "General Game",
+    "ord": 27
+  },
+  {
+    "code": "GG8",
+    "desc": "Keep your Robot together",
+    "category": "General Game",
+    "ord": 28
+  },
+  {
+    "code": "GG9",
+    "desc": "Don’t damage the Field",
+    "category": "General Game",
+    "ord": 29
+  },
+  {
+    "code": "GG10",
+    "desc": "Handling the Robot mid-Match is allowed under certain circumstances",
+    "category": "General Game",
+    "ord": 30
+  },
+  {
+    "code": "GG11",
+    "desc": "A Team’s two Drivers switch controllers midway through the Match",
+    "category": "General Game",
+    "ord": 31
+  },
+  {
+    "code": "GG12",
+    "desc": "Don’t start before the timer, and stop moving at the end of the Match",
+    "category": "General Game",
+    "ord": 32
+  },
+  {
+    "code": "GG13",
+    "desc": "Ending a Match early",
+    "category": "General Game",
+    "ord": 33
+  },
+  {
+    "code": "GG14",
+    "desc": "Drive Team Members are permitted to appeal the Head Referee’s ruling",
+    "category": "General Game",
+    "ord": 34
+  },
+  {
+    "code": "RSC1",
+    "desc": "Standard rules apply in most cases",
+    "category": "Robot Skills Challenge",
+    "ord": 35
+  },
+  {
+    "code": "RSC2",
+    "desc": "Scoring Robot Skills Matches",
+    "category": "Robot Skills Challenge",
+    "ord": 36
+  },
+  {
+    "code": "RSC3",
+    "desc": "Robot and Field setup for Robot Skills Matches",
+    "category": "Robot Skills Challenge",
+    "ord": 37
+  },
+  {
+    "code": "RSC4",
+    "desc": "Loading and Driver differences",
+    "category": "Robot Skills Challenge",
+    "ord": 38
+  },
+  {
+    "code": "RSC5",
+    "desc": "Handling Robots during an Autonomous Coding Skills Match",
+    "category": "Robot Skills Challenge",
+    "ord": 39
+  },
+  {
+    "code": "RSC6",
+    "desc": "Starting an Autonomous Coding Skills Match",
+    "category": "Robot Skills Challenge",
+    "ord": 40
+  },
+  {
+    "code": "RSC7",
+    "desc": "Autonomous means “no humans”",
+    "category": "Robot Skills Challenge",
+    "ord": 41
+  },
+  {
+    "code": "RSC8",
+    "desc": "Skills Stop Time",
+    "category": "Robot Skills Challenge",
+    "ord": 42
+  },
+  {
+    "code": "R1",
+    "desc": "One Robot per Team",
+    "category": "Robot",
+    "ord": 43
+  },
+  {
+    "code": "R2",
+    "desc": "Robots must pass inspection",
+    "category": "Robot",
+    "ord": 44
+  },
+  {
+    "code": "R3",
+    "desc": "Robots must fit within an 11” x 20” x 15” (279.4mm x 508mm x 381.0mm) volume",
+    "category": "Robot",
+    "ord": 45
+  },
+  {
+    "code": "R4",
+    "desc": "License Plates",
+    "category": "Robot",
+    "ord": 46
+  },
+  {
+    "code": "R5",
+    "desc": "Let it go after the Match is over",
+    "category": "Robot",
+    "ord": 47
+  },
+  {
+    "code": "R6",
+    "desc": "Robots have one Brain",
+    "category": "Robot",
+    "ord": 48
+  },
+  {
+    "code": "R7",
+    "desc": "Keep the power button accessible",
+    "category": "Robot",
+    "ord": 49
+  },
+  {
+    "code": "R8",
+    "desc": "Firmware",
+    "category": "Robot",
+    "ord": 50
+  },
+  {
+    "code": "R9",
+    "desc": "Motors",
+    "category": "Robot",
+    "ord": 51
+  },
+  {
+    "code": "R10",
+    "desc": "Batteries",
+    "category": "Robot",
+    "ord": 52
+  },
+  {
+    "code": "R11",
+    "desc": "One controller per Robot",
+    "category": "Robot",
+    "ord": 53
+  },
+  {
+    "code": "R12",
+    "desc": "Robots are built from the VEX IQ product line",
+    "category": "Robot",
+    "ord": 54
+  },
+  {
+    "code": "R13",
+    "desc": "Prohibited items",
+    "category": "Robot",
+    "ord": 55
+  },
+  {
+    "code": "R14",
+    "desc": "Legal Non-VEX IQ components",
+    "category": "Robot",
+    "ord": 56
+  },
+  {
+    "code": "R15",
+    "desc": "Decorations are allowed",
+    "category": "Robot",
+    "ord": 57
+  },
+  {
+    "code": "R16",
+    "desc": "Pneumatics",
+    "category": "Robot",
+    "ord": 58
+  },
+  {
+    "code": "R17",
+    "desc": "Modifications of parts",
+    "category": "Robot",
+    "ord": 59
+  },
+  {
+    "code": "T1",
+    "desc": "Head Referees have ultimate and final authority on all gameplay and Robot ruling decisions",
+    "category": "Tournament",
+    "ord": 60
+  },
+  {
+    "code": "T2",
+    "desc": "Head Referees must be qualified",
+    "category": "Tournament",
+    "ord": 61
+  },
+  {
+    "code": "T3",
+    "desc": "The Drive Team Members are permitted to immediately appeal the Head Referee’s ruling",
+    "category": "Tournament",
+    "ord": 62
+  },
+  {
+    "code": "T4",
+    "desc": "The Event Partner has ultimate authority regarding all non-gameplay decisions",
+    "category": "Tournament",
+    "ord": 63
+  },
+  {
+    "code": "T5",
+    "desc": "Be prepared for minor Field variance",
+    "category": "Tournament",
+    "ord": 64
+  },
+  {
+    "code": "T6",
+    "desc": "Fields and Field Elements may be repaired at the Event Partner’s discretion",
+    "category": "Tournament",
+    "ord": 65
+  },
+  {
+    "code": "T7",
+    "desc": "Fields at an event must be consistent with each other",
+    "category": "Tournament",
+    "ord": 66
+  },
+  {
+    "code": "T8",
+    "desc": "Qualification Matches will occur according to the official Match Schedule",
+    "category": "Tournament",
+    "ord": 67
+  },
+  {
+    "code": "T9",
+    "desc": "Each Team will be scheduled Qualification Matches as follows",
+    "category": "Tournament",
+    "ord": 68
+  },
+  {
+    "code": "T10",
+    "desc": "Teams are ranked by their average Qualification Match scores",
+    "category": "Tournament",
+    "ord": 69
+  },
+  {
+    "code": "T11",
+    "desc": "Qualification Match tiebreakers",
+    "category": "Tournament",
+    "ord": 70
+  },
+  {
+    "code": "T12",
+    "desc": "How Alliances are formed for Teamwork Matches",
+    "category": "Tournament",
+    "ord": 71
+  },
+  {
+    "code": "T13",
+    "desc": "Teams playing in Finals Matches.",
+    "category": "Tournament",
+    "ord": 72
+  },
+  {
+    "code": "T14",
+    "desc": "Finals Match Schedule",
+    "category": "Tournament",
+    "ord": 73
+  },
+  {
+    "code": "T15",
+    "desc": "Skills Match Schedule",
+    "category": "Tournament",
+    "ord": 74
+  },
+  {
+    "code": "T16",
+    "desc": "No requirement that Skills Fields have the same modifications as the Teamwork Fields",
+    "category": "Tournament",
+    "ord": 75
+  },
+  {
+    "code": "T17",
+    "desc": "Skills Rankings at events",
+    "category": "Tournament",
+    "ord": 76
+  },
+  {
+    "code": "T18",
+    "desc": "Skills Rankings globally",
+    "category": "Tournament",
+    "ord": 77
+  },
+  {
+    "code": "T19",
+    "desc": "Robot Skills at League Events",
+    "category": "Tournament",
+    "ord": 78
+  }
+]
