@@ -43,7 +43,7 @@ export default function EventModal({ event, onSave, onClose, competitionProgram=
           <div><Label>Practice matches (optional)</Label>
             <input value={practice} onChange={(e) => setPractice(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="leave blank if none"
               className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
-          <div className="grid grid-cols-2 gap-2">
+          {program === "iq" ? <div className="rounded-lg bg-sky-50 dark:bg-sky-950/30 p-3 text-sm">IQ uses ranked partner finals, one match per partnership. Choose the number of finals matches and review pairings in the Finals tab after importing official qualification ranks. There is no elimination bracket or best-of-three series.</div> : <div className="grid grid-cols-2 gap-2">
             <div><Label>Elimination bracket</Label>
               <select value={bracket} onChange={(e) => setBracket(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
                 <option value="0">None</option><option value="4">Top 4</option><option value="8">Top 8</option><option value="16">Top 16</option>
@@ -55,13 +55,14 @@ export default function EventModal({ event, onSave, onClose, competitionProgram=
               </select>
             </div>
           </div>
-          {bracket !== "0" && (
+          }
+          {program !== "iq" && bracket !== "0" && (
             <p className="text-[11px] text-slate-400">Generates {(() => { const ec = elimCounts(bracket); const parts = []; if (ec.r16) parts.push("R16-1…8"); if (ec.qf) parts.push("QF1…4"); if (ec.sf) parts.push("SF1…2"); parts.push(finalsBestOf === "3" ? "F1…3" : "F1"); return parts.join(", "); })()} as dropdowns.</p>
           )}
         </div>
         <div className="p-4 pt-0 flex gap-2">
           <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
-          <button onClick={() => onSave({ name, quals, practice, bracket, finalsBestOf, competitionProgram:program })} className="flex-1 py-2.5 rounded-lg font-semibold text-white bg-slate-900 hover:bg-slate-800">{creating ? "Create event" : "Save event"}</button>
+          <button onClick={() => onSave({ name, quals, practice, bracket:program==="iq"?"0":bracket, finalsBestOf:program==="iq"?"1":finalsBestOf, competitionProgram:program })} className="flex-1 py-2.5 rounded-lg font-semibold text-white bg-slate-900 hover:bg-slate-800">{creating ? "Create event" : "Save event"}</button>
         </div>
       </div>
     </div>

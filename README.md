@@ -31,9 +31,6 @@ Ref OS was originally developed for the Highlander Summit Signature Event and ha
 - [Highlander Summit](#highlander-summit)
 - [Tech stack](#tech-stack)
 - [Project structure](#project-structure)
-- [Supabase setup](#supabase-setup)
-- [Local development](#local-development)
-- [Deployment](#deployment)
 - [Attribution](#attribution)
 - [Disclaimer](#disclaimer)
 
@@ -84,9 +81,13 @@ For IQ events, the Rules tab provides:
 - The bundled **VEX IQ Level Up 2026–2027 Game Manual, version 2.0 (September 3, 2026)**. **Read IQ manual** and **Open PDF** open an in-app viewer with **Back to Ref OS**, including on mobile. **Download manual** saves a separate copy.
 - Offline manual access after the updated app finishes downloading its offline files. The bundled edition does not automatically track later official revisions.
 
-**Current scope:** IQ support covers the program choice, rules reference, and manual. IQ-specific schedules, teamwork scoring, finals, rankings, inspection, and referee workflows have not been adapted. Choosing IQ does not make the existing V5 competition tools IQ-ready. The existing Official Q&A link is for V5RC Override; an IQ-specific Q&A link is not implemented.
+IQ workflows now include **two-partner teamwork matches**, **one shared score**, a **Level Up bag-count scoring aid**, **ranked partner finals**, IQ violation rule choices, imported qualification averages/skills, and inspection preparation. IQ Event Setup and match screens omit the V5 elimination bracket, best-of-three finals, AWP, and opposing-alliance timeout controls.
 
-The program choice uses the existing `competition_program` event setting; it requires no additional database migration.
+Use **Matches → Import IQ schedule / results** with the official TM export. Supported CSV columns are `Round,Match,Team1,Team2,Field,Score`; blank scores retain saved results. Review before applying. In **Finals**, select the match count and preview ranks 1 + 2, 3 + 4, and so on; the lowest seed plays first. Saved scores update Ref OS only. TM remains the official source for rankings, excluded scores, no-shows, League eligibility, skills attempts and finals tiebreakers.
+
+**Setup:** run [`supabase/iq-competition-program.sql`](supabase/iq-competition-program.sql) in the Supabase SQL Editor after the existing schema and event-settings migration. This read-only function lets Inspection devices identify IQ without exposing other settings. Then publish the frontend. No VEX Edge Function redeployment is needed for these workflows.
+
+The inspection checklist is temporary and does not certify a pass. Photo completion indicates reference photos, not inspection certification. Individual skills attempts and automatic finals tiebreakers are not recorded/calculated in Ref OS. IQ uses individual TM imports; the V5 multi-file package classifier and IQ API rankings sync are not enabled. An IQ-specific Official Q&A link is not implemented. Detailed instructions, export formats and limits are in [`IQ-WORKFLOWS.md`](IQ-WORKFLOWS.md).
 
 ---
 
@@ -107,7 +108,7 @@ Manual creation remains available if lookup fails. If an event is created but it
 
 ### Qualification rankings sync
 
-Available to cloud Admins from **Rankings → VEX API Sync** or **Event Command Center → VEX API Sync**:
+Available to cloud Admins in V5RC / VEX U events from **Rankings → VEX API Sync** or **Event Command Center → VEX API Sync**:
 
 1. Confirm the saved event code. Divisions load automatically when a saved code is available; a single division is selected automatically. For a multi-division event, choose the division to import.
 2. Review the qualification rankings preview and confirm the target event and, for a League, the working session.
@@ -371,6 +372,7 @@ src/
   api.js                   Supabase data access (events, teams, matches, photos, lifecycle)
   officialResources.js     Per-season official links (Official Q&A)
   iqLevelUpRules.json       Bundled IQ rule codes and quick-reference descriptions
+  iq/                      IQ teamwork, shared scoring, ranked finals and inspection aids
   sync/                    Sync mode (Cloud or Local Venue Server) and venue server sync
   league/                  League Overview, session management, and league display helpers
   eventProfiles.js         Built-in event profiles and branding resolution

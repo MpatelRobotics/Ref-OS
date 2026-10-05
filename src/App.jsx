@@ -1,3 +1,6 @@
+import IQMatches, {IQMatchDetail, IQInspectionChecklist} from './iq/IQWorkflows.jsx';
+import {parseIQMatches, iqTeams} from './iq/iqWorkflows.js';
+import IQ_RULES from './iqLevelUpRules.json';
 import HighlanderPractice from "./components/HighlanderPractice.jsx";
 import IQRules from "./components/IQRules.jsx";
 import IQManual from "./components/IQManual.jsx";
@@ -180,7 +183,7 @@ function parseRankingsFile(text, filename = "") {
     stat("wp", "wp"); stat("ap", "ap"); stat("sp", "sp");
     stat("played", "numplayed", "played", "matchesplayed");
     stat("winPct", "winpercentage", "winpct");
-    stat("avgPoints", "averagepoints", "avgpoints");
+    stat("avgPoints", "averagepoints", "avgpoints", "averagescore", "avgscore", "average");
     stat("totalPoints", "totalpoints");
     stat("highScore", "highscore");
     return wlt || Object.keys(stats).length ? { ...(wlt || {}), ...stats } : null;
@@ -583,6 +586,7 @@ const elimCounts = (bracket) => {
 };
 const phaseCount = (phase, event) => {
   if (!event) return null;
+  if (event.competitionProgram === "iq" && phase === "final") return null;
   if (phase === "qual") return event.quals > 0 ? event.quals : null;
   if (phase === "practice") return event.practice > 0 ? event.practice : null;
   if (phase === "final") return event.bracket ? (event.finalsBestOf || 1) : null;
@@ -590,6 +594,7 @@ const phaseCount = (phase, event) => {
   return phase in ec ? ec[phase] : null;
 };
 const availablePhases = (event) => MATCH_PHASES.filter((p) => {
+  if (event?.competitionProgram === "iq") return ["qual","practice","final","skills","none"].includes(p.key);
   if (["qual", "practice", "skills", "none", "final"].includes(p.key)) return true;
   if (!event?.bracket) return true;
   return p.key in elimCounts(event.bracket);
@@ -1765,6 +1770,9 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   const [fieldLog, setFieldLog] = useState([]);
   const [fieldResetChecks, setFieldResetChecks] = useState([]);
   const [eventSettings, setEventSettings] = useState({});
+  const [programLookupError, setProgramLookupError] = useState("");
+  const isIQ = (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq";
+
   // Settings this device just saved. A realtime or focus refresh can return a server
   // snapshot read before that save committed; keep the just-saved row until the server
   // snapshot catches up, instead of letting the older snapshot overwrite it.
@@ -2332,6 +2340,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         })));
         // Inspection cannot read event_settings; load only the read-only display configuration:
         // configured field display names and the event's public branding (short name, logo, accent).
+        api.getEventCompetitionProgram(eventId).then(row => { if (row) setEventSettings(cur=>({...cur,competition_program:row})); setProgramLookupError(""); }).catch(()=>setProgramLookupError("Competition program could not be loaded. Ask the Admin to check IQ setup before using the rule library."));
         api.getEventFieldNames(eventId).then((row) => { if (row) setEventSettings((cur) => ({ ...cur, field_names: row })); }).catch(() => {});
         api.getPublicEventBranding(eventId).then((row) => { if (row) setEventSettings((cur) => ({ ...cur, event_branding: row })); }).catch(() => {});
         setSyncedAt(Date.now());
@@ -2816,6 +2825,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   };
 
   const importAlliancesFile = async (file) => {
+    if (isIQ) { alert("IQ uses ranked partner finals. Use the IQ Finals tab or import its schedule."); return; }
     if (!file) return;
     if (highlanderDemoLocked) { explainDemoLock(); return; }
     try {
@@ -3091,6 +3101,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
     } catch (error) { alert(error.message || "Could not import rules."); }
   };
   const importScoresFile = async (file) => {
+    if (isIQ && file) return importIQFile(file);
     if (!file) return;
     if (highlanderDemoLocked) { explainDemoLock(); return; }
     try {
@@ -3230,8 +3241,39 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
       alert("Could not read that file: " + (e.message || e) + "\n\nExport match results from Tournament Manager as CSV and try again.");
     } finally { setImporting(null); }
   };
+  const importIQRows = async (rows) => {
+    if (!adminUnlocked || !isIQ || highlanderDemoLocked) throw new Error("IQ match imports require Admin access to this IQ event.");
+    const targetSession = api.leagueSessionFor(eventId);
+    for (const row of rows) {
+      const old = matches[tmMatchKey(row.phase, row.num)];
+      if (row.redScore == null && old?.blueScore != null) throw new Error("The saved match has opposing scores. Include the reviewed IQ shared score to replace it.");
+      if (old?.redScore != null && row.redScore == null && iqTeams(old).join("|") !== iqTeams(row).join("|")) throw new Error("A scored match's partners changed without an updated score. Include the reviewed shared score.");
+    }
+    for (const row of rows) {
+      if (api.leagueSessionFor(eventId) !== targetSession) throw new Error("Working session changed. Reopen the import in the intended session.");
+      await api.addMatch(eventId, row);
+      if (row.redScore != null) await api.updateMatchScore(eventId, row.phase, row.num, row.redScore, null, null);
+    }
+    const unknown = [...new Set(rows.flatMap(iqTeams))].filter(number => !teams.some(team => team.number === number));
+    if (unknown.length) { await api.bulkUpsertTeams(eventId, unknown.map(number => ({number,name:""}))); setTeams(await api.listTeams(eventId)); }
+    await reloadMatches();
+    markTMSync("matches");
+  };
+  const saveIQScore = async (match, score) => {
+    if (!adminUnlocked || !isIQ) throw new Error("Only an Admin can save an IQ shared score.");
+    await api.updateMatchScore(eventId, match.phase, match.num, score, null, null);
+    await reloadMatches();
+  };
+  const importIQFile = async (file) => {
+    try {
+      const rows = parseIQMatches(await file.text(), file.name, parseCSV);
+      if (!await confirmImport({title:"IQ teamwork matches — change preview", chips:[{label:`${rows.length} matches in the current event/session`},{label:"Partner teams; one shared score"}], warnings:rows.map(row=>`${row.phase} ${row.num}: ${iqTeams(row).join(" + ")}${row.redScore == null ? " · score unchanged" : " · score " + row.redScore}`)})) return;
+      await importIQRows(rows);
+    } catch (error) { alert("IQ import failed: " + error.message + " Review and retry; some writes may have saved."); }
+  };
   const importMatchesFile = async (file) => {
     if (!file) return;
+    if (isIQ) return importIQFile(file);
     if (highlanderDemoLocked) { explainDemoLock(); return; }
     try {
       const text = await file.text();
@@ -3658,6 +3700,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
     for (const v of viols) { m[v.team] = m[v.team] || { total: 0, minor: 0, major: 0, inspection: 0 }; m[v.team].total++; m[v.team][v.type]++; }
     return m;
   }, [viols]);
+  const workflowRules = isIQ ? IQ_RULES : rules;
   const knownRules = useMemo(() => {
     const m = {};
     for (const v of viols) {
@@ -3728,6 +3771,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
 
   const teamRecords = useMemo(() => {
     const rec = {};
+    if (isIQ) return rec;
     const bump = (team, k) => { const x = rec[team] = rec[team] || { w: 0, l: 0, t: 0 }; x[k]++; };
     for (const m of Object.values(matches)) {
       if (m.phase !== "qual") continue; // W-L-T is the qualification record
@@ -3739,7 +3783,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
       for (const t of (m.blue || [])) bump(t, result === "blue" ? "w" : result === "red" ? "l" : "t");
     }
     return rec;
-  }, [matches]);
+  }, [matches, isIQ]);
   const teamWatch = useMemo(() => {
     const m = {};
     for (const w of watchNotes) { (m[w.team] = m[w.team] || []).push(w); }
@@ -4291,16 +4335,16 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         {!openTeam && !openMatch && !openRobot && (() => {
           const navItems = isInspection ? [
             { k: "robots", label: "Robots", Icon: Camera },
-            ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])
+            ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])
           ] : isJudge ? [
             { k: "judging", label: "Judging", Icon: Trophy },
-            { k: "alliances", label: "Alliances", Icon: GitBranch }
+            { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch }
           ] : [
-            ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
+            ...((isIQ || Object.keys(matches).length > 0) ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
             { k: "teams", label: "Teams", Icon: Users },
-            ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
+            ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
             { k: "robots", label: "Robots", Icon: Camera },
-            { k: "alliances", label: "Alliances", Icon: GitBranch },
+            { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch },
             { k: "judging", label: "Judging", Icon: Trophy },
             ...(adminUnlocked ? [{ k: "rankings", label: "Rankings", Icon: BarChart3 }] : [])
           ];
@@ -4340,14 +4384,14 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
       {!openTeam && !openMatch && !openRobot && !showIdentity && !logFor && !editing && (() => {
         const primary = isInspection ? [
           { k: "robots", label: "Robots", Icon: Camera },
-          ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])
+          ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])
         ] : isJudge ? [
           { k: "judging", label: "Judging", Icon: Trophy },
-          { k: "alliances", label: "Alliances", Icon: GitBranch }
+          { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch }
         ] : [
           { k: "matches", label: "Matches", Icon: ListOrdered },
           { k: "teams", label: "Teams", Icon: Users },
-          ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
+          ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
           { k: "robots", label: "Robots", Icon: Camera }
         ];
         return (
@@ -4365,16 +4409,16 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
       {mobileNavOpen && !openTeam && !openMatch && !openRobot && (() => {
         const navItems = isInspection ? [
           { k: "robots", label: "Robots", Icon: Camera },
-          ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])
+          ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])
         ] : isJudge ? [
           { k: "judging", label: "Judging", Icon: Trophy },
-          { k: "alliances", label: "Alliances", Icon: GitBranch }
+          { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch }
         ] : [
           { k: "teams", label: "Teams", Icon: Users },
-          ...(Object.keys(matches).length > 0 ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
-          ...(rules.length > 0 ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
+          ...((isIQ || Object.keys(matches).length > 0) ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
+          ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
           { k: "robots", label: "Robots", Icon: Camera },
-          { k: "alliances", label: "Alliances", Icon: GitBranch },
+          { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch },
           { k: "judging", label: "Judging", Icon: Trophy },
           ...(adminUnlocked ? [{ k: "rankings", label: "Rankings", Icon: BarChart3 }] : [])
         ];
@@ -4521,13 +4565,14 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         {highlanderDemoLocked && !isInspection && !isEmcee && <HighlanderPractice key={eventId} by={meName || "Demo Ref"}
           renderForm={({onSave,onClose}) => <LogModal practice teams={teams} viols={[]} presetTeam={openTeam || null} knownRules={knownRules} me={{name:meName || "Demo Ref"}} event={event} matches={matches} presetMatch={openMatch && matches[openMatch] ? {phase:matches[openMatch].phase,num:String(matches[openMatch].num)} : null} rules={rules} onOpenPhoto={setLightbox} fieldNames={fieldNames} onSetName={()=>{}} onSave={onSave} onClose={onClose} />}
           renderEntry={(entry,remove) => <ViolationCard key={entry.id} v={entry} showTeam canManage onDelete={remove} onOpenPhoto={setLightbox} />} />}
+        {isInspection && programLookupError && <p role="alert" className="mb-3 rounded-lg border border-amber-300 p-3 text-sm">{programLookupError}</p>}
         {!openTeam && !openMatch && !openRobot && <section className="refos-page-heading" aria-label="Workspace overview">
           <div>
           {view === "awp" && <button onClick={() => { if (commandCenterChildOpen) return returnToCommandCenter(); setView("matches"); setQuery(""); }} className="refos-back-button mb-3" aria-label={commandCenterChildOpen ? "Back to Command Center" : "Back to Matches"}>
             <ChevronLeft size={18} /> Back
           </button>}
-          <p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: "Alliances & bracket", rankings: "Rankings"}[view] || "Event workspace"}</h2>
-          <p className="refos-description">{{teams: "Find a team. Review its history. Keep your crew informed.", matches: "Your schedule, field activity, and match details in one place.", robots: "A shared visual reference for every robot.", judging: "Capture the moments that deserve recognition.", rulebook: "Find the right rule when you need it.", awp: "Review autonomous observations across the event.", alliances: "Import official alliances, then follow the bracket to the final.", rankings: "Qualification standings and Skills Challenge scores."}[view]}</p></div>
+          <p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: isIQ ? "IQ Teamwork Finals" : "Alliances & bracket", rankings: "Rankings"}[view] || "Event workspace"}</h2>
+          <p className="refos-description">{{teams: "Find a team. Review its history. Keep your crew informed.", matches: "Your schedule, field activity, and match details in one place.", robots: "A shared visual reference for every robot.", judging: "Capture the moments that deserve recognition.", rulebook: "Find the right rule when you need it.", awp: "Review autonomous observations across the event.", alliances: isIQ ? "Ranked partnerships, one shared score, and finals results." : "Import official alliances, then follow the bracket to the final.", rankings: "Qualification standings and Skills Challenge scores."}[view]}</p></div>
           <span className="refos-role">{adminUnlocked ? (isDeveloper ? "Developer" : "Admin") : isInspection ? "Inspection" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
         </section>}
         {!openTeam && !openMatch && !openRobot && view === "teams" && <dl className="refos-stats">
@@ -4536,19 +4581,19 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           {!isJudge && !isEmcee && <div><dt>Shared log</dt><dd>{viols.length}<span> entries</span></dd></div>}
         </dl>}
         {openTeam ? (
-          <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={teamRecords[openTeam]}
+          <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={isIQ ? undefined : teamRecords[openTeam]}
             onLog={highlanderDemoLocked ? undefined : () => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked && !highlanderDemoLocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : openMatch ? (
-          <MatchDetail match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
+          isIQ ? <IQMatchDetail key={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols} fieldLog={fieldLog} canEdit={adminUnlocked && !highlanderDemoLocked} onSaveScore={saveIQScore} onLogTeam={!isEmcee && !isJudge ? number => { const m=matches[openMatch]; setLogFor(number); setLogMatch({phase:m.phase,num:m.num}); } : null} onAddField={!isEmcee && !isJudge ? addFieldLog : null} /> : <MatchDetail match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
             fieldLog={fieldLog} fieldResetChecks={fieldResetChecks} onVerifyFieldReset={verifyFieldResetQuadrant} onResetFieldReset={resetFieldResetMatch}
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={highlanderDemoLocked ? undefined : (n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} emcee={isEmcee} />
         ) : openRobot ? (
-          <RobotDetail team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} canTakePhotos={!isEmcee} canDeletePhotos={!isInspection && !isEmcee} />
+          <RobotDetail isIQ={isIQ} team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} canTakePhotos={!isEmcee} canDeletePhotos={!isInspection && !isEmcee} />
         ) : view === "matches" ? (
-          <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
+          isIQ ? <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} parseCSV={parseCSV} /> : <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
-          <RobotList teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
+          <RobotList isIQ={isIQ} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "judging" ? (
           <JudgingView noms={noms} viols={viols} teamName={teamNameMap} finalists={finalists} rankOrder={eventSettings?.judging_rank_order?.value || {}} canReorder={adminUnlocked} onMoveRank={moveJudgingRank} emcee={isEmcee}
             onToggleFinalist={(award, team) => (isJudge ? toggleFinalist(award, team) : requireAdmin(() => toggleFinalist(award, team)))}
@@ -4577,14 +4622,14 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                   </select>
                   <span className="text-xs text-slate-500 dark:text-slate-400">Imported Tournament Manager snapshot from {league.sessionName(snapshotId)}{importedAt ? ` · ${new Date(importedAt).toLocaleString()}` : " · not imported"}</span>
                 </div>
-                <EventRankings teams={snapshotTeams} records={isCurrent ? teamRecords : {}} importedRecords={snapshot("qualification_records")?.records || {}} skills={snapshot("skills_rankings")?.rows || []} onImportSkills={isCurrent ? () => skillsFileRef.current?.click() : null} />
+                <EventRankings isIQ={isIQ} teams={snapshotTeams} records={isCurrent ? teamRecords : {}} importedRecords={snapshot("qualification_records")?.records || {}} skills={snapshot("skills_rankings")?.rows || []} onImportSkills={isCurrent ? () => skillsFileRef.current?.click() : null} />
               </>
             );
-          })() : <EventRankings teams={teams} records={teamRecords} importedRecords={eventSettings?.qualification_records?.value?.records || {}} skills={eventSettings?.skills_rankings?.value?.rows || []} onImportSkills={() => skillsFileRef.current?.click()} />
+          })() : <EventRankings isIQ={isIQ} teams={teams} records={teamRecords} importedRecords={eventSettings?.qualification_records?.value?.records || {}} skills={eventSettings?.skills_rankings?.value?.rows || []} onImportSkills={() => skillsFileRef.current?.click()} />
         ) : view === "awp" ? (
-          <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} fieldNames={fieldNames} />
+          isIQ ? <p>AWP is a V5 tool. IQ teamwork has no autonomous win point.</p> : <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} fieldNames={fieldNames} />
         ) : view === "alliances" ? (
-          <AllianceSelection matches={matches} finalsBestOf={event?.finalsBestOf} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
+          isIQ ? <IQMatches key={`iq-finals-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} parseCSV={parseCSV} /> : <AllianceSelection matches={matches} finalsBestOf={event?.finalsBestOf} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
         ) : (
           <>
             {!event?.quals ? (
@@ -4662,12 +4707,12 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         onClose={() => setShowTeamScanner(false)}
       />}
       {logFor !== null && (
-        <LogModal teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} presetMatch={logMatch} rules={rules} onOpenPhoto={setLightbox} fieldNames={fieldNames}
+        <LogModal isIQ={isIQ} teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={{...event,competitionProgram:isIQ?"iq":"v5"}} matches={matches} presetMatch={logMatch} rules={workflowRules} onOpenPhoto={setLightbox} fieldNames={fieldNames}
           onSetName={() => openIdentityEditor()} onClose={() => { setLogFor(null); setLogMatch(null); }}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await saveViolation({ ...form, team }); setLogFor(null); setLogMatch(null); }} />
       )}
       {editing && (
-        <LogModal teams={teams} viols={viols} presetTeam={editing.team} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={event} matches={matches} rules={rules} onOpenPhoto={setLightbox} edit={editing} fieldNames={fieldNames}
+        <LogModal isIQ={isIQ} teams={teams} viols={viols} presetTeam={editing.team} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={{...event,competitionProgram:isIQ?"iq":"v5"}} matches={matches} rules={workflowRules} onOpenPhoto={setLightbox} edit={editing} fieldNames={fieldNames}
           onSetName={() => openIdentityEditor()} onClose={() => setEditing(null)}
           onSave={async (form) => {
             const team = await upsertTeam(form.team || form.newNumber, form.newName);
@@ -4727,7 +4772,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         </div>
       )}
       {showTMSync && (
-        <TMSyncCenter
+        <TMSyncCenter isIQ={isIQ}
           protectedKeys={highlanderDemoLocked ? ["matches", "alliances", "scores"] : []}
           onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowTMSync(false)}
           onImportTeams={() => teamFileRef.current?.click()}
@@ -4736,7 +4781,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           onImportSkills={() => skillsFileRef.current?.click()}
           onImportAlliances={() => allianceFileRef.current?.click()}
           onImportScores={() => scoreFileRef.current?.click()}
-          onImportPackage={() => tmPackageFileRef.current?.click()}
+          onImportPackage={isIQ ? null : () => tmPackageFileRef.current?.click()}
           packageRunning={tmPackageRunning}
           leagueImport={league ? {
             leagueName: league.eventName,
@@ -4884,7 +4929,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         onTwoDeviceSyncTest={() => openCommandCenterTool(() => setShowTwoDeviceSyncTest(true))}
         onDiagnosticReport={() => openCommandCenterTool(() => setShowDiagnosticReport(true))}
         onEventSetup={() => openCommandCenterTool(() => setShowEvent(true))}
-        onVexSync={!highlanderDemoLocked && !isVenueMode() ? () => openCommandCenterTool(() => setShowVexLiveSync(true)) : null}
+        onVexSync={!isIQ && !highlanderDemoLocked && !isVenueMode() ? () => openCommandCenterTool(() => setShowVexLiveSync(true)) : null}
         onTMSync={() => openCommandCenterTool(() => setShowTMSync(true))}
         onExportViolations={exportCSV}
         onExportNominations={exportNominations}
@@ -4892,7 +4937,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         onBackupAll={backupAll}
         onActivityFeed={() => openCommandCenterTool(() => setShowActivity(true))}
         onRankings={() => openCommandCenterTool(() => setShowRankings(true))}
-        onAwpHistory={() => openCommandCenterTool(() => { setView("awp"); setQuery(""); })}
+        onAwpHistory={isIQ ? null : () => openCommandCenterTool(() => { setView("awp"); setQuery(""); })}
         onClearData={() => openCommandCenterTool(() => setShowClear(true))}
         onResetVolunteerSignIns={async () => {
           try {
@@ -4943,8 +4988,8 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           </div>
         </div>
       )}
-      {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && view === "rankings" && <button type="button" onClick={() => setShowVexLiveSync(true)} className="my-3 rounded-lg border border-blue-300 px-4 py-2 font-semibold">VEX API Sync · Qualification Rankings</button>}
-      {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexLiveSync visible={showVexLiveSync} onOpen={() => setShowVexLiveSync(true)} key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onSaveCode={async code => { if (eventSettings?.vex_event?.value?.code === code) return; const saved = await api.upsertEventSetting(eventId, "vex_event", { ...(eventSettings?.vex_event?.value || {}), code }); setEventSettings(prev => ({ ...prev, vex_event:saved })); }} onFetch={api.getVexStandings} onApply={applyVexSnapshot} onClose={() => setShowVexLiveSync(false)} />}
+      {!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode() && view === "rankings" && <button type="button" onClick={() => setShowVexLiveSync(true)} className="my-3 rounded-lg border border-blue-300 px-4 py-2 font-semibold">VEX API Sync · Qualification Rankings</button>}
+      {!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexLiveSync visible={showVexLiveSync} onOpen={() => setShowVexLiveSync(true)} key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onSaveCode={async code => { if (eventSettings?.vex_event?.value?.code === code) return; const saved = await api.upsertEventSetting(eventId, "vex_event", { ...(eventSettings?.vex_event?.value || {}), code }); setEventSettings(prev => ({ ...prev, vex_event:saved })); }} onFetch={api.getVexStandings} onApply={applyVexSnapshot} onClose={() => setShowVexLiveSync(false)} />}
       {showFeedback && <FeedbackModal meName={meName} myRole={myRole} onSubmit={addFieldLog} onClose={() => setShowFeedback(false)} />}
       {showOnboarding && <QuickStartModal step={onboardingStep} setStep={setOnboardingStep} onClose={closeOnboarding} />}
       {undoPrompt && (
@@ -5262,7 +5307,7 @@ function ByRule({ viols, expandRule, setExpandRule }) {
 }
 
 /* ============================ LOG MODAL ============================ */
-function LogModal({ practice = false, teams, viols, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, edit, onSetName, onClose, onSave, fieldNames = DEFAULT_FIELD_NAMES }) {
+function LogModal({ isIQ = false, practice = false, teams, viols, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, edit, onSetName, onClose, onSave, fieldNames = DEFAULT_FIELD_NAMES }) {
   const ruleBook = useMemo(() => {
     const m = {}; for (const r of (rules || [])) m[r.code] = r.desc; return m;
   }, [rules]);
@@ -5441,9 +5486,7 @@ function LogModal({ practice = false, teams, viols, presetTeam, knownRules, me, 
                 <div className="mt-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5">
                   <p className="text-[11px] text-slate-400 mb-1.5">Teams in this match — tap the one that committed the violation:</p>
                   <div className="flex flex-wrap items-center gap-1.5">
-                    {m.red.map((n) => chip(n, "red"))}
-                    <span className="text-slate-300 px-1">vs</span>
-                    {m.blue.map((n) => chip(n, "blue"))}
+                    {isIQ ? iqTeams(m).map(n=>chip(n,"blue")) : <>{m.red.map((n) => chip(n, "red"))}<span className="text-slate-300 px-1">vs</span>{m.blue.map((n) => chip(n, "blue"))}</>}
                   </div>
                 </div>
               );
@@ -6605,7 +6648,7 @@ function robotAngleCount(team) {
   return REQUIRED_ROBOT_ANGLES.filter((angle) => angles.has(angle.key)).length;
 }
 
-function RobotList({ teams, query, setQuery, onOpen }) {
+function RobotList({ isIQ = false, teams, query, setQuery, onOpen }) {
   const q = query.trim().toUpperCase();
   const list = [...teams].sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
   const filtered = q ? list.filter((t) => t.number.toUpperCase().includes(q) || (t.name || "").toUpperCase().includes(q)) : list;
@@ -6672,16 +6715,17 @@ function LeagueEarlierRobotPhotos({ team, league, onOpenPhoto }) {
   );
 }
 
-function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, canTakePhotos = true, canDeletePhotos = true }) {
+function RobotDetail({ isIQ = false, team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, canTakePhotos = true, canDeletePhotos = true }) {
   const league = useContext(LeagueUiContext);
   const [busy, setBusy] = useState(false);
   const [captureAngle, setCaptureAngle] = useState("");
   const [sequenceIndex, setSequenceIndex] = useState(-1);
   const fileRef = useRef(null);
   if (!team) return <Empty title="Team not found" sub="" />;
+  const photoSlots = isIQ ? ROBOT_PHOTO_SLOTS.filter(slot=>slot.key!=="lexan") : ROBOT_PHOTO_SLOTS;
   const photos = team.photoKeys || [];
   const pendingPhotos = team._pendingRobotPhotos || [];
-  const slotData = ROBOT_PHOTO_SLOTS.map((angle) => ({
+  const slotData = photoSlots.map((angle) => ({
     ...angle,
     remote: [...photos].reverse().find((path) => robotPhotoAngle(path) === angle.key) || "",
     pending: [...pendingPhotos].reverse().find((photo) => photo.angle === angle.key) || null,
@@ -6698,7 +6742,7 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
   };
   const beginSequence = () => {
     setSequenceIndex(0);
-    setCaptureAngle(ROBOT_PHOTO_SLOTS[0].key);
+    setCaptureAngle(photoSlots[0].key);
   };
   const add = async (file) => {
     if (!file || !captureAngle) return;
@@ -6709,11 +6753,11 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
       const { dataUrl } = await compressRobotPhoto(file);
       await onAddPhoto(team.number, dataUrl, captureAngle);
       const nextIndex = sequenceIndex + 1;
-      if (sequenceIndex >= 0 && nextIndex < ROBOT_PHOTO_SLOTS.length) {
+      if (sequenceIndex >= 0 && nextIndex < photoSlots.length) {
         setSequenceIndex(nextIndex);
-        setCaptureAngle(ROBOT_PHOTO_SLOTS[nextIndex].key);
+        setCaptureAngle(photoSlots[nextIndex].key);
         // Leave the optional Lexan photo as a choice after the required pictures.
-        if (ROBOT_PHOTO_SLOTS[nextIndex].required) {
+        if (photoSlots[nextIndex].required) {
           // Mobile browsers may require another tap to reopen the camera.
           setTimeout(() => fileRef.current?.click(), 0);
         }
@@ -6729,6 +6773,7 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
   };
   return (
     <>
+      {isIQ && <IQInspectionChecklist key={team.number} />}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">{team.number}</div>
         {team.name && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{team.name}</div>}
@@ -6743,12 +6788,12 @@ function RobotDetail({ team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, on
         <div className="fixed inset-0 z-[160] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4" onClick={() => { if (!busy) { setSequenceIndex(-1); setCaptureAngle(""); } }}>
           <div role="dialog" aria-modal="true" aria-labelledby="robot-photo-sequence-title" onClick={(event) => event.stopPropagation()} className="w-full max-w-lg rounded-t-2xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl dark:bg-slate-800 sm:rounded-2xl sm:p-6">
             <h2 id="robot-photo-sequence-title" className="text-xl font-bold text-slate-900 dark:text-white">Take all robot pictures</h2>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Take Front, Side, Back, and the Inspection Tag in order. The Lexan Diagram is optional.</p>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Take Front, Side, Back, and the Inspection Tag in order.{!isIQ && " The Lexan Diagram is optional."}</p>
             <div role="status" className="mt-5 rounded-lg border border-sky-200 bg-sky-50 p-4 dark:border-sky-800 dark:bg-sky-950/30">
-              <p className="mb-3 text-base font-semibold text-sky-900 dark:text-sky-100">Picture {sequenceIndex + 1} of {ROBOT_PHOTO_SLOTS.length}: {ROBOT_PHOTO_SLOTS[sequenceIndex].label}{ROBOT_PHOTO_SLOTS[sequenceIndex].required ? "" : " (optional)"}</p>
-              <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#D7212B] px-4 py-4 text-base font-bold text-white shadow-sm disabled:bg-slate-400"><Camera size={22}/>{busy ? "Saving picture…" : `Open camera: Take ${ROBOT_PHOTO_SLOTS[sequenceIndex].label} picture`}</button>
+              <p className="mb-3 text-base font-semibold text-sky-900 dark:text-sky-100">Picture {sequenceIndex + 1} of {photoSlots.length}: {photoSlots[sequenceIndex].label}{photoSlots[sequenceIndex].required ? "" : " (optional)"}</p>
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#D7212B] px-4 py-4 text-base font-bold text-white shadow-sm disabled:bg-slate-400"><Camera size={22}/>{busy ? "Saving picture…" : `Open camera: Take ${photoSlots[sequenceIndex].label} picture`}</button>
             </div>
-            <button type="button" onClick={() => { setSequenceIndex(-1); setCaptureAngle(""); }} disabled={busy} className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-3 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200 disabled:opacity-50">{ROBOT_PHOTO_SLOTS[sequenceIndex].required ? "Stop taking pictures" : "Finish without Lexan"}</button>
+            <button type="button" onClick={() => { setSequenceIndex(-1); setCaptureAngle(""); }} disabled={busy} className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-3 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200 disabled:opacity-50">{photoSlots[sequenceIndex].required ? "Stop taking pictures" : "Finish without Lexan"}</button>
           </div>
         </div>, document.body)}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
@@ -7033,14 +7078,14 @@ function ActivityFeed({ viols, onOpenPhoto, onDeleteViolation, onEditViolation, 
 }
 
 /* ============================ RANKINGS (admin) ============================ */
-function EventRankings({ teams, records, importedRecords, skills, onImportSkills }) {
+function EventRankings({ isIQ = false, teams, records, importedRecords, skills, onImportSkills }) {
   const [section, setSection] = useState("qualification");
   const names = new Map(teams.map((team) => [team.number, team.name]));
   const qualifications = teams.filter((team) => Number(team.rank) > 0).sort((a, b) => Number(a.rank) - Number(b.rank) || a.number.localeCompare(b.number, undefined, { numeric: true }));
   const rankedSkills = [...skills].sort((a, b) => Number(a.rank) - Number(b.rank) || b.total - a.total);
   const active = section === "qualification" ? qualifications : rankedSkills;
   // WP / AP / SP columns appear only when the imported TM rankings include them.
-  const showPoints = section === "qualification" && Object.values(importedRecords || {}).some((r) => r && r.wp != null);
+  const showPoints = !isIQ && section === "qualification" && Object.values(importedRecords || {}).some((r) => r && r.wp != null);
   const fmtStat = (v) => v == null || !Number.isFinite(Number(v)) ? "—" : String(Number(v));
   return <section className="space-y-4">
     <div className="flex flex-wrap items-center gap-2">
@@ -7048,10 +7093,11 @@ function EventRankings({ teams, records, importedRecords, skills, onImportSkills
       <button onClick={() => setSection("skills")} aria-pressed={section === "skills"} className={`px-4 py-2 rounded-lg text-sm font-bold ${section === "skills" ? "bg-[#0D0F32] text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"}`}>Skills Challenge</button>
       {section === "skills" && onImportSkills && <button onClick={onImportSkills} className="ml-auto px-4 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-semibold">Import skills rankings</button>}
     </div>
+    {isIQ && <p className="text-sm">Qualification ranks and averages are imported from TM, including excluded scores and tiebreakers. Skills use the best Driving + Autonomous Coding results; TM resolves all skills tiebreakers and the three-run allowance per category. Ref OS does not calculate official rankings from match scores.</p>}
     {!active.length ? <Empty title={section === "skills" ? "No Skills Challenge scores yet" : "No qualification rankings yet"} sub="Import the Tournament Manager standings in the Sync Center." /> :
       <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-        <table className="w-full text-sm text-left"><thead className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200"><tr><th className="px-3 py-3">Rank</th><th className="px-3 py-3">Team</th><th className="px-3 py-3">Name</th>{section === "qualification" && <th className="px-3 py-3 text-right whitespace-nowrap" title="Wins, losses, ties">W L T</th>}{showPoints && <><th className="px-3 py-3 text-right" title="Win points">WP</th><th className="px-3 py-3 text-right" title="Autonomous points">AP</th><th className="px-3 py-3 text-right" title="Strength of schedule points">SP</th></>}{section === "skills" && <><th className="px-3 py-3 text-right">Driver</th><th className="px-3 py-3 text-right">Autonomous</th><th className="px-3 py-3 text-right">Total</th></>}</tr></thead>
-          <tbody>{active.map((row) => <tr key={row.number} className="border-t border-slate-100 dark:border-slate-700"><td className="px-3 py-3 font-bold">{row.rank ?? "—"}</td><td className="px-3 py-3 font-mono font-bold whitespace-nowrap">{row.number}</td><td className="px-3 py-3 text-slate-500 dark:text-slate-300">{names.get(row.number) || "—"}</td>{section === "qualification" && <td className="px-3 py-3 text-right font-mono tabular-nums whitespace-nowrap" title="Wins, losses, ties">{(() => { const imported = importedRecords[row.number]; const r = imported && imported.w != null ? imported : records[row.number]; return r && r.w != null ? `${r.w}-${r.l}-${r.t}` : "—"; })()}</td>}{showPoints && (() => { const r = importedRecords[row.number] || {}; return <><td className="px-3 py-3 text-right font-mono tabular-nums">{fmtStat(r.wp)}</td><td className="px-3 py-3 text-right font-mono tabular-nums">{fmtStat(r.ap)}</td><td className="px-3 py-3 text-right font-mono tabular-nums">{fmtStat(r.sp)}</td></>; })()}{section === "skills" && <><td className="px-3 py-3 text-right">{row.driver ?? "—"}</td><td className="px-3 py-3 text-right">{row.programming ?? "—"}</td><td className="px-3 py-3 text-right font-bold">{row.total}</td></>}</tr>)}</tbody>
+        <table className="w-full text-sm text-left"><thead className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200"><tr><th className="px-3 py-3">Rank</th><th className="px-3 py-3">Team</th><th className="px-3 py-3">Name</th>{section === "qualification" && (isIQ ? <><th className="px-3 py-3 text-right">Average score</th><th className="px-3 py-3 text-right">Played</th></> : <th className="px-3 py-3 text-right whitespace-nowrap" title="Wins, losses, ties">W L T</th>)}{showPoints && <><th className="px-3 py-3 text-right" title="Win points">WP</th><th className="px-3 py-3 text-right" title="Autonomous points">AP</th><th className="px-3 py-3 text-right" title="Strength of schedule points">SP</th></>}{section === "skills" && <><th className="px-3 py-3 text-right">Driver</th><th className="px-3 py-3 text-right">{isIQ ? "Autonomous Coding" : "Autonomous"}</th><th className="px-3 py-3 text-right">Total</th></>}</tr></thead>
+          <tbody>{active.map((row) => <tr key={row.number} className="border-t border-slate-100 dark:border-slate-700"><td className="px-3 py-3 font-bold">{row.rank ?? "—"}</td><td className="px-3 py-3 font-mono font-bold whitespace-nowrap">{row.number}</td><td className="px-3 py-3 text-slate-500 dark:text-slate-300">{names.get(row.number) || "—"}</td>{section === "qualification" && isIQ && <><td className="px-3 py-3 text-right">{fmtStat(importedRecords[row.number]?.avgPoints)}</td><td className="px-3 py-3 text-right">{fmtStat(importedRecords[row.number]?.played)}</td></>}{section === "qualification" && !isIQ && <td className="px-3 py-3 text-right font-mono tabular-nums whitespace-nowrap" title="Wins, losses, ties">{(() => { const imported = importedRecords[row.number]; const r = imported && imported.w != null ? imported : records[row.number]; return r && r.w != null ? `${r.w}-${r.l}-${r.t}` : "—"; })()}</td>}{showPoints && (() => { const r = importedRecords[row.number] || {}; return <><td className="px-3 py-3 text-right font-mono tabular-nums">{fmtStat(r.wp)}</td><td className="px-3 py-3 text-right font-mono tabular-nums">{fmtStat(r.ap)}</td><td className="px-3 py-3 text-right font-mono tabular-nums">{fmtStat(r.sp)}</td></>; })()}{section === "skills" && <><td className="px-3 py-3 text-right">{row.driver ?? "—"}</td><td className="px-3 py-3 text-right">{row.programming ?? "—"}</td><td className="px-3 py-3 text-right font-bold">{row.total}</td></>}</tr>)}</tbody>
         </table>
       </div>}
   </section>;
@@ -7128,7 +7174,7 @@ function ImportPreviewModal({ preview, onImport, onCancel }) {
   );
 }
 
-function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRankings, onImportSkills, onImportAlliances, onImportScores, onImportPackage, packageRunning = false, stats, syncStatus, leagueImport = null }) {
+function TMSyncCenter({ isIQ = false, onClose, onImportTeams, onImportMatches, onImportRankings, onImportSkills, onImportAlliances, onImportScores, onImportPackage, packageRunning = false, stats, syncStatus, leagueImport = null }) {
   const items = [
     { key: "teams", title: "Teams", detail: `${stats.teams} teams loaded`, action: "Import teams", onClick: onImportTeams, Icon: Users },
     { key: "matches", title: "Match schedule", detail: `${stats.matches} matches loaded`, action: "Import matches", onClick: onImportMatches, Icon: ListOrdered },
@@ -7136,7 +7182,7 @@ function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRanking
     { key: "skills", title: "Skills Challenge rankings", detail: `${stats.skills} teams with scores`, action: "Import skills", onClick: onImportSkills, Icon: Trophy },
     { key: "alliances", title: "Alliance selection", detail: `${stats.alliances} / 16 alliances loaded`, action: "Upload alliances", onClick: onImportAlliances, Icon: GitBranch },
     { key: "scores", title: "Match results", detail: `${stats.scored} scored matches`, action: "Import scores", onClick: onImportScores, Icon: Trophy },
-  ];
+  ].filter(item=>!isIQ || item.key!=="alliances");
   const when = (ts) => {
     if (!ts) return "Not imported this session";
     const d = new Date(ts);
@@ -7153,6 +7199,7 @@ function TMSyncCenter({ onClose, onImportTeams, onImportMatches, onImportRanking
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-3">
+          {isIQ && <p className="text-sm">IQ: import categories individually. Schedule/results CSV uses Round, Match, Team1, Team2, Field and optional shared Score. Use Finals for ranked partnerships; no alliance-selection export is needed.</p>}
           {leagueImport && (
             <div className="bg-white dark:bg-slate-800 rounded-xl border-2 border-sky-300 dark:border-sky-800 p-4">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">League</div>

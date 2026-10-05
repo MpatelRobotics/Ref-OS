@@ -1112,6 +1112,21 @@ export async function getPublicEventBranding(eventId) {
 }
 // Phase 6: field display names only, readable by every event role including Inspection
 // (supabase/refos-2-phase6-event-settings.sql). Returns null if the function is not installed.
+export async function getEventCompetitionProgram(eventId) {
+  if (E2E_MOCK) return null;
+  try {
+    const {data,error} = await supabase.rpc("get_event_competition_program", {p_event:eventId});
+    if (error) throw error;
+    if (!["iq","v5"].includes(data)) throw new Error("Competition program is unavailable.");
+    const row = {key:"competition_program",value:{program:data},updatedAt:0,updatedBy:""};
+    saveReadCache(eventId,"competition_program",[row]);
+    return row;
+  } catch (error) {
+    const cached = loadReadCache(eventId,"competition_program")?.[0];
+    if (cached) return cached;
+    throw error;
+  }
+}
 export async function getEventFieldNames(eventId) {
   if (E2E_MOCK) return null;
   const { data, error } = await supabase.rpc("get_event_field_names", { p_event: eventId });

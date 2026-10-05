@@ -152,7 +152,7 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
             <button onClick={onContactDirectory} className={tool}><Contact size={16}/> Event Contact Directory</button>
             <button onClick={onRankings} className={tool}><BarChart3 size={16}/> Rankings</button>
             <button onClick={onActivityFeed} className={tool}><ListOrdered size={16}/> Activity Feed</button>
-            <button onClick={onAwpHistory} className={tool}><ClipboardCheck size={16}/> AWP History and Analytics</button>
+            {onAwpHistory && <button onClick={onAwpHistory} className={tool}><ClipboardCheck size={16}/> AWP History and Analytics</button>}
             {onAlertDelivery && <button onClick={onAlertDelivery} className={tool}><Mail size={16}/> Alert delivery <span className="ml-auto text-[10px] font-bold text-slate-400">{alertDeliveryLabel}</span></button>}
           </ToolSection>
           <ToolSection title="System & Devices">
@@ -227,7 +227,7 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
         </div>
         <div className="bg-white dark:bg-slate-800 border rounded-xl p-4">
           <div className="font-bold flex items-center gap-2"><Flag size={17}/> Event activity</div>
-          <div className="grid grid-cols-2 gap-2 mt-2 text-sm"><div>AWP checks <b className="float-right">{awps}</b></div><div>Announcements <b className="float-right">{announcements}</b></div></div>
+          <div className="grid grid-cols-2 gap-2 mt-2 text-sm">{onAwpHistory && <div>AWP checks <b className="float-right">{awps}</b></div>}<div>Announcements <b className="float-right">{announcements}</b></div></div>
           <button onClick={onAnnouncement} className="mt-3 w-full py-2 rounded-lg border font-semibold text-sm">Send Key Volunteer Announcement</button>
 
           <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
