@@ -17,7 +17,7 @@ export default defineConfig({
       VITE_SUPABASE_URL: "https://example.supabase.co",
       VITE_SUPABASE_ANON_KEY: "test-anon-key",
       VITE_E2E_MOCK: "1",
-      VITE_APP_VERSION: "1.0.0",
+      VITE_APP_VERSION: "1.0.1",
     },
   },
   projects: [
