@@ -1,4 +1,4 @@
-import { fetchVexMatches } from "./matches.js";
+import { fetchVexStandings } from "./matches.js";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { lookupEvent, normalizeCode, searchEvents } from "./lookup.js";
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
@@ -24,8 +24,9 @@ Deno.serve(async request => {
     if (raw.length > 1000) return json({ error: "Request too large." }, 400);
     let body;
     try { body = JSON.parse(raw); } catch { return json({ error: "Invalid request." }, 400); }
-    if (body?.action === "matches") {
-      return json(await fetchVexMatches(normalizeCode(body.code), body.division, Deno.env.get("VEX_EVENTS_API_TOKEN") || "", fetch, body.kind || "matches"));
+    if (body?.action === "matches") return json({ error: "VEX match sync has been removed. Use Tournament Manager for matches." }, 400);
+    if (body?.action === "standings") {
+      return json(await fetchVexStandings(normalizeCode(body.code), body.division, Deno.env.get("VEX_EVENTS_API_TOKEN") || "", fetch, body.kind || "rankings"));
     }
     if (body?.action === "search") {
       const results = await searchEvents(body, Deno.env.get("VEX_EVENTS_API_TOKEN") || "");
@@ -47,4 +48,5 @@ Deno.serve(async request => {
     return json({ error: message }, 502);
   }
 });
+
 

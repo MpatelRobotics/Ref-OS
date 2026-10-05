@@ -16,7 +16,7 @@ function ToolSection({ title, children, first = false, danger = false }) {
   );
 }
 
-export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onFieldNames, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, brand = null, onEventSettings, onEventManagement, onSyncStatus, syncModeLabel = "Cloud", league = null, onLeagueSessions, onClose }) {
+export default function CommandCenter({ matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onFieldNames, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onVexSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, brand = null, onEventSettings, onEventManagement, onSyncStatus, syncModeLabel = "Cloud", league = null, onLeagueSessions, onClose }) {
   const accent = brand?.accent || "#0D0F32";
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
@@ -130,6 +130,7 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
           {/* Tools, grouped by purpose. Every handler is unchanged; only order, grouping, and labels changed. */}
           <ToolSection title="Event Setup & Management" first>
             {onTMSync && (
+
               <button type="button" onClick={onTMSync} data-tool="tm-sync"
                 className="sm:col-span-2 w-full min-h-[4.5rem] rounded-xl border-2 bg-white dark:bg-slate-900 px-4 py-3.5 text-left flex items-center gap-3 shadow-sm transition hover:shadow-md hover:bg-slate-50 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                 style={{ borderColor: accent }}>
@@ -312,3 +313,5 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
     </div>
   );
 }
+
+

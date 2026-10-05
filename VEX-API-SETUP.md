@@ -32,11 +32,8 @@ Redeploy `vex-event-lookup` using the deployment command above after publishing 
 
 Event-code lookup supports both RE- and VE- codes. Event search accepts tournament/league labels such as Open Tournament, including object labels. These compatibility cases are covered by fixture tests; live API verification still requires deployment.
 
-## Matches, rankings and Skills sync
-Cloud administrators can open VEX API Sync from Matches or Rankings. Enter the full event code, load divisions, select a division and category, check for updates, review the snapshot, and Apply snapshot. Then optionally enable once-a-minute checks for that category while Ref OS is open, visible and online, even after closing the dialog. Changing the source/category or an error stops automatic updates. Closing the dialog keeps sync running; use the status bar to manage or stop it. Switching events/sessions, signing out or reloading stops monitoring. Only one category is monitored at a time.
-Matches use the selected division. Scored ties clear the winner; unscored rows preserve saved scores. Imports update matching rows without deleting other matches. Qualification rankings include official rank and available W/L/T and points. Skills cover the whole upstream event and combine best Driver and Autonomous scores per team; combined official ranks/tie-breaks are unavailable and displayed as a dash. For leagues, confirm the selected session before import, especially because Skills cover the whole upstream event.
-Empty snapshots retain existing data. Multi-game quarterfinal/semifinal/round-of-16 formats are rejected rather than collapsed; use TM imports for unsupported divisions. Database writes are sequential and can partially succeed on failure; retry the reviewed snapshot. API publishing delay is unknown and this is polling, not guaranteed live scoring. Live-token verification has not been performed.
-Redeploy the existing vex-event-lookup function after these changes; keep the existing secret.
-
-
+## Rankings and Skills sync
+Open Rankings or the Event Command Center in cloud Admin mode and choose VEX API Sync. Load the event divisions, choose a division and Qualification rankings or Skills, review the snapshot and Apply snapshot. Optionally enable once-a-minute checks; closing the dialog keeps monitoring active while Ref OS is open, visible and online. Manage or stop it from the status bar. Switching events/sessions, signing out or reloading stops it.
+Qualification rankings use the selected division. Skills combine the best Driver and Autonomous runs across the whole upstream event; official combined ranks are unavailable. Confirm the target League session before import. Empty snapshots retain saved data. Only one category is monitored at a time. API publication may lag scoring. Failed writes can partially succeed; retry the reviewed snapshot.
+Match API sync has been removed. Import match schedules and scores through Tournament Manager. Redeploy vex-event-lookup so old match-sync requests are rejected; the existing API token stays configured. Live-token verification remains pending.
 

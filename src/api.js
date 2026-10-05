@@ -1763,14 +1763,15 @@ export async function searchVexEvents(filters) {
   return data;
 }
 
-export async function getVexMatches(code, division = null, kind = "matches") {
+export async function getVexStandings(code, division = null, kind = "rankings") {
   await ensureAnonymousSession();
-  const { data, error } = await supabase.functions.invoke("vex-event-lookup", { body: { action: "matches", code, division, kind } });
+  const { data, error } = await supabase.functions.invoke("vex-event-lookup", { body: { action: "standings", code, division, kind } });
   if (error) {
-    let message = "VEX match lookup is unavailable.";
+    let message = "VEX standings lookup is unavailable.";
     try { const body = await error.context?.json(); if (typeof body?.error === "string") message = body.error; } catch {}
     throw new Error(message);
   }
-  if (!Array.isArray(data?.divisions) || !Array.isArray(data?.matches)) throw new Error("VEX returned incomplete match information.");
+  if (!Array.isArray(data?.divisions)) throw new Error("VEX returned incomplete standings information.");
   return data;
 }
+

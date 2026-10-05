@@ -3385,18 +3385,13 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   };
   const applyVexSnapshot = async (data, kind) => {
     if (!adminUnlocked || highlanderDemoLocked || isVenueMode()) throw new Error("Cloud administrator access is required.");
+    if (!["rankings", "skills"].includes(kind)) throw new Error("VEX API sync supports only rankings and Skills.");
     const rows = data[kind] || [];
     if (!rows.length) return;
-    const numbers = [...new Set(kind === "matches" ? rows.flatMap(r => [...r.red, ...r.blue]) : rows.map(r => r.number))];
+    const numbers = [...new Set(rows.map(r => r.number))];
     const missing = numbers.filter(number => !teams.some(t => t.number === number));
     if (missing.length) await api.bulkUpsertTeams(eventId, missing.map(number => ({ number, name: "" })));
-    if (kind === "matches") {
-      for (const row of rows) {
-        await api.addMatch(eventId, { phase: row.phase, num: row.num, red: row.red, blue: row.blue, field: row.field, label: row.label });
-        if (row.scored) await api.updateMatchScore(eventId, row.phase, row.num, row.redScore, row.blueScore, row.winner);
-      }
-      await reloadMatches();
-    } else if (kind === "rankings") {
+    if (kind === "rankings") {
       await api.bulkUpsertRankings(eventId, rows.map(r => ({ number:r.number, rank:r.rank })));
       const saved = await api.upsertEventSetting(eventId, "qualification_records", { records:Object.fromEntries(rows.map(r => [r.number, { w:r.w, l:r.l, t:r.t, wp:r.wp, ap:r.ap, sp:r.sp }])), importedAt:Date.now() });
       setEventSettings(prev => ({ ...prev, qualification_records:saved }));
@@ -4876,6 +4871,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         onTwoDeviceSyncTest={() => openCommandCenterTool(() => setShowTwoDeviceSyncTest(true))}
         onDiagnosticReport={() => openCommandCenterTool(() => setShowDiagnosticReport(true))}
         onEventSetup={() => openCommandCenterTool(() => setShowEvent(true))}
+        onVexSync={!highlanderDemoLocked && !isVenueMode() ? () => openCommandCenterTool(() => setShowVexLiveSync(true)) : null}
         onTMSync={() => openCommandCenterTool(() => setShowTMSync(true))}
         onExportViolations={exportCSV}
         onExportNominations={exportNominations}
@@ -4933,8 +4929,8 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           </div>
         </div>
       )}
-      {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && ["matches","rankings"].includes(view) && <button type="button" onClick={() => setShowVexLiveSync(true)} className="my-3 rounded-lg border border-blue-300 px-4 py-2 font-semibold">VEX API Sync · Matches, Rankings &amp; Skills</button>}
-      {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexLiveSync visible={showVexLiveSync} onOpen={() => setShowVexLiveSync(true)} key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onFetch={api.getVexMatches} onApply={applyVexSnapshot} onClose={() => setShowVexLiveSync(false)} />}
+      {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && view === "rankings" && <button type="button" onClick={() => setShowVexLiveSync(true)} className="my-3 rounded-lg border border-blue-300 px-4 py-2 font-semibold">VEX API Sync · Rankings &amp; Skills</button>}
+      {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexLiveSync visible={showVexLiveSync} onOpen={() => setShowVexLiveSync(true)} key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onFetch={api.getVexStandings} onApply={applyVexSnapshot} onClose={() => setShowVexLiveSync(false)} />}
       {showFeedback && <FeedbackModal meName={meName} myRole={myRole} onSubmit={addFieldLog} onClose={() => setShowFeedback(false)} />}
       {showOnboarding && <QuickStartModal step={onboardingStep} setStep={setOnboardingStep} onClose={closeOnboarding} />}
       {undoPrompt && (
@@ -8109,6 +8105,9 @@ const Label = ({ children }) => <label className="block text-xs font-semibold up
 const Empty = ({ title, sub }) => (
   <div className="text-center py-14 px-6"><p className="font-semibold text-slate-700 dark:text-slate-200">{title}</p><p className="text-sm text-slate-400 mt-1">{sub}</p></div>
 );
+
+
+
 
 
 
