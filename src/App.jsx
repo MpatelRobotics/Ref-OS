@@ -62,6 +62,7 @@ import FeedbackModal from "./components/modals/FeedbackModal.jsx";
 import FeedbackViewer from "./components/FeedbackViewer.jsx";
 import { submitFeedbackScreenshots } from "./feedbackScreenshots";
 import UniversalFeedback from "./components/UniversalFeedback.jsx";
+import LostFoundBoard from "./components/LostFoundBoard.jsx";
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
 import HelpRequestModal from "./components/modals/HelpRequestModal.jsx";
 import manualQuickLinks from "./manualQuickLinks.json";
@@ -1831,6 +1832,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   const [alliances, setAlliances] = useState({}); // seed -> [team1, team2]
   const [alliancesLoaded, setAlliancesLoaded] = useState(false);
   const [showFieldLog, setShowFieldLog] = useState(false);
+  const [showLostFound, setShowLostFound] = useState(false);
   const [addMatchOpen, setAddMatchOpen] = useState(false);
   const [nominating, setNominating] = useState(null); // award key when the nominate modal is open
   const [editing, setEditing] = useState(null); // violation being edited
@@ -4380,6 +4382,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                   <div className="refos-sidebar-section-label refos-sidebar-tools-label" aria-hidden="true">Event Tools</div>
                   {adminUnlocked && <button onClick={() => { loadEventMembers(); loadAlertStats(); setShowCommandCenter(true); }} className="refos-sidebar-tool"><BarChart3 size={16} /> Command Center</button>}
                   {!isInspection && <button onClick={() => setShowFieldLog(true)} className="refos-sidebar-tool"><Flag size={16} /> Field Log</button>}
+                  <button onClick={() => setShowLostFound(true)} className="refos-sidebar-tool"><Flag size={16} /> Lost &amp; Found</button>
                   {!isInspection && <button onClick={() => setShowContactDirectory(true)} className="refos-sidebar-tool"><Contact size={16} /> Contacts</button>}
                 </div>
                 <div className="refos-sidebar-footer">
@@ -4878,6 +4881,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           </div></div>
         </div>
       )}
+      {showLostFound && <LostFoundBoard key={eventId} eventId={eventId} eventName={event?.name || "Current event"} meName={meName} canManage={adminUnlocked} onClose={()=>setShowLostFound(false)}/>}
       {showPreEventTest && adminUnlocked && <PreEventSystemTest eventId={eventId} adminUnlocked={adminUnlocked}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowPreEventTest(false)} onComplete={setLastSystemTest} />}
       {showTwoDeviceSyncTest && adminUnlocked && <TwoDeviceSyncTest fieldLog={fieldLog} deviceId={deviceId} meName={meName}
@@ -4978,6 +4982,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                 <div className="flex-1 min-w-0"><div className="font-bold text-slate-900 dark:text-slate-100">View Quick Start</div><div className="text-xs text-slate-500 dark:text-slate-400">Assignments, help requests, and offline saving in three short screens.</div></div>
                 <ChevronRight size={18} className="text-sky-600 shrink-0"/>
               </button>
+              <button type="button" onClick={()=>setShowLostFound(true)} className="mb-4 w-full min-h-[44px] rounded-xl border bg-white p-4 text-left font-bold dark:bg-slate-800">Lost &amp; Found <span className="text-sm font-normal">· Found items and pickup locations</span></button>
               <div className="mb-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/30 text-[#D7212B] flex items-center justify-center shrink-0"><Mail size={18} /></div>
                 <div className="flex-1 min-w-0">

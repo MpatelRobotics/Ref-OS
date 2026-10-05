@@ -441,3 +441,10 @@ Admin or Developer: open **Event Settings → Required robot pictures**, select 
 Robots completion counts, required/optional labels, violation-form thumbnails, and the camera sequence follow this event configuration. Required views come first; optional pictures and existing uploads are kept. IQ keeps its normal four-view layout unless Lexan is selected as required. These are reference-photo requirements, not official inspection certification. League events use one configuration across sessions, while each session keeps its own photos.
 
 Run [`supabase/robot-photo-requirements.sql`](supabase/robot-photo-requirements.sql) in the Supabase SQL Editor after the base schema and event-settings migration so Inspection devices can read only these requirements. Writes keep the existing Admin-only settings permissions. No Edge Function redeployment is needed. Changes require a cloud connection. Inspection caches the last successfully loaded requirements for that event; without a readable or cached configuration, it warns and shows the default four views. Other devices receive changes through the existing event refresh/sync flow.
+## Lost & Found
+
+Event staff can open **Lost & Found** from desktop Event Tools or **Features & Help** on mobile. Add an item description, pickup location, and optional JPEG/PNG/WebP photo (up to 10 MB, compressed before upload). Search and filter awaiting-pickup or returned items. Admin/Developer can mark items returned or reopen them.
+
+Run `supabase/lost-found.sql` in Supabase SQL Editor after the base schema and role migrations. It creates the event-scoped board and a private photo bucket with event-membership access policies. No Edge Function redeployment is required.
+
+The board is shared across League sessions and refreshes every 30 seconds while open and visible. Internet is required; it does not use Local Venue Server sync or existing event backups/exports. Failed saves can be retried with the same item ID while the form remains open. Unattached photo uploads and photos belonging to deleted events currently require manual storage cleanup. Live database permissions must be checked after applying the migration.
