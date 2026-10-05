@@ -1542,7 +1542,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
           <div className="mt-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4">
             <h2 className="font-bold text-slate-900 dark:text-white">Create VEX Event</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">Create the event shell now. Use TM Sync Center after login to import teams, schedules, rankings, skills, and alliances.</p>
-            <VexEventLookup onLookup={api.lookupVexEvent} onResult={receiveVexEvent} disabled={saving} onBusy={setVexLookupBusy} />
+            <VexEventLookup onLookup={api.lookupVexEvent} onSearch={api.searchVexEvents} onResult={receiveVexEvent} disabled={saving} onBusy={setVexLookupBusy} />
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Event name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Example: NJ State Championship"
               className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-3 text-slate-900 dark:text-white mb-3" />

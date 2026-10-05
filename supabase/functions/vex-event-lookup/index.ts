@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { lookupEvent, normalizeCode } from "./lookup.js";
+import { lookupEvent, normalizeCode, searchEvents } from "./lookup.js";
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store" } });
 // Small, bounded per-instance cache and request limiter. No token or user data is cached.
@@ -23,6 +23,10 @@ Deno.serve(async request => {
     if (raw.length > 1000) return json({ error: "Request too large." }, 400);
     let body;
     try { body = JSON.parse(raw); } catch { return json({ error: "Invalid request." }, 400); }
+    if (body?.action === "search") {
+      const results = await searchEvents(body, Deno.env.get("VEX_EVENTS_API_TOKEN") || "");
+      return json(results);
+    }
     let code;
     try { code = normalizeCode(body?.code); } catch (e) { return json({ error: e instanceof Error ? e.message : "Invalid event code." }, 400); }
     for (const [key,value] of cache) if (value.until < now) cache.delete(key);

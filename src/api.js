@@ -1750,3 +1750,15 @@ export async function lookupVexEvent(code) {
   if (!data?.event || !Array.isArray(data.event.teams)) throw new Error("VEX returned incomplete event information.");
   return data.event;
 }
+
+export async function searchVexEvents(filters) {
+  await ensureAnonymousSession();
+  const { data, error } = await supabase.functions.invoke("vex-event-lookup", { body: { ...filters, action: "search" } });
+  if (error) {
+    let message = "Event search is unavailable. Check the connection or use the event code.";
+    try { const body = await error.context?.json(); if (typeof body?.error === "string") message = body.error; } catch {}
+    throw new Error(message);
+  }
+  if (!Array.isArray(data?.events)) throw new Error("VEX returned incomplete search results.");
+  return data;
+}
