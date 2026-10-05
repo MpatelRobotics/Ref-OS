@@ -1762,3 +1762,15 @@ export async function searchVexEvents(filters) {
   if (!Array.isArray(data?.events)) throw new Error("VEX returned incomplete search results.");
   return data;
 }
+
+export async function getVexMatches(code, division = null, kind = "matches") {
+  await ensureAnonymousSession();
+  const { data, error } = await supabase.functions.invoke("vex-event-lookup", { body: { action: "matches", code, division, kind } });
+  if (error) {
+    let message = "VEX match lookup is unavailable.";
+    try { const body = await error.context?.json(); if (typeof body?.error === "string") message = body.error; } catch {}
+    throw new Error(message);
+  }
+  if (!Array.isArray(data?.divisions) || !Array.isArray(data?.matches)) throw new Error("VEX returned incomplete match information.");
+  return data;
+}

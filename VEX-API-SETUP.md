@@ -16,7 +16,7 @@ npx supabase functions deploy vex-event-lookup --project-ref YOUR_PROJECT_REF --
 
 The API token is read only inside the Edge Function. Only the event's public name, code, dates, location, program, type, and team numbers/names are returned. All team pages must succeed before autofill succeeds. The function uses a fixed upstream host, request timeout, bounded cache, and per-instance request limiter. The limiter is not a distributed quota; monitor provider usage in production.
 
-Supported scope: autofill during new event creation; Tournament and League supported. Dates/location are saved in the `vex_event` event setting, with dates/location shown in the lookup preview. League start date initializes the editable first-session date. The integration does not create every League session, sync continuously, import matches/results/rankings, or change the current event after lookup. Tournament Manager remains the schedule/results import source.
+Supported scope: autofill during new event creation; Tournament and League supported. Dates/location are saved in the `vex_event` event setting, with dates/location shown in the lookup preview. League start date initializes the editable first-session date. Event autofill does not create every League session or change the current event after lookup. Optional VEX API Sync is described below; Tournament Manager imports remain available.
 
 Manual creation remains available if lookup fails. If saving the roster fails after creation, the app keeps the event and directs you to import teams into that existing event, avoiding duplicate events. Existing event access and event creation restrictions remain in place. No database migration is needed.
 
@@ -30,4 +30,12 @@ Search requests the date window and checks country/state server-side, accepting 
 
 Redeploy `vex-event-lookup` using the deployment command above after publishing these changes. The existing VEX_EVENTS_API_TOKEN secret stays in place. Verify with your live token after deployment.
 
-Event-code lookup supports both RE- and VE- codes. Event search accepts tournament/league labels such as Open Tournament, including object labels. These compatibility cases are covered by fixture tests; live API verification still requires deployment.
+Event-code lookup supports both RE- and VE- codes. Event search accepts tournament/league labels such as Open Tournament, including object labels. These compatibility cases are covered by fixture tests; live API verification still requires deployment.
+
+## Matches, rankings and Skills sync
+Cloud administrators can open VEX API Sync from Matches or Rankings. Enter the full event code, load divisions, select a division and category, check for updates, review the snapshot, and Apply snapshot. Then optionally enable once-a-minute checks for that category while the dialog is open, visible and online. Closing, changing the source/category, or an error stops automatic updates. Only one category is monitored at a time.
+Matches use the selected division. Scored ties clear the winner; unscored rows preserve saved scores. Imports update matching rows without deleting other matches. Qualification rankings include official rank and available W/L/T and points. Skills cover the whole upstream event and combine best Driver and Autonomous scores per team; combined official ranks/tie-breaks are unavailable and displayed as a dash. For leagues, confirm the selected session before import, especially because Skills cover the whole upstream event.
+Empty snapshots retain existing data. Multi-game quarterfinal/semifinal/round-of-16 formats are rejected rather than collapsed; use TM imports for unsupported divisions. Database writes are sequential and can partially succeed on failure; retry the reviewed snapshot. API publishing delay is unknown and this is polling, not guaranteed live scoring. Live-token verification has not been performed.
+Redeploy the existing vex-event-lookup function after these changes; keep the existing secret.
+
+

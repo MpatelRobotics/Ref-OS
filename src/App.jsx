@@ -1,3 +1,4 @@
+import VexLiveSync from "./components/VexLiveSync.jsx";
 import VexEventLookup from "./components/VexEventLookup.jsx";
 import useMenuViewport from "./useMenuViewport.js";
 import Thumb from "./components/PhotoThumbnail.jsx";
@@ -1818,6 +1819,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   const [showFeatures, setShowFeatures] = useState(false);
   const [showUserGuide, setShowUserGuide] = useState(false);
   const [guideArticleId, setGuideArticleId] = useState(null);
+  const [showVexLiveSync, setShowVexLiveSync] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showFeedbackViewer, setShowFeedbackViewer] = useState(false);
   // League: choosing another session in the TM Sync Center reopens it in that session.
@@ -3381,6 +3383,29 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
     const list = await api.listMatches(eventId);
     const map = {}; for (const x of list) map[x.id] = x; setMatches(map); return map;
   };
+  const applyVexSnapshot = async (data, kind) => {
+    if (!adminUnlocked || highlanderDemoLocked || isVenueMode()) throw new Error("Cloud administrator access is required.");
+    const rows = data[kind] || [];
+    if (!rows.length) return;
+    const numbers = [...new Set(kind === "matches" ? rows.flatMap(r => [...r.red, ...r.blue]) : rows.map(r => r.number))];
+    const missing = numbers.filter(number => !teams.some(t => t.number === number));
+    if (missing.length) await api.bulkUpsertTeams(eventId, missing.map(number => ({ number, name: "" })));
+    if (kind === "matches") {
+      for (const row of rows) {
+        await api.addMatch(eventId, { phase: row.phase, num: row.num, red: row.red, blue: row.blue, field: row.field, label: row.label });
+        if (row.scored) await api.updateMatchScore(eventId, row.phase, row.num, row.redScore, row.blueScore, row.winner);
+      }
+      await reloadMatches();
+    } else if (kind === "rankings") {
+      await api.bulkUpsertRankings(eventId, rows.map(r => ({ number:r.number, rank:r.rank })));
+      const saved = await api.upsertEventSetting(eventId, "qualification_records", { records:Object.fromEntries(rows.map(r => [r.number, { w:r.w, l:r.l, t:r.t, wp:r.wp, ap:r.ap, sp:r.sp }])), importedAt:Date.now() });
+      setEventSettings(prev => ({ ...prev, qualification_records:saved }));
+    } else if (kind === "skills") {
+      const saved = await api.upsertEventSetting(eventId, "skills_rankings", { rows, importedAt:Date.now(), source:"VEX API" });
+      setEventSettings(prev => ({ ...prev, skills_rankings:saved }));
+    }
+    if (missing.length || kind === "rankings") setTeams(await api.listTeams(eventId));
+  };
   const winnerTeams = (m) => (m && m.winner ? (m.winner === "red" ? m.red : m.blue) : null);
   const advanceBracket = async (map) => {
     const get = (phase, num) => map[`${phase}-${num}`];
@@ -4908,6 +4933,8 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           </div>
         </div>
       )}
+      {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && ["matches","rankings"].includes(view) && <button type="button" onClick={() => setShowVexLiveSync(true)} className="my-3 rounded-lg border border-blue-300 px-4 py-2 font-semibold">VEX API Sync · Matches, Rankings &amp; Skills</button>}
+      {showVexLiveSync && adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexLiveSync key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onFetch={api.getVexMatches} onApply={applyVexSnapshot} onClose={() => setShowVexLiveSync(false)} />}
       {showFeedback && <FeedbackModal meName={meName} myRole={myRole} onSubmit={addFieldLog} onClose={() => setShowFeedback(false)} />}
       {showOnboarding && <QuickStartModal step={onboardingStep} setStep={setOnboardingStep} onClose={closeOnboarding} />}
       {undoPrompt && (
@@ -7012,7 +7039,7 @@ function EventRankings({ teams, records, importedRecords, skills, onImportSkills
     {!active.length ? <Empty title={section === "skills" ? "No Skills Challenge scores yet" : "No qualification rankings yet"} sub="Import the Tournament Manager standings in the Sync Center." /> :
       <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
         <table className="w-full text-sm text-left"><thead className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200"><tr><th className="px-3 py-3">Rank</th><th className="px-3 py-3">Team</th><th className="px-3 py-3">Name</th>{section === "qualification" && <th className="px-3 py-3 text-right whitespace-nowrap" title="Wins, losses, ties">W L T</th>}{showPoints && <><th className="px-3 py-3 text-right" title="Win points">WP</th><th className="px-3 py-3 text-right" title="Autonomous points">AP</th><th className="px-3 py-3 text-right" title="Strength of schedule points">SP</th></>}{section === "skills" && <><th className="px-3 py-3 text-right">Driver</th><th className="px-3 py-3 text-right">Autonomous</th><th className="px-3 py-3 text-right">Total</th></>}</tr></thead>
-          <tbody>{active.map((row) => <tr key={row.number} className="border-t border-slate-100 dark:border-slate-700"><td className="px-3 py-3 font-bold">{row.rank}</td><td className="px-3 py-3 font-mono font-bold whitespace-nowrap">{row.number}</td><td className="px-3 py-3 text-slate-500 dark:text-slate-300">{names.get(row.number) || "—"}</td>{section === "qualification" && <td className="px-3 py-3 text-right font-mono tabular-nums whitespace-nowrap" title="Wins, losses, ties">{(() => { const imported = importedRecords[row.number]; const r = imported && imported.w != null ? imported : records[row.number]; return r && r.w != null ? `${r.w}-${r.l}-${r.t}` : "—"; })()}</td>}{showPoints && (() => { const r = importedRecords[row.number] || {}; return <><td className="px-3 py-3 text-right font-mono tabular-nums">{fmtStat(r.wp)}</td><td className="px-3 py-3 text-right font-mono tabular-nums">{fmtStat(r.ap)}</td><td className="px-3 py-3 text-right font-mono tabular-nums">{fmtStat(r.sp)}</td></>; })()}{section === "skills" && <><td className="px-3 py-3 text-right">{row.driver ?? "—"}</td><td className="px-3 py-3 text-right">{row.programming ?? "—"}</td><td className="px-3 py-3 text-right font-bold">{row.total}</td></>}</tr>)}</tbody>
+          <tbody>{active.map((row) => <tr key={row.number} className="border-t border-slate-100 dark:border-slate-700"><td className="px-3 py-3 font-bold">{row.rank ?? "—"}</td><td className="px-3 py-3 font-mono font-bold whitespace-nowrap">{row.number}</td><td className="px-3 py-3 text-slate-500 dark:text-slate-300">{names.get(row.number) || "—"}</td>{section === "qualification" && <td className="px-3 py-3 text-right font-mono tabular-nums whitespace-nowrap" title="Wins, losses, ties">{(() => { const imported = importedRecords[row.number]; const r = imported && imported.w != null ? imported : records[row.number]; return r && r.w != null ? `${r.w}-${r.l}-${r.t}` : "—"; })()}</td>}{showPoints && (() => { const r = importedRecords[row.number] || {}; return <><td className="px-3 py-3 text-right font-mono tabular-nums">{fmtStat(r.wp)}</td><td className="px-3 py-3 text-right font-mono tabular-nums">{fmtStat(r.ap)}</td><td className="px-3 py-3 text-right font-mono tabular-nums">{fmtStat(r.sp)}</td></>; })()}{section === "skills" && <><td className="px-3 py-3 text-right">{row.driver ?? "—"}</td><td className="px-3 py-3 text-right">{row.programming ?? "—"}</td><td className="px-3 py-3 text-right font-bold">{row.total}</td></>}</tr>)}</tbody>
         </table>
       </div>}
   </section>;
@@ -8080,3 +8107,4 @@ const Label = ({ children }) => <label className="block text-xs font-semibold up
 const Empty = ({ title, sub }) => (
   <div className="text-center py-14 px-6"><p className="font-semibold text-slate-700 dark:text-slate-200">{title}</p><p className="text-sm text-slate-400 mt-1">{sub}</p></div>
 );
+
