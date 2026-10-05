@@ -15,6 +15,8 @@ Ref OS was originally developed for the Highlander Summit Signature Event and ha
 - [Ref OS 2.0: multi-event platform](#ref-os-20-multi-event-platform)
 - [Event lifecycle](#event-lifecycle)
 - [League events](#league-events)
+- [VEX IQ events](#vex-iq-events)
+- [VEX Events API integration](#vex-events-api-integration)
 - [Roles](#roles)
 - [Tournament Manager Sync Center](#tournament-manager-sync-center)
 - [Referee and field operations](#referee-and-field-operations)
@@ -49,7 +51,8 @@ Every VEX event in Ref OS is an independent workspace identified by its own UUID
 | **Event-scoped data isolation** | Database access rules are evaluated per event, so a device signed in to one event cannot read another event's data. |
 | **Event-specific branding** | Each event can set its display name, short name, logo, and accent color. |
 | **Event-specific field names** | Field 1, Field 2, and Field 3 can be renamed per event without changing imported match data. |
-| **Tournament Manager driven setup** | A new event starts as an empty shell and is populated from Tournament Manager exports. |
+| **Event search and autofill** | Find an event using its full RE or VE event code, or filter USA events by state/territory and date range, then select from the results dropdown. Autofill imports event details and teams. |
+| **Tournament Manager driven setup** | Import match schedules, scores, alliances, skills, and other competition data from Tournament Manager exports. |
 | **Archiving and restoration** | Finished events can be archived out of the active list and restored later with all data intact. |
 | **Protected permanent deletion** | Archived events can be permanently deleted only through confirmation-protected workflows. |
 
@@ -71,6 +74,73 @@ Details, including the full league-wide versus session table, are in [`LEAGUE-EV
 
 ---
 
+## VEX IQ events
+
+During **Create VEX Event**, choose **VEX IQ** or **V5RC / VEX U**, as well as **Tournament** or **League**. Competition program and event format are separate choices. An Admin can also change the program in **Event Setup**. Existing events default to V5RC / VEX U; successful VEX Events autofill identifies the program from the returned event details.
+
+For IQ events, the Rules tab provides:
+
+- **78 searchable rule references** grouped by category, with rule codes and brief descriptions from the Level Up manual's quick-reference list. These summaries help locate a rule; use the full manual for conditions, exceptions, and rulings.
+- The bundled **VEX IQ Level Up 2026–2027 Game Manual, version 2.0 (September 3, 2026)**. **Read IQ manual** and **Open PDF** open an in-app viewer with **Back to Ref OS**, including on mobile. **Download manual** saves a separate copy.
+- Offline manual access after the updated app finishes downloading its offline files. The bundled edition does not automatically track later official revisions.
+
+**Current scope:** IQ support covers the program choice, rules reference, and manual. IQ-specific schedules, teamwork scoring, finals, rankings, inspection, and referee workflows have not been adapted. Choosing IQ does not make the existing V5 competition tools IQ-ready. The existing Official Q&A link is for V5RC Override; an IQ-specific Q&A link is not implemented.
+
+The program choice uses the existing `competition_program` event setting; it requires no additional database migration.
+
+---
+
+## VEX Events API integration
+
+Ref OS uses the VEX Events API through the Supabase **`vex-event-lookup`** Edge Function. The API token stays on the server. Tournament Manager remains the source for match schedules, scores, alliances, and skills imports.
+
+### Event autofill and USA event finder
+
+**Two ways to find an event:** search by its full **RE or VE event code**, or **filter USA events by state or territory and date range**, then select the event from the dropdown. Both routes load event details and the team roster for review before creation.
+
+1. Open **Choose VEX Event → Create VEX Event**.
+2. Enter the full event code (both `RE-` and `VE-` formats are supported) and choose **Look up**. Alternatively, select a US state or territory and a date range of up to one year, choose **Find events**, select an event from the dropdown, and choose **Use selected event**. **Load more events** retrieves later result pages; the displayed count is the number loaded so far. Location search currently covers the USA only.
+3. Review the event name, dates, location, program, and team roster. Choose Tournament or League and enter a separate Ref OS Admin access code.
+4. Create the event. Ref OS saves its metadata and roster. For a League, the start date initializes the editable first-session date; autofill does not create every session.
+
+Manual creation remains available if lookup fails. If an event is created but its roster cannot be saved, import teams into that existing event through TM Sync Center rather than creating a duplicate.
+
+### Qualification rankings sync
+
+Available to cloud Admins from **Rankings → VEX API Sync** or **Event Command Center → VEX API Sync**:
+
+1. Confirm the saved event code. Divisions load automatically when a saved code is available; a single division is selected automatically. For a multi-division event, choose the division to import.
+2. Review the qualification rankings preview and confirm the target event and, for a League, the working session.
+3. Choose **Import once** for one update, or **Start syncing** to import and enable checks once a minute. The dialog closes so the rest of the app remains usable.
+4. Use **Manage VEX sync** or **Stop sync** in the status bar to manage updates.
+
+The code is retained in the event settings after a successful lookup. Automatic checks continue while Ref OS is open, visible, and online, even with the dialog closed. They stop on errors, switching events or League sessions, signing out, or reloading. This is polling of published API data, so updates may lag scoring; it does not run while the app is closed or suspended. Empty snapshots keep existing data. Failed writes may partially succeed; review and retry the snapshot.
+
+**API sync is limited to qualification rankings.** Matches, scores, alliances, and skills use Tournament Manager imports. Each selected division is imported into the current target; Ref OS does not merge standings across divisions or calculate cumulative League standings.
+
+### Team event history
+
+At the bottom of team history, **Registered & Past Events** retrieves the exact team's associated events in a bounded past-year to next-year window. Upcoming events appear first. Successful results are cached on the device for offline viewing and reused for 15 minutes; **Refresh events** requests an update. The API's associated-event list does not guarantee registration status or include every future registration. Ambiguous team numbers show an error instead of selecting a different program's team.
+
+### Setup
+
+1. In the Supabase project's Edge Function secrets, add **`VEX_EVENTS_API_TOKEN`** with the approved VEX API token. Never put it in a `VITE_` variable, committed file, or frontend code.
+2. Sign in to the Supabase CLI and deploy the function. Replace `YOUR_PROJECT_REF` with the reference of the Supabase project used by that deployment:
+
+```bat
+npx supabase login
+npx supabase functions deploy vex-event-lookup --project-ref YOUR_PROJECT_REF --no-verify-jwt
+```
+
+The function validates the caller's Supabase session itself. `--no-verify-jwt` supports modern signing keys without removing that session check. Supabase anonymous sign-ins must be enabled, as for the rest of Ref OS.
+
+3. Publish the matching frontend build. Redeploy the function when its server code changes; frontend-only changes do not require redeployment. The existing token secret remains configured.
+4. Verify a known event, full team roster, selected division, and rankings with the live account. Local automated tests use fixtures and do not prove live API access.
+
+No additional database migration is required for the API integration. Detailed setup and limitations are in [`VEX-API-SETUP.md`](VEX-API-SETUP.md).
+
+---
+
 ## Event lifecycle
 
 ```
@@ -83,7 +153,7 @@ Create Event
   → Restore  OR  Permanently Delete
 ```
 
-1. **Create Event.** From *Choose VEX Event*, select *Create VEX Event*, enter an event name, and choose the event's Admin access code. This creates an empty event shell with its own UUID.
+1. **Create Event.** From *Choose VEX Event*, select *Create VEX Event*, enter an event name (or use VEX Events autofill), choose VEX IQ or V5RC / VEX U and Tournament or League, and set the event's Admin access code. This creates an event with its own UUID; VEX autofill can also populate its metadata and team roster.
 2. **Configure Access.** Sign in as Admin and set the Referee, Judge Advisor, Inspection, and Emcee access codes from the Event Command Center.
 3. **Import Tournament Manager Data.** Use the TM Sync Center to import teams, schedule, rankings, skills, alliances, and results.
 4. **Configure Event Settings.** Set the event name, short name, logo, accent color, and field names.
@@ -153,8 +223,8 @@ The TM Sync Center (Event Command Center → *TM Sync Center*) supports:
 - Alliance selection and elimination bracket information.
 
 **Rules**
-- Searchable rules reference. Every new event starts with its own copy of the default rule library (currently the V5RC Override 2026-2027 rules, taken from Highlander Summit), so the Rules tab works immediately. Each event's rules are independent, and events can import their own rules from CSV.
-- **Game Manual** opens the bundled Override 2.0 Game Manual, which is available offline.
+- **V5RC / VEX U:** searchable event rule library, initially copied from the V5RC Override 2026–2027 default template. Each event's library is independent and can be imported from CSV. **VEX IQ:** the Rules tab shows the bundled Level Up quick-reference list instead; see [VEX IQ events](#vex-iq-events).
+- **Game Manual** for V5 events opens the bundled Override 2.0 manual. IQ events offer the bundled Level Up 2.0 manual with an in-app Back button. Both are available offline after the app's offline files finish downloading.
 - **Official Q&A** opens the official VEX Q&A for the season in a new browser tab. It needs an internet connection; offline, Ref OS says so instead of opening it. The link is set per season in `src/officialResources.js`, not in individual components. Ref OS only links to the Q&A; it does not copy or download it.
 
 **Coordination**
@@ -186,7 +256,7 @@ The Event Command Center is the Admin-only hub for event administration. Current
 
 | Area | Tools |
 |---|---|
-| **Event configuration** | Event Settings, Event Management, Event setup (match counts and bracket format), TM Sync Center |
+| **Event configuration** | Event Settings, Event Management, Event setup (competition program, match counts and bracket format), TM Sync Center, VEX API Sync (qualification rankings) |
 | **Access** | Volunteer Access Codes, Key Volunteer Status (including granting Admin to an online volunteer), Reset Volunteer Sign Ins |
 | **Communication** | Key volunteer announcements, countdown management, Event Contact Directory, event alert counter |
 | **Readiness and health** | Pre Event System Test, Two Device Sync Test, offline readiness test, Admin Diagnostics, failed sync items (retry or discard) |
@@ -255,7 +325,7 @@ Ref OS is built for venues with unreliable Wi-Fi and cellular service.
 
 - **Installable app.** Ref OS can be added to the home screen and works as an installed app, with update notifications when a new version is available.
 - **Durable outbox.** New violations and robot photos are saved on the device immediately and upload automatically when the connection returns. The interface shows connection health, pending items, and the last successful sync.
-- **Cached reads.** Recently loaded teams, matches, and rules, previously viewed robot photos, and the app shell remain available offline. The Highlander event's bundled Game Manual is available offline.
+- **Cached reads.** Recently loaded teams, matches, and rules, previously viewed robot photos, and the app shell remain available offline. The bundled Override and IQ Level Up manuals are available offline after the offline files finish downloading.
 - **Live updates** arrive through Supabase Realtime when connected.
 
 Offline support protects work created on that device. Seeing new information entered by other volunteers, signing in, imports, exports, and administrative changes all require a connection, unless the event uses the optional Local Venue Server described next.
@@ -317,6 +387,7 @@ src/
   App.jsx                  Event selector, login flow, and the main event workspace
   api.js                   Supabase data access (events, teams, matches, photos, lifecycle)
   officialResources.js     Per-season official links (Official Q&A)
+  iqLevelUpRules.json       Bundled IQ rule codes and quick-reference descriptions
   sync/                    Sync mode (Cloud or Local Venue Server) and venue server sync
   league/                  League Overview, session management, and league display helpers
   eventProfiles.js         Built-in event profiles and branding resolution
@@ -329,7 +400,7 @@ src/
   features/                Field reset checks and team scanner
 public/                    Icons, logos, service worker, manifest, manual pages, forms
 supabase/                  SQL migrations (run in the Supabase SQL Editor)
-supabase/functions/        Edge Functions
+supabase/functions/        Edge Functions (including vex-event-lookup for VEX API integration)
 scripts/                   Build-time and setup helper scripts
 tests/                     Playwright tests
 tm-bridge/                 Optional Tournament Manager bridge utility
@@ -389,6 +460,7 @@ npx supabase functions deploy refos-developer-access
 `refos-developer-access` reads its credential from the `REFOS_SUPER_ADMIN_CODE` Supabase secret (`npx supabase secrets set REFOS_SUPER_ADMIN_CODE=<code>`). The value is never stored in this repository, the database, or the app.
 
 - `send-code-request-push` delivers push alerts for help and access-code requests. It requires VAPID secrets; see [`PUSH-NOTIFICATIONS-SETUP.md`](PUSH-NOTIFICATIONS-SETUP.md).
+- `vex-event-lookup` supports event autofill, USA event search, qualification rankings, and team event history. It requires the server-only `VEX_EVENTS_API_TOKEN` secret; see [VEX Events API integration](#vex-events-api-integration).
 - `purge-deleted-event-photos` removes cloud photo objects for permanently deleted events. It uses the service role that Supabase provides to Edge Functions; no additional secrets are required.
 
 Anonymous sign-ins must be enabled in Supabase Auth, because each device uses an anonymous session before claiming an event role.
