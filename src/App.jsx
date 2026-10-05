@@ -31,6 +31,7 @@ import * as api from "./api";
 import * as outbox from "./outbox";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { APP_VERSION } from "./appVersion";
+import { ROBOT_PHOTO_SLOTS, normalizeRequiredRobotPhotos, robotPhotoSlots } from "./robotPhotoRequirements";
 import { compressRobotPhoto } from "./photoCompression";
 import * as photoCache from "./photoCache";
 import CommandCenter from "./components/CommandCenter.jsx";
@@ -1778,6 +1779,8 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   const [eventSettings, setEventSettings] = useState({});
   const [programLookupError, setProgramLookupError] = useState("");
   const isIQ = (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq";
+  const requiredRobotPhotos = normalizeRequiredRobotPhotos(eventSettings?.robot_photo_requirements?.value?.required);
+  const [photoRequirementsError, setPhotoRequirementsError] = useState("");
 
   // Settings this device just saved. A realtime or focus refresh can return a server
   // snapshot read before that save committed; keep the just-saved row until the server
@@ -2346,6 +2349,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         })));
         // Inspection cannot read event_settings; load only the read-only display configuration:
         // configured field display names and the event's public branding (short name, logo, accent).
+        api.getEventRobotPhotoRequirements(eventId).then(row=>{if(row)setEventSettings(cur=>({...cur,robot_photo_requirements:row}));setPhotoRequirementsError("");}).catch(()=>setPhotoRequirementsError("Required picture settings could not be loaded. The default four views are shown; reconnect or ask an Admin to verify event requirements."));
         api.getEventCompetitionProgram(eventId).then(row => { if (row) setEventSettings(cur=>({...cur,competition_program:row})); setProgramLookupError(""); }).catch(()=>setProgramLookupError("Competition program could not be loaded. Ask the Admin to check IQ setup before using the rule library."));
         api.getEventFieldNames(eventId).then((row) => { if (row) setEventSettings((cur) => ({ ...cur, field_names: row })); }).catch(() => {});
         api.getPublicEventBranding(eventId).then((row) => { if (row) setEventSettings((cur) => ({ ...cur, event_branding: row })); }).catch(() => {});
@@ -2693,7 +2697,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   //   events.name, event_settings "event_branding", event_settings "field_names".
   // Only the parts the Admin changed are written. Teams, matches, rankings, violations,
   // alliances, nominations, and access credentials are never touched.
-  const saveEventSettings = async ({ name, branding, fieldNames: nextFieldNames }) => {
+  const saveEventSettings = async ({ name, branding, fieldNames: nextFieldNames, requiredRobotPhotos: nextPhotoRequirements }) => {
     if (!adminUnlocked) throw new Error("Only this event's Admin can change event settings.");
     try {
       if (branding) {
@@ -2704,6 +2708,11 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         const savedBranding = await api.upsertEventSetting(eventId, "event_branding", next, meName);
         rememberSettingWrite(savedBranding);
         setEventSettings((cur) => ({ ...cur, event_branding: savedBranding }));
+      }
+      if (nextPhotoRequirements !== null && nextPhotoRequirements !== undefined) {
+        const savedPhotos = await api.upsertEventSetting(eventId, "robot_photo_requirements", {required:normalizeRequiredRobotPhotos(nextPhotoRequirements)}, meName);
+        rememberSettingWrite(savedPhotos);
+        setEventSettings(cur=>({...cur,robot_photo_requirements:savedPhotos}));
       }
       if (nextFieldNames) {
         const savedFields = await api.upsertEventSetting(eventId, "field_names", nextFieldNames, meName);
@@ -4569,8 +4578,9 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         )}
         {highlanderDemoLocked && <div role="status" className="mb-4 rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-900 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-100">Highlander Summit demo archive: matches, alliances, and violations are read only.</div>}
         {highlanderDemoLocked && !isInspection && !isEmcee && <HighlanderPractice key={eventId} by={meName || "Demo Ref"}
-          renderForm={({onSave,onClose}) => <LogModal practice teams={teams} viols={[]} presetTeam={openTeam || null} knownRules={knownRules} me={{name:meName || "Demo Ref"}} event={event} matches={matches} presetMatch={openMatch && matches[openMatch] ? {phase:matches[openMatch].phase,num:String(matches[openMatch].num)} : null} rules={rules} onOpenPhoto={setLightbox} fieldNames={fieldNames} onSetName={()=>{}} onSave={onSave} onClose={onClose} />}
+          renderForm={({onSave,onClose}) => <LogModal requiredRobotPhotos={requiredRobotPhotos} practice teams={teams} viols={[]} presetTeam={openTeam || null} knownRules={knownRules} me={{name:meName || "Demo Ref"}} event={event} matches={matches} presetMatch={openMatch && matches[openMatch] ? {phase:matches[openMatch].phase,num:String(matches[openMatch].num)} : null} rules={rules} onOpenPhoto={setLightbox} fieldNames={fieldNames} onSetName={()=>{}} onSave={onSave} onClose={onClose} />}
           renderEntry={(entry,remove) => <ViolationCard key={entry.id} v={entry} showTeam canManage onDelete={remove} onOpenPhoto={setLightbox} />} />}
+        {isInspection && photoRequirementsError && <p role="alert" className="mb-3 rounded-lg border border-amber-300 p-3 text-sm">{photoRequirementsError}</p>}
         {isInspection && programLookupError && <p role="alert" className="mb-3 rounded-lg border border-amber-300 p-3 text-sm">{programLookupError}</p>}
         {!openTeam && !openMatch && !openRobot && <section className="refos-page-heading" aria-label="Workspace overview">
           <div>
@@ -4595,11 +4605,11 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={highlanderDemoLocked ? undefined : (n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} emcee={isEmcee} />
         ) : openRobot ? (
-          <RobotDetail isIQ={isIQ} team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} canTakePhotos={!isEmcee} canDeletePhotos={!isInspection && !isEmcee} />
+          <RobotDetail requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} canTakePhotos={!isEmcee} canDeletePhotos={!isInspection && !isEmcee} />
         ) : view === "matches" ? (
           isIQ ? <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} parseCSV={parseCSV} /> : <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
-          <RobotList isIQ={isIQ} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
+          <RobotList requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "judging" ? (
           <JudgingView noms={noms} viols={viols} teamName={teamNameMap} finalists={finalists} rankOrder={eventSettings?.judging_rank_order?.value || {}} canReorder={adminUnlocked} onMoveRank={moveJudgingRank} emcee={isEmcee}
             onToggleFinalist={(award, team) => (isJudge ? toggleFinalist(award, team) : requireAdmin(() => toggleFinalist(award, team)))}
@@ -4713,12 +4723,12 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         onClose={() => setShowTeamScanner(false)}
       />}
       {logFor !== null && (
-        <LogModal isIQ={isIQ} teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={{...event,competitionProgram:isIQ?"iq":"v5"}} matches={matches} presetMatch={logMatch} rules={workflowRules} onOpenPhoto={setLightbox} fieldNames={fieldNames}
+        <LogModal requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={{...event,competitionProgram:isIQ?"iq":"v5"}} matches={matches} presetMatch={logMatch} rules={workflowRules} onOpenPhoto={setLightbox} fieldNames={fieldNames}
           onSetName={() => openIdentityEditor()} onClose={() => { setLogFor(null); setLogMatch(null); }}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await saveViolation({ ...form, team }); setLogFor(null); setLogMatch(null); }} />
       )}
       {editing && (
-        <LogModal isIQ={isIQ} teams={teams} viols={viols} presetTeam={editing.team} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={{...event,competitionProgram:isIQ?"iq":"v5"}} matches={matches} rules={workflowRules} onOpenPhoto={setLightbox} edit={editing} fieldNames={fieldNames}
+        <LogModal requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} viols={viols} presetTeam={editing.team} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={{...event,competitionProgram:isIQ?"iq":"v5"}} matches={matches} rules={workflowRules} onOpenPhoto={setLightbox} edit={editing} fieldNames={fieldNames}
           onSetName={() => openIdentityEditor()} onClose={() => setEditing(null)}
           onSave={async (form) => {
             const team = await upsertTeam(form.team || form.newNumber, form.newName);
@@ -4888,7 +4898,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
       {showEventManagement && adminUnlocked && <EventManagementModal event={event} eventId={eventId} brand={brand} roleLabel={myRole} isProtected={eventProtected}
         onArchive={archiveCurrentEvent}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEventManagement(false)} />}
-      {showEventSettings && adminUnlocked && <EventSettingsModal event={event} brand={brand} fieldNames={fieldNames}
+      {showEventSettings && adminUnlocked && <EventSettingsModal event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
         eventFormat={league || event?.format === "league" ? "league" : "tournament"}
         canConvertToLeague={!league && !isHighlander && event?.format !== "league"}
         onConvertToLeague={() => setShowConvertLeague(true)}
@@ -5313,7 +5323,7 @@ function ByRule({ viols, expandRule, setExpandRule }) {
 }
 
 /* ============================ LOG MODAL ============================ */
-function LogModal({ isIQ = false, practice = false, teams, viols, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, edit, onSetName, onClose, onSave, fieldNames = DEFAULT_FIELD_NAMES }) {
+function LogModal({ requiredRobotPhotos, isIQ = false, practice = false, teams, viols, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, edit, onSetName, onClose, onSave, fieldNames = DEFAULT_FIELD_NAMES }) {
   const ruleBook = useMemo(() => {
     const m = {}; for (const r of (rules || [])) m[r.code] = r.desc; return m;
   }, [rules]);
@@ -5422,7 +5432,7 @@ function LogModal({ isIQ = false, practice = false, teams, viols, presetTeam, kn
                   <span className="text-[11px] text-slate-500 dark:text-slate-400">Robot on file:</span>
                   <div className="mt-1 flex gap-1.5 overflow-x-auto pb-1">
                     {rk.map((k) => {
-                      const slot = ROBOT_PHOTO_SLOTS.find((item) => item.key === robotPhotoAngle(k));
+                      const slot = robotPhotoSlots(requiredRobotPhotos,isIQ).find((item) => item.key === robotPhotoAngle(k));
                       return <div key={k} className={`w-[76px] shrink-0 rounded-md border p-1 text-center ${slot?.required ? "border-amber-400 bg-amber-50 dark:border-amber-600 dark:bg-amber-950/30" : "border-slate-200 bg-white dark:border-slate-600 dark:bg-slate-800"}`}>
                         <div className="flex justify-center"><Thumb pkey={k} onOpen={onOpenPhoto} compact /></div>
                         <span className="mt-0.5 block break-words text-[10px] font-bold leading-tight text-slate-800 dark:text-slate-100">{slot?.label || "Other view"}</span>
@@ -6634,34 +6644,28 @@ function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onS
 }
 
 /* ============================ ROBOTS (inspection photos) ============================ */
-const ROBOT_PHOTO_SLOTS = [
-  { key: "front", label: "Front", required: true },
-  { key: "side", label: "Side", required: true },
-  { key: "back", label: "Back", required: true },
-  { key: "tag", label: "Inspection Tag", required: true },
-  { key: "lexan", label: "Lexan Diagram", required: false },
-];
-const REQUIRED_ROBOT_ANGLES = ROBOT_PHOTO_SLOTS.filter((angle) => angle.required);
+
 
 function robotPhotoAngle(path) {
   const match = String(path || "").match(/\/(front|back|side|tag|lexan)-[^/]+\.(?:jpe?g|webp)$/i);
   return match ? match[1].toLowerCase() : "";
 }
 
-function robotAngleCount(team) {
+function robotAngleCount(team, requiredRobotPhotos) {
   const angles = new Set((team?.photoKeys || []).map(robotPhotoAngle).filter(Boolean));
   (team?._pendingRobotPhotos || []).forEach((photo) => angles.add(photo.angle));
-  return REQUIRED_ROBOT_ANGLES.filter((angle) => angles.has(angle.key)).length;
+  return normalizeRequiredRobotPhotos(requiredRobotPhotos).filter(key=>angles.has(key)).length;
 }
 
-function RobotList({ isIQ = false, teams, query, setQuery, onOpen }) {
+function RobotList({ requiredRobotPhotos, isIQ = false, teams, query, setQuery, onOpen }) {
   const q = query.trim().toUpperCase();
   const list = [...teams].sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
   const filtered = q ? list.filter((t) => t.number.toUpperCase().includes(q) || (t.name || "").toUpperCase().includes(q)) : list;
-  const complete = teams.filter((team) => robotAngleCount(team) === REQUIRED_ROBOT_ANGLES.length).length;
+  const required = normalizeRequiredRobotPhotos(requiredRobotPhotos);
+  const complete = teams.filter((team) => robotAngleCount(team,required) === required.length).length;
   return (
     <>
-      <p className="text-xs text-slate-400 mb-3">{complete} of {teams.length} teams have all four required inspection pictures. Every team needs Front, Side, Back, and an inspection tag picture.</p>
+      <p className="text-xs text-slate-400 mb-3">{required.length ? `${complete} of ${teams.length} teams have all ${required.length} required pictures. Required: ${ROBOT_PHOTO_SLOTS.filter(slot=>required.includes(slot.key)).map(slot=>slot.label).join(", ")}.` : "No robot pictures are required for this event. All pictures are optional."}</p>
       <div className="relative mb-4">
         <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search teams by number or name" placeholder="Search team #"
@@ -6673,7 +6677,7 @@ function RobotList({ isIQ = false, teams, query, setQuery, onOpen }) {
         <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {filtered.map((t) => {
             const key = (t.photoKeys || [])[0];
-            const angleCount = robotAngleCount(t);
+            const angleCount = robotAngleCount(t,required);
             const pendingCount = (t._pendingRobotPhotos || []).length;
             return (
               <li key={t.number}>
@@ -6683,7 +6687,7 @@ function RobotList({ isIQ = false, teams, query, setQuery, onOpen }) {
                   </div>
                   <div className="px-2.5 py-2 flex items-center gap-1.5">
                     <span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm truncate">{t.number}</span>
-                    <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${angleCount === REQUIRED_ROBOT_ANGLES.length ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"}`}>{angleCount}/{REQUIRED_ROBOT_ANGLES.length}</span>
+                    <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${angleCount === required.length ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"}`}>{required.length ? `${angleCount}/${required.length}` : "Optional"}</span>
                     {pendingCount > 0 && <span className="text-[9px] font-bold text-sky-600 dark:text-sky-300">{pendingCount} queued</span>}
                   </div>
                 </button>
@@ -6721,14 +6725,16 @@ function LeagueEarlierRobotPhotos({ team, league, onOpenPhoto }) {
   );
 }
 
-function RobotDetail({ isIQ = false, team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, canTakePhotos = true, canDeletePhotos = true }) {
+function RobotDetail({ requiredRobotPhotos, isIQ = false, team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, canTakePhotos = true, canDeletePhotos = true }) {
   const league = useContext(LeagueUiContext);
   const [busy, setBusy] = useState(false);
   const [captureAngle, setCaptureAngle] = useState("");
   const [sequenceIndex, setSequenceIndex] = useState(-1);
+  const [sequenceSlots, setSequenceSlots] = useState([]);
   const fileRef = useRef(null);
   if (!team) return <Empty title="Team not found" sub="" />;
-  const photoSlots = isIQ ? ROBOT_PHOTO_SLOTS.filter(slot=>slot.key!=="lexan") : ROBOT_PHOTO_SLOTS;
+  const photoSlots = sequenceIndex >= 0 && sequenceSlots.length ? sequenceSlots : robotPhotoSlots(requiredRobotPhotos,isIQ);
+  const requiredCount = photoSlots.filter(slot=>slot.required).length;
   const photos = team.photoKeys || [];
   const pendingPhotos = team._pendingRobotPhotos || [];
   const slotData = photoSlots.map((angle) => ({
@@ -6747,6 +6753,7 @@ function RobotDetail({ isIQ = false, team, onAddPhoto, onRemovePhoto, onRemovePe
     fileRef.current?.click();
   };
   const beginSequence = () => {
+    setSequenceSlots(photoSlots);
     setSequenceIndex(0);
     setCaptureAngle(photoSlots[0].key);
   };
@@ -6762,7 +6769,7 @@ function RobotDetail({ isIQ = false, team, onAddPhoto, onRemovePhoto, onRemovePe
       if (sequenceIndex >= 0 && nextIndex < photoSlots.length) {
         setSequenceIndex(nextIndex);
         setCaptureAngle(photoSlots[nextIndex].key);
-        // Leave the optional Lexan photo as a choice after the required pictures.
+        // Required views come first; optional views wait for another tap.
         if (photoSlots[nextIndex].required) {
           // Mobile browsers may require another tap to reopen the camera.
           setTimeout(() => fileRef.current?.click(), 0);
@@ -6783,10 +6790,10 @@ function RobotDetail({ isIQ = false, team, onAddPhoto, onRemovePhoto, onRemovePe
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">{team.number}</div>
         {team.name && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{team.name}</div>}
-        <div className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${completed === REQUIRED_ROBOT_ANGLES.length ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"}`}>
-          <Camera size={13}/>{completed === REQUIRED_ROBOT_ANGLES.length ? "Required pictures complete" : `${completed} of ${REQUIRED_ROBOT_ANGLES.length} required pictures`}
+        <div className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${completed === requiredCount ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"}`}>
+          <Camera size={13}/>{!requiredCount ? "No pictures required" : completed === requiredCount ? "Required pictures complete" : `${completed} of ${requiredCount} required pictures`}
         </div>
-        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">After inspection passes, photograph the inspection tag attached to the robot.</p>
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{requiredCount ? "Required views are configured by the event Admin. Photo completion does not certify inspection." : "All views are optional for this event."}</p>
         {canTakePhotos && <button type="button" onClick={beginSequence} disabled={busy} className="mt-3 w-full rounded-lg bg-[#D7212B] px-3 py-3 text-base font-bold text-white disabled:bg-slate-400"><Camera size={18} className="inline mr-1.5"/>Take pictures in order</button>}
       </div>
       {canTakePhotos && <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; add(file); }} />}
@@ -6799,7 +6806,7 @@ function RobotDetail({ isIQ = false, team, onAddPhoto, onRemovePhoto, onRemovePe
               <p className="mb-3 text-base font-semibold text-sky-900 dark:text-sky-100">Picture {sequenceIndex + 1} of {photoSlots.length}: {photoSlots[sequenceIndex].label}{photoSlots[sequenceIndex].required ? "" : " (optional)"}</p>
               <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#D7212B] px-4 py-4 text-base font-bold text-white shadow-sm disabled:bg-slate-400"><Camera size={22}/>{busy ? "Saving picture…" : `Open camera: Take ${photoSlots[sequenceIndex].label} picture`}</button>
             </div>
-            <button type="button" onClick={() => { setSequenceIndex(-1); setCaptureAngle(""); }} disabled={busy} className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-3 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200 disabled:opacity-50">{photoSlots[sequenceIndex].required ? "Stop taking pictures" : "Finish without Lexan"}</button>
+            <button type="button" onClick={() => { setSequenceIndex(-1); setCaptureAngle(""); }} disabled={busy} className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-3 text-sm font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200 disabled:opacity-50">{photoSlots[sequenceIndex].required ? "Stop taking pictures" : "Finish without optional pictures"}</button>
           </div>
         </div>, document.body)}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
@@ -7835,10 +7842,10 @@ function FeaturesGuide({ isHighlander = true }) {
           <Li><b>Teams</b> — search teams, open their full history, add teams, review Tournament Manager rank, and start a new log from the team record.</Li>
           <Li><b>Team scanner</b> — use the camera OCR scanner to recognize a team number and jump to the team record.</Li>
           <Li><b>Watchlist</b> — add shared watch notes to teams. Watched teams are flagged and their notes appear during relevant matches.</Li>
-          <Li><b>Required inspection pictures</b> — capture Front, Back, Side, and the inspection tag attached to the robot after it passes inspection. Completion appears on each team card.</Li>
-          <Li><b>Take pictures in order</b> — open a separate camera dialog that walks through the four required views and then offers the optional Lexan Diagram. The red camera button names the next picture.</Li>
-          <Li><b>Optional Lexan Diagram</b> — save a picture of the team's Lexan or plastic diagram without affecting the four required picture completion count.</Li>
-          <Li><b>Pictures on violation forms</b> — compact bordered thumbnails show each view name and identify required inspection pictures.</Li>
+          <Li><b>Required inspection pictures</b> — capture the views selected in Event Settings. Defaults are Front, Side, Back, and Inspection Tag. Completion appears on each team card; a tag photo follows an inspection pass.</Li>
+          <Li><b>Take pictures in order</b> — open a separate camera dialog that starts with the views required for this event and then offers optional views. The red camera button names the next picture.</Li>
+          <Li><b>Lexan Diagram</b> — this view counts toward completion when selected as required in Event Settings.</Li>
+          <Li><b>Pictures on violation forms</b> — compact bordered thumbnails show each view name and identify the views required for this event.</Li>
           <Li><b>Offline picture queue</b> — required pictures remain visible as queued and upload automatically after connectivity returns.</Li>
         </ul>
       </Section>

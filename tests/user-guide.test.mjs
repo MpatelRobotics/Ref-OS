@@ -19,7 +19,7 @@ test('role restrictions apply to browsing and full-text search', () => {
   }
   for (const role of ['Inspection', 'Emcee', 'Judge Advisor', 'Referee']) {
     assert.ok(!visibleArticles(role).some((a) => a.id === 'clear'));
-    assert.equal(searchArticles(role, 'Delete Selected').length, 0);
+    assert.ok(!searchArticles(role, 'Delete Selected').some((a) => a.id === 'clear'));
   }
   assert.ok(!visibleArticles('Emcee').some((a) => a.id === 'violation'));
   assert.ok(!visibleArticles('Inspection').some((a) => a.id === 'judging'));

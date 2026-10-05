@@ -1823,3 +1823,14 @@ export async function setUniversalFeedbackStatus(_eventId, feedbackId, status) {
   const { error } = await supabase.rpc('set_universal_feedback_status', { p_feedback: feedbackId, p_status: status });
   if (error) throw error;
 }
+
+export async function getEventRobotPhotoRequirements(eventId) {
+ if(E2E_MOCK)return null;
+ try {
+  const {data,error}=await supabase.rpc('get_event_robot_photo_requirements',{p_event:eventId});
+  if(error)throw error;
+  if(!data)throw Error('Event access required');
+  const row={key:'robot_photo_requirements',value:data,updatedAt:0,updatedBy:''};
+  saveReadCache(eventId,'robot_photo_requirements',[row]);return row;
+ }catch(error){const cached=loadReadCache(eventId,'robot_photo_requirements')?.[0];if(cached)return cached;throw error;}
+}

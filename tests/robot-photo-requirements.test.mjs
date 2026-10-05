@@ -1,0 +1,3 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {normalizeRequiredRobotPhotos,robotPhotoSlots} from '../src/robotPhotoRequirements.js';
+test('defaults, explicit empty, deduplication and stable required-first order',()=>{assert.deepEqual(normalizeRequiredRobotPhotos(undefined),['front','side','back','tag']);assert.deepEqual(normalizeRequiredRobotPhotos([]),[]);assert.deepEqual(normalizeRequiredRobotPhotos(['lexan','bogus','front','front']),['front','lexan']);assert.equal(robotPhotoSlots(['lexan'])[0].key,'lexan');assert.equal(robotPhotoSlots(undefined,true).some(s=>s.key==='lexan'),false);assert.equal(robotPhotoSlots(['lexan'],true)[0].required,true);});

@@ -33,8 +33,8 @@ add('ref-start', 'Quick Starts', 'Referee quick start', REF,
   'Ref OS observations do not replace official scoring or the Head Referee’s decisions.', ['violation', 'awp', 'field', 'offline']);
 add('inspection-start', 'Quick Starts', 'Inspection quick start', PHOTO,
   'Collect the required robot identification pictures.', 'During inspection after the robot passes.',
-  ['Open Robots and find the team.', 'Choose Take pictures in order.', 'Capture Front, Back, Side, and the inspection tag attached to the robot.', 'Add the optional Lexan Diagram if supplied.', 'Check completion and upload status before leaving the team.'],
-  'The completion count tracks four required views; the Lexan Diagram is optional.',
+  ['Open Robots and find the team.', 'Choose Take pictures in order.', 'Capture the views marked Required for this event. Photograph an inspection tag only after inspection passes.', 'Add other optional views if useful.', 'Check completion and upload status before leaving the team.'],
+  'Completion uses the views selected for this event. Defaults are Front, Side, Back, and Inspection Tag; Admin or Developer can change them in Event Settings. Queued pictures count on this device.',
   'Inspection role does not provide referee violation logging. In a League, robot pictures belong to the working session.', ['photos', 'rules', 'photo-trouble']);
 add('judge-start', 'Quick Starts', 'Judge Advisor quick start', ['Judge Advisor', ...ADMIN],
   'Review nomination evidence and award finalists.', 'Before judging review or preparing award recommendations.',
@@ -88,8 +88,8 @@ add('reset-check', 'Referee', 'Field reset and live setup checks', REF,
   'A digital check is a coordination aid; physically inspect the field. League checks are session specific.', ['matches', 'field']);
 add('photos', 'Inspection', 'Robot pictures and completion', PHOTO,
   'Store robot views so authorized volunteers can identify and inspect teams.', 'During inspection or when replacing an incorrect picture.',
-  ['Open Robots, search the roster, and select the team.', 'Use Take pictures in order or an individual view’s capture/upload control.', 'Take Front, Back, Side, and the passed-inspection tag view.', 'Optionally add the Lexan Diagram.', 'Open a picture to review it and use the offered replacement/removal control if needed.', 'Check pending upload and completion information.'],
-  'Four required views determine completion. The optional diagram does not change that count. Camera controls name the next picture.',
+  ['Open Robots, search the roster, and select the team.', 'Use Take pictures in order or an individual view’s capture/upload control.', 'Take the views marked Required for this event; take an inspection-tag picture only after inspection passes.', 'Add optional views as needed.', 'Open a picture to review it and use the offered replacement/removal control if needed.', 'Check pending upload and completion information.'],
+  'The event configuration determines required pictures and completion. Optional views do not change the count. Required views appear first in the camera sequence. IQ shows Lexan when selected as required. No selected views means all pictures are optional.',
   'Pictures are private event data. Inspection can capture or retake pictures but cannot delete them; ask a Referee or Admin for deletion. Camera access depends on browser permissions and a supported secure context. Venue mode does not replace cloud robot-photo storage.', ['inspection-start', 'photo-trouble', 'offline']);
 add('rules', 'Rules & Official Q&A', 'Search rules, manual, and Official Q&A', ['Referee', 'Inspection', 'Emcee', ...ADMIN],
   'Rules provides the event’s rule reference and official resource links.', 'Before citing a rule or checking an interpretation.',
@@ -163,7 +163,7 @@ add('setup', 'Admin', 'Event Setup and field names', ADMIN,
   'These values do not import a real TM schedule. Bracket, best-of, and match-count setup is League-wide.', ['settings', 'tm']);
 add('settings', 'Admin', 'Event Settings and branding', ADMIN,
   'Edit the event’s identity and field display labels.', 'When setting up a custom event or correcting its presentation.',
-  ['Open Command Center → Event Settings.', 'Enter the event name and short name.', 'Use an optional full image URL for the logo and a valid accent color.', 'Give each competition field a distinct name.', 'Review the preview and validation messages, then Save.'],
+  ['Open Command Center → Event Settings.', 'Enter the event name and short name.', 'Use an optional full image URL for the logo and a valid accent color.', 'Give each competition field a distinct name. Choose Required robot pictures (Front, Side, Back, Inspection Tag, Lexan Diagram); uncheck all if pictures should be optional.', 'Review the preview and validation messages, then Save.'],
   'The short name, logo, and accent update the event presentation. Some protected event changes may be unavailable.',
   'External logos may require internet. Event Settings is separate from Event Setup match options and Event Management lifecycle actions.', ['setup', 'management', 'conversion']);
 add('creation', 'Admin', 'Create and choose events', ADMIN,

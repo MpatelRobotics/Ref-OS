@@ -433,3 +433,11 @@ A Developer can select **View screenshots** on a submission in either the event 
 Run [`supabase/feedback-attachments.sql`](supabase/feedback-attachments.sql) after the base schema, League, event lifecycle, and Developer migrations. No Edge Function redeployment is required. Text-only feedback keeps its existing submission path. Screenshots require internet and are not queued or cached offline. If the message saves but an attachment fails, keep the window open and press **Send Feedback** again; retry uses the same submission and skips already registered screenshots. Closing the window loses pending screenshot retries. Message and attachment choices stay locked once sending starts.
 
 Deleting feedback removes its attachment references, but this build does not add automatic cleanup of feedback screenshot objects in Storage. Unreferenced objects require storage maintenance; the bucket remains private.
+
+### Event-specific robot picture requirements
+
+Admin or Developer: open **Event Settings → Required robot pictures**, select Front, Side, Back, Inspection Tag, and/or Lexan Diagram, then **Save Settings**. Selecting no views makes pictures optional. Existing events keep the default Front, Side, Back, and Inspection Tag requirements until changed.
+
+Robots completion counts, required/optional labels, violation-form thumbnails, and the camera sequence follow this event configuration. Required views come first; optional pictures and existing uploads are kept. IQ keeps its normal four-view layout unless Lexan is selected as required. These are reference-photo requirements, not official inspection certification. League events use one configuration across sessions, while each session keeps its own photos.
+
+Run [`supabase/robot-photo-requirements.sql`](supabase/robot-photo-requirements.sql) in the Supabase SQL Editor after the base schema and event-settings migration so Inspection devices can read only these requirements. Writes keep the existing Admin-only settings permissions. No Edge Function redeployment is needed. Changes require a cloud connection. Inspection caches the last successfully loaded requirements for that event; without a readable or cached configuration, it warns and shows the default four views. Other devices receive changes through the existing event refresh/sync flow.

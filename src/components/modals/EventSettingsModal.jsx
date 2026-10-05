@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { ROBOT_PHOTO_SLOTS, normalizeRequiredRobotPhotos } from "../../robotPhotoRequirements";
 import { CalendarDays, ImageOff, MapPin, Palette, RotateCcw, Save, Settings, X } from "lucide-react";
 import { HEX_COLOR_RE, isHttpUrl, normalizeHexColor } from "../../eventProfiles.js";
 
@@ -21,7 +22,9 @@ function FieldError({ children }) {
   return <p className="mt-1 text-xs font-semibold text-red-700 dark:text-red-300">{children}</p>;
 }
 
-export default function EventSettingsModal({ event, brand, fieldNames = {}, onSave, onClose, eventFormat = "tournament", canConvertToLeague = false, onConvertToLeague }) {
+export default function EventSettingsModal({ event, brand, fieldNames = {}, requiredRobotPhotos, onSave, onClose, eventFormat = "tournament", canConvertToLeague = false, onConvertToLeague }) {
+  const [photoRequirements, setPhotoRequirements] = useState(()=>normalizeRequiredRobotPhotos(requiredRobotPhotos));
+  const initialPhotoRequirements = normalizeRequiredRobotPhotos(requiredRobotPhotos);
   const initial = useMemo(() => ({
     name: String(event?.name || brand?.name || "").trim(),
     shortName: String(brand?.shortName || event?.name || "").trim(),
@@ -85,7 +88,8 @@ export default function EventSettingsModal({ event, brand, fieldNames = {}, onSa
     };
     const fieldsChanged = FIELD_KEYS.some((key) => cleanedFields[key] !== initial.fields[key]);
     const nameChanged = cleanName !== initial.name;
-    if (!nameChanged && !fieldsChanged && !Object.values(identityChanged).some(Boolean)) { onClose(); return; }
+    const photoRequirementsChanged = JSON.stringify(photoRequirements) !== JSON.stringify(initialPhotoRequirements);
+    if (!nameChanged && !fieldsChanged && !photoRequirementsChanged && !Object.values(identityChanged).some(Boolean)) { onClose(); return; }
     setSaving(true);
     try {
       await onSave({
@@ -97,6 +101,7 @@ export default function EventSettingsModal({ event, brand, fieldNames = {}, onSa
           removeLegacyLogo,
         } : null,
         fieldNames: fieldsChanged ? cleanedFields : null,
+        requiredRobotPhotos: photoRequirementsChanged ? photoRequirements : null,
       });
     } catch (error) {
       setSaveError(error?.message || "Could not save event settings.");
@@ -209,6 +214,12 @@ export default function EventSettingsModal({ event, brand, fieldNames = {}, onSa
               )}
           </section>
 
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-bold">Required robot pictures</legend>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Choose the required views for this event. Unchecked views do not affect completion. This applies to all League sessions and does not delete saved pictures or certify inspection.</p>
+            {ROBOT_PHOTO_SLOTS.map(slot=><label key={slot.key} className="flex min-h-[44px] items-center gap-3 rounded-lg border border-slate-200 dark:border-slate-700 px-3"><input type="checkbox" disabled={saving} checked={photoRequirements.includes(slot.key)} onChange={e=>setPhotoRequirements(old=>normalizeRequiredRobotPhotos(e.target.checked?[...old,slot.key]:old.filter(key=>key!==slot.key)))}/>{slot.label}</label>)}
+            {!photoRequirements.length && <p className="text-sm">No robot pictures will be required. Volunteers can still take optional pictures.</p>}
+          </fieldset>
           <div className="flex items-center gap-2 text-xs text-slate-400"><Palette size={13} /> Settings apply to this event only.</div>
         </div>
 
