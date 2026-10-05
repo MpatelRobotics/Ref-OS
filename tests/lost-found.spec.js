@@ -1,4 +1,15 @@
 import {test,expect} from '@playwright/test';
+test('Lost & Found is a workspace tab and normal navigation remains usable',async({page,isMobile})=>{
+ await page.route('https://example.supabase.co/**',r=>r.fulfill({contentType:'application/json',body:'[]'}));
+ await page.route('**/src/lostFound*',r=>r.fulfill({contentType:'text/javascript',body:'export const listLostFound=async()=>[];export const saveLostFound=async()=>{};export const setLostFoundReturned=async()=>{};export const prepareItemPhoto=async()=>({});export const lostFoundPhoto=async()=>null;'}));
+ await page.goto('/');await page.getByRole('button',{name:/Highlander Summit/}).first().click();await page.getByRole('button',{name:'Admin login',exact:true}).click();await page.getByPlaceholder('Admin password').fill('test-admin');await page.getByRole('button',{name:'Enter',exact:true}).click();await page.getByPlaceholder('e.g. Maharshi').fill('BoardTester');await page.getByPlaceholder('Required for exports').nth(0).fill('Board');await page.getByPlaceholder('Required for exports').nth(1).fill('Tester');await page.getByRole('button',{name:'Start logging',exact:true}).click();await page.getByRole('button',{name:'Close Quick Start'}).click();
+ const nav=page.getByRole('navigation',{name:isMobile?'Mobile navigation':'Main navigation',exact:true});
+ const openBoard=async()=>{if(isMobile){await expect(nav.getByRole('button',{name:'Lost & Found',exact:true})).toHaveCount(0);await expect(nav.getByRole('button',{name:'Robots',exact:true})).toBeVisible();await nav.getByRole('button',{name:'More',exact:true}).click();await page.getByRole('button',{name:'Lost & Found',exact:true}).click();}else{const tab=nav.getByRole('button',{name:'Lost & Found',exact:true});await tab.click();await expect(tab).toHaveAttribute('aria-current','page');}};
+ await openBoard();await expect(page.getByRole('heading',{name:/Lost & Found ·/})).toBeVisible();
+ await nav.getByRole('button',{name:'Teams',exact:true}).click();await expect(page.getByRole('heading',{name:/Lost & Found ·/})).toHaveCount(0);
+ if(isMobile)await nav.getByRole('button',{name:'Robots',exact:true}).click();
+ await openBoard();await expect(page.getByRole('heading',{name:/Lost & Found ·/})).toBeVisible();
+});
 async function mount(page,manage=true,fail=false){
  await page.route('**/src/lostFound*',r=>r.fulfill({contentType:'text/javascript',body:`export const listLostFound=async()=>[];export const saveLostFound=async()=>{};export const setLostFoundReturned=async()=>{};export const prepareItemPhoto=async()=>({});export const lostFoundPhoto=async()=>'/missing-photo';`}));
  await page.route('**/lost-found-test',r=>r.fulfill({contentType:'text/html',body:`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">

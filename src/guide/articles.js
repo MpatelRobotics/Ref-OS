@@ -13,7 +13,7 @@ function add(id, category, title, roles, summary, when, steps, seen, important, 
 add('lost-found', 'Event Tools', 'Lost & Found board', ALL,
   'Record found items, an optional picture, and the pickup location for event staff.',
   'When an item is handed in or returned to its owner.',
-  ['Open Lost & Found from the desktop Event Tools or Features & Help on any device.', 'Enter an item description and pickup location. Optionally attach a JPEG, PNG, or WebP photo up to 10 MB, then select Add item.', 'Search descriptions and pickup locations, or filter Awaiting pickup, Returned, or All items.', 'Admin and Developer can select Mark returned when the item is collected, or Reopen item if needed.'],
+  ['Open Lost & Found from its event navigation tab on desktop, or More → Lost & Found on mobile.', 'Enter an item description and pickup location. Optionally attach a JPEG, PNG, or WebP photo up to 10 MB, then select Add item.', 'Search descriptions and pickup locations, or filter Awaiting pickup, Returned, or All items.', 'Admin and Developer can select Mark returned when the item is collected, or Reopen item if needed.'],
   'The event-wide board refreshes every 30 seconds while open and visible. Select Refresh for an immediate check. League sessions share the same items.',
   'Internet is required. Avoid personal information and photos of people. If saving fails, keep the form open and retry. This board is not included in existing event exports or Local Venue Server sync.', ['offline'], 'lost found pickup returned belongings');
 add('start', 'Getting Started', 'Sign in and choose your event', ALL,

@@ -443,7 +443,7 @@ Robots completion counts, required/optional labels, violation-form thumbnails, a
 Run [`supabase/robot-photo-requirements.sql`](supabase/robot-photo-requirements.sql) in the Supabase SQL Editor after the base schema and event-settings migration so Inspection devices can read only these requirements. Writes keep the existing Admin-only settings permissions. No Edge Function redeployment is needed. Changes require a cloud connection. Inspection caches the last successfully loaded requirements for that event; without a readable or cached configuration, it warns and shows the default four views. Other devices receive changes through the existing event refresh/sync flow.
 ## Lost & Found
 
-Event staff can open **Lost & Found** from desktop Event Tools or **Features & Help** on mobile. Add an item description, pickup location, and optional JPEG/PNG/WebP photo (up to 10 MB, compressed before upload). Search and filter awaiting-pickup or returned items. Admin/Developer can mark items returned or reopen them.
+Event staff can open **Lost & Found** from its own event navigation tab on desktop or **More → Lost & Found** on mobile. Add an item description, pickup location, and optional JPEG/PNG/WebP photo (up to 10 MB, compressed before upload). Search and filter awaiting-pickup or returned items. Admin/Developer can mark items returned or reopen them.
 
 Run `supabase/lost-found.sql` in Supabase SQL Editor after the base schema and role migrations. It creates the event-scoped board and a private photo bucket with event-membership access policies. No Edge Function redeployment is required.
 

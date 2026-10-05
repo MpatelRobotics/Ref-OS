@@ -1832,7 +1832,6 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   const [alliances, setAlliances] = useState({}); // seed -> [team1, team2]
   const [alliancesLoaded, setAlliancesLoaded] = useState(false);
   const [showFieldLog, setShowFieldLog] = useState(false);
-  const [showLostFound, setShowLostFound] = useState(false);
   const [addMatchOpen, setAddMatchOpen] = useState(false);
   const [nominating, setNominating] = useState(null); // award key when the nominate modal is open
   const [editing, setEditing] = useState(null); // violation being edited
@@ -4365,6 +4364,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
             { k: "judging", label: "Judging", Icon: Trophy },
             ...(adminUnlocked ? [{ k: "rankings", label: "Rankings", Icon: BarChart3 }] : [])
           ];
+          navItems.push({ k: "lost-found", label: "Lost & Found", Icon: Flag });
           const active = navItems.find((item) => item.k === view) || navItems[0];
           const ActiveIcon = active?.Icon || Menu;
           return (
@@ -4382,7 +4382,6 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                   <div className="refos-sidebar-section-label refos-sidebar-tools-label" aria-hidden="true">Event Tools</div>
                   {adminUnlocked && <button onClick={() => { loadEventMembers(); loadAlertStats(); setShowCommandCenter(true); }} className="refos-sidebar-tool"><BarChart3 size={16} /> Command Center</button>}
                   {!isInspection && <button onClick={() => setShowFieldLog(true)} className="refos-sidebar-tool"><Flag size={16} /> Field Log</button>}
-                  <button onClick={() => setShowLostFound(true)} className="refos-sidebar-tool"><Flag size={16} /> Lost &amp; Found</button>
                   {!isInspection && <button onClick={() => setShowContactDirectory(true)} className="refos-sidebar-tool"><Contact size={16} /> Contacts</button>}
                 </div>
                 <div className="refos-sidebar-footer">
@@ -4419,7 +4418,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                 <Icon size={19}/><span>{label}</span>
               </button>
             ))}
-            {!isInspection && !isJudge && <button aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}><Menu size={19}/><span>More</span></button>}
+            <button aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}><Menu size={19}/><span>More</span></button>
           </nav>
         );
       })()}
@@ -4448,7 +4447,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                 <button onClick={() => setMobileNavOpen(false)} className="ml-auto p-1 text-slate-500"><X size={20}/></button>
               </div>
               <div className="p-2">
-                {navItems.map(({ k, label, Icon }) => (
+                {[...navItems, { k: "lost-found", label: "Lost & Found", Icon: Flag }].map(({ k, label, Icon }) => (
                   <button key={k} onClick={() => { setView(k); setQuery(""); setMobileNavOpen(false); }}
                     className={`w-full px-3 py-3 rounded-xl flex items-center gap-3 text-left font-semibold ${view === k ? "bg-[#0D0F32] text-white" : "text-slate-800 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700"}`}>
                     <Icon size={20}/>
@@ -4570,7 +4569,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
       })()}
       <main id="workspace" tabIndex={-1} className="refos-workspace mx-auto px-4 pb-28 pt-4">
         <button type="button" onClick={() => {
-          setGuideArticleId(({ teams: "teams", matches: "matches", rulebook: "rules", robots: isEmcee ? "emcee-start" : "photos", alliances: "alliances", judging: "judging", rankings: "rankings" })[view] || "navigation");
+          setGuideArticleId(({ "lost-found": "lost-found", teams: "teams", matches: "matches", rulebook: "rules", robots: isEmcee ? "emcee-start" : "photos", alliances: "alliances", judging: "judging", rankings: "rankings" })[view] || "navigation");
           setShowUserGuide(true); setShowFeatures(true);
         }} className="min-h-[44px] mb-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 inline-flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600"><BookOpen size={17} aria-hidden="true" />Help with this section</button>
         {league && !league.isActiveSession && (
@@ -4609,6 +4608,8 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
             onLogTeam={highlanderDemoLocked ? undefined : (n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} emcee={isEmcee} />
         ) : openRobot ? (
           <RobotDetail requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} canTakePhotos={!isEmcee} canDeletePhotos={!isInspection && !isEmcee} />
+        ) : view === "lost-found" ? (
+          <LostFoundBoard embedded key={eventId} eventId={eventId} eventName={event?.name || "Current event"} meName={meName} canManage={adminUnlocked}/>
         ) : view === "matches" ? (
           isIQ ? <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} parseCSV={parseCSV} /> : <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
@@ -4881,7 +4882,6 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           </div></div>
         </div>
       )}
-      {showLostFound && <LostFoundBoard key={eventId} eventId={eventId} eventName={event?.name || "Current event"} meName={meName} canManage={adminUnlocked} onClose={()=>setShowLostFound(false)}/>}
       {showPreEventTest && adminUnlocked && <PreEventSystemTest eventId={eventId} adminUnlocked={adminUnlocked}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowPreEventTest(false)} onComplete={setLastSystemTest} />}
       {showTwoDeviceSyncTest && adminUnlocked && <TwoDeviceSyncTest fieldLog={fieldLog} deviceId={deviceId} meName={meName}
@@ -4982,7 +4982,6 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                 <div className="flex-1 min-w-0"><div className="font-bold text-slate-900 dark:text-slate-100">View Quick Start</div><div className="text-xs text-slate-500 dark:text-slate-400">Assignments, help requests, and offline saving in three short screens.</div></div>
                 <ChevronRight size={18} className="text-sky-600 shrink-0"/>
               </button>
-              <button type="button" onClick={()=>setShowLostFound(true)} className="mb-4 w-full min-h-[44px] rounded-xl border bg-white p-4 text-left font-bold dark:bg-slate-800">Lost &amp; Found <span className="text-sm font-normal">· Found items and pickup locations</span></button>
               <div className="mb-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/30 text-[#D7212B] flex items-center justify-center shrink-0"><Mail size={18} /></div>
                 <div className="flex-1 min-w-0">
