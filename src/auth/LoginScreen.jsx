@@ -107,7 +107,7 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
             className={highlander && profile.logoSource === "profile" ? "h-40 sm:h-48 w-40 sm:w-48 object-contain mb-2" : "h-24 sm:h-28 w-24 sm:w-28 object-contain mb-4"} />
           <span className="font-bold text-xl text-[#11172F]">{eventName || (highlander ? "Highlander Summit — Violation Log" : "Ref OS Event")}</span>
           {showShortName && <span className="mt-1 text-sm font-semibold text-slate-500">{profile.shortName}</span>}
-          {highlander && <span className="mt-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-700">Highlander Summit Release</span>}
+          <span className="mt-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-700">Official Release</span>
         </div>
 
         {notice && !showRemembered && (
@@ -223,7 +223,7 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
           <img src={highlander ? "/logo.svg" : "/refos-logo.svg"} alt={highlander ? "Highlander Summit" : "Ref OS"} className="h-12 w-12 object-contain" />
           <p className="text-center text-xs text-slate-500">
             Made by Maharshi Patel ·{" "}
-            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-[#11172F] underline">@mpatel_ref</a>{" · "}v{APP_VERSION}{highlander ? " · Highlander Summit Release" : ""}
+            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-[#11172F] underline">@mpatel_ref</a>{" · "}v{APP_VERSION} · Official Release
           </p>
         </div>
       </div>

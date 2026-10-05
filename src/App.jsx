@@ -4198,7 +4198,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
               <div className="leading-tight hidden sm:block">
                 <div className="flex items-center gap-1.5">
                   <div className="font-bold text-[13px] text-white">Ref-OS</div>
-                  {isHighlander && <span className="rounded-full border border-red-300/50 bg-red-400/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-red-100">Highlander Summit Release</span>}
+                  <span className="rounded-full border border-red-300/50 bg-red-400/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-red-100">Official Release</span>
                 </div>
                 <div className="text-[9px] text-slate-400">Referee Operating System</div>
               </div>
@@ -4375,7 +4375,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                 </div>
                 <div className="refos-sidebar-footer">
                   <span>{adminUnlocked ? (isDeveloper ? "Developer" : "Admin") : isInspection ? "Inspection" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
-                  <span>v{APP_VERSION}{isHighlander ? " · Highlander Summit Release" : ""}</span>
+                  <span>v{APP_VERSION} · Official Release</span>
                 </div>
               </nav>
               <div className="sm:hidden refos-mobile-context">
@@ -4696,7 +4696,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           <img src={isHighlander ? "/logo.svg" : "/refos-logo.svg"} alt={isHighlander ? "Highlander Summit" : "Ref OS"} className="h-10 w-10 object-contain opacity-90" />
           <p className="text-center text-xs text-slate-400">
             Made by Maharshi Patel ·{" "}
-            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 underline">@mpatel_ref</a>{" · "}v{APP_VERSION}{isHighlander ? " · Highlander Summit Release" : ""}
+            <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:text-slate-200 underline">@mpatel_ref</a>{" · "}v{APP_VERSION} · Official Release
           </p>
         </div>
       </main>
@@ -4989,7 +4989,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                 <div className="mt-4"><FeaturesGuide isHighlander={isHighlander} /></div>
               </>}
               </>}
-              <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 text-sm"><div className="font-bold text-slate-900 dark:text-slate-100">Ref OS support & release</div><div className="mt-1 text-slate-600 dark:text-slate-300">Version v{APP_VERSION}{isHighlander ? " · Highlander Summit Release" : " · Multi Event Release"}</div><div className="mt-1 text-xs text-slate-500">Use Send Feedback above to report a bug or request a feature. Include the event name, device, and what you were doing when the issue occurred.</div></div>
+              <div className="mt-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 text-sm"><div className="font-bold text-slate-900 dark:text-slate-100">Ref OS support & release</div><div className="mt-1 text-slate-600 dark:text-slate-300">Version v{APP_VERSION} · Official Release</div><div className="mt-1 text-xs text-slate-500">Use Send Feedback above to report a bug or request a feature. Include the event name, device, and what you were doing when the issue occurred.</div></div>
             </div>
           </div>
         </div>
@@ -7729,7 +7729,7 @@ function FeaturesGuide({ isHighlander = true }) {
   return (
     <>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-        Ref OS is an operations app for VEX robotics events. {isHighlander ? `This v${APP_VERSION} Highlander Summit Release includes the Override rules and manual.` : "This event has its own roster, matches, roles, rules, and settings. An Admin can import rules and Tournament Manager data. The bundled Override manual is only available in the Highlander event."}
+        Ref OS is an operations app for VEX robotics events. {isHighlander ? `This v${APP_VERSION} Official Release includes the Override rules and manual.` : "This event has its own roster, matches, roles, rules, and settings. An Admin can import rules and Tournament Manager data. The bundled Override manual is only available in the Highlander event."}
       </p>
 
       <Section icon={KeyRound} title="Login, access codes & roles">
@@ -7904,7 +7904,7 @@ function FeaturesGuide({ isHighlander = true }) {
         <ul className="space-y-1.5">
           <Li><b>Install Ref-OS</b> — add the deployed HTTPS site to the device home screen for an app-like PWA experience.</Li>
           <Li><b>Dark / Light mode</b> and <b>Text size</b> are saved per device.</Li>
-          <Li><b>Release identification</b> — login, settings, diagnostics, and this guide display v{APP_VERSION}{isHighlander ? " Highlander Summit Release" : ""}.</Li>
+          <Li><b>Release identification</b> — login, settings, diagnostics, and this guide display v{APP_VERSION} Official Release.</Li>
           <Li><b>Mobile navigation</b> — phones use the compact Go to section menu instead of forcing the full desktop navigation across the screen.</Li>
           <Li><b>Device readiness</b> — event staff can approve modern devices by running the Pre Event System Test before use.</Li>
         </ul>
