@@ -5070,7 +5070,6 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
           </div>
         </div>
       )}
-      {team && <TeamRegisteredEvents key={team.number} number={team.number} />}
       {league && team && <LeagueTeamPanel team={team} emcee={emcee} meName={meName} onOpenPhoto={onOpenPhoto} />}
       {!emcee && (<>
       <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">{league ? `${league.session.name} log` : "Log"} ({viols.length})</h2>
@@ -5078,6 +5077,7 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
         <ul className="space-y-2">{sorted.map((v) => <ViolationCard key={v.id} v={v} onDelete={onDeleteViolation} onOpenPhoto={onOpenPhoto} onEdit={onEditViolation} canManage={canManageViolation(v)} />)}</ul>
       )}
       </>)}
+      {team && <TeamRegisteredEvents key={team.number} number={team.number} />}
     </>
   );
 }
@@ -8105,6 +8105,7 @@ const Label = ({ children }) => <label className="block text-xs font-semibold up
 const Empty = ({ title, sub }) => (
   <div className="text-center py-14 px-6"><p className="font-semibold text-slate-700 dark:text-slate-200">{title}</p><p className="text-sm text-slate-400 mt-1">{sub}</p></div>
 );
+
 
 
 
