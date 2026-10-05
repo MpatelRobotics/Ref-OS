@@ -290,7 +290,7 @@ add('view-feedback', 'Developer', 'View feedback submissions', ['Developer'],
 
 add('vex-live-sync', 'Sync & Offline', 'Import VEX matches, rankings and Skills', ADMIN,
   'Preview published VEX API data before importing it into the current event or League session.', 'When schedules or standings have been published on VEX Events.',
-  ['In cloud mode, open Matches or Rankings and select VEX API Sync. Confirm the target event and League session.', 'Enter the full event code, select Load divisions, and choose a division.', 'Choose Matches and scores, Qualification rankings, or Skills scores. Skills cover the whole upstream event.', 'Check for updates, review the preview, then Apply snapshot. Overlapping data is updated; other matches remain.', 'Optionally enable automatic updates for this category. Checks run once a minute while the dialog stays open, visible and online.', 'Close the dialog to stop monitoring. Change categories to review and approve another import.'],
+  ['In cloud mode, open Matches or Rankings and select VEX API Sync. Confirm the target event and League session.', 'Enter the full event code, select Load divisions, and choose a division.', 'Choose Matches and scores, Qualification rankings, or Skills scores. Skills cover the whole upstream event.', 'Check for updates, review the preview, then Apply snapshot. Overlapping data is updated; other matches remain.', 'Optionally enable automatic updates for this category. Checks run once a minute while Ref OS stays open, visible and online, even after closing the dialog.', 'Close the dialog to use the app while syncing. Use Stop sync in the status bar to stop monitoring. Change categories to review and approve another import.'],
   'Matches show published scores; rankings retain official qualification ranks. Skills total each team’s best Driver and Autonomous runs, with a dash for unavailable combined ranks.',
   'Published data may lag scoring. Empty snapshots preserve data; errors stop automatic updates. Imports can partially succeed if a write fails; retry the reviewed snapshot. Unsupported elimination formats require Tournament Manager import. Only one category is monitored at a time.', [], 'api vex events skills scores rankings division automatic polling');
 export const GUIDE_ARTICLES = articles;
@@ -303,4 +303,5 @@ export function searchArticles(role, query = '', category = '') {
     [a.title, a.category, a.summary, a.when, ...a.steps, a.seen, a.important, a.keywords,
       'Available to When to use it How to use it What you will see Important Related guides'].join(' ').toLocaleLowerCase().includes(word)));
 }
+
 

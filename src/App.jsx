@@ -4934,7 +4934,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         </div>
       )}
       {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && ["matches","rankings"].includes(view) && <button type="button" onClick={() => setShowVexLiveSync(true)} className="my-3 rounded-lg border border-blue-300 px-4 py-2 font-semibold">VEX API Sync · Matches, Rankings &amp; Skills</button>}
-      {showVexLiveSync && adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexLiveSync key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onFetch={api.getVexMatches} onApply={applyVexSnapshot} onClose={() => setShowVexLiveSync(false)} />}
+      {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexLiveSync visible={showVexLiveSync} onOpen={() => setShowVexLiveSync(true)} key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onFetch={api.getVexMatches} onApply={applyVexSnapshot} onClose={() => setShowVexLiveSync(false)} />}
       {showFeedback && <FeedbackModal meName={meName} myRole={myRole} onSubmit={addFieldLog} onClose={() => setShowFeedback(false)} />}
       {showOnboarding && <QuickStartModal step={onboardingStep} setStep={setOnboardingStep} onClose={closeOnboarding} />}
       {undoPrompt && (
@@ -5697,8 +5697,9 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
                 </div>
                 {m.field && <span className="text-[11px] text-slate-400 shrink-0">{fieldDisplayName(m.field, fieldNames)}</span>}
                 {m.redScore != null && m.blueScore != null && (
-                  <span className="font-mono text-xs font-bold shrink-0"><span className={m.winner === "red" ? "text-red-700 dark:text-red-300" : "text-slate-400"}>{m.redScore}</span><span className="text-slate-300">-</span><span className={m.winner === "blue" ? "text-blue-700 dark:text-blue-300" : "text-slate-400"}>{m.blueScore}</span></span>
+                  <span aria-label={`Score: red ${m.redScore}, blue ${m.blueScore}`} className="font-mono text-sm font-bold shrink-0"><span className="text-slate-500 mr-1">Score</span><span className={m.winner === "red" ? "text-red-700 dark:text-red-300" : "text-slate-400"}>{m.redScore}</span><span className="text-slate-300">-</span><span className={m.winner === "blue" ? "text-blue-700 dark:text-blue-300" : "text-slate-400"}>{m.blueScore}</span></span>
                 )}
+                {(m.redScore == null || m.blueScore == null) && <span className="text-xs text-slate-500 shrink-0">Awaiting score</span>}
                 {!emcee && replaySet.has(m.id) && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700 shrink-0"><RefreshCw size={10} /> REPLAY</span>}
                 {!emcee && timeoutSet.has(m.id) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700 shrink-0">TO</span>}
                 {!emcee && faultSet.has(m.id) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-red-100 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-200 dark:border-red-700 shrink-0">FAULT</span>}
@@ -7263,6 +7264,7 @@ function AllianceSelection({ matches, finalsBestOf = 1, onImport, onSetWinner, c
                         <Side m={m} side="red" />
                         <span className="text-slate-300 text-xs font-sans shrink-0">vs</span>
                         <Side m={m} side="blue" />
+                        <span className="text-sm font-mono font-bold">{m.redScore != null && m.blueScore != null ? `Score ${m.redScore} – ${m.blueScore}` : "Awaiting score"}</span>
                       </div>
                     </div>
                   ))}
@@ -8107,4 +8109,6 @@ const Label = ({ children }) => <label className="block text-xs font-semibold up
 const Empty = ({ title, sub }) => (
   <div className="text-center py-14 px-6"><p className="font-semibold text-slate-700 dark:text-slate-200">{title}</p><p className="text-sm text-slate-400 mt-1">{sub}</p></div>
 );
+
+
 

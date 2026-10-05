@@ -20,14 +20,15 @@ test('preview and approval precede periodic updates; changing category resets ap
  await page.route('**/vex-sync-test',r=>r.fulfill({contentType:'text/html',body:`<html><body><div id="root"></div><script type="module">
  import '/@vite/client';import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;
  const React=(await import('/node_modules/.vite/deps/react.js')).default;const ReactDOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default;const Sync=(await import('/src/components/VexLiveSync.jsx')).default;
- window.applied=[];window.calls=0;ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Sync,{initialCode:'VE-V5-27-6588',target:'Test',onClose:()=>{},onFetch:async()=>({divisions:[{id:1,name:'Main'}],matches:[{phase:'qual',num:1,red:['2A'],blue:['3B'],scored:true,redScore:++window.calls,blueScore:0}]}),onApply:async(data,kind)=>window.applied.push({data,kind})}));
+ window.applied=[];window.calls=0;function Harness(){const [visible,setVisible]=React.useState(true);return React.createElement(Sync,{initialCode:'VE-V5-27-6588',target:'Test',visible,onOpen:()=>setVisible(true),onClose:()=>setVisible(false),onFetch:async()=>({divisions:[{id:1,name:'Main'}],matches:[{phase:'qual',num:1,red:['2A'],blue:['3B'],scored:true,redScore:++window.calls,blueScore:0}]}),onApply:async(data,kind)=>window.applied.push({data,kind})});}ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Harness));
  </script></body></html>`}));
  await page.goto('/vex-sync-test');await page.getByRole('button',{name:'Load divisions'}).click();await page.getByRole('combobox').first().selectOption('1');
  await page.getByRole('button',{name:'Check for updates'}).click();expect(await page.evaluate(()=>window.applied.length)).toBe(0);
- await page.getByRole('button',{name:'Apply snapshot'}).click();await page.getByRole('checkbox').check();await page.clock.fastForward(60000);
+ await page.getByRole('button',{name:'Apply snapshot'}).click();await page.getByRole('checkbox').check();await page.getByRole('button',{name:'Close and continue using app'}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByLabel('VEX sync status')).toBeVisible();await page.clock.fastForward(60000);
  await expect.poll(()=>page.evaluate(()=>window.applied.length)).toBe(2);
- await page.getByRole('checkbox').uncheck();await page.getByRole('combobox').nth(1).selectOption('skills');await expect(page.getByRole('checkbox')).toBeDisabled();
+ await page.getByRole('button',{name:'Manage VEX sync'}).click();await page.getByRole('checkbox').uncheck();await page.getByRole('combobox').nth(1).selectOption('skills');await expect(page.getByRole('checkbox')).toBeDisabled();
 });
 
 
 test('unsupported rounds do not block valid qualifications and string rounds normalize',()=>{const warnings=[]; const rows=mapVexMatches([{...match,round:'2'},{...match,round:7}],warnings);expect(rows).toHaveLength(1);expect(rows[0].phase).toBe('qual');expect(warnings[0]).toContain('round 7');});
+
