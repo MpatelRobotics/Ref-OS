@@ -15,9 +15,9 @@ test('preview and approval precede periodic updates; changing category resets ap
  await page.route('**/vex-sync-test',r=>r.fulfill({contentType:'text/html',body:`<html><body><div id="root"></div><script type="module">
  import '/@vite/client';import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;
  const React=(await import('/node_modules/.vite/deps/react.js')).default;const ReactDOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default;const Sync=(await import('/src/components/VexLiveSync.jsx')).default;
- window.applied=[];window.calls=0;function Harness(){const [visible,setVisible]=React.useState(true);return React.createElement(Sync,{initialCode:'VE-V5-27-6588',target:'Test',visible,onOpen:()=>setVisible(true),onClose:()=>setVisible(false),onFetch:async()=>({divisions:[{id:1,name:'Main'}],rankings:[{number:'2A',rank:++window.calls}]}),onApply:async(data,kind)=>window.applied.push({data,kind})});}ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Harness));
+ window.applied=[];window.calls=0;function Harness(){const [visible,setVisible]=React.useState(true);const [savedCode,setSavedCode]=React.useState('');window.restoreCode=()=>setSavedCode('VE-V5-27-6588');return React.createElement(Sync,{initialCode:savedCode,onSaveCode:async code=>{window.savedCode=code;},target:'Test',visible,onOpen:()=>setVisible(true),onClose:()=>setVisible(false),onFetch:async()=>({divisions:[{id:1,name:'Main'}],rankings:[{number:'2A',rank:++window.calls}]}),onApply:async(data,kind)=>window.applied.push({data,kind})});}ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Harness));
  </script></body></html>`}));
- await page.goto('/vex-sync-test');await expect(page.getByRole('combobox').first()).toHaveValue('1');
+ await page.goto('/vex-sync-test');await expect(page.getByRole('textbox')).toHaveValue('');await page.evaluate(()=>window.restoreCode());await expect(page.getByRole('combobox').first()).toHaveValue('1');expect(await page.evaluate(()=>window.savedCode)).toBe('VE-V5-27-6588');
  await expect(page.getByRole('combobox')).toHaveCount(1);await page.getByRole('button',{name:'Check for updates'}).click();expect(await page.evaluate(()=>window.applied.length)).toBe(0);
  await page.getByRole('button',{name:'Start syncing'}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByLabel('VEX sync status')).toBeVisible();await page.clock.fastForward(60000);
  await expect.poll(()=>page.evaluate(()=>window.applied.length)).toBe(2);
@@ -31,3 +31,4 @@ test('preview and approval precede periodic updates; changing category resets ap
 test('match sync requests are rejected before contacting VEX',async()=>{await expect(fetchVexStandings('VE-V5-27-6588',1,'fixture-token',()=>{throw new Error('Should not fetch');},'matches')).rejects.toThrow('only qualification rankings');});
 
 test('Skills API sync is rejected before contacting VEX',async()=>{await expect(fetchVexStandings('VE-V5-27-6588',1,'fixture-token',()=>{throw new Error('Should not fetch');},'skills')).rejects.toThrow('only qualification rankings');});
+

@@ -1,12 +1,13 @@
 import React,{useEffect,useRef,useState} from 'react';
-export default function VexLiveSync({initialCode='',target='',onFetch,onApply,onClose,visible=true,onOpen=()=>{}}){
+export default function VexLiveSync({initialCode='',target='',onFetch,onApply,onClose,visible=true,onSaveCode=async()=>{},onOpen=()=>{}}){
  const [code,setCode]=useState(initialCode),[division,setDivision]=useState(''),[divisions,setDivisions]=useState([]),[kind,setKind]=useState('rankings'),[preview,setPreview]=useState(null),[busy,setBusy]=useState(false),[auto,setAuto]=useState(false),[approved,setApproved]=useState(false),[status,setStatus]=useState(''),[error,setError]=useState('');
  const running=useRef(false),last=useRef(''),active=useRef(true);useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
+ useEffect(()=>{if(initialCode && !code) setCode(initialCode);},[initialCode]);
  const reset=()=>{setAuto(false);setApproved(false);setPreview(null);last.current='';setStatus('');setError('');};
  const check=async(background=false)=>{
  if(running.current||document.hidden||!navigator.onLine)return;
  running.current=true;setBusy(true);setError('');
- try{const data=await onFetch(code,division||null,kind);if(!active.current)return;setDivisions(data.divisions);
+ try{const data=await onFetch(code,division||null,kind);if(!active.current)return;await onSaveCode(data.code || code.trim().toUpperCase());if(!active.current)return;setDivisions(data.divisions);
  if(!division){if(data.divisions.length===1){setDivision(String(data.divisions[0].id));const snapshot=await onFetch(code,data.divisions[0].id,'rankings');if(active.current)setPreview(snapshot);setStatus('Review the rankings, then Start syncing.');}else setStatus('Select a division, then check for data.');return;}
  const signature=JSON.stringify(data[kind]||[]);
  if(background){if(data.warnings?.length)throw new Error(data.warnings[0]+' Automatic updates stopped. Review a new preview.');if(signature!==last.current){await onApply(data,kind);last.current=signature;}setStatus('Last checked '+new Date().toLocaleTimeString()+'. API data may lag the event.');}
@@ -14,7 +15,7 @@ export default function VexLiveSync({initialCode='',target='',onFetch,onApply,on
  }catch(e){if(active.current){setError(e.message||'VEX sync failed.');setAuto(false);}}
  finally{running.current=false;if(active.current)setBusy(false);}
  };
- useEffect(()=>{if(visible && !divisions.length && /^(RE|VE)-[A-Z0-9]+-\d{2}-\d{3,8}$/.test(code)) check();},[visible]);
+ useEffect(()=>{if(visible && !divisions.length && /^(RE|VE)-[A-Z0-9]+-\d{2}-\d{3,8}$/.test(code)) check();},[visible,code]);
  const latestCheck=useRef(check);latestCheck.current=check;
  useEffect(()=>{if(!auto)return;const timer=setInterval(()=>latestCheck.current(true),60000);return()=>clearInterval(timer);},[auto,code,division,kind]);
  const apply=async(start=false)=>{setBusy(true);try{await onApply(preview,kind);last.current=JSON.stringify(preview[kind]||[]);setApproved(true);setPreview(null);setStatus('Rankings imported.');if(start){setAuto(true);onClose();}}catch(e){setError(e.message||'Import failed. Retry this snapshot.');setAuto(false);}finally{setBusy(false);}};
@@ -31,6 +32,7 @@ export default function VexLiveSync({initialCode='',target='',onFetch,onApply,on
  <p className="text-xs text-slate-500">Closing this box keeps automatic sync running. Uncheck automatic updates to stop. Switching events or League sessions, signing out, or reloading the app stops it.</p><button disabled={busy} onClick={onClose} className="border rounded-lg px-3 py-2">Close and continue using app</button>
  </section></div>;
 }
+
 
 
 
