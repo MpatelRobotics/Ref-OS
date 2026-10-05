@@ -423,3 +423,13 @@ Run [`supabase/feedback-management.sql`](supabase/feedback-management.sql) in th
 The main **Choose VEX Event** screen also has **Universal Feedback · Developer only**. Verify Developer access using an active event and your Developer code, without entering that event's workspace. Review submissions from all events and League sessions, including archived events, and filter by event or status. **Refresh statuses** reloads submissions as well as statuses in this view. Deleted events have no remaining feedback.
 
 Run [`supabase/universal-feedback.sql`](supabase/universal-feedback.sql) after `feedback-management.sql` and the League migration. Its functions enforce verified Developer authorization for cross-event reads and status changes. No Edge Function redeployment is needed. The universal view requires internet and retains no offline feedback copy.
+
+### Feedback screenshots
+
+**Features & Help → Send Feedback** accepts up to three optional screenshots (PNG, JPEG, or WebP, up to 10 MB each before compression). Preview and remove files before sending. Images are resized, re-encoded, and stored in the private `feedback-screenshots` bucket; the original file and camera metadata are not uploaded. Review screenshots for private information before selecting them.
+
+A Developer can select **View screenshots** on a submission in either the event viewer or **Universal Feedback**. Links expire after ten minutes; **Refresh screenshots** creates fresh links. Ordinary Admin access does not grant screenshot viewing. The submitting device may access its own registered images for retry handling.
+
+Run [`supabase/feedback-attachments.sql`](supabase/feedback-attachments.sql) after the base schema, League, event lifecycle, and Developer migrations. No Edge Function redeployment is required. Text-only feedback keeps its existing submission path. Screenshots require internet and are not queued or cached offline. If the message saves but an attachment fails, keep the window open and press **Send Feedback** again; retry uses the same submission and skips already registered screenshots. Closing the window loses pending screenshot retries. Message and attachment choices stay locked once sending starts.
+
+Deleting feedback removes its attachment references, but this build does not add automatic cleanup of feedback screenshot objects in Storage. Unreferenced objects require storage maintenance; the bucket remains private.

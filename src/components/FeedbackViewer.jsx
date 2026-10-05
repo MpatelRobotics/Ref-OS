@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
+import FeedbackAttachments from './FeedbackAttachments';
 import { listFeedbackManagement, setFeedbackStatus } from '../api';
 const STATUSES = { new: 'New', in_progress: 'In progress', resolved: 'Resolved' };
 export default function FeedbackViewer({ isDeveloper = false, entries = [], eventId, eventName = '', sessionName = '', universal = false, onClose, loadStatuses = listFeedbackManagement, saveStatus = setFeedbackStatus }) {
@@ -46,6 +47,7 @@ export default function FeedbackViewer({ isDeveloper = false, entries = [], even
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm"><span className="font-semibold">{entry.by || 'Unknown sender'}</span>{Number.isFinite(entry.createdAt) && <time dateTime={new Date(entry.createdAt).toISOString()} className="text-slate-500 dark:text-slate-400">{new Date(entry.createdAt).toLocaleString()}</time>}</div>
       {universal && <p className="mt-2 text-sm font-semibold">{entry.eventName}{entry.sessionName ? ` · ${entry.sessionName}` : ""}</p>}
       <p className="my-3 whitespace-pre-wrap break-words text-sm">{entry.note || 'No message recorded.'}</p>
+      <FeedbackAttachments feedbackId={entry.id}/>
       <label className="block sm:max-w-xs"><span className="block text-sm font-semibold mb-1">Status for {entry.by || 'Unknown sender'}</span><select aria-label={`Status for ${entry.by || 'Unknown sender'}`} value={statusOf(entry)} disabled={loading || !!error || !!busy} onChange={e=>update(entry,e.target.value)} className={control}>{Object.entries(STATUSES).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>{busy===entry.id && <p role="status">Saving…</p>}
     </article>)}</div>
   </section>;
