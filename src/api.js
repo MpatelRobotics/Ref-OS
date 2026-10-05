@@ -1808,3 +1808,18 @@ export async function setFeedbackStatus(eventId, feedbackId, status) {
   const { error } = await supabase.rpc('set_feedback_status', { p_event: eventId, p_feedback: feedbackId, p_status: status });
   if (error) throw error;
 }
+
+export async function listUniversalFeedback() {
+  const rows = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await supabase.rpc('list_universal_feedback').range(offset, offset + 499);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if (!data || data.length < 500) break;
+  }
+  return Array.from(new Map(rows.map(row => [row.id, row])).values()).map(row => ({ ...mapFieldLog(row), kind: "feedback", eventId: row.event_id, eventName: row.event_name, sessionName: row.session_name, status: row.status }));
+}
+export async function setUniversalFeedbackStatus(_eventId, feedbackId, status) {
+  const { error } = await supabase.rpc('set_universal_feedback_status', { p_feedback: feedbackId, p_status: status });
+  if (error) throw error;
+}

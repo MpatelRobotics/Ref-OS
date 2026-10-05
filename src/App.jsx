@@ -59,6 +59,7 @@ import EventLogo from "./components/EventLogo.jsx";
 import OfflineReadinessModal from "./components/modals/OfflineReadinessModal.jsx";
 import FeedbackModal from "./components/modals/FeedbackModal.jsx";
 import FeedbackViewer from "./components/FeedbackViewer.jsx";
+import UniversalFeedback from "./components/UniversalFeedback.jsx";
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
 import HelpRequestModal from "./components/modals/HelpRequestModal.jsx";
 import manualQuickLinks from "./manualQuickLinks.json";
@@ -1320,6 +1321,7 @@ const formatEventDate = (value) => {
 };
 
 const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, initialNotice = "" }) => {
+  const [universalFeedbackOpen, setUniversalFeedbackOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   // Phase 7: active events by default; archived events in their own view.
   const [view, setView] = useState("active");
@@ -1441,6 +1443,8 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{view === "archived" ? "Archived events keep all of their data. An event Admin can restore one." : "Select the event this device is working at."}</p>
       </div>
+      {universalFeedbackOpen ? <UniversalFeedback events={events} onClose={()=>setUniversalFeedbackOpen(false)}/> : <button type="button" onClick={()=>setUniversalFeedbackOpen(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 bg-white dark:bg-slate-800 p-3 font-semibold">Universal Feedback · Developer only</button>}
+      {!universalFeedbackOpen && <>
       {notice && view === "active" && (
         <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">{notice}</div>
       )}
@@ -1602,6 +1606,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
         )}
       </>
       )}
+      </>}
       <p className="text-xs text-center text-slate-400 mt-4">Ref OS 2.0 · Event Selector</p>
       {deleteTarget && (
         <DeleteEventModal event={deleteTarget} profile={resolveEventBranding(deleteTarget.id, deleteTarget, deleteTarget.branding)}
