@@ -1,3 +1,4 @@
+import HighlanderPractice from "./components/HighlanderPractice.jsx";
 import IQRules from "./components/IQRules.jsx";
 import IQManual from "./components/IQManual.jsx";
 import EventProgramChoice, {detectEventProgram, programLabel} from "./components/EventProgramChoice.jsx";
@@ -4517,6 +4518,9 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           </div>
         )}
         {highlanderDemoLocked && <div role="status" className="mb-4 rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-900 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-100">Highlander Summit demo archive: matches, alliances, and violations are read only.</div>}
+        {highlanderDemoLocked && !isInspection && !isEmcee && <HighlanderPractice key={eventId} by={meName || "Demo Ref"}
+          renderForm={({onSave,onClose}) => <LogModal practice teams={teams} viols={[]} presetTeam={openTeam || null} knownRules={knownRules} me={{name:meName || "Demo Ref"}} event={event} matches={matches} presetMatch={openMatch && matches[openMatch] ? {phase:matches[openMatch].phase,num:String(matches[openMatch].num)} : null} rules={rules} onOpenPhoto={setLightbox} fieldNames={fieldNames} onSetName={()=>{}} onSave={onSave} onClose={onClose} />}
+          renderEntry={(entry,remove) => <ViolationCard key={entry.id} v={entry} showTeam canManage onDelete={remove} onOpenPhoto={setLightbox} />} />}
         {!openTeam && !openMatch && !openRobot && <section className="refos-page-heading" aria-label="Workspace overview">
           <div>
           {view === "awp" && <button onClick={() => { if (commandCenterChildOpen) return returnToCommandCenter(); setView("matches"); setQuery(""); }} className="refos-back-button mb-3" aria-label={commandCenterChildOpen ? "Back to Command Center" : "Back to Matches"}>
@@ -5258,7 +5262,7 @@ function ByRule({ viols, expandRule, setExpandRule }) {
 }
 
 /* ============================ LOG MODAL ============================ */
-function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, edit, onSetName, onClose, onSave, fieldNames = DEFAULT_FIELD_NAMES }) {
+function LogModal({ practice = false, teams, viols, presetTeam, knownRules, me, lastMatch, event, matches, presetMatch, rules, onOpenPhoto, edit, onSetName, onClose, onSave, fieldNames = DEFAULT_FIELD_NAMES }) {
   const ruleBook = useMemo(() => {
     const m = {}; for (const r of (rules || [])) m[r.code] = r.desc; return m;
   }, [rules]);
@@ -5335,7 +5339,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
     <div className="fixed inset-0 z-[80] bg-black/40 flex items-end sm:items-center justify-center">
       <div className="bg-slate-50 dark:bg-slate-900 w-full h-[92dvh] sm:h-auto sm:max-h-[92dvh] sm:max-w-lg sm:rounded-2xl rounded-t-2xl flex flex-col overflow-hidden">
         <div className="shrink-0 bg-slate-50 dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700">
-          <h2 className="font-bold text-slate-900 dark:text-slate-100">{edit ? "Edit violation" : "New violation"}</h2>
+          <h2 className="font-bold text-slate-900 dark:text-slate-100">{practice ? "Practice violation · Not saved" : edit ? "Edit violation" : "New violation"}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:text-slate-300"><X size={22} /></button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 space-y-4">
@@ -5505,7 +5509,7 @@ function LogModal({ teams, viols, presetTeam, knownRules, me, lastMatch, event, 
         </div>
         <div className="shrink-0 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-2 shadow-[0_-8px_20px_rgba(15,23,42,0.08)]">
           <button onClick={onClose} className="px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
-          <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? `${T.solid} ${T.solidHover}` : "bg-slate-300"}`}>{busy ? "Saving…" : edit ? "Save changes" : "Save violation"}</button>
+          <button onClick={submit} disabled={!valid || busy} className={`flex-1 py-3 rounded-lg font-semibold text-white transition ${valid && !busy ? `${T.solid} ${T.solidHover}` : "bg-slate-300"}`}>{busy ? "Saving…" : practice ? "Add practice entry" : edit ? "Save changes" : "Save violation"}</button>
         </div>
       </div>
       {showRulePicker && (
@@ -8116,6 +8120,7 @@ const Label = ({ children }) => <label className="block text-xs font-semibold up
 const Empty = ({ title, sub }) => (
   <div className="text-center py-14 px-6"><p className="font-semibold text-slate-700 dark:text-slate-200">{title}</p><p className="text-sm text-slate-400 mt-1">{sub}</p></div>
 );
+
 
 
 

@@ -303,6 +303,11 @@ add('iq-event', 'Getting Started', 'Create a VEX IQ event', ALL,
  ['Choose Create VEX Event and select VEX IQ or V5RC / VEX U.', 'Optional VEX lookup detects the program; confirm it matches your event.', 'Enter the name, choose Tournament or League, and finish event creation.', 'For IQ events, open Rules or Features & Help to read the supplied Level Up 2026–2027 manual version 2.0. The IQ Rules screen includes 78 searchable quick-reference descriptions grouped by category.', 'Admins can correct the saved program in Event Setup. Open PDF or Download manual if the embedded viewer is unavailable.'],
  'The competition program is saved with the event. Existing events default to V5RC / VEX U.',
  'This first IQ update adds event identification and the manual. IQ-specific matches, finals, scoring and violation-entry rule templates are not implemented. The manual is available offline after the updated app finishes caching its files. Check official resources for subsequent revisions.', [], 'iq viqrc level up manual competition program');
+add('highlander-practice', 'Quick Starts', 'Practice logging at Highlander Summit', ['Referee','Admin','Developer','Judge Advisor'],
+ 'Demonstrate violations without saving changes to the protected Highlander event.', 'When showing Ref OS to volunteers.',
+ ['Open the protected Highlander Summit demo.', 'In Practice violations, choose Log practice violation.', 'Select a team, match and rules, then add notes or example photos.', 'Choose Add practice entry to show a temporary card. Use Clear practice entries to reset your demonstration.'],
+ 'Practice cards appear in a separate area marked Not saved. The usual event form is used.',
+ 'Practice entries are held only in memory on this device. Leaving the event or reloading removes them. They do not change real teams, history, totals, exports or sync queues. Existing Highlander records remain protected.', [], 'highlander demo practice fake temporary violation');
 export const GUIDE_ARTICLES = articles;
 export function visibleArticles(role) {
   return articles.filter((a) => a.roles.includes(role));
@@ -319,6 +324,7 @@ export function searchArticles(role, query = '', category = '') {
 
 
 // Qualification API sync quick start: open Rankings or Event Command Center > VEX API Sync. Confirm the event code; divisions load automatically for a saved code and a single division is selected. Review the preview and click Start syncing to import and enable background updates. Import once performs only one import. Manage or Stop sync from the status bar. Skills and matches use Tournament Manager imports.
+
 
 
 
