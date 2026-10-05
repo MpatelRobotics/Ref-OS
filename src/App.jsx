@@ -3385,7 +3385,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   };
   const applyVexSnapshot = async (data, kind) => {
     if (!adminUnlocked || highlanderDemoLocked || isVenueMode()) throw new Error("Cloud administrator access is required.");
-    if (!["rankings", "skills"].includes(kind)) throw new Error("VEX API sync supports only rankings and Skills.");
+    if (kind !== "rankings") throw new Error("VEX API sync supports only qualification rankings.");
     const rows = data[kind] || [];
     if (!rows.length) return;
     const numbers = [...new Set(rows.map(r => r.number))];
@@ -3395,9 +3395,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
       await api.bulkUpsertRankings(eventId, rows.map(r => ({ number:r.number, rank:r.rank })));
       const saved = await api.upsertEventSetting(eventId, "qualification_records", { records:Object.fromEntries(rows.map(r => [r.number, { w:r.w, l:r.l, t:r.t, wp:r.wp, ap:r.ap, sp:r.sp }])), importedAt:Date.now() });
       setEventSettings(prev => ({ ...prev, qualification_records:saved }));
-    } else if (kind === "skills") {
-      const saved = await api.upsertEventSetting(eventId, "skills_rankings", { rows, importedAt:Date.now(), source:"VEX API" });
-      setEventSettings(prev => ({ ...prev, skills_rankings:saved }));
+
     }
     if (missing.length || kind === "rankings") setTeams(await api.listTeams(eventId));
   };
@@ -4929,7 +4927,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           </div>
         </div>
       )}
-      {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && view === "rankings" && <button type="button" onClick={() => setShowVexLiveSync(true)} className="my-3 rounded-lg border border-blue-300 px-4 py-2 font-semibold">VEX API Sync · Rankings &amp; Skills</button>}
+      {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && view === "rankings" && <button type="button" onClick={() => setShowVexLiveSync(true)} className="my-3 rounded-lg border border-blue-300 px-4 py-2 font-semibold">VEX API Sync · Qualification Rankings</button>}
       {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexLiveSync visible={showVexLiveSync} onOpen={() => setShowVexLiveSync(true)} key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onFetch={api.getVexStandings} onApply={applyVexSnapshot} onClose={() => setShowVexLiveSync(false)} />}
       {showFeedback && <FeedbackModal meName={meName} myRole={myRole} onSubmit={addFieldLog} onClose={() => setShowFeedback(false)} />}
       {showOnboarding && <QuickStartModal step={onboardingStep} setStep={setOnboardingStep} onClose={closeOnboarding} />}
@@ -8105,6 +8103,7 @@ const Label = ({ children }) => <label className="block text-xs font-semibold up
 const Empty = ({ title, sub }) => (
   <div className="text-center py-14 px-6"><p className="font-semibold text-slate-700 dark:text-slate-200">{title}</p><p className="text-sm text-slate-400 mt-1">{sub}</p></div>
 );
+
 
 
 

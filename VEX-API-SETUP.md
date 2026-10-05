@@ -32,8 +32,12 @@ Redeploy `vex-event-lookup` using the deployment command above after publishing 
 
 Event-code lookup supports both RE- and VE- codes. Event search accepts tournament/league labels such as Open Tournament, including object labels. These compatibility cases are covered by fixture tests; live API verification still requires deployment.
 
-## Rankings and Skills sync
-Open Rankings or the Event Command Center in cloud Admin mode and choose VEX API Sync. Load the event divisions, choose a division and Qualification rankings or Skills, review the snapshot and Apply snapshot. Optionally enable once-a-minute checks; closing the dialog keeps monitoring active while Ref OS is open, visible and online. Manage or stop it from the status bar. Switching events/sessions, signing out or reloading stops it.
-Qualification rankings use the selected division. Skills combine the best Driver and Autonomous runs across the whole upstream event; official combined ranks are unavailable. Confirm the target League session before import. Empty snapshots retain saved data. Only one category is monitored at a time. API publication may lag scoring. Failed writes can partially succeed; retry the reviewed snapshot.
-Match API sync has been removed. Import match schedules and scores through Tournament Manager. Redeploy vex-event-lookup so old match-sync requests are rejected; the existing API token stays configured. Live-token verification remains pending.
+## Qualification rankings sync
+Open Rankings or the Event Command Center in cloud Admin mode and choose VEX API Sync. Load the event divisions, choose a division and Qualification rankings, review the snapshot and Start syncing. Start syncing enables once-a-minute checks; closing the dialog keeps monitoring active while Ref OS is open, visible and online. Manage or stop it from the status bar. Switching events/sessions, signing out or reloading stops it.
+Qualification rankings use the selected division. Skills use Tournament Manager imports. Confirm the target League session before import. Empty snapshots retain saved data. Only one category is monitored at a time. API publication may lag scoring. Failed writes can partially succeed; retry the reviewed snapshot.
+Match and Skills API sync have been removed. Import match schedules and scores through Tournament Manager. Redeploy vex-event-lookup so old match-sync requests are rejected; the existing API token stays configured. Live-token verification remains pending.
+
+
+Quick start: open Rankings or Event Command Center > VEX API Sync. Confirm the event code; divisions load automatically for a saved code and a single division is selected. Review the preview and click Start syncing to import and enable background updates. Import once performs only one import. Manage or Stop sync from the status bar. Skills and matches use Tournament Manager imports.
+
 

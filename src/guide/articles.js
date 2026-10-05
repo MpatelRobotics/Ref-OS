@@ -288,11 +288,11 @@ add('view-feedback', 'Developer', 'View feedback submissions', ['Developer'],
   'The screen lists saved feedback messages, newest first. New submissions appear as event data syncs. Other field log entries are excluded.',
   'This screen is available only to Developers. It shows the current event or session, not a combined inbox across events. Older submissions may contain only the message, sender, and date.', ['trouble']);
 
-add('vex-live-sync', 'Sync & Offline', 'Import VEX rankings and Skills', ADMIN,
+add('vex-live-sync', 'Sync & Offline', 'Import VEX qualification rankings', ADMIN,
   'Preview published VEX API data before importing it into the current event or League session.', 'When standings have been published on VEX Events.',
-  ['In cloud mode, open Rankings or the Event Command Center and select VEX API Sync. Confirm the target event and League session.', 'Enter the full event code, select Load divisions, and choose a division.', 'Choose Qualification rankings or Skills scores. Skills cover the whole upstream event.', 'Check for updates, review the preview, then Apply snapshot. Overlapping standings are updated.', 'Optionally enable automatic updates for this category. Checks run once a minute while Ref OS stays open, visible and online, even after closing the dialog.', 'Close the dialog to use the app while syncing. Use Stop sync in the status bar to stop monitoring. Change categories to review and approve another import.'],
-  'Rankings retain official qualification ranks. Skills total each team’s best Driver and Autonomous runs, with a dash for unavailable combined ranks.',
-  'Published data may lag scoring. Empty snapshots preserve data; errors stop automatic updates. Imports can partially succeed if a write fails; retry the reviewed snapshot. Match schedules and scores use Tournament Manager imports. Only one category is monitored at a time.', [], 'api vex events skills scores rankings division automatic polling');
+  ['In cloud mode, open Rankings or the Event Command Center and select VEX API Sync. Confirm the target event and League session.', 'Enter the full event code, select Load divisions, and choose a division.', 'Only qualification rankings are available.', 'Check for updates, review the preview, then Start syncing. Overlapping standings are updated.', 'Start syncing imports the preview and enables automatic updates. Checks run once a minute while Ref OS stays open, visible and online, even after closing the dialog.', 'Close the dialog to use the app while syncing. Use Stop sync in the status bar to stop monitoring. '],
+  'Rankings retain official qualification ranks. Skills use Tournament Manager imports.',
+  'Published data may lag scoring. Empty snapshots preserve data; errors stop automatic updates. Imports can partially succeed if a write fails; retry the reviewed snapshot. Match schedules and scores use Tournament Manager imports. Only qualification rankings are synced.', [], 'api vex events skills scores rankings division automatic polling');
 export const GUIDE_ARTICLES = articles;
 export function visibleArticles(role) {
   return articles.filter((a) => a.roles.includes(role));
@@ -305,5 +305,9 @@ export function searchArticles(role, query = '', category = '') {
 }
 
 
+
+
+
+// Qualification API sync quick start: open Rankings or Event Command Center > VEX API Sync. Confirm the event code; divisions load automatically for a saved code and a single division is selected. Review the preview and click Start syncing to import and enable background updates. Import once performs only one import. Manage or Stop sync from the status bar. Skills and matches use Tournament Manager imports.
 
 

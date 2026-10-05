@@ -1,6 +1,6 @@
 const BASE='https://events.vex.com/api/v2/';
 export async function fetchVexStandings(code, division, token, fetcher=fetch, kind='rankings') {
- if(!['rankings','skills'].includes(kind))throw new Error('VEX API sync supports only rankings and Skills.');
+ if(kind !== 'rankings')throw new Error('VEX API sync supports only qualification rankings.');
  if(!token)throw new Error('VEX standings sync is not configured. Contact the developer.');
  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),25000);
  const get=async(path,params={})=>{const url=new URL(path,BASE);Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,String(v)));const res=await fetcher(url,{headers:{Authorization:`Bearer ${token}`,Accept:'application/json'},signal:controller.signal,redirect:'error'});if(!res.ok)throw new Error('Could not retrieve VEX standingses. Try again later.');return res.json();};
@@ -11,7 +11,7 @@ export async function fetchVexStandings(code, division, token, fetcher=fetch, ki
   const divisions=(event.divisions||[]).filter(d=>Number.isSafeInteger(d.id)).map(d=>({id:d.id,name:String(d.name||'Division '+d.id)}));
   if(!division)return {code,divisions,rankings:[],skills:[]};
   if(!divisions.some(d=>d.id===Number(division)))throw new Error('VEX division is not available for this event.');
-  if(!['rankings','skills'].includes(kind))throw new Error('VEX sync category is not supported.');
+  if(kind !== 'rankings')throw new Error('VEX sync category is not supported.');
   const rows=[];
   for(let page=1;page<=20;page++){const result=await get(kind==='skills'?`events/${found[0].id}/skills`:`events/${found[0].id}/divisions/${Number(division)}/${kind}`,{page,per_page:250});const last=Number(result.meta?.last_page);if(!Array.isArray(result.data)||!Number.isInteger(last)||last<page||last>20)throw new Error('VEX standings pagination is incomplete. No standings were imported.');rows.push(...result.data);if(page===last)break;}
   const warnings=[];
@@ -35,4 +35,5 @@ export function mapVexSkills(rows) {
  }
  return [...teams.values()].map(row=>({...row,total:(row.driver??0)+(row.programming??0)})).sort((a,b)=>b.total-a.total||a.number.localeCompare(b.number,'en',{numeric:true}));
 }
+
 
