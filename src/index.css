@@ -129,11 +129,11 @@ button:active:not(:disabled) {
 }
 
 /* Ref-OS workspace system: navy structure, neutral surfaces, semantic status. */
-:root { --ref-bg:#f3f5f8; --ref-surface:#fff; --ref-text:#17243a; --ref-muted:#526176; --ref-border:#d9e1eb; --ref-accent:#1d4ed8; --ref-navy:#101d33; }
+:root { --ref-bg:#f3f5f8; --ref-surface:#fff; --ref-text:#17243a; --ref-muted:#526176; --ref-border:#d9e1eb; --ref-accent:#1d4ed8; --ref-navy:#0a3773; --ref-nav-border:#31598b; }
 .dark { --ref-bg:#101827; --ref-surface:#1a2638; --ref-text:#eef3fb; --ref-muted:#afbdd0; --ref-border:#3d4d64; --ref-accent:#93c5fd; }
 body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 .refos-shell { background:var(--ref-bg); color:var(--ref-text); }
-.refos-header { background:var(--ref-navy); border-bottom:1px solid #33425b; box-shadow:0 2px 8px #0f172a12; }
+.refos-header { background:var(--ref-navy); border-bottom:1px solid var(--ref-nav-border); box-shadow:0 2px 8px #0f172a12; }
 .refos-header-inner { max-width:1120px; min-height:88px; }
 .refos-header button { min-height:32px; }
 .refos-back-button { display:inline-flex; align-items:center; gap:5px; flex-shrink:0; border:0; border-radius:6px; background:transparent; padding:6px 8px 6px 2px; color:var(--ref-muted); font-size:14px; line-height:1; font-weight:700; white-space:nowrap; box-shadow:none; }
@@ -167,10 +167,10 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 #workspace { scroll-margin-top:180px; }
 @media(min-width:1100px) {
  .refos-shell { padding-left:272px; }
- .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav { position:fixed; left:0; top:0; bottom:0; width:272px; flex-direction:column; padding:142px 18px 24px; background:linear-gradient(180deg,#24275d 0%,#191c49 100%); border-right:1px solid #444779; gap:6px; box-shadow:8px 0 28px rgb(13 15 50 / .18); overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#aebbd2 transparent; }
+ .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav { position:fixed; left:0; top:0; bottom:0; width:272px; flex-direction:column; padding:142px 18px 24px; background:var(--ref-navy); border-right:1px solid var(--ref-nav-border); gap:6px; box-shadow:8px 0 28px rgb(13 15 50 / .18); overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#aebbd2 transparent; }
  .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar { width:7px; }
  .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar-track { background:transparent; }
- .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar-thumb { background:#aebbd2; border-radius:999px; border:2px solid #24275d; }
+ .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar-thumb { background:#aebbd2; border-radius:999px; border:2px solid var(--ref-navy); }
  .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar-thumb:hover { background:#d7e0ee; }
  .refos-desktop-nav::before { content:'REF-OS'; position:absolute; top:34px; left:28px; font-size:26px; line-height:1; font-weight:800; letter-spacing:.04em; color:#fff; }
  .refos-sidebar-subtitle { position:absolute; top:67px; left:28px; font-size:10px; line-height:1.2; font-weight:600; letter-spacing:.025em; color:#d7e3f1; white-space:nowrap; }
@@ -184,7 +184,7 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
  .refos-desktop-nav .refos-sidebar-tool { min-height:40px; padding:9px 13px; color:#d5e2f0; font-size:12px; }
  .refos-sidebar-footer { position:static; margin:18px 10px 0; padding:14px 0 2px; border-top:1px solid #ffffff2b; display:flex; flex-direction:column; gap:4px; color:#c1d1e3; font-size:10px; flex-shrink:0; }
  .refos-sidebar-footer span:first-child { color:#f4f8fc; font-size:11px; font-weight:700; }
- .refos-header { background:#292c63; border-bottom-color:#464a7d; box-shadow:0 1px 0 rgb(13 15 50 / .34); }
+ .refos-header { background:var(--ref-navy); border-bottom-color:var(--ref-nav-border); box-shadow:0 1px 0 rgb(13 15 50 / .34); }
  .refos-header .text-slate-400 { color:#dce7f3; }
  .refos-header .text-slate-300 { color:#eef5fb; }
  .refos-header-inner { max-width:1440px; min-height:72px; padding-left:36px; padding-right:36px; }
