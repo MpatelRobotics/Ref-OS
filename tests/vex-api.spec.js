@@ -39,3 +39,14 @@ test('lookup failure explains manual fallback',async({page})=>{
  await mount(page,true);await page.getByLabel('Autofill from VEX Events (optional)').fill('RE-V5RC-26-4270');await page.getByRole('button',{name:'Look up',exact:true}).click();await expect(page.getByRole('alert')).toContainText('create the event manually');
 });
 
+
+test('both RE and VE event codes normalize and VE lookup keeps the exact SKU',async()=>{
+ expect(normalizeCode('re-v5rc-26-4246')).toBe('RE-V5RC-26-4246');
+ expect(normalizeCode(' ve-v5-27-65868 ')).toBe('VE-V5-27-65868');
+ const result=await lookupEvent('VE-V5-27-65868','fixture-token',async url=>{
+   if(url.pathname.endsWith('/events')) {expect(url.searchParams.get('sku[]')).toBe('VE-V5-27-65868');return response({data:[{...event,sku:'VE-V5-27-65868'}]});}
+   return response({data:[],meta:{last_page:1}});
+ });
+ expect(result.code).toBe('VE-V5-27-65868');
+ expect(()=>normalizeCode('VE-V5-27-65868/../../')).toThrow();
+});

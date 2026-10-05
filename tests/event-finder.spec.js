@@ -8,7 +8,7 @@ test('USA search uses region/date filters and excludes foreign states/workshops'
  {sku:'RE-V5RC-26-4272',name:'Other state',location:{country:'United States',region:'New Jersey'},event_type:'tournament'},
  {sku:'RE-V5RC-26-4273',name:'Workshop',location:{country:'United States',region:'New York'},event_type:'workshop'}
  ]}),{status:200});});
- expect(url.searchParams.get('region')).toBe('New York');expect(url.searchParams.get('start')).toContain('2026-10-01');expect(response.events.map(e=>e.name)).toEqual(['NY event']);expect(response.nextPage).toBeNull();
+ expect(url.searchParams.has('region')).toBe(false);expect(url.searchParams.get('start')).toContain('2026-10-01');expect(response.events.map(e=>e.name)).toEqual(['NY event']);expect(response.nextPage).toBeNull();
 });
 test('search has a continuation instead of silently dropping later pages',async()=>{
  const response=await searchEvents(filters,'fixture-token',async()=>new Response(JSON.stringify({meta:{last_page:7},data:[]}),{status:200}));
@@ -32,4 +32,12 @@ test('state search, continuation and selected event work without country picker'
  await page.getByRole('button',{name:'Load more events'}).click();await expect(page.getByLabel('Select VEX event').locator('option')).toHaveCount(3);
  await page.getByLabel('Select VEX event').selectOption('RE-V5RC-26-4271');await page.getByRole('button',{name:'Use selected event'}).click();expect(await page.evaluate(()=>window.selectedCode)).toBe('RE-V5RC-26-4271');
  await page.getByLabel('State or territory').selectOption('New Jersey');await expect(page.getByLabel('Select VEX event')).toHaveCount(0);
+});
+
+test('new event type labels, VE codes and state abbreviations are included',async()=>{
+ const result=await searchEvents({...filters,state:'New Jersey'},'fixture-token',async()=>new Response(JSON.stringify({meta:{last_page:1},data:[
+ {sku:'VE-V5-27-65868',name:'Cedar Grove',start:'2026-12-01',location:{country:'USA',region:'NJ',city:'Cedar Grove'},event_type:'Open Tournament'},
+ {sku:'RE-V5RC-26-4246',name:'Newark',start:'2026-11-20',location:{country:'United States',region:'New Jersey'},event_type:{name:'Open Tournament'}}
+ ]}),{status:200}));
+ expect(result.events.map(e=>e.code)).toEqual(['RE-V5RC-26-4246','VE-V5-27-65868']);
 });

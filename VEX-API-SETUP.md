@@ -26,6 +26,8 @@ Live verification is required after adding the secret and deploying: try a real 
 
 Create Event now also offers US state/territory and date-range search. Select a state, choose dates (maximum one year), select Find events, then choose an event from the dropdown and Use selected event. The normal code lookup retrieves its details and full team roster. Code lookup remains available for any supported full event code.
 
-Search uses the API's documented region and start/end filters, then checks the country/state server-side. Load more events retrieves later API pages and appends matches to the dropdown; a count is the number loaded, not a claim that all events have been retrieved. Date range defaults to today through the next 90 days. Only tournaments and leagues are included. An empty result with more pages available means continue loading pages. No non-US location finder is enabled in this release.
+Search requests the date window and checks country/state server-side, accepting full state names and abbreviations. It avoids depending on the upstream region filter. Load more events retrieves later API pages and appends matches to the dropdown; a count is the number loaded, not a claim that all events have been retrieved. Date range defaults to today through the next 90 days. Only tournaments and leagues are included. An empty result with more pages available means continue loading pages. No non-US location finder is enabled in this release.
 
 Redeploy `vex-event-lookup` using the deployment command above after publishing these changes. The existing VEX_EVENTS_API_TOKEN secret stays in place. Verify with your live token after deployment.
+
+Event-code lookup supports both RE- and VE- codes. Event search accepts tournament/league labels such as Open Tournament, including object labels. These compatibility cases are covered by fixture tests; live API verification still requires deployment.
