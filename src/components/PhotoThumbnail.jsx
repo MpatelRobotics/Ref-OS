@@ -34,6 +34,7 @@ export default function PhotoThumbnail({ pkey, onOpen, full = false, compact = f
     setSrc(null);
     if (!recoveryUsed.current && navigator.onLine !== false) {
       recoveryUsed.current = true;
+      setStatus("loading");
       refreshPath.current = pkey;
       setRetry((n) => n + 1);
     } else setStatus(navigator.onLine === false ? "offline" : "missing");
@@ -42,11 +43,12 @@ export default function PhotoThumbnail({ pkey, onOpen, full = false, compact = f
   if (status === "offline" || status === "missing") return (
     <button type="button" onClick={retryPhoto} aria-label="Retry loading robot picture" title={status === "offline" ? "Picture unavailable offline. Reconnect and retry." : "Picture could not be displayed. Tap to retry."}
       className={`${size} min-h-[44px] rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 flex flex-col items-center justify-center gap-2 text-slate-600 dark:text-slate-300`}>
-      {status === "offline" ? <CloudOff size={18} /> : <ImageOff size={18} />}
-      {full && <span className="text-sm px-3">{status === "offline" ? "Reconnect to load picture" : "Picture unavailable"} · Tap to retry</span>}
+      {status === "offline" ? <CloudOff size={18} aria-hidden="true" /> : <ImageOff size={18} aria-hidden="true" />}
+      {full && <span className="text-sm px-3">{status === "offline" ? "Picture unavailable offline. Reconnect and try again." : "Picture could not load. Try again."}</span>}
+      <span className={`${full ? "text-sm px-4 py-2 rounded-lg border border-slate-400 dark:border-slate-500" : "text-xs"} font-semibold`}>Retry</span>
     </button>
   );
-  if (!src) return <div className={`${size} rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 animate-pulse`} />;
+  if (!src) return <div role="status" aria-label="Loading robot picture" className={`${size} min-h-[44px] rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 flex items-center justify-center motion-safe:animate-pulse`}><span className={full ? "text-sm text-slate-600 dark:text-slate-300" : "sr-only"}>Loading picture…</span></div>;
   const image = <img src={src} alt="robot" onError={failedImage} className={`${size} rounded-lg object-cover border border-slate-200 dark:border-slate-700`} />;
   if (!onOpen) return image;
   return <button type="button" onClick={() => onOpen(src)} className={`${size} shrink-0`}>{image}</button>;

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aE7sAAAAASUVORK5CYII=', 'base64');
-async function mount(page, corruptCache = false) {
+async function mount(page, corruptCache = false, full = true) {
   await page.route('**/src/api.js*', (route) => route.fulfill({ contentType: 'text/javascript', body: 'export async function photoUrl() { return "/test-photo-image"; }' }));
   await page.route('**/photo-recovery-test', (route) => route.fulfill({contentType: 'text/html', body: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
     import '/@vite/client'; import RefreshRuntime from '/@react-refresh';
@@ -12,7 +12,7 @@ async function mount(page, corruptCache = false) {
     const path = 'test-event/team/1/front-test.jpg';
     ${corruptCache ? "await cache.putCachedBlob(path, new Blob(['broken image'], {type:'image/jpeg'}));" : ''}
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    window.remountPhoto = () => root.render(React.createElement(Photo, {key:Date.now(), pkey:path, full:true}));
+    window.remountPhoto = () => root.render(React.createElement(Photo, {key:Date.now(), pkey:path, full:${full}}));
     window.remountPhoto();
   </script></body></html>`}));
   await page.goto('/photo-recovery-test');
@@ -29,10 +29,24 @@ test('unreadable downloads stop automatically and can be retried', async ({page}
   await page.route('**/test-photo-image', (route) => { downloads++; return route.fulfill({contentType:'image/png',body:valid?PNG:Buffer.from('invalid')}); });
   await mount(page);
   await expect(page.getByRole('button',{name:'Retry loading robot picture'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Retry loading robot picture'})).toContainText('Retry');
+  await expect(page.locator('img')).toHaveCount(0);
   expect(downloads).toBe(2);
   valid = true;
   await page.getByRole('button',{name:'Retry loading robot picture'}).click();
   await expect.poll(() => page.locator('img').evaluateAll((imgs) => imgs.some((im) => im.naturalWidth===1))).toBe(true);
+});
+
+test('small thumbnails show a visible Retry label and recover after a failed request', async ({page}) => {
+  let valid = false;
+  await page.route('**/test-photo-image', route => route.fulfill(valid ? {contentType:'image/png',body:PNG} : {status:404,body:''}));
+  await mount(page, false, false);
+  const retry = page.getByRole('button', {name:'Retry loading robot picture'});
+  await expect(retry).toContainText('Retry');
+  await expect(page.locator('img')).toHaveCount(0);
+  valid = true;
+  await retry.click();
+  await expect.poll(() => page.locator('img').evaluateAll(imgs => imgs.some(im => im.naturalWidth === 1))).toBe(true);
 });
 test('valid downloaded photos still display from cache offline', async ({page,context}) => {
   await page.route('**/test-photo-image', (route) => route.fulfill({contentType:'image/png',body:PNG}));
