@@ -1,3 +1,4 @@
+import EventProgramChoice from "../EventProgramChoice.jsx";
 import React, { useState } from "react";
 import { CalendarDays, ListOrdered, X } from "lucide-react";
 import Label from "./FormLabel.jsx";
@@ -11,12 +12,13 @@ const elimCounts = (bracket) => {
   }
 };
 
-export default function EventModal({ event, onSave, onClose }) {
+export default function EventModal({ event, onSave, onClose, competitionProgram="v5" }) {
   const [name, setName] = useState(event?.name || "");
   const [quals, setQuals] = useState(event?.quals ? String(event.quals) : "");
   const [practice, setPractice] = useState(event?.practice ? String(event.practice) : "");
   const [bracket, setBracket] = useState(event?.bracket ? String(event.bracket) : "16");
   const [finalsBestOf, setFinalsBestOf] = useState(event?.finalsBestOf ? String(event.finalsBestOf) : "3");
+  const [program, setProgram] = useState(competitionProgram);
   const creating = !event;
   return (
     <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
@@ -26,6 +28,7 @@ export default function EventModal({ event, onSave, onClose }) {
           <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-3">
+          <EventProgramChoice value={program} onChange={setProgram} />
           <div><Label>Event name</Label>
             <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Highlander Summit Signature"
               className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-300" /></div>
@@ -58,7 +61,7 @@ export default function EventModal({ event, onSave, onClose }) {
         </div>
         <div className="p-4 pt-0 flex gap-2">
           <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
-          <button onClick={() => onSave({ name, quals, practice, bracket, finalsBestOf })} className="flex-1 py-2.5 rounded-lg font-semibold text-white bg-slate-900 hover:bg-slate-800">{creating ? "Create event" : "Save event"}</button>
+          <button onClick={() => onSave({ name, quals, practice, bracket, finalsBestOf, competitionProgram:program })} className="flex-1 py-2.5 rounded-lg font-semibold text-white bg-slate-900 hover:bg-slate-800">{creating ? "Create event" : "Save event"}</button>
         </div>
       </div>
     </div>

@@ -1,3 +1,5 @@
+import IQManual from "./components/IQManual.jsx";
+import EventProgramChoice, {detectEventProgram, programLabel} from "./components/EventProgramChoice.jsx";
 import TeamRegisteredEvents from "./components/TeamRegisteredEvents.jsx";
 import VexLiveSync from "./components/VexLiveSync.jsx";
 import VexEventLookup from "./components/VexEventLookup.jsx";
@@ -1368,6 +1370,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
   };
   const [name, setName] = useState("");
   const [adminCode, setAdminCode] = useState("");
+  const [competitionProgram, setCompetitionProgram] = useState("");
   const [format, setFormat] = useState("tournament");
   const [firstSession, setFirstSession] = useState({ name: "Session 1", date: "" });
   const [vexEvent, setVexEvent] = useState(null);
@@ -1376,6 +1379,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
     setVexEvent(details);
     if (!details) return;
     setName(details.name);
+    const detectedProgram = detectEventProgram(details); if (detectedProgram) setCompetitionProgram(detectedProgram);
     if (details.eventType === "league" || details.eventType === "tournament") setFormat(details.eventType);
     if (details.eventType === "league" && details.start) setFirstSession(current => ({ ...current, date: details.start.slice(0,10) }));
   };
@@ -1386,12 +1390,15 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
     if (vexLookupBusy || saving) return;
     const cleanName = name.trim();
     const cleanCode = adminCode.trim().toUpperCase();
+    if (!["iq","v5"].includes(competitionProgram)) return setCreateError("Choose VEX IQ or V5RC / VEX U.");
+    if (vexEvent && detectEventProgram(vexEvent) && detectEventProgram(vexEvent) !== competitionProgram) return setCreateError("The selected program does not match the VEX event lookup. Choose the matching program or clear the lookup.");
     if (cleanName.length < 3) return setCreateError("Enter an event name.");
     if (!/^\d[A-Z]\d\d$/.test(cleanCode)) return setCreateError("Admin code must use the Ref OS 4 character format, for example 3S23.");
     setSaving(true);
     setCreateError("");
     try {
       const ev = await api.createVexEvent(cleanName, cleanCode, format);
+      try { await api.upsertEventSetting(ev.id, "competition_program", { program:competitionProgram, label:programLabel(competitionProgram), manual:competitionProgram === "iq" ? "levelup-2.0" : null }); } catch { alert("The event was created, but its competition program could not be saved. Ask an Admin to set the program in Event Setup; do not create a duplicate event."); }
       // League: optionally create (and start) the first session now. Later sessions are added
       // from the League Overview; they are never required up front.
       if (format === "league" && firstSession.name.trim()) {
@@ -1411,7 +1418,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
           alert("The event was created, but its VEX details or roster could not be fully saved. Open this existing event and import the teams from Tournament Manager; do not create a duplicate event.");
         }
       }
-      onCreated({ ...ev, format });
+      onCreated({ ...ev, format, competitionProgram });
     } catch (e) {
       setCreateError(e?.message || "Could not create the event.");
     } finally {
@@ -1544,6 +1551,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
           <div className="mt-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4">
             <h2 className="font-bold text-slate-900 dark:text-white">Create VEX Event</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">Create the event shell now. Use TM Sync Center after login to import teams, schedules, rankings, skills, and alliances.</p>
+            <EventProgramChoice value={competitionProgram} onChange={setCompetitionProgram} disabled={saving || vexLookupBusy} />
             <VexEventLookup onLookup={api.lookupVexEvent} onSearch={api.searchVexEvents} onResult={receiveVexEvent} disabled={saving} onBusy={setVexLookupBusy} />
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Event name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Example: NJ State Championship"
@@ -2457,6 +2465,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   }, [eventId, isInspection, meName, myRole]);
 
   const saveEvent = async (data) => {
+    if (data.competitionProgram) { const saved = await api.upsertEventSetting(eventId, "competition_program", { program:data.competitionProgram, label:programLabel(data.competitionProgram), manual:data.competitionProgram === "iq" ? "levelup-2.0" : null }); setEventSettings(prev => ({...prev, competition_program:saved})); }
     const ev = await api.updateEvent(eventId, {
       name: (data.name || "").trim(),
       quals: Math.max(0, parseInt(data.quals, 10) || 0),
@@ -4541,7 +4550,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
             onNominate={(award) => setNominating(award || "sportsmanship")} onDeleteNom={removeNomination}
             onExport={isEmcee ? undefined : () => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
         ) : view === "rulebook" ? (
-          <RuleBook rules={rules} online={online} accent={brand.accent}
+          (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq" ? <IQManual /> : <RuleBook rules={rules} online={online} accent={brand.accent}
             qaUrl={officialResourcesFor(eventSettings?.rules_template?.value?.ruleset).qaUrl} />
         ) : view === "rankings" && adminUnlocked ? (
           league ? (() => {
@@ -4911,6 +4920,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                 </div>
                 <button onClick={() => setShowFeedback(true)} className="px-3 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-semibold shrink-0">Send Feedback</button>
               </div>
+              {(eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq" && <IQManual />}
               {isDeveloper && !showFeedbackViewer && <button type="button" onClick={() => setShowFeedbackViewer(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 dark:border-sky-700 bg-sky-50 dark:bg-sky-950/30 p-4 text-left font-bold">View Feedback <span className="font-normal text-sm">· Developer only · {fieldLog.filter(entry => entry.kind === "feedback").length} submissions</span></button>}
               {isDeveloper && showFeedbackViewer ? <FeedbackViewer isDeveloper={isDeveloper} entries={fieldLog} eventName={event?.name || "Current event"} sessionName={league ? league.sessionName(leagueSessionId) : ""} onClose={() => setShowFeedbackViewer(false)} /> : <>
               {showUserGuide ? <UserGuide role={myRole} initialArticleId={guideArticleId} onClose={() => { setShowUserGuide(false); setGuideArticleId(null); }} /> : <>
@@ -4980,7 +4990,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           <button onClick={() => setShowInstallHelp(false)} className="w-full mt-4 py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold">Got it</button>
         </Modal>
       )}
-      {showEvent && <EventModal event={event} onSave={saveEvent} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEvent(false)} />}
+      {showEvent && <EventModal event={event} competitionProgram={eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram || "v5"} onSave={saveEvent} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEvent(false)} />}
       {lightbox && createPortal(
         <div onClick={() => setLightbox(null)} role="dialog" aria-modal="true" aria-label="Robot photo" className="fixed inset-0 z-[200] bg-black/90 grid place-items-center p-4">
           <img src={lightbox} alt="Robot" className="max-h-full max-w-full object-contain rounded-lg" />
@@ -8105,6 +8115,8 @@ const Label = ({ children }) => <label className="block text-xs font-semibold up
 const Empty = ({ title, sub }) => (
   <div className="text-center py-14 px-6"><p className="font-semibold text-slate-700 dark:text-slate-200">{title}</p><p className="text-sm text-slate-400 mt-1">{sub}</p></div>
 );
+
+
 
 
 
