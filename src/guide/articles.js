@@ -285,7 +285,7 @@ add('trouble', 'Troubleshooting', 'Missing tabs, stale data, and support', ALL,
 add('view-feedback', 'Developer', 'View feedback submissions', ['Developer'],
   'Read feedback sent from Features & Help for the current event or League session.', 'When reviewing bugs, requests, or general feedback.',
   ['Sign in with Developer access and select the event and working League session.', 'Open Features & Help and choose View Feedback.', 'Search by message or sender, and review the submission date.', 'Use Back to Features & Help when finished.'],
-  'The screen lists saved feedback messages, newest first. New submissions appear as event data syncs. Other field log entries are excluded.',
+  'The screen lists saved feedback messages, newest first. Developer can set New, In progress, or Resolved, search by sender/message, and filter by status. Existing submissions start as New. Changes require a cloud connection; Refresh statuses loads updates from other Developer devices. Original messages remain unchanged. New submissions appear as event data syncs. Other field log entries are excluded.',
   'This screen is available only to Developers. It shows the current event or session, not a combined inbox across events. Older submissions may contain only the message, sender, and date.', ['trouble']);
 
 add('vex-live-sync', 'Sync & Offline', 'Import VEX qualification rankings', ADMIN,

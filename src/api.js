@@ -1797,3 +1797,14 @@ export async function lookupVexTeamEvents(number) {
   if (!Array.isArray(data?.events)) throw new Error("VEX returned incomplete team events.");
   return data;
 }
+
+// Developer-only feedback triage; authorization is enforced by the database RPCs.
+export async function listFeedbackManagement(eventId) {
+  const { data, error } = await supabase.rpc('list_feedback_management', { p_event: eventId });
+  if (error) throw error;
+  return data || [];
+}
+export async function setFeedbackStatus(eventId, feedbackId, status) {
+  const { error } = await supabase.rpc('set_feedback_status', { p_event: eventId, p_feedback: feedbackId, p_status: status });
+  if (error) throw error;
+}

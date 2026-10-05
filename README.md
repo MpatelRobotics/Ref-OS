@@ -413,3 +413,9 @@ This repository does not currently include a software license. Contact the autho
 Ref OS is independently developed and is not an official product of VEX Robotics, Innovation First International, or the Robotics Education & Competition Foundation. Public availability does not imply endorsement or maintenance by any of these organizations.
 
 VEX, VEX Robotics, and related names and marks belong to their respective owners.
+
+### Developer feedback management
+
+In **Features & Help → View Feedback**, a verified Developer can mark submissions **New**, **In progress**, or **Resolved**, search by sender/message, and filter by status. Existing feedback starts as New. Status changes preserve the original message and are shared through Supabase; use **Refresh statuses** to load changes from another Developer device. The list stays scoped to the current event/League session. Status changes require a cloud connection and are not queued offline or synced through Local Venue Server.
+
+Run [`supabase/feedback-management.sql`](supabase/feedback-management.sql) in the Supabase SQL Editor after the base schema and `refos-2-developer-access.sql`. This adds separate status records and database-enforced Developer-only read/write functions. Ordinary Admin access cannot change statuses. No Edge Function redeployment is needed. Until setup succeeds, messages remain readable but status controls are disabled with a setup/connection message.
