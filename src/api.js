@@ -1775,3 +1775,10 @@ export async function getVexStandings(code, division = null, kind = "rankings") 
   return data;
 }
 
+export async function lookupVexTeamEvents(number) {
+  await ensureAnonymousSession();
+  const { data, error } = await supabase.functions.invoke("vex-event-lookup", { body:{action:"team-events",number} });
+  if (error) { let message="Team events are unavailable. Check your connection."; try { const body=await error.context?.json(); if(typeof body?.error === "string") message=body.error; } catch {} throw new Error(message); }
+  if (!Array.isArray(data?.events)) throw new Error("VEX returned incomplete team events.");
+  return data;
+}

@@ -1,3 +1,4 @@
+import TeamRegisteredEvents from "./components/TeamRegisteredEvents.jsx";
 import VexLiveSync from "./components/VexLiveSync.jsx";
 import VexEventLookup from "./components/VexEventLookup.jsx";
 import useMenuViewport from "./useMenuViewport.js";
@@ -5069,6 +5070,7 @@ function TeamDetail({ team, viols, record, onLog, onDeleteViolation, onEditViola
           </div>
         </div>
       )}
+      {team && <TeamRegisteredEvents key={team.number} number={team.number} />}
       {league && team && <LeagueTeamPanel team={team} emcee={emcee} meName={meName} onOpenPhoto={onOpenPhoto} />}
       {!emcee && (<>
       <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">{league ? `${league.session.name} log` : "Log"} ({viols.length})</h2>
@@ -8103,6 +8105,7 @@ const Label = ({ children }) => <label className="block text-xs font-semibold up
 const Empty = ({ title, sub }) => (
   <div className="text-center py-14 px-6"><p className="font-semibold text-slate-700 dark:text-slate-200">{title}</p><p className="text-sm text-slate-400 mt-1">{sub}</p></div>
 );
+
 
 
 

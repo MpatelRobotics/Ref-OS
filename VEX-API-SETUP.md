@@ -41,3 +41,6 @@ Match and Skills API sync have been removed. Import match schedules and scores t
 Quick start: open Rankings or Event Command Center > VEX API Sync. Confirm the event code; divisions load automatically for a saved code and a single division is selected. Review the preview and click Start syncing to import and enable background updates. Import once performs only one import. Manage or Stop sync from the status bar. Skills and matches use Tournament Manager imports.
 
 
+
+## Team events
+Team details now includes Registered & Past Events using exact team-number lookup and the teams/{id}/events endpoint. Retrieves a bounded past-year to next-year window, with complete pagination required. Upcoming events sort first. Saves successful results on this device for offline viewing; fresh copies are reused for 15 minutes. Refresh events updates manually. The API describes associated/attended events and does not guarantee registration status or every future registration. Ambiguous team numbers fail rather than choosing a different program. Existing VEX token is reused; redeploy the function. No database migration. Live-token verification remains pending. V5 event links follow the official event page code format; other programs show event details without guessed links.
