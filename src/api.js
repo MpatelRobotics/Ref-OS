@@ -1737,3 +1737,16 @@ function venueJoinPresence(eventId, meta, onChange) {
 function venueDeviceKey() {
   try { return localStorage.getItem("refosDeviceId") || "unknown"; } catch { return "unknown"; }
 }
+
+// Token stays in the server-side VEX_EVENTS_API_TOKEN secret.
+export async function lookupVexEvent(code) {
+  await ensureAnonymousSession();
+  const { data, error } = await supabase.functions.invoke("vex-event-lookup", { body: { code: String(code || "").trim().toUpperCase() } });
+  if (error) {
+    let message = "VEX lookup is unavailable. Check the connection and ask the developer to configure it.";
+    try { const body = await error.context?.json(); if (typeof body?.error === "string") message = body.error; } catch {}
+    throw new Error(message);
+  }
+  if (!data?.event || !Array.isArray(data.event.teams)) throw new Error("VEX returned incomplete event information.");
+  return data.event;
+}

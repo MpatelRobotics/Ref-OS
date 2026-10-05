@@ -1,3 +1,4 @@
+import VexEventLookup from "./components/VexEventLookup.jsx";
 import useMenuViewport from "./useMenuViewport.js";
 import Thumb from "./components/PhotoThumbnail.jsx";
 import React, { useState, useEffect, useMemo, useRef, useCallback, useContext } from "react";
@@ -1367,10 +1368,20 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
   const [adminCode, setAdminCode] = useState("");
   const [format, setFormat] = useState("tournament");
   const [firstSession, setFirstSession] = useState({ name: "Session 1", date: "" });
+  const [vexEvent, setVexEvent] = useState(null);
+  const [vexLookupBusy, setVexLookupBusy] = useState(false);
+  const receiveVexEvent = (details) => {
+    setVexEvent(details);
+    if (!details) return;
+    setName(details.name);
+    if (details.eventType === "league" || details.eventType === "tournament") setFormat(details.eventType);
+    if (details.eventType === "league" && details.start) setFirstSession(current => ({ ...current, date: details.start.slice(0,10) }));
+  };
   const [createError, setCreateError] = useState("");
   const [saving, setSaving] = useState(false);
 
   const createEvent = async () => {
+    if (vexLookupBusy || saving) return;
     const cleanName = name.trim();
     const cleanCode = adminCode.trim().toUpperCase();
     if (cleanName.length < 3) return setCreateError("Enter an event name.");
@@ -1387,6 +1398,15 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
           await api.setLeagueSessionStatus(created.id, "active");
         } catch (sessionError) {
           alert(`The league was created, but its first session could not be: ${sessionError?.message || sessionError}. Create it from the League Overview.`);
+        }
+      }
+      if (vexEvent) {
+        try {
+          const { teams: registeredTeams, ...details } = vexEvent;
+          await api.upsertEventSetting(ev.id, "vex_event", { ...details, fetchedAt: new Date().toISOString() });
+          await api.bulkUpsertTeams(ev.id, registeredTeams);
+        } catch {
+          alert("The event was created, but its VEX details or roster could not be fully saved. Open this existing event and import the teams from Tournament Manager; do not create a duplicate event.");
         }
       }
       onCreated({ ...ev, format });
@@ -1522,6 +1542,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
           <div className="mt-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4">
             <h2 className="font-bold text-slate-900 dark:text-white">Create VEX Event</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">Create the event shell now. Use TM Sync Center after login to import teams, schedules, rankings, skills, and alliances.</p>
+            <VexEventLookup onLookup={api.lookupVexEvent} onResult={receiveVexEvent} disabled={saving} onBusy={setVexLookupBusy} />
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Event name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Example: NJ State Championship"
               className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-3 text-slate-900 dark:text-white mb-3" />
@@ -1557,7 +1578,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
             <div className="flex gap-2 mt-4">
               <button type="button" onClick={() => { setCreating(false); setCreateError(""); }}
                 className="flex-1 rounded-xl border border-slate-300 dark:border-slate-600 px-4 py-3 font-semibold">Cancel</button>
-              <button type="button" disabled={saving} onClick={createEvent}
+              <button type="button" disabled={saving || vexLookupBusy} onClick={createEvent}
                 className="flex-1 rounded-xl bg-blue-600 text-white px-4 py-3 font-semibold disabled:opacity-50">{saving ? "Creating…" : "Create Event"}</button>
             </div>
           </div>
