@@ -29,3 +29,5 @@ test('preview and approval precede periodic updates; changing category resets ap
  await page.getByRole('checkbox').uncheck();await page.getByRole('combobox').nth(1).selectOption('skills');await expect(page.getByRole('checkbox')).toBeDisabled();
 });
 
+
+test('unsupported rounds do not block valid qualifications and string rounds normalize',()=>{const warnings=[]; const rows=mapVexMatches([{...match,round:'2'},{...match,round:7}],warnings);expect(rows).toHaveLength(1);expect(rows[0].phase).toBe('qual');expect(warnings[0]).toContain('round 7');});

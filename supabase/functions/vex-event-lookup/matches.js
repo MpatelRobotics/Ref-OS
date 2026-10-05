@@ -1,9 +1,13 @@
 const BASE='https://events.vex.com/api/v2/';
-export function mapVexMatches(rows) {
+export function mapVexMatches(rows, warnings = null) {
  const seen=new Set();return rows.map(row=>{
-  const phase=({1:'practice',2:'qual',3:'qf',4:'sf',5:'final',6:'r16'})[row.round];
-  const num=Number([3,4,6].includes(row.round)?row.instance:row.matchnum);
-  if(!phase||!Number.isInteger(num)||num<1||([3,4,6].includes(row.round)&&Number(row.matchnum)>1))throw new Error('VEX match format is not supported. Use Tournament Manager import for this division.');
+  const round=Number(row.round);
+  const phase=({1:'practice',2:'qual',3:'qf',4:'sf',5:'final',6:'r16'})[round];
+  const num=Number([3,4,6].includes(round)?row.instance:row.matchnum);
+  if(!phase||!Number.isInteger(num)||num<1||([3,4,6].includes(round)&&Number(row.matchnum)>1)) {
+   if(warnings) { warnings.push(`Skipped match: round ${String(row.round)}, instance ${String(row.instance)}, match number ${String(row.matchnum)}. This format requires Tournament Manager import.`); return null; }
+   throw new Error('VEX match format is not supported. Use Tournament Manager import for this division.');
+  }
   const key=phase+'-'+num;if(seen.has(key))throw new Error('VEX matches have overlapping round numbers. Use Tournament Manager import.');seen.add(key);
   const red=row.alliances?.find(a=>a.color==='red'),blue=row.alliances?.find(a=>a.color==='blue');
   const teams=alliance=>(alliance?.teams||[]).filter(t=>!t.sitting).map(t=>String(t.team?.name||'').trim().toUpperCase());
@@ -12,7 +16,7 @@ export function mapVexMatches(rows) {
   const scored=row.scored===true;
   if(scored&&(!Number.isFinite(red?.score)||!Number.isFinite(blue?.score)))throw new Error('VEX returned incomplete scores. Try again later.');
   return {phase,num,red:r,blue:b,field:String(row.field||''),label:String(row.name||''),scored,redScore:scored?red.score:null,blueScore:scored?blue.score:null,winner:scored?(red.score>blue.score?'red':blue.score>red.score?'blue':''):''};
- });
+ }).filter(Boolean);
 }
 export async function fetchVexMatches(code, division, token, fetcher=fetch, kind='matches') {
  if(!token)throw new Error('VEX match sync is not configured. Contact the developer.');
@@ -28,7 +32,8 @@ export async function fetchVexMatches(code, division, token, fetcher=fetch, kind
   if(!['matches','rankings','skills'].includes(kind))throw new Error('VEX sync category is not supported.');
   const rows=[];
   for(let page=1;page<=20;page++){const result=await get(kind==='skills'?`events/${found[0].id}/skills`:`events/${found[0].id}/divisions/${Number(division)}/${kind}`,{page,per_page:250});const last=Number(result.meta?.last_page);if(!Array.isArray(result.data)||!Number.isInteger(last)||last<page||last>20)throw new Error('VEX match pagination is incomplete. No matches were imported.');rows.push(...result.data);if(page===last)break;}
-  return {code,divisions,kind,matches:kind==='matches'?mapVexMatches(rows):[],rankings:kind==='rankings'?mapVexRankings(rows):[],skills:kind==='skills'?mapVexSkills(rows):[],checkedAt:new Date().toISOString()};
+  const warnings=[];
+  return {code,divisions,kind,matches:kind==='matches'?mapVexMatches(rows,warnings):[],warnings,upstreamRows:rows.length,rankings:kind==='rankings'?mapVexRankings(rows):[],skills:kind==='skills'?mapVexSkills(rows):[],checkedAt:new Date().toISOString()};
  }finally{clearTimeout(timer);}
 }
 
