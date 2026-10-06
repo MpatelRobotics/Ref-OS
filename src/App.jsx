@@ -4623,7 +4623,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
             onToggleFinalist={(award, team) => (isJudge ? toggleFinalist(award, team) : requireAdmin(() => toggleFinalist(award, team)))}
             onNominate={(award) => setNominating(award || "sportsmanship")} onDeleteNom={removeNomination}
             onExport={isEmcee ? undefined : () => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
-          {(adminUnlocked || isJudge) && <InterviewScheduler key={`${eventId}:${leagueSessionId || ""}`} eventId={eventId} sessionId={leagueSessionId || null} sessionName={league?.sessionName(leagueSessionId) || ""} teams={teams}/>}
+          {(adminUnlocked || isJudge) && <InterviewScheduler key={`${eventId}:${leagueSessionId || ""}`} eventId={eventId} sessionId={leagueSessionId || null} sessionName={league?.sessionName(leagueSessionId) || ""} teams={teams} eventTimezone={eventSettings?.event_timezone?.value?.zone || 'UTC'} onSaveTimezone={adminUnlocked ? async zone => { const saved = await api.upsertEventSetting(eventId, 'event_timezone', {zone}); setEventSettings(prev=>({...prev,event_timezone:saved})); } : undefined}/>}
           </>
         ) : view === "rulebook" ? (
           (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq" ? <IQRules /> : <RuleBook rules={rules} online={online} accent={brand.accent}

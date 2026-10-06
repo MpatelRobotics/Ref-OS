@@ -1,7 +1,14 @@
-export function localInterviewTime(iso) {
+export function localInterviewTime(iso,zone='UTC') {
  const date=new Date(iso);if(!Number.isFinite(date.getTime()))return '';
- const pad=value=>String(value).padStart(2,'0');
- return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+ const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date).map(p=>[p.type,p.value]));
+ return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+export function interviewTimeToUTC(value,zone='UTC') {
+ if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))throw Error('Choose a valid interview time.');
+ const target=Date.parse(value+'Z');let guess=target;
+ for(let i=0;i<4;i++){const shown=Date.parse(localInterviewTime(new Date(guess).toISOString(),zone)+'Z');guess+=target-shown;}
+ if(localInterviewTime(new Date(guess).toISOString(),zone)!==value)throw Error('This time does not exist in the event timezone because the clocks change. Choose another time.');
+ return new Date(guess).toISOString();
 }
 export function validateInterviews(entries,duration=10) {
  if(!Number.isInteger(Number(duration))||Number(duration)<1||Number(duration)>120)return 'Interview length must be a whole number from 1 to 120 minutes.';

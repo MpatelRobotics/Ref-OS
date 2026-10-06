@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {addInterviewSlots,validateInterviews,localInterviewTime} from '../src/interviewSchedule.js';
+import {addInterviewSlots,validateInterviews,localInterviewTime,interviewTimeToUTC} from '../src/interviewSchedule.js';
 test('slots use configured length, numeric team order and do not duplicate already scheduled teams',()=>{
  const slots=addInterviewSlots([],['10A','2A'],'2026-10-06T09:00',15,'Panel 1');
  assert.deepEqual(slots.map(slot=>slot.team),['2A','10A']);assert.equal(Date.parse(slots[1].start)-Date.parse(slots[0].start),15*60000);
  const added=addInterviewSlots(slots,['2A','3A'],'2026-10-06T10:00',5,'Panel 1');assert.equal(added.length,3);assert.equal(added[2].minutes,5);
- assert.equal(localInterviewTime(slots[0].start),'2026-10-06T09:00');
+ assert.equal(localInterviewTime(slots[0].start,Intl.DateTimeFormat().resolvedOptions().timeZone),'2026-10-06T09:00');
 });
 test('overlapping panel slots are rejected, adjacent times and independent panels are allowed',()=>{
  const slots=addInterviewSlots([],['2A','10A'],'2026-10-06T09:00',15,'Panel 1');assert.equal(validateInterviews(slots),'');
@@ -17,4 +17,10 @@ test('invalid durations, missing times and duplicate teams cannot be saved',()=>
  assert.throws(()=>addInterviewSlots([],['2A'],'invalid',10,'Panel 1'),/valid/);
  const slots=addInterviewSlots([],['2A'],'2026-10-06T09:00',10,'Panel 1');assert.match(validateInterviews([...slots,{...slots[0],id:'another'}]),/only one/);
  assert.match(validateInterviews([{...slots[0],minutes:2.5}]),/valid start/);
+});
+
+test('event timezone conversion and daylight-saving gaps',()=>{
+ assert.equal(interviewTimeToUTC('2026-10-06T09:00','America/Los_Angeles'),'2026-10-06T16:00:00.000Z');
+ assert.equal(localInterviewTime('2026-10-06T16:00:00.000Z','America/New_York'),'2026-10-06T12:00');
+ assert.throws(()=>interviewTimeToUTC('2026-03-08T02:30','America/New_York'),/does not exist/);
 });
