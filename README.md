@@ -448,3 +448,8 @@ Event staff can open **Lost & Found** from its own event navigation tab on deskt
 Run `supabase/lost-found.sql` in Supabase SQL Editor after the base schema and role migrations. It creates the event-scoped board and a private photo bucket with event-membership access policies. No Edge Function redeployment is required.
 
 The board is shared across League sessions and refreshes every 30 seconds while open and visible. Internet is required; it does not use Local Venue Server sync or existing event backups/exports. Failed saves can be retried with the same item ID while the form remains open. Unattached photo uploads and photos belonging to deleted events currently require manual storage cleanup. Live database permissions must be checked after applying the migration.
+## Photo failure explanations
+
+Robot picture cards show the detected failure and a next step: offline/uncached, unreachable service, request timeout, rejected access or expired link, server-reported missing file, storage server error, request limiting, empty download, or an image the device cannot display. Retry requests a new signed link and replaces only that downloaded cache entry. Cloud photos and pending uploads are preserved.
+
+Lost & Found pictures also explain signing failures and offer retry. Browser image errors there cannot reveal an HTTP status, so they use an unknown-cause message rather than blame storage or the app. No raw server messages, storage paths, credentials, or signed URLs are displayed in failure explanations. These are local explanations, not an event monitoring or developer alert system. No SQL or Edge Function redeployment is needed.

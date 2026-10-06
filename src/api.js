@@ -1804,6 +1804,13 @@ export async function listFeedbackManagement(eventId) {
   if (error) throw error;
   return data || [];
 }
+// Keep the legacy helper's null-on-error behavior for other callers.
+export async function photoUrlForDisplay(path) {
+  if (E2E_MOCK) return null;
+  const {data,error} = await supabase.storage.from("robot-photos").createSignedUrl(path,3600);
+  if(error) throw error;
+  return data?.signedUrl || null;
+}
 export async function setFeedbackStatus(eventId, feedbackId, status) {
   const { error } = await supabase.rpc('set_feedback_status', { p_event: eventId, p_feedback: feedbackId, p_status: status });
   if (error) throw error;

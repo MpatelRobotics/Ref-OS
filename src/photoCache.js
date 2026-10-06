@@ -10,6 +10,7 @@
      { path, eventId, blob, bytes, cachedAt, lastUsed }
    ===================================================================== */
 
+import { photoFailureReason } from './photoFailures';
 const DB_NAME = "refos-photo-cache";
 const STORE = "photos";
 const MAX_CACHE_BYTES = 150 * 1024 * 1024; // least recently used photos are evicted beyond this
@@ -138,23 +139,27 @@ export async function pruneMissingEvents(existingEventIds) {
 //   2. Otherwise, when online: signed URL -> download -> cache -> display.
 //   3. Offline and never cached: report "offline"; never pretend it is available.
 export async function loadPhoto(path, getSignedUrl, { refresh = false } = {}) {
-  if (!path) return { status: "missing" };
+  if (!path) return { status: "missing", reason: "unknown" };
   // Discard only this downloaded cache entry, never the cloud photo or upload queue.
   if (refresh) await deletePaths([path]);
   if (objectUrls.has(path)) return { url: objectUrls.get(path) };
   const cached = refresh ? null : await getCachedBlob(path);
   if (cached) return { url: objectUrlFor(path, cached) };
-  if (typeof navigator !== "undefined" && navigator.onLine === false) return { status: "offline" };
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return { status: "offline", reason: "offline" };
+  let timer;
   try {
     const signed = await getSignedUrl(path);
-    if (!signed) return { status: "missing" };
-    const response = await fetch(signed, { cache: "no-store" });
-    if (!response.ok) return { status: response.status === 404 || response.status === 400 ? "missing" : "offline" };
+    if (!signed) return { status: "missing", reason: "unknown" };
+    const controller = new AbortController();
+    timer = setTimeout(() => controller.abort(), 20000);
+    const response = await fetch(signed, { cache: "no-store", signal: controller.signal });
+    if (!response.ok) return { status: "missing", reason: photoFailureReason({status:response.status}) };
     const blob = await response.blob();
-    if (!blob.size) return { status: "missing" };
+    if (!blob.size) return { status: "missing", reason: "empty" };
     await putCachedBlob(path, blob);
     return { url: objectUrlFor(path, blob) };
-  } catch {
-    return { status: typeof navigator !== "undefined" && navigator.onLine === false ? "offline" : "missing" };
-  }
+  } catch (error) {
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+    return { status: offline ? "offline" : "missing", reason: offline ? "offline" : photoFailureReason(error) };
+  } finally { clearTimeout(timer); }
 }

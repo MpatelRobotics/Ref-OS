@@ -1,12 +1,13 @@
 import React, {useEffect,useMemo,useRef,useState} from 'react';
 import {listLostFound,saveLostFound,setLostFoundReturned,prepareItemPhoto,lostFoundPhoto} from '../lostFound';
+import {PHOTO_FAILURES,photoFailureReason} from '../photoFailures';
 
 function ItemPhoto({path}) {
-  const [url,setUrl]=useState(''); const [failed,setFailed]=useState(false); const [retry,setRetry]=useState(0);
-  useEffect(()=>{let live=true;setUrl('');setFailed(false);lostFoundPhoto(path).then(value=>{if(live)setUrl(value);}).catch(()=>{if(live)setFailed(true);});return()=>{live=false;};},[path,retry]);
-  if(failed)return <button type="button" onClick={()=>setRetry(n=>n+1)} className="min-h-[44px] rounded-lg border p-3">Picture unavailable · Retry</button>;
+  const [url,setUrl]=useState(''); const [failed,setFailed]=useState(false); const [retry,setRetry]=useState(0); const [reason,setReason]=useState('unknown');
+  useEffect(()=>{let live=true;setUrl('');setFailed(false);lostFoundPhoto(path).then(value=>{if(live)setUrl(value);}).catch(error=>{if(live){setReason(navigator.onLine===false?'offline':photoFailureReason(error));setFailed(true);}});return()=>{live=false;};},[path,retry]);
+  if(failed)return <div className="space-y-2"><p className="text-sm">{PHOTO_FAILURES[reason].message}</p><button type="button" onClick={()=>setRetry(n=>n+1)} className="min-h-[44px] rounded-lg border p-3">Picture unavailable · Retry</button></div>;
   if(!url)return <p role="status">Loading picture…</p>;
-  return <a href={url} target="_blank" rel="noreferrer"><img src={url} alt="Found item" onError={()=>setFailed(true)} className="max-h-64 max-w-full rounded-lg object-contain"/></a>;
+  return <a href={url} target="_blank" rel="noreferrer"><img src={url} alt="Found item" onError={()=>{setReason(navigator.onLine===false?'offline':'unknown');setFailed(true);}} className="max-h-64 max-w-full rounded-lg object-contain"/></a>;
 }
 
 const defaultService={listLostFound,saveLostFound,setLostFoundReturned,prepareItemPhoto};

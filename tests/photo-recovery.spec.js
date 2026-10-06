@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aE7sAAAAASUVORK5CYII=', 'base64');
-async function mount(page, corruptCache = false, full = true) {
-  await page.route('**/src/api.js*', (route) => route.fulfill({ contentType: 'text/javascript', body: 'export async function photoUrl() { return "/test-photo-image"; }' }));
+async function mount(page, corruptCache = false, full = true, signingError = null) {
+  await page.route('**/src/api.js*', (route) => route.fulfill({ contentType: 'text/javascript', body: `export async function photoUrlForDisplay() { ${signingError ? `throw ${JSON.stringify(signingError)};` : 'return "/test-photo-image";'} }` }));
   await page.route('**/photo-recovery-test', (route) => route.fulfill({contentType: 'text/html', body: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
     import '/@vite/client'; import RefreshRuntime from '/@react-refresh';
     RefreshRuntime.injectIntoGlobalHook(window); window.$RefreshReg$ = () => {}; window.$RefreshSig$ = () => (type) => type; window.__vite_plugin_react_preamble_installed__ = true;
@@ -31,10 +31,34 @@ test('unreadable downloads stop automatically and can be retried', async ({page}
   await expect(page.getByRole('button',{name:'Retry loading robot picture'})).toBeVisible();
   await expect(page.getByRole('button',{name:'Retry loading robot picture'})).toContainText('Retry');
   await expect(page.locator('img')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Retry loading robot picture'})).toContainText('could not display');
   expect(downloads).toBe(2);
   valid = true;
   await page.getByRole('button',{name:'Retry loading robot picture'}).click();
   await expect.poll(() => page.locator('img').evaluateAll((imgs) => imgs.some((im) => im.naturalWidth===1))).toBe(true);
+});
+
+for (const [status, text] of [[403,'rejected picture access'],[404,'reported that the picture was not found'],[503,'server error'],[429,'limiting requests'],[400,'could not determine the cause']]) {
+  test(`HTTP ${status} shows evidence-based cause and hides internal URLs`, async ({page}) => {
+    await page.route('**/test-photo-image', route => route.fulfill({status,body:'private server detail token=secret'}));
+    await mount(page);
+    const retry=page.getByRole('button',{name:'Retry loading robot picture'});
+    await expect(retry).toContainText(text);
+    await expect(page.locator('body')).not.toContainText('token=secret');
+  });
+}
+test('signing permission errors are reported without exposing raw diagnostics', async({page})=>{
+  await mount(page,false,true,{statusCode:403,message:'private path/uuid token=secret'});
+  await expect(page.getByRole('button',{name:'Retry loading robot picture'})).toContainText('rejected picture access');
+  await expect(page.locator('body')).not.toContainText('token=secret');
+});
+test('unreachable service and uncached offline photos have different explanations',async({page,context})=>{
+  await page.route('**/test-photo-image',route=>route.abort('failed'));
+  await mount(page);
+  await expect(page.getByRole('button',{name:'Retry loading robot picture'})).toContainText('could not be reached');
+  await context.setOffline(true);await page.evaluate(()=>window.remountPhoto());
+  await expect(page.getByRole('button',{name:'Retry loading robot picture'})).toContainText('device is offline');
+  await context.setOffline(false);
 });
 
 test('small thumbnails show a visible Retry label and recover after a failed request', async ({page}) => {

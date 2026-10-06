@@ -27,6 +27,7 @@ export async function setLostFoundReturned(id,returned) {
 }
 export async function lostFoundPhoto(path) {
   const {data,error} = await supabase.storage.from(bucket).createSignedUrl(path,600);
-  if(error || !data?.signedUrl) throw Error('Picture could not load.');
+  if(error) throw error;
+  if(!data?.signedUrl) throw Error('Picture could not load.');
   return data.signedUrl;
 }
