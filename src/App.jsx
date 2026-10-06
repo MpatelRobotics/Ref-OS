@@ -4619,11 +4619,11 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           <RobotList requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "judging" ? (
           <>
-          {(adminUnlocked || isJudge) && <InterviewScheduler key={`${eventId}:${leagueSessionId || ""}`} eventId={eventId} sessionId={leagueSessionId || null} sessionName={league?.sessionName(leagueSessionId) || ""} teams={teams}/>}
           <JudgingView noms={noms} viols={viols} teamName={teamNameMap} finalists={finalists} rankOrder={eventSettings?.judging_rank_order?.value || {}} canReorder={adminUnlocked} onMoveRank={moveJudgingRank} emcee={isEmcee}
             onToggleFinalist={(award, team) => (isJudge ? toggleFinalist(award, team) : requireAdmin(() => toggleFinalist(award, team)))}
             onNominate={(award) => setNominating(award || "sportsmanship")} onDeleteNom={removeNomination}
             onExport={isEmcee ? undefined : () => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
+          {(adminUnlocked || isJudge) && <InterviewScheduler key={`${eventId}:${leagueSessionId || ""}`} eventId={eventId} sessionId={leagueSessionId || null} sessionName={league?.sessionName(leagueSessionId) || ""} teams={teams}/>}
           </>
         ) : view === "rulebook" ? (
           (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq" ? <IQRules /> : <RuleBook rules={rules} online={online} accent={brand.accent}
