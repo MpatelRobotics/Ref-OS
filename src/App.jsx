@@ -4642,10 +4642,10 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                   </select>
                   <span className="text-xs text-slate-500 dark:text-slate-400">Imported Tournament Manager snapshot from {league.sessionName(snapshotId)}{importedAt ? ` · ${new Date(importedAt).toLocaleString()}` : " · not imported"}</span>
                 </div>
-                <EventRankings isIQ={isIQ} teams={snapshotTeams} records={isCurrent ? teamRecords : {}} importedRecords={snapshot("qualification_records")?.records || {}} skills={snapshot("skills_rankings")?.rows || []} onImportSkills={isCurrent ? () => skillsFileRef.current?.click() : null} />
+                <EventRankings isIQ={isIQ} teams={snapshotTeams} records={isCurrent ? teamRecords : {}} importedRecords={snapshot("qualification_records")?.records || {}} skills={snapshot("skills_rankings")?.rows || []} onImportSkills={isCurrent ? () => skillsFileRef.current?.click() : null} onImportRankings={isCurrent ? () => rankingFileRef.current?.click() : null} />
               </>
             );
-          })() : <EventRankings isIQ={isIQ} teams={teams} records={teamRecords} importedRecords={eventSettings?.qualification_records?.value?.records || {}} skills={eventSettings?.skills_rankings?.value?.rows || []} onImportSkills={() => skillsFileRef.current?.click()} />
+          })() : <EventRankings isIQ={isIQ} teams={teams} records={teamRecords} importedRecords={eventSettings?.qualification_records?.value?.records || {}} skills={eventSettings?.skills_rankings?.value?.rows || []} onImportSkills={() => skillsFileRef.current?.click()} onImportRankings={() => rankingFileRef.current?.click()} />
         ) : view === "awp" ? (
           isIQ ? <p>AWP is a V5 tool. IQ teamwork has no autonomous win point.</p> : <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} fieldNames={fieldNames} />
         ) : view === "alliances" ? (
@@ -7088,7 +7088,7 @@ function ActivityFeed({ viols, onOpenPhoto, onDeleteViolation, onEditViolation, 
 }
 
 /* ============================ RANKINGS (admin) ============================ */
-function EventRankings({ isIQ = false, teams, records, importedRecords, skills, onImportSkills }) {
+function EventRankings({ isIQ = false, teams, records, importedRecords, skills, onImportSkills, onImportRankings }) {
   const [section, setSection] = useState("qualification");
   const names = new Map(teams.map((team) => [team.number, team.name]));
   const qualifications = teams.filter((team) => Number(team.rank) > 0).sort((a, b) => Number(a.rank) - Number(b.rank) || a.number.localeCompare(b.number, undefined, { numeric: true }));
@@ -7101,6 +7101,7 @@ function EventRankings({ isIQ = false, teams, records, importedRecords, skills, 
     <div className="flex flex-wrap items-center gap-2">
       <button onClick={() => setSection("qualification")} aria-pressed={section === "qualification"} className={`px-4 py-2 rounded-lg text-sm font-bold ${section === "qualification" ? "bg-[#0D0F32] text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"}`}>Qualification rankings</button>
       <button onClick={() => setSection("skills")} aria-pressed={section === "skills"} className={`px-4 py-2 rounded-lg text-sm font-bold ${section === "skills" ? "bg-[#0D0F32] text-white" : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"}`}>Skills Challenge</button>
+      {section === "qualification" && onImportRankings && <button onClick={onImportRankings} className="ml-auto min-h-[44px] px-4 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-semibold">Import qualification rankings</button>}
       {section === "skills" && onImportSkills && <button onClick={onImportSkills} className="ml-auto px-4 py-2 rounded-lg bg-[#D7212B] text-white text-sm font-semibold">Import skills rankings</button>}
     </div>
     {isIQ && <p className="text-sm">Qualification ranks and averages are imported from TM, including excluded scores and tiebreakers. Skills use the best Driving + Autonomous Coding results; TM resolves all skills tiebreakers and the three-run allowance per category. Ref OS does not calculate official rankings from match scores.</p>}
