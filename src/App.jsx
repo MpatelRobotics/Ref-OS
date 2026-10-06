@@ -1,3 +1,4 @@
+import EventLocalClock from "./components/EventLocalClock.jsx";
 import IQMatches, {IQMatchDetail, IQInspectionChecklist} from './iq/IQWorkflows.jsx';
 import {parseIQMatches, iqTeams} from './iq/iqWorkflows.js';
 import IQ_RULES from './iqLevelUpRules.json';
@@ -4266,6 +4267,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
                 {!league.isActiveSession && <span className="shrink-0 rounded bg-amber-400/90 px-1 text-[9px] font-bold uppercase text-slate-900">{SESSION_STATUS_LABELS[league.session.status]}</span>}
               </button>
             )}
+            <EventLocalClock timeZone={eventSettings?.event_timezone?.value?.zone} />
             <button onClick={() => { refresh(); doFlush(); }} className="text-[11px] text-slate-400 leading-tight mt-0.5 flex items-center gap-1 hover:text-slate-200">
               <RefreshCw size={10} className={syncing ? "animate-spin" : ""} />
               {isInspection ? `${teams.length} teams · inspection access` : `${teams.length} teams · ${viols.length} violations`} · synced {ago(syncedAt)}
