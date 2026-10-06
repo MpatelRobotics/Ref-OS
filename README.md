@@ -478,3 +478,17 @@ Open **Live user activity · Developer only** on the main event selection screen
 Run `supabase/developer-live-activity.sql` after the base, Developer, League and event lifecycle migrations. Server-side RPC permissions restrict reads to verified Developers and reports to the signed-in user's event. No Edge Function deployment is needed. Updated clients report screen changes and a heartbeat every 30 seconds; the viewer refreshes every 15 seconds while visible. Background tabs are labelled and stale devices expire from the view after 90 seconds. Cleanup deletes stored status rows older than 24 hours when a report arrives. Multiple tabs can appear separately. Closing/disconnecting may take up to 90 seconds to disappear.
 
 Internet is required, reporting is best-effort and cannot block event work; older clients and Local Venue Server-only/offline devices do not provide reliable cloud activity. Live database authorization remains to be checked after applying the migration.
+
+## Separate VEX API Skills sync
+
+Admins/Developers can open **Rankings → VEX API Sync · Skills Challenge** independently of qualification ranking sync. Confirm the saved event code, review the event-wide Skills snapshot, then choose Import once or Start syncing. No division selection is required. Skills and qualification rankings have separate previews, approval, timers and stop controls. Updates run every minute while the app is open, visible and online after the dialog closes. Switching events/League sessions, signing out or reloading stops them. League imports apply only to the working session; confirm that the VEX event code represents the intended session.
+
+Driving and programming results use each team's best published run and combine their totals; official Skills rank/tiebreakers are not invented. Empty snapshots preserve existing results. Redeploy `vex-event-lookup` for Skills support. No new SQL or token is required. Publication delays depend on VEX; live API delivery remains to be checked after deployment.
+
+## VEX scores-only sync
+
+Admin/Developer: open **Matches**, scroll to the very bottom and choose **VEX API · Sync scores only**. Confirm the event code and division, review the published scored results, then Import once or Start syncing. Automatic checks continue every minute while Ref OS is open, visible and online after the dialog closes. Manage or stop the independent scores sync from its status bar. Event/session changes, signing out and reload stop syncing.
+
+This option never creates matches or changes the schedule, field or alliance assignments. Only existing matches with the same phase, number and teams on each alliance receive scores and a score-derived winner/tie. Missing, unsupported or ambiguous results are skipped. Non-final elimination series containing multiple games cannot be represented safely by a single pairing and are skipped. Unscored results do not clear saved scores. Qualification rankings and Skills remain separate. Confirm the imported schedule and event/division; in Leagues, scores target only the current working session.
+
+Redeploy `vex-event-lookup` after this update. No SQL changes are required. API publication can lag the event; live delivery remains to be verified after deployment.

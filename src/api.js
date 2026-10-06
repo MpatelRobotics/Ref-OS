@@ -1842,3 +1842,12 @@ export async function getEventRobotPhotoRequirements(eventId) {
   saveReadCache(eventId,'robot_photo_requirements',[row]);return row;
  }catch(error){const cached=loadReadCache(eventId,'robot_photo_requirements')?.[0];if(cached)return cached;throw error;}
 }
+
+export async function updateExistingVexScore(eventId,row){
+ const {existing}=row;
+ let query=supabase.from('matches').update({red_score:row.redScore,blue_score:row.blueScore,winner:row.redScore>row.blueScore?'red':row.blueScore>row.redScore?'blue':'tie'})
+ .eq('event_id',eventId).eq('phase',row.phase).eq('num',Number(row.num))
+ .contains('red',existing.red).containedBy('red',existing.red).contains('blue',existing.blue).containedBy('blue',existing.blue);
+ const session=leagueSessionFor(eventId);query=session?query.eq('session_id',session):query.is('session_id',null);
+ const {data,error}=await query.select('num');if(error)throw error;return (data||[]).length;
+}
