@@ -7,7 +7,17 @@ export default function InterviewScheduler({eventId,sessionId=null,sessionName='
  const [loaded,setLoaded]=useState(false),[busy,setBusy]=useState(false),[dirty,setDirty]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
  const version=useRef(0),flight=useRef(false);
  const zone=eventTimezone;
- const zones=Intl.supportedValuesOf?.('timeZone') || ['America/New_York','America/Chicago','America/Denver','America/Los_Angeles'];
+ const zones=[
+  ['America/New_York','Eastern (EST / EDT)'],
+  ['America/Chicago','Central (CST / CDT)'],
+  ['America/Denver','Mountain (MST / MDT)'],
+  ['America/Phoenix','Arizona (MST — no daylight saving)'],
+  ['America/Los_Angeles','Pacific (PST / PDT)'],
+  ['America/Anchorage','Alaska (AKST / AKDT)'],
+  ['America/Adak','Aleutian (HST / HDT)'],
+  ['Pacific/Honolulu','Hawaii (HST — no daylight saving)'],
+ ];
+ const zoneLabel=zones.find(([value])=>value===zone)?.[1] || 'Not set (currently UTC)';
  const sortedTeams=useMemo(()=>[...teams].sort((a,b)=>a.number.localeCompare(b.number,undefined,{numeric:true})),[teams]);
  useEffect(()=>{let live=true;api.loadInterviewSchedule(eventId,sessionId).then(result=>{if(!live)return;setEntries(result.value.entries||[]);setDuration(result.value.duration||10);version.current=result.version;setLoaded(true);}).catch(e=>{if(live)setError(e.message);});return()=>{live=false;};},[eventId,sessionId,api]);
  const reload=async()=>{if(flight.current||dirty&&!confirm('Discard your unsaved interview changes and reload the saved schedule?'))return;flight.current=true;setBusy(true);setError('');try{const result=await api.loadInterviewSchedule(eventId,sessionId);setEntries(result.value.entries||[]);setDuration(result.value.duration||10);version.current=result.version;setLoaded(true);setDirty(false);setSelected([]);setMessage('Saved schedule loaded.');}catch(e){setError(e.message);}finally{flight.current=false;setBusy(false);}};
@@ -19,8 +29,8 @@ export default function InterviewScheduler({eventId,sessionId=null,sessionName='
  const scheduled=new Set(entries.map(entry=>entry.team));
  return <section aria-label="Experimental Interview Scheduler" className="mb-5 space-y-4 rounded-xl border border-amber-300 bg-white p-4 dark:bg-slate-800">
   <div><h3 className="font-bold">Interview Scheduler <span className="rounded bg-amber-100 px-2 py-1 text-sm text-amber-900">Experimental</span></h3><p className="mt-2 text-sm">Shared with Admin and Judge Advisor only. {sessionName?`Schedule for ${sessionName}. `:''}Review times before using them. Match-time conflicts are not checked because imported matches do not include scheduled times. No invitations or notifications are sent.</p></div>
-  <p className="text-sm">Times use the event timezone: <b>{zone}</b>. Interview length applies to new slots; existing slots can be edited individually.</p>
-  {onSaveTimezone&&<label className="block text-sm">Event timezone<select value={zone} disabled={busy} className="ml-2 min-h-[44px] rounded border bg-transparent p-2" onChange={async e=>{setBusy(true);try{await onSaveTimezone(e.target.value);setStart('');setError('');}catch(err){setError('Could not save the event timezone. Try again.');}finally{setBusy(false);}}}><option value="UTC">UTC</option>{zones.map(z=><option key={z} value={z}>{z}</option>)}</select></label>}
+  <p className="text-sm">Times use the event timezone: <b>{zoneLabel}</b>. Daylight saving is applied automatically where observed. Interview length applies to new slots; existing slots can be edited individually.</p>
+  {onSaveTimezone&&<label className="block text-sm">Event timezone<select value={zone} disabled={busy} className="ml-2 min-h-[44px] rounded border bg-transparent p-2" onChange={async e=>{setBusy(true);try{await onSaveTimezone(e.target.value);setStart('');setError('');}catch(err){setError('Could not save the event timezone. Try again.');}finally{setBusy(false);}}}>{!zones.some(([value])=>value===zone)&&<option value={zone} disabled>Select a U.S. timezone</option>}{zones.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>}
   {error&&<p role="alert" className="text-red-700 dark:text-red-300">{error}</p>}{message&&<p role="status">{message}</p>}
   {!loaded&&!error&&<p role="status">Loading interview schedule…</p>}
   <fieldset disabled={!loaded||busy} className="space-y-3"><legend className="font-semibold">Plan interviews</legend>
