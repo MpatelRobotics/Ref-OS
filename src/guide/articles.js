@@ -10,6 +10,12 @@ const articles = [];
 function add(id, category, title, roles, summary, when, steps, seen, important, related = [], keywords = '') {
   articles.push({ id, category, title, roles, summary, when, steps, seen, important, related, keywords });
 }
+add('interviews', 'Judging', 'Experimental Interview Scheduler', ['Admin','Developer','Judge Advisor'],
+  'Plan a shared team interview schedule from the Judging tab. This feature is experimental.',
+  'Before interviews begin or when adjusting interview times.',
+  ['Open Judging and find Interview Scheduler — Experimental.', 'Set an interview length from 1 to 120 minutes, the first interview time, and panel/location. Times use this device’s timezone.', 'Select unscheduled teams and choose Add selected interviews. Teams are placed in numerical order, one after another.', 'Review each slot. Adjust its start, length, or panel/location, then select Save interview schedule.', 'Use Reload saved schedule to see another organizer’s saved changes. Reload asks before discarding an unsaved draft.'],
+  'Overlapping times for the same panel/location block saving. Another organizer’s changes also block a stale save so they are not overwritten. A League schedule belongs to the session currently open.',
+  'Internet is required. Save before leaving Judging. This experimental tool does not check match-time conflicts, send notifications, or change judging nominations. It is not included in existing backups, clear-judging actions, or Local Venue Server sync.', ['judging'], 'interview schedule duration panel experimental');
 add('lost-found', 'Event Tools', 'Lost & Found board', ALL,
   'Record found items, an optional picture, and the pickup location for event staff.',
   'When an item is handed in or returned to its owner.',
@@ -69,7 +75,7 @@ add('matches', 'Tournament Workflows', 'Schedules and match details', VIEW,
   'Tournament Manager remains the official results source. Confirm a League session before using repeated match numbers.', ['violation', 'field', 'tm-results', 'league']);
 add('violation', 'Referee', 'Log and correct a violation', REF,
   'Save an observation for a team with a match reference and rule.', 'After confirming an incident with the responsible official.',
-  ['Open a team or match and choose the violation action.', 'Confirm team and match phase/number.', 'Choose Minor, Major, or Inspection; select a rule or enter the supported custom description.', 'Write specific notes and add evidence pictures if useful.', 'Review any duplicate warning and save once.', 'For corrections, open the existing synced record and use Edit or Delete when permitted.'],
+  ['Open a team or match and choose the violation action.', 'Confirm team and match phase/number. For Skills, choose Driving Skills, Autonomous/Coding Skills, or Skills (unspecified); the run number is optional and no imported schedule is required.', 'Choose Minor, Major, or Inspection; select a rule or enter the supported custom description.', 'Write specific notes and add evidence pictures if useful.', 'Review any duplicate warning and save once.', 'For corrections, open the existing synced record and use Edit or Delete when permitted.'],
   'A pending record shows its saving state. New entries offer Undo for eight seconds; confirmation removes the entry across connected devices.',
   'Regular users can correct their own entries; Admin access handles wider corrections. Avoid creating a second record to correct the first. Queued entries must sync before some actions become available.', ['rules', 'offline', 'violation-export'], 'history disciplinary duplicate undo');
 add('awp', 'Referee', 'Record an Autonomous Win Point check', REF,

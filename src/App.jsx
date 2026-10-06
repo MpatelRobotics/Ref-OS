@@ -63,6 +63,7 @@ import FeedbackViewer from "./components/FeedbackViewer.jsx";
 import { submitFeedbackScreenshots } from "./feedbackScreenshots";
 import UniversalFeedback from "./components/UniversalFeedback.jsx";
 import LostFoundBoard from "./components/LostFoundBoard.jsx";
+import InterviewScheduler from "./components/InterviewScheduler.jsx";
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
 import HelpRequestModal from "./components/modals/HelpRequestModal.jsx";
 import manualQuickLinks from "./manualQuickLinks.json";
@@ -569,6 +570,8 @@ const MATCH_PHASES = [
   { key: "sf", label: "Semifinal", abbrev: "SF" },
   { key: "final", label: "Final", abbrev: "F" },
   { key: "skills", label: "Skills", abbrev: "Skills" },
+  { key: "skills_driver", label: "Driving Skills", abbrev: "Driving Skills" },
+  { key: "skills_auto", label: "Autonomous/Coding Skills", abbrev: "Autonomous/Coding Skills" },
   { key: "none", label: "Not tied to a match", abbrev: "" },
 ];
 const fmtMatch = (m) => {
@@ -576,7 +579,7 @@ const fmtMatch = (m) => {
   const p = MATCH_PHASES.find((x) => x.key === m.phase);
   if (!p) return null;
   const num = String(m.num == null ? "" : m.num).trim();
-  if (m.phase === "skills") return num ? `Skills ${num}` : "Skills";
+  if (m.phase.startsWith("skills")) return num ? `${p.abbrev} ${num}` : p.abbrev;
   if (!num) return p.abbrev;
   return /\d$/.test(p.abbrev) ? `${p.abbrev}-${num}` : `${p.abbrev}${num}`;
 };
@@ -598,8 +601,8 @@ const phaseCount = (phase, event) => {
   return phase in ec ? ec[phase] : null;
 };
 const availablePhases = (event) => MATCH_PHASES.filter((p) => {
-  if (event?.competitionProgram === "iq") return ["qual","practice","final","skills","none"].includes(p.key);
-  if (["qual", "practice", "skills", "none", "final"].includes(p.key)) return true;
+  if (event?.competitionProgram === "iq") return p.key.startsWith("skills") || ["qual","practice","final","none"].includes(p.key);
+  if (p.key.startsWith("skills") || ["qual", "practice", "none", "final"].includes(p.key)) return true;
   if (!event?.bracket) return true;
   return p.key in elimCounts(event.bracket);
 });
@@ -4615,10 +4618,13 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         ) : view === "robots" ? (
           <RobotList requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "judging" ? (
+          <>
+          {(adminUnlocked || isJudge) && <InterviewScheduler key={`${eventId}:${leagueSessionId || ""}`} eventId={eventId} sessionId={leagueSessionId || null} sessionName={league?.sessionName(leagueSessionId) || ""} teams={teams}/>}
           <JudgingView noms={noms} viols={viols} teamName={teamNameMap} finalists={finalists} rankOrder={eventSettings?.judging_rank_order?.value || {}} canReorder={adminUnlocked} onMoveRank={moveJudgingRank} emcee={isEmcee}
             onToggleFinalist={(award, team) => (isJudge ? toggleFinalist(award, team) : requireAdmin(() => toggleFinalist(award, team)))}
             onNominate={(award) => setNominating(award || "sportsmanship")} onDeleteNom={removeNomination}
             onExport={isEmcee ? undefined : () => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
+          </>
         ) : view === "rulebook" ? (
           (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq" ? <IQRules /> : <RuleBook rules={rules} online={online} accent={brand.accent}
             qaUrl={officialResourcesFor(eventSettings?.rules_template?.value?.ruleset).qaUrl} />
@@ -5355,7 +5361,7 @@ function LogModal({ requiredRobotPhotos, isIQ = false, practice = false, teams, 
   }, [teamScopedMatches, creatingNew, team, matches]);
 
   const addPhotos = async (files) => { const list = Array.from(files).slice(0, 4); const out = []; for (const f of list) { try { out.push(await compress(f)); } catch {} } setPhotos((p) => [...p, ...out].slice(0, 6)); };
-  const valid = (creatingNew ? newNumber.trim() : team) && (code.trim() || desc.trim());
+  const valid = (creatingNew ? newNumber.trim() : team) && (code.trim() || desc.trim()) && (!matchPhase.startsWith("skills") || !matchNum || /^[1-9]\d*$/.test(String(matchNum)));
   const doSave = async () => {
     setBusy(true);
     try {
@@ -5378,11 +5384,11 @@ function LogModal({ requiredRobotPhotos, isIQ = false, practice = false, teams, 
     const selectedRuleCodes = splitRuleCodes(code);
     // duplicate guard (all users): same team + any selected rule + match already logged
     if (!edit && selectedTeam && selectedRuleCodes.length) {
-      const myKey = matchPhase !== "none" && matchNum ? `${matchPhase}:${matchNum}` : "";
+      const myKey = matchPhase.startsWith("skills") ? `${matchPhase}:${matchNum || ""}` : matchPhase !== "none" && matchNum ? `${matchPhase}:${matchNum}` : "";
       const duplicateCodes = selectedRuleCodes.filter((selectedRule) => (viols || []).some((v) => {
         if (normNum(v.team) !== selectedTeam) return false;
         if (!splitRuleCodes(v.code).includes(selectedRule)) return false;
-        const vKey = v.match && v.match.phase && v.match.phase !== "none" && v.match.num ? `${v.match.phase}:${v.match.num}` : "";
+        const vKey = v.match?.phase?.startsWith("skills") ? `${v.match.phase}:${v.match.num || ""}` : v.match && v.match.phase && v.match.phase !== "none" && v.match.num ? `${v.match.phase}:${v.match.num}` : "";
         return vKey === myKey;
       }));
       if (duplicateCodes.length) {
@@ -5446,9 +5452,10 @@ function LogModal({ requiredRobotPhotos, isIQ = false, practice = false, teams, 
             <Label>Match</Label>
             {teamScopedMatches && !creatingNew ? (
               <select
-                value={matchPhase === "none" || !matchNum ? "none" : `${matchPhase}:${matchNum}`}
+                value={matchPhase.startsWith("skills") ? matchPhase : matchPhase === "none" || !matchNum ? "none" : `${matchPhase}:${matchNum}`}
                 onChange={(event) => {
                   if (event.target.value === "none") { setMatchPhase("none"); setMatchNum(""); return; }
+                  if (event.target.value.startsWith("skills")) { setMatchPhase(event.target.value); setMatchNum(""); return; }
                   const [phase, number] = event.target.value.split(":");
                   setMatchPhase(phase);
                   setMatchNum(number);
@@ -5456,6 +5463,9 @@ function LogModal({ requiredRobotPhotos, isIQ = false, practice = false, teams, 
                 className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300"
               >
                 <option value="none">Not tied to a match</option>
+                <option value="skills">Skills (unspecified)</option>
+                <option value="skills_driver">Driving Skills</option>
+                <option value="skills_auto">Autonomous/Coding Skills</option>
                 {selectedTeamMatches.map((scheduledMatch) => (
                   <option key={scheduledMatch.id} value={`${scheduledMatch.phase}:${scheduledMatch.num}`}>
                     {fmtMatch({ phase: scheduledMatch.phase, num: scheduledMatch.num })}{scheduledMatch.field ? ` · ${fieldDisplayName(scheduledMatch.field, fieldNames)}` : ""}
@@ -5468,7 +5478,7 @@ function LogModal({ requiredRobotPhotos, isIQ = false, practice = false, teams, 
                 {availablePhases(event).map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
               </select>
               {(() => {
-                if (matchPhase === "none") return null;
+                if (matchPhase === "none" || matchPhase.startsWith("skills")) return null;
                 const count = phaseCount(matchPhase, event);
                 if (count) return (
                   <select value={matchNum} onChange={(e) => setMatchNum(e.target.value)}
@@ -5481,7 +5491,8 @@ function LogModal({ requiredRobotPhotos, isIQ = false, practice = false, teams, 
                   className="w-24 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-center focus:outline-none focus:ring-2 focus:ring-slate-300" />);
               })()}
             </div>}
-            {teamScopedMatches && !creatingNew && selectedTeamMatches.length === 0 && <p className="text-[11px] text-amber-600 dark:text-amber-300 mt-1">No scheduled matches were found for Team {team}.</p>}
+            {matchPhase.startsWith("skills") && <label className="mt-2 block text-sm">Skills run number (optional)<input type="number" min="1" step="1" value={matchNum} onChange={e=>setMatchNum(e.target.value)} className="ml-2 min-h-[44px] w-24 rounded-lg border bg-transparent px-3 py-2"/><span className="mt-1 block text-xs text-slate-500">Skills violations do not require an imported match schedule.</span></label>}
+            {teamScopedMatches && !creatingNew && selectedTeamMatches.length === 0 && !matchPhase.startsWith("skills") && <p className="text-[11px] text-amber-600 dark:text-amber-300 mt-1">No scheduled matches were found for Team {team}. Skills runs can still be recorded using the Skills options above.</p>}
             {fmtMatch({ phase: matchPhase, num: matchNum }) && (<p className="text-[11px] text-slate-400 mt-1">Recorded as <b className="font-mono text-slate-600 dark:text-slate-300">{fmtMatch({ phase: matchPhase, num: matchNum })}</b></p>)}
             {(() => {
               const m = matchNum && matchPhase !== "none" ? matches?.[matchPhase === "qual" ? String(matchNum) : `${matchPhase}-${matchNum}`] : null;
