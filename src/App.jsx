@@ -4356,7 +4356,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
             { k: "judging", label: "Judging", Icon: Trophy },
             { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch }
           ] : [
-            ...((isIQ || Object.keys(matches).length > 0) ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
+            { k: "matches", label: "Matches", Icon: ListOrdered },
             { k: "teams", label: "Teams", Icon: Users },
             ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
             { k: "robots", label: "Robots", Icon: Camera },
@@ -4432,7 +4432,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch }
         ] : [
           { k: "teams", label: "Teams", Icon: Users },
-          ...((isIQ || Object.keys(matches).length > 0) ? [{ k: "matches", label: "Matches", Icon: ListOrdered }] : []),
+          { k: "matches", label: "Matches", Icon: ListOrdered },
           ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
           { k: "robots", label: "Robots", Icon: Camera },
           { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch },
