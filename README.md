@@ -464,3 +464,9 @@ This feature is experimental. Internet is required, and drafts must be saved bef
 ## Skills violation logging
 
 In New violation, select Driving Skills, Autonomous/Coding Skills, or Skills (unspecified). You can optionally enter a positive whole-number run number. These choices are available from team history even without an imported match schedule. Entries retain the Skills category in team history; logging does not change official scores. No database migration is needed for these options.
+
+## Developer feedback alerts
+
+New text feedback and feedback with screenshots request a private push alert to verified Developer devices across events. Sign in as Developer in an event and enable push alerts in the Access section on each device. The notification opens Universal Feedback, which still requires Developer access. Alert previews do not include messages or screenshots. Event Admins and other volunteers do not receive feedback alerts. Feedback alerts are independent of an event's help-alert delivery preference.
+
+Redeploy `send-code-request-push` after this update. Existing push subscriptions, Developer access migrations, and VAPID configuration must be installed; no new SQL is required. Notification dispatch is deduplicated per feedback record. Feedback still saves if notification delivery fails; failed push dispatches are not automatically retried. Browser permission and device delivery settings control whether alerts appear. Live push delivery needs verification after deployment.

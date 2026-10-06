@@ -1174,6 +1174,7 @@ export async function addFieldLog(eventId, e) {
   if (isVenueMode() && !VENUE_CLOUD_ONLY_FIELD_LOG_KINDS.has(row.kind)) return venueAddFieldLog(eventId, row);
   const { data, error } = await supabase.from("field_log").upsert(row, { onConflict: "id" }).select().single();
   if (error) throw error;
+  if (data.kind === "feedback") await sendRoleCodeRequestPush(data.id).catch(() => {});
   return mapFieldLog(data);
 }
 export async function deleteFieldLog(id) {

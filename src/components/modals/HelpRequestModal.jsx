@@ -18,7 +18,7 @@ const OTHER_LOCATIONS = [
   "Other",
 ];
 
-export default function HelpRequestModal({ fieldNames = {}, onSend, onClose }) {
+export default function HelpRequestModal({ fieldNames = {}, fieldCount=3, onSend, onClose }) {
   const [category, setCategory] = useState("Need an Admin");
   const [location, setLocation] = useState("");
   const [details, setDetails] = useState("");
@@ -57,7 +57,7 @@ export default function HelpRequestModal({ fieldNames = {}, onSend, onClose }) {
           </div>
           <div className="mt-4 text-xs font-bold uppercase tracking-wide text-slate-500">Where is help needed?</div>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            {[...FIELD_LOCATIONS, ...OTHER_LOCATIONS].map((item) => (
+            {[...FIELD_LOCATIONS.slice(0,fieldCount), ...OTHER_LOCATIONS].map((item) => (
               <button key={item} onClick={() => setLocation(item)} className={`min-h-11 px-3 py-2 rounded-xl border-2 text-left text-sm font-semibold ${location === item ? "border-[#D7212B] bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-200" : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"}`}>
                 {fieldNames[item] || item}
               </button>

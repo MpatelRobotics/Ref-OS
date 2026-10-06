@@ -12,13 +12,14 @@ const elimCounts = (bracket) => {
   }
 };
 
-export default function EventModal({ event, onSave, onClose, competitionProgram="v5" }) {
+export default function EventModal({ event, onSave, onClose, competitionProgram="v5", fieldCount=3 }) {
   const [name, setName] = useState(event?.name || "");
   const [quals, setQuals] = useState(event?.quals ? String(event.quals) : "");
   const [practice, setPractice] = useState(event?.practice ? String(event.practice) : "");
   const [bracket, setBracket] = useState(event?.bracket ? String(event.bracket) : "16");
   const [finalsBestOf, setFinalsBestOf] = useState(event?.finalsBestOf ? String(event.finalsBestOf) : "3");
   const [program, setProgram] = useState(competitionProgram);
+  const [fields, setFields] = useState(fieldCount);
   const creating = !event;
   return (
     <div className="fixed inset-0 z-40 bg-black/40 flex items-end sm:items-center justify-center">
@@ -28,6 +29,7 @@ export default function EventModal({ event, onSave, onClose, competitionProgram=
           <button onClick={onClose} className="text-slate-400"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-3">
+          <label className="block text-sm font-semibold">Number of competition fields<select value={fields} onChange={e=>setFields(Number(e.target.value))} className="mt-1 block min-h-[44px] w-full rounded-lg border bg-transparent p-2">{[1,2,3].map(count=><option key={count} value={count}>{count} {count===1?'field':'fields'}</option>)}</select><span className="block text-xs font-normal text-slate-500">You can add more fields here later. Imported match assignments are preserved.</span></label>
           <EventProgramChoice value={program} onChange={setProgram} />
           <div><Label>Event name</Label>
             <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Highlander Summit Signature"
@@ -62,7 +64,7 @@ export default function EventModal({ event, onSave, onClose, competitionProgram=
         </div>
         <div className="p-4 pt-0 flex gap-2">
           <button onClick={onClose} className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-medium text-slate-600 dark:text-slate-300">Cancel</button>
-          <button onClick={() => onSave({ name, quals, practice, bracket:program==="iq"?"0":bracket, finalsBestOf:program==="iq"?"1":finalsBestOf, competitionProgram:program })} className="flex-1 py-2.5 rounded-lg font-semibold text-white bg-slate-900 hover:bg-slate-800">{creating ? "Create event" : "Save event"}</button>
+          <button onClick={() => onSave({ fieldCount:fields, name, quals, practice, bracket:program==="iq"?"0":bracket, finalsBestOf:program==="iq"?"1":finalsBestOf, competitionProgram:program })} className="flex-1 py-2.5 rounded-lg font-semibold text-white bg-slate-900 hover:bg-slate-800">{creating ? "Create event" : "Save event"}</button>
         </div>
       </div>
     </div>

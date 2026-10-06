@@ -1,3 +1,4 @@
+import { sendRoleCodeRequestPush } from './api';
 import { supabase } from './supabaseClient';
 import { compressRobotPhoto } from './photoCompression';
 const BUCKET = 'feedback-screenshots';
@@ -14,6 +15,7 @@ export async function submitFeedbackScreenshots({eventId,id,note,by,sessionId=nu
  if(authError || !auth?.user)throw Error('Sign in to this event before sending feedback.');
  const {error}=await supabase.rpc('submit_feedback_with_screenshots',{p_event:eventId,p_id:id,p_note:note,p_by:by,p_session:sessionId});
  if(error)throw Error('Could not save feedback. Check your connection and ensure feedback-attachments.sql has been run.');
+ await sendRoleCodeRequestPush(id).catch(()=>{});
  try {
   const {data:registered,error:readError}=await supabase.from('feedback_attachments').select('slot,path').eq('feedback_id',id);
   if(readError)throw readError;

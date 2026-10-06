@@ -22,7 +22,10 @@ function FieldError({ children }) {
   return <p className="mt-1 text-xs font-semibold text-red-700 dark:text-red-300">{children}</p>;
 }
 
-export default function EventSettingsModal({ event, brand, fieldNames = {}, requiredRobotPhotos, onSave, onClose, eventFormat = "tournament", canConvertToLeague = false, onConvertToLeague }) {
+export default function EventSettingsModal({ event, brand, fieldNames = {}, requiredRobotPhotos, onSave, onClose, eventFormat = "tournament", fieldCount, canConvertToLeague = false, onConvertToLeague }) {
+  const initialCount = fieldCount || (eventFormat === "league" ? 1 : 3);
+  const [count,setCount] = useState(initialCount);
+  const visibleFields = FIELD_KEYS.slice(0,count);
   const [photoRequirements, setPhotoRequirements] = useState(()=>normalizeRequiredRobotPhotos(requiredRobotPhotos));
   const initialPhotoRequirements = normalizeRequiredRobotPhotos(requiredRobotPhotos);
   const initial = useMemo(() => ({
@@ -89,7 +92,7 @@ export default function EventSettingsModal({ event, brand, fieldNames = {}, requ
     const fieldsChanged = FIELD_KEYS.some((key) => cleanedFields[key] !== initial.fields[key]);
     const nameChanged = cleanName !== initial.name;
     const photoRequirementsChanged = JSON.stringify(photoRequirements) !== JSON.stringify(initialPhotoRequirements);
-    if (!nameChanged && !fieldsChanged && !photoRequirementsChanged && !Object.values(identityChanged).some(Boolean)) { onClose(); return; }
+    if (count === initialCount && !nameChanged && !fieldsChanged && !photoRequirementsChanged && !Object.values(identityChanged).some(Boolean)) { onClose(); return; }
     setSaving(true);
     try {
       await onSave({
@@ -100,6 +103,7 @@ export default function EventSettingsModal({ event, brand, fieldNames = {}, requ
           ...(identityChanged.accent ? { accent } : {}),
           removeLegacyLogo,
         } : null,
+        fieldCount: count !== initialCount ? count : null,
         fieldNames: fieldsChanged ? cleanedFields : null,
         requiredRobotPhotos: photoRequirementsChanged ? photoRequirements : null,
       });
@@ -185,7 +189,9 @@ export default function EventSettingsModal({ event, brand, fieldNames = {}, requ
           <section className="space-y-4">
             <SectionTitle icon={MapPin}>Field settings</SectionTitle>
             <p className="text-sm text-slate-600 dark:text-slate-300 -mt-1">Display names only. Matches, field logs, and AWP history stay connected to Field 1, Field 2, and Field 3.</p>
-            {FIELD_KEYS.map((key) => (
+            <label className="block text-sm font-semibold">Number of competition fields<select value={count} onChange={e=>setCount(Number(e.target.value))} className={inputClass}>{[1,2,3].map(n=><option key={n} value={n}>{n} {n===1?'field':'fields'}</option>)}</select></label>
+            <p className="text-sm text-slate-500">Leagues default to one field. Add more here later; existing match assignments and field history are preserved.</p>
+            {visibleFields.map((key) => (
               <label key={key} className="block">
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{key} name</span>
                 <input value={fields[key] || ""} maxLength={40} onChange={(e) => setFields((cur) => ({ ...cur, [key]: e.target.value }))} placeholder={key}

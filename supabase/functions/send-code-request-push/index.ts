@@ -36,7 +36,7 @@ Deno.serve(async (request) => {
       .select("id,event_id,kind,note")
       .eq("id", requestId)
       .single();
-    if (requestError || !eventRequest || !["role_code_request", "help_request"].includes(eventRequest.kind)) return json({ error: "Request not found" }, 404);
+    if (requestError || !eventRequest || !["role_code_request", "help_request", "feedback"].includes(eventRequest.kind)) return json({ error: "Request not found" }, 404);
 
     const { error: claimError } = await serviceClient.from("push_dispatches").insert({
       request_id: eventRequest.id,
@@ -52,20 +52,19 @@ Deno.serve(async (request) => {
       .eq("key", "notification_delivery")
       .maybeSingle();
     if (deliveryError) throw deliveryError;
-    const pushEnabled = pushDeliveryEnabled(deliverySetting?.value);
+    const isFeedback = eventRequest.kind === "feedback";
+    const pushEnabled = isFeedback || pushDeliveryEnabled(deliverySetting?.value);
 
-    const { data: subscriptions, error: subscriptionError } = await serviceClient
-      .from("push_subscriptions")
-      .select("endpoint,user_id,p256dh,auth")
-      .eq("event_id", eventRequest.event_id);
-    if (subscriptionError) throw subscriptionError;
-    const { data: members, error: memberError } = await serviceClient
-      .from("event_members")
-      .select("user_id")
-      .eq("event_id", eventRequest.event_id);
-    if (memberError) throw memberError;
-    const memberIds = new Set((members || []).map((member) => member.user_id));
-    const memberSubscriptions = (subscriptions || []).filter((subscription) => memberIds.has(subscription.user_id));
+    let subscriptionQuery = serviceClient.from("push_subscriptions").select("endpoint,user_id,p256dh,auth");
+    let memberQuery = serviceClient.from("event_members").select("user_id");
+    if (isFeedback) memberQuery = memberQuery.eq("role", "admin").eq("developer", true);
+    else { subscriptionQuery = subscriptionQuery.eq("event_id", eventRequest.event_id); memberQuery = memberQuery.eq("event_id", eventRequest.event_id); }
+    const {data:members,error:memberError} = await memberQuery;
+    if(memberError) throw memberError;
+    const memberIds = [...new Set((members || []).map(member=>member.user_id))];
+    const {data:subscriptions,error:subscriptionError} = memberIds.length ? await subscriptionQuery.in("user_id",memberIds) : {data:[],error:null};
+    if(subscriptionError) throw subscriptionError;
+    const memberSubscriptions = subscriptions || [];
 
     if (pushEnabled) {
       const publicKey = Deno.env.get("VAPID_PUBLIC_KEY");
@@ -84,7 +83,12 @@ Deno.serve(async (request) => {
     const category = String(details.category || "Need an Admin").slice(0, 80);
     const location = String(details.location || "Location not provided").slice(0, 80);
     const extra = String(details.details || "").trim().slice(0, 140);
-    const payload = JSON.stringify(isHelp ? {
+    const payload = JSON.stringify(isFeedback ? {
+      title: "Ref OS · New feedback",
+      body: "New feedback was submitted. Open Universal Feedback to review it.",
+      tag: `refos-feedback-${eventRequest.id}`,
+      url: "/?open=universal-feedback",
+    } : isHelp ? {
       title: `Ref OS help request · ${category}`,
       body: `${location} · ${requester}${extra ? `: ${extra}` : " requested assistance."}`,
       tag: `refos-help-${eventRequest.id}`,

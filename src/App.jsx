@@ -713,7 +713,7 @@ export default function App() {
   // saved refosActiveEventId. Only "Choose or configure an event" and "Lock This Device ->
   // Main Screen" clear the selection ("Lock This Device -> Event Main Page" keeps it). Access is never restored from these values: the server-side
   // event membership check below decides whether this device is still signed in.
-  const [activeEventId, setActiveEventId] = useState(readSavedEventId);
+  const [activeEventId, setActiveEventId] = useState(()=>new URLSearchParams(window.location.search).get("open") === "universal-feedback" ? "" : readSavedEventId());
   const [eventChoices, setEventChoices] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventChoiceError, setEventChoiceError] = useState("");
@@ -1327,7 +1327,7 @@ const formatEventDate = (value) => {
 };
 
 const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, initialNotice = "" }) => {
-  const [universalFeedbackOpen, setUniversalFeedbackOpen] = useState(false);
+  const [universalFeedbackOpen, setUniversalFeedbackOpen] = useState(()=>new URLSearchParams(window.location.search).get("open") === "universal-feedback");
   const [creating, setCreating] = useState(false);
   // Phase 7: active events by default; archived events in their own view.
   const [view, setView] = useState("active");
@@ -1806,6 +1806,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   }, []);
   const highlanderDemoLocked = eventId === "11111111-1111-4111-8111-111111111111" && eventSettings?.highlander_demo_lock?.value?.locked !== false;
   const explainDemoLock = () => alert("Highlander Summit matches, alliances, and violations are read only for the demo.");
+  const configuredFieldCount = Math.max(1, Math.min(3, Number(eventSettings?.field_configuration?.value?.count) || (event?.format === 'league' || league ? 1 : 3)));
   const savedFieldNames = eventSettings?.field_names?.value;
   // Same field_names setting used by Event Settings and the Field Name Configurator:
   // { "Field 1": "...", "Field 2": "...", "Field 3": "..." }. Blank or invalid entries keep the default.
@@ -2490,6 +2491,8 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   }, [eventId, isInspection, meName, myRole]);
 
   const saveEvent = async (data) => {
+    if (data.fieldCount) { const saved = await api.upsertEventSetting(eventId, 'field_configuration', {count:Number(data.fieldCount)}); rememberSettingWrite(saved); setEventSettings(prev=>({...prev,field_configuration:saved})); }
+
     if (data.competitionProgram) { const saved = await api.upsertEventSetting(eventId, "competition_program", { program:data.competitionProgram, label:programLabel(data.competitionProgram), manual:data.competitionProgram === "iq" ? "levelup-2.0" : null }); setEventSettings(prev => ({...prev, competition_program:saved})); }
     const ev = await api.updateEvent(eventId, {
       name: (data.name || "").trim(),
@@ -2701,7 +2704,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   //   events.name, event_settings "event_branding", event_settings "field_names".
   // Only the parts the Admin changed are written. Teams, matches, rankings, violations,
   // alliances, nominations, and access credentials are never touched.
-  const saveEventSettings = async ({ name, branding, fieldNames: nextFieldNames, requiredRobotPhotos: nextPhotoRequirements }) => {
+  const saveEventSettings = async ({ name, branding, fieldNames: nextFieldNames, requiredRobotPhotos: nextPhotoRequirements, fieldCount: nextFieldCount }) => {
     if (!adminUnlocked) throw new Error("Only this event's Admin can change event settings.");
     try {
       if (branding) {
@@ -2718,6 +2721,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         rememberSettingWrite(savedPhotos);
         setEventSettings(cur=>({...cur,robot_photo_requirements:savedPhotos}));
       }
+      if (nextFieldCount) { const saved = await api.upsertEventSetting(eventId, 'field_configuration', {count:Number(nextFieldCount)}, meName); rememberSettingWrite(saved); setEventSettings(prev=>({...prev,field_configuration:saved})); }
       if (nextFieldNames) {
         const savedFields = await api.upsertEventSetting(eventId, "field_names", nextFieldNames, meName);
         rememberSettingWrite(savedFields);
@@ -4748,7 +4752,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
       )}
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
       {showIdentity && <IdentityModal me={{ nickname: meName, fullName: meFullName, phone: mePhone }} onSave={async (identity) => { await onEditName(identity); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
-      {showHelpRequest && <HelpRequestModal fieldNames={fieldNames} onSend={sendHelpRequest} onClose={() => setShowHelpRequest(false)} />}
+      {showHelpRequest && <HelpRequestModal fieldCount={configuredFieldCount} fieldNames={fieldNames} onSend={sendHelpRequest} onClose={() => setShowHelpRequest(false)} />}
       {showNotificationPreferences && createPortal(
         <div className="fixed inset-0 z-[90] bg-black/45 flex items-end sm:items-center justify-center" onClick={() => setShowNotificationPreferences(false)}>
           <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-white dark:bg-slate-800 shadow-2xl overflow-hidden" onClick={(event) => event.stopPropagation()}>
@@ -4777,7 +4781,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
               <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Users size={18} /> Key Volunteer Status</h2>
               <button onClick={() => setShowOnline(false)} className="text-slate-400"><X size={22} /></button>
             </div>
-            <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}><OnlineList presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} eventMembers={eventMembers} onSetAdmin={adminUnlocked ? setVolunteerAdmin : undefined} assignments={volunteerAssignments} onSetAssignment={adminUnlocked ? setVolunteerAssignment : undefined} fieldNames={fieldNames} /></div>
+            <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}><OnlineList fieldCount={configuredFieldCount} presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} eventMembers={eventMembers} onSetAdmin={adminUnlocked ? setVolunteerAdmin : undefined} assignments={volunteerAssignments} onSetAssignment={adminUnlocked ? setVolunteerAssignment : undefined} fieldNames={fieldNames} /></div>
           </div>
         </div>
       )}
@@ -4901,7 +4905,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
       {showEventManagement && adminUnlocked && <EventManagementModal event={event} eventId={eventId} brand={brand} roleLabel={myRole} isProtected={eventProtected}
         onArchive={archiveCurrentEvent}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEventManagement(false)} />}
-      {showEventSettings && adminUnlocked && <EventSettingsModal event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
+      {showEventSettings && adminUnlocked && <EventSettingsModal fieldCount={configuredFieldCount} event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
         eventFormat={league || event?.format === "league" ? "league" : "tournament"}
         canConvertToLeague={!league && !isHighlander && event?.format !== "league"}
         onConvertToLeague={() => setShowConvertLeague(true)}
@@ -5059,7 +5063,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           <button onClick={() => setShowInstallHelp(false)} className="w-full mt-4 py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold">Got it</button>
         </Modal>
       )}
-      {showEvent && <EventModal event={event} competitionProgram={eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram || "v5"} onSave={saveEvent} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEvent(false)} />}
+      {showEvent && <EventModal fieldCount={configuredFieldCount} event={event} competitionProgram={eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram || "v5"} onSave={saveEvent} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEvent(false)} />}
       {lightbox && createPortal(
         <div onClick={() => setLightbox(null)} role="dialog" aria-modal="true" aria-label="Robot photo" className="fixed inset-0 z-[200] bg-black/90 grid place-items-center p-4">
           <img src={lightbox} alt="Robot" className="max-h-full max-w-full object-contain rounded-lg" />
@@ -6576,7 +6580,7 @@ function roleChip(role) {
 
 const VOLUNTEER_LOCATIONS = ["Field 1", "Field 2", "Field 3", "Pit Floor", "Competition Floor", "Skills", "Judging"];
 
-function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onSetAdmin, assignments = {}, onSetAssignment, fieldNames = DEFAULT_FIELD_NAMES }) {
+function OnlineList({ fieldCount=3, presence, roster, meName, onRemove, eventMembers = [], onSetAdmin, assignments = {}, onSetAssignment, fieldNames = DEFAULT_FIELD_NAMES }) {
   const onlineCounts = {};
   const roleByName = {};
   const userIdByName = {};
@@ -6638,7 +6642,7 @@ function OnlineList({ presence, roster, meName, onRemove, eventMembers = [], onS
                   <span className="text-xs font-semibold text-slate-500 dark:text-slate-300 shrink-0">Assignment</span>
                   <select value={assignment} onChange={(event) => onSetAssignment(member, event.target.value)} className="ml-auto min-w-0 flex-1 max-w-[190px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-100">
                     <option value="">Unassigned</option>
-                    {VOLUNTEER_LOCATIONS.map((location) => <option key={location} value={location}>{fieldDisplayName(location, fieldNames)}</option>)}
+                    {VOLUNTEER_LOCATIONS.filter(location=>!/^Field [123]$/.test(location)||Number(location.slice(-1))<=fieldCount||Object.values(assignments).some(a=>a?.location===location)).map((location) => <option key={location} value={location}>{fieldDisplayName(location, fieldNames)}</option>)}
                   </select>
                 </label>
               )}
