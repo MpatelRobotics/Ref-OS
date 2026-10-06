@@ -4652,14 +4652,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           isIQ ? <IQMatches key={`iq-finals-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} parseCSV={parseCSV} /> : <AllianceSelection matches={matches} finalsBestOf={event?.finalsBestOf} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
         ) : (
           <>
-            {!event?.quals ? (
-              <button onClick={() => requireAdmin(() => setShowEvent(true))} className="w-full mb-4 bg-[#0D0F32] text-white rounded-xl p-4 flex items-center gap-3 text-left hover:bg-[#171a45]">
-                <CalendarDays size={22} className="text-[#EBA622] shrink-0" />
-                <div className="flex-1"><p className="font-semibold leading-tight">Finish event setup</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Add how many matches so logging picks the match from a list.</p></div>
-                <ChevronRight size={18} className="text-slate-500 dark:text-slate-400" />
-              </button>
-            ) : (
+            {!!event?.quals && (
               <button onClick={() => requireAdmin(() => setShowEvent(true))} className="w-full mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 flex items-center gap-2 text-left hover:border-slate-300 dark:border-slate-600">
                 <CalendarDays size={16} className="text-slate-400 shrink-0" />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate flex-1">{event.name || "Event"}</span>
