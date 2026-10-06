@@ -1,3 +1,5 @@
+import DeveloperLiveActivity from "./components/DeveloperLiveActivity.jsx";
+import useLiveActivity from "./useLiveActivity.js";
 import EventLocalClock from "./components/EventLocalClock.jsx";
 import IQMatches, {IQMatchDetail, IQInspectionChecklist} from './iq/IQWorkflows.jsx';
 import {parseIQMatches, iqTeams} from './iq/iqWorkflows.js';
@@ -1328,6 +1330,7 @@ const formatEventDate = (value) => {
 };
 
 const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, initialNotice = "" }) => {
+  const [liveActivityOpen,setLiveActivityOpen] = useState(false);
   const [universalFeedbackOpen, setUniversalFeedbackOpen] = useState(()=>new URLSearchParams(window.location.search).get("open") === "universal-feedback");
   const [creating, setCreating] = useState(false);
   // Phase 7: active events by default; archived events in their own view.
@@ -1450,6 +1453,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{view === "archived" ? "Archived events keep all of their data. An event Admin can restore one." : "Select the event this device is working at."}</p>
       </div>
+      {liveActivityOpen ? <DeveloperLiveActivity events={events} onClose={()=>setLiveActivityOpen(false)}/> : <button type="button" onClick={()=>setLiveActivityOpen(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 bg-white dark:bg-slate-800 p-3 font-semibold">Live user activity · Developer only</button>}
       {universalFeedbackOpen ? <UniversalFeedback events={events} onClose={()=>setUniversalFeedbackOpen(false)}/> : <button type="button" onClick={()=>setUniversalFeedbackOpen(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 bg-white dark:bg-slate-800 p-3 font-semibold">Universal Feedback · Developer only</button>}
       {!universalFeedbackOpen && <>
       {notice && view === "active" && (
@@ -2490,6 +2494,10 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
     const iv = setInterval(() => { api.touchRefRoster(eventId, name, myRole); loadRoster(); }, 60000);
     return () => { clearInterval(iv); leave(); };
   }, [eventId, isInspection, meName, myRole]);
+
+  const activityScreen = showCommandCenter ? 'Command Center' : showEventSettings || showEvent ? 'Event Settings' : showFeatures || showUserGuide ? 'Features & Guide' : showFeedback || showFeedbackViewer ? 'Feedback' : showOnline ? 'Volunteer status' : ({matches:'Matches',teams:'Teams',rulebook:'Rules',robots:'Robots',alliances:isIQ?'Finals':'Alliances',judging:'Judging',rankings:'Rankings','lost-found':'Lost & Found'}[view] || 'Other');
+  const liveAction = editing ? 'Editing violation' : logFor !== null ? 'Entering violation' : nominating ? 'Adding nomination' : showTMSync ? 'Importing event data' : openTeam ? 'Viewing team' : openMatch ? 'Viewing match' : openRobot ? 'Viewing robot photos' : 'Viewing';
+  useLiveActivity({eventId,sessionId:leagueSessionId,name:meName,screen:activityScreen,activity:liveAction});
 
   const saveEvent = async (data) => {
     if (data.fieldCount) { const saved = await api.upsertEventSetting(eventId, 'field_configuration', {count:Number(data.fieldCount)}); rememberSettingWrite(saved); setEventSettings(prev=>({...prev,field_configuration:saved})); }
@@ -4783,7 +4791,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
               <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Users size={18} /> Key Volunteer Status</h2>
               <button onClick={() => setShowOnline(false)} className="text-slate-400"><X size={22} /></button>
             </div>
-            <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}><OnlineList fieldCount={configuredFieldCount} presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} eventMembers={eventMembers} onSetAdmin={adminUnlocked ? setVolunteerAdmin : undefined} assignments={volunteerAssignments} onSetAssignment={adminUnlocked ? setVolunteerAssignment : undefined} fieldNames={fieldNames} /></div>
+            <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}><OnlineList isDeveloper={isDeveloper} fieldCount={configuredFieldCount} presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} eventMembers={eventMembers} onSetAdmin={adminUnlocked ? setVolunteerAdmin : undefined} assignments={volunteerAssignments} onSetAssignment={adminUnlocked ? setVolunteerAssignment : undefined} fieldNames={fieldNames} /></div>
           </div>
         </div>
       )}
@@ -6582,7 +6590,7 @@ function roleChip(role) {
 
 const VOLUNTEER_LOCATIONS = ["Field 1", "Field 2", "Field 3", "Pit Floor", "Competition Floor", "Skills", "Judging"];
 
-function OnlineList({ fieldCount=3, presence, roster, meName, onRemove, eventMembers = [], onSetAdmin, assignments = {}, onSetAssignment, fieldNames = DEFAULT_FIELD_NAMES }) {
+function OnlineList({ isDeveloper=false, fieldCount=3, presence, roster, meName, onRemove, eventMembers = [], onSetAdmin, assignments = {}, onSetAssignment, fieldNames = DEFAULT_FIELD_NAMES }) {
   const onlineCounts = {};
   const roleByName = {};
   const userIdByName = {};
@@ -6601,6 +6609,7 @@ function OnlineList({ fieldCount=3, presence, roster, meName, onRemove, eventMem
   const onlineTotal = refs.filter((r) => onlineCounts[r.name]).length;
   return (
     <>
+      {isDeveloper && <DeveloperLiveActivity isDeveloper/>}
       <p className="text-xs text-slate-400 mb-3">{onlineTotal} online · {Math.max(0, refs.length - onlineTotal)} offline. Status updates live as volunteers join or leave.{onRemove ? " Tap the trash on an offline volunteer to remove them." : ""}</p>
       <ul className="space-y-2">
         {refs.map((r) => {
