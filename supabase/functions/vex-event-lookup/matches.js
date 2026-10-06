@@ -14,7 +14,9 @@ export async function fetchVexStandings(code, division, token, fetcher=fetch, ki
   const rows=[];
   for(let page=1;page<=20;page++){const result=await get(kind==='skills'?`events/${found[0].id}/skills`:`events/${found[0].id}/divisions/${Number(division)}/${kind==='scores'?'matches':kind}`,{page,per_page:250});const last=Number(result.meta?.last_page);if(!Array.isArray(result.data)||!Number.isInteger(last)||last<page||last>20)throw new Error('VEX standings pagination is incomplete. No standings were imported.');rows.push(...result.data);if(page===last)break;}
   const warnings=[];
-  return {code,divisions,kind,warnings,upstreamRows:rows.length,rankings:kind==='rankings'?mapVexRankings(rows):[],skills:kind==='skills'?mapVexSkills(rows):[],scores:kind==='scores'?mapVexScores(rows):[],checkedAt:new Date().toISOString()};
+  const scores=kind==='scores'?mapVexScores(rows):[];
+  const notScored=kind==='scores'?rows.filter(row=>!vexMatchIsScored(row)).length:0;
+  return {code,divisions,kind,warnings,upstreamRows:rows.length,rankings:kind==='rankings'?mapVexRankings(rows):[],skills:kind==='skills'?mapVexSkills(rows):[],scores,scoreSummary:kind==='scores'?{received:rows.length,notScored,unsupported:rows.length-notScored-scores.length}:undefined,checkedAt:new Date().toISOString()};
  }finally{clearTimeout(timer);}
 }
 
@@ -37,10 +39,15 @@ export function mapVexSkills(rows) {
 
 
 
+export function vexMatchIsScored(row){
+ // VEX can supply the scoring time instead of a boolean completion flag.
+ // Never infer completion from a scheduled time or from 0-0 score placeholders.
+ return row.scored===true || typeof row.scored==='string' && /^\d{4}-\d{2}-\d{2}T/.test(row.scored) && Number.isFinite(Date.parse(row.scored));
+}
 export function mapVexScores(rows){
  const result=[];
  for(const row of rows){
-  if(row.scored!==true)continue;
+  if(!vexMatchIsScored(row))continue;
   const phase={1:'practice',2:'qual',3:'qf',4:'sf',5:'final',6:'r16'}[row.round];
   if(!phase)continue;
   // The app represents non-final elimination pairings as a single match.
