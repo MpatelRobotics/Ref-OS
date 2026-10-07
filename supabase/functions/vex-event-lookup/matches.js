@@ -41,8 +41,12 @@ export function mapVexSkills(rows) {
 
 export function vexMatchIsScored(row){
  // VEX can supply the scoring time instead of a boolean completion flag.
- // Never infer completion from a scheduled time or from 0-0 score placeholders.
- return row.scored===true || typeof row.scored==='string' && /^\d{4}-\d{2}-\d{2}T/.test(row.scored) && Number.isFinite(Date.parse(row.scored));
+ // Some responses omit completion metadata but include published alliance scores.
+ // Explicitly unscored matches and 0-0 placeholders must not overwrite scores.
+ if(row.scored===true || typeof row.scored==='string' && /^\d{4}-\d{2}-\d{2}[T ]/.test(row.scored) && Number.isFinite(Date.parse(row.scored)))return true;
+ if(row.scored!==undefined && row.scored!==null && row.scored!=='')return false;
+ const red=row.alliances?.find(a=>a.color==='red'),blue=row.alliances?.find(a=>a.color==='blue');
+ return Number.isInteger(red?.score)&&red.score>=0&&Number.isInteger(blue?.score)&&blue.score>=0&&(red.score>0||blue.score>0);
 }
 export function mapVexScores(rows){
  const result=[];

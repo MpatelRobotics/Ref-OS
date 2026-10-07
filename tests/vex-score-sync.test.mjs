@@ -13,6 +13,22 @@ test('VEX scored timestamps accept published scores including valid zero scores'
  const q1={...row,matchnum:1,scored:timestamp,alliances:row.alliances.map(a=>({...a,score:a.color==='red'?133:0}))};
  const q2={...row,matchnum:2,scored:timestamp,alliances:row.alliances.map(a=>({...a,score:a.color==='red'?24:74}))};
  assert.deepEqual(mapVexScores([q1,q2]).map(m=>[m.num,m.redScore,m.blueScore]),[[1,133,0],[2,24,74]]);
- assert.equal(mapVexScores([{...q1,scored:null},{...q1,scored:''},{...q1,scored:'not-a-date'}]).length,0);
+ assert.equal(mapVexScores([{...q1,scored:'not-a-date'}]).length,0);
  assert.equal(mapVexScores([{...q1,alliances:q1.alliances.map(a=>({...a,score:0}))}]).length,1);
+});
+
+test('published scores without completion metadata import but placeholders and explicit unscored results skip',async()=>{
+ const {scored,...published}=row;
+ const q1={...published,matchnum:1,alliances:row.alliances.map(a=>({...a,score:a.color==='red'?133:0}))};
+ const q2={...published,matchnum:2,alliances:row.alliances.map(a=>({...a,score:a.color==='red'?24:74}))};
+ const placeholder={...published,alliances:row.alliances.map(a=>({...a,score:0}))};
+ assert.deepEqual(mapVexScores([q1,q2]).map(m=>[m.num,m.redScore,m.blueScore]),[[1,133,0],[2,24,74]]);
+ assert.equal(mapVexScores([{...q1,scored:null},{...q1,scored:''}]).length,2);
+ assert.equal(mapVexScores([placeholder,{...q1,scored:false},{...q1,alliances:q1.alliances.map(a=>({...a,score:'133'}))}]).length,0);
+ let n=0;
+ const fetcher=async()=>new Response(JSON.stringify(++n===1?{data:[{id:1,sku:'VE-V5-26-65633'}]}:n===2?{divisions:[{id:1,name:'Main'}]}:{data:[q1,q2,placeholder],meta:{last_page:1}}));
+ const result=await fetchVexStandings('VE-V5-26-65633',1,'fixture-token',fetcher,'scores');
+ assert.equal(result.scores.length,2);
+ assert.deepEqual(result.scoreSummary,{received:3,notScored:1,unsupported:0});
+ assert.equal(planScoreUpdates(Object.fromEntries(result.scores.map(score=>[score.num,{...score,redScore:null,blueScore:null}])),result.scores).updates.length,2);
 });
