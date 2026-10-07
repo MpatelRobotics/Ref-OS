@@ -1,5 +1,5 @@
-import React,{useEffect,useRef,useState} from 'react';
-export default function VexLiveSync({category='rankings',initialCode='',target='',onFetch,onApply,onClose,visible=true,onSaveCode=async()=>{},onOpen=()=>{}}){
+import React,{forwardRef,useEffect,useImperativeHandle,useRef,useState} from 'react';
+export default forwardRef(function VexLiveSync({category='rankings',initialCode='',target='',onFetch,onApply,onClose,visible=true,onSaveCode=async()=>{},onOpen=()=>{}},ref){
  const [code,setCode]=useState(initialCode),[division,setDivision]=useState(''),[divisions,setDivisions]=useState([]),[preview,setPreview]=useState(null),[busy,setBusy]=useState(false),[auto,setAuto]=useState(false),[approved,setApproved]=useState(false),[status,setStatus]=useState(''),[error,setError]=useState('');
  const kind=['skills','scores'].includes(category)?category:'rankings';const categoryLabel=kind==='skills'?'Skills Challenge':kind==='scores'?'Scores only':'Qualification rankings';
  const running=useRef(false),last=useRef(''),active=useRef(true);useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
@@ -18,21 +18,42 @@ export default function VexLiveSync({category='rankings',initialCode='',target='
  };
  useEffect(()=>{if(visible && !divisions.length && /^(RE|VE)-[A-Z0-9]+-\d{2}-\d{3,8}$/.test(code)) check();},[visible,code]);
  const latestCheck=useRef(check);latestCheck.current=check;
- useEffect(()=>{if(!auto)return;const timer=setInterval(()=>latestCheck.current(true),60000);return()=>clearInterval(timer);},[auto,code,division,kind]);
+ useEffect(()=>{if(!auto)return;const timer=setInterval(()=>latestCheck.current(true),15000);return()=>clearInterval(timer);},[auto,code,division,kind]);
+ useImperativeHandle(ref,()=>({start:async(selectedCode,selectedDivision)=>{
+  if(running.current)throw new Error(categoryLabel+' is busy. Try again shortly.');
+  running.current=true;setBusy(true);setAuto(false);setError('');
+  try{
+   const data=await onFetch(selectedCode,kind==='skills'?null:selectedDivision,kind);
+   if(!active.current)return;
+   if(data.warnings?.length)throw new Error(data.warnings[0]);
+   const result=await onApply(data,kind);
+   if(!active.current)return;
+   setCode(selectedCode);setDivision(kind==='skills'?'':String(selectedDivision));setDivisions(data.divisions||[]);
+   last.current=JSON.stringify(data[kind]||[]);setPreview(null);setApproved(true);setStatus(result?.message||categoryLabel+' imported.');setAuto(true);
+  }catch(e){if(active.current){setError(e.message||'Sync failed.');setAuto(false);}throw e;}
+  finally{running.current=false;if(active.current)setBusy(false);}
+ }}));
  const apply=async(start=false)=>{setBusy(true);try{const result=await onApply(preview,kind);last.current=JSON.stringify(preview[kind]||[]);setApproved(true);setPreview(null);setStatus(result?.message || categoryLabel+' imported.');if(start){setAuto(true);onClose();}}catch(e){setError(e.message||'Import failed. Retry this snapshot.');setAuto(false);}finally{setBusy(false);}};
- if(!visible) return (auto || error) ? <aside aria-label={kind==='skills'?'VEX Skills sync status':kind==='scores'?'VEX scores sync status':'VEX sync status'} className="my-3 rounded-lg border border-blue-300 p-3 text-sm flex flex-wrap gap-3 items-center"><span>{auto ? `VEX ${kind} sync active · checks every minute` : 'VEX sync stopped'}{status ? ' · '+status : ''}</span>{error && <span role="alert" className="text-red-600">{error}</span>}<button type="button" onClick={onOpen} className="border rounded-lg px-3 py-2">{kind==='skills'?'Manage VEX Skills sync':kind==='scores'?'Manage VEX scores sync':'Manage VEX sync'}</button>{auto && <button type="button" onClick={()=>{setAuto(false);setStatus('Automatic sync stopped.');}} className="border rounded-lg px-3 py-2">Stop sync</button>}</aside> : null;
+ if(!visible) return (auto || error) ? <aside aria-label={kind==='skills'?'VEX Skills sync status':kind==='scores'?'VEX scores sync status':'VEX sync status'} className="min-w-0 rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-xs">
+  <div className="flex flex-wrap items-center gap-2"><span className="flex-1">{auto ? `VEX ${kind} sync active · 15s` : `VEX ${kind} sync stopped`}</span>
+   <button type="button" aria-label={kind==='skills'?'Manage VEX Skills sync':kind==='scores'?'Manage VEX scores sync':'Manage VEX sync'} onClick={onOpen} className="min-h-[44px] rounded px-2 hover:bg-slate-100 dark:hover:bg-slate-700">Manage</button>
+   {auto&&<button type="button" aria-label="Stop sync" onClick={()=>{setAuto(false);setStatus('Automatic sync stopped.');}} className="min-h-[44px] rounded px-2 hover:bg-slate-100 dark:hover:bg-slate-700">Stop</button>}
+  </div>
+  {error&&<p role="alert" className="text-red-600 break-words">{error}</p>}
+  {status&&<details className="pb-1"><summary className="cursor-pointer min-h-[24px] text-slate-500">Details</summary><p className="pt-1 break-words">{status}</p></details>}
+ </aside> : null;
  return <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3"><section role="dialog" aria-modal="true" aria-label="VEX API Sync" className="w-full max-w-xl max-h-[90dvh] overflow-y-auto rounded-xl bg-white dark:bg-slate-800 p-4 space-y-3">
- <h2 className="text-xl font-bold">VEX {categoryLabel} Sync</h2><p className="text-sm">{kind==='skills'?'1. Confirm the event code. 2. Review the Skills scores. 3. Click Start syncing. Skills are event-wide and do not require a division.':'1. Confirm the event code. 2. Choose a division if asked. 3. Review the snapshot and click Start syncing.'} The box closes and this category updates every minute. Use Manage or Stop sync in its status bar.</p><p className="text-sm">Target: {target}</p>{kind==='scores'&&<p className="text-sm font-semibold">Only existing matches with matching round, number and teams on both alliances receive scores. Unmatched or ambiguous results are skipped. No matches are added; schedule, field and team assignments are kept.</p>}<p className="text-xs text-slate-500">Experimental. VEX publication timing is outside Ref OS's control. Automatic checks run once a minute while Ref OS is open, visible and online, even when this box is closed. Errors stop only this category; other syncs keep running.</p>
+ <h2 className="text-xl font-bold">VEX {categoryLabel} Sync</h2><p className="text-sm">{kind==='skills'?'1. Confirm the event code. 2. Review the Skills scores. 3. Click Start syncing. Skills are event-wide and do not require a division.':'1. Confirm the event code. 2. Choose a division if asked. 3. Review the snapshot and click Start syncing.'} The box closes and this category updates every 15 seconds. Use Manage or Stop sync in its status bar.</p><p className="text-sm">Target: {target}</p>{kind==='scores'&&<p className="text-sm font-semibold">Only existing matches with matching round, number and teams on both alliances receive scores. Unmatched or ambiguous results are skipped. No matches are added; schedule, field and team assignments are kept.</p>}<p className="text-xs text-slate-500">Experimental. VEX publication timing is outside Ref OS's control. Automatic checks run every 15 seconds while Ref OS is open, visible and online, even when this box is closed. Errors stop only this category; other syncs keep running.</p>
  <label className="block text-sm">VEX event code<input value={code} disabled={busy||auto} onChange={e=>{setCode(e.target.value.toUpperCase());setDivision('');setDivisions([]);reset();}} className="w-full border rounded-lg bg-transparent p-2"/></label>
  <button disabled={busy||auto||!code} onClick={()=>check()} className="border rounded-lg px-3 py-2">{kind==='skills'||division?'Check for updates':'Load divisions'}</button>
  {kind!=='skills'&&divisions.length>0&&<label className="block text-sm">Division<select value={division} disabled={busy||auto} onChange={e=>{setDivision(e.target.value);reset();}} className="w-full rounded-lg border bg-white dark:bg-slate-800 p-2"><option value="">Select division</option>{divisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label>}
  <p className="text-sm font-semibold">Data to sync: {categoryLabel}</p>
  {preview&&<div className="border rounded-lg p-3 space-y-2"><p className="font-semibold">{(preview[kind]||[]).length} rows ready</p>{(preview[kind]||[]).length === 0 && <p className="text-sm">{kind==='scores' ? "No completed match scores passed validation. Existing scores will be kept." : preview.upstreamRows ? "No supported standings were returned." : "The API returned no rows for this category and division. Existing data will be kept."}</p>}{kind==='scores'&&preview.scoreSummary&&<p className="text-xs">{preview.scoreSummary.received} matches returned · {preview.scoreSummary.notScored} unscored or missing published scores · {preview.scoreSummary.unsupported} unsupported or ambiguous results skipped.</p>}{kind==='scores'&&preview.scoreDiagnostics&&<div className="rounded-lg bg-slate-50 dark:bg-slate-900 p-2 text-xs"><p className="font-semibold">What VEX returned</p><p>{preview.scoreDiagnostics.message}</p><ul>{preview.scoreDiagnostics.samples.map((sample,i)=><li key={i}>Match {sample.number??'?'}: {sample.redScore??'Missing'} – {sample.blueScore??'Missing'} · {sample.completion}</li>)}</ul></div>}<p className="text-xs">{kind==='scores'?'Only existing matching matches are updated. Unmatched results are skipped.':'Importing replaces overlapping standings in this target. Empty snapshots keep existing data.'}</p><ul className="text-xs space-y-1">{(preview[kind]||[]).slice(0,10).map((row,i)=><li key={i}>{kind==='rankings'?`${row.number}: rank ${row.rank}`:kind==='scores'?`${row.phase} ${row.num}: ${row.redScore} – ${row.blueScore}`:`${row.number}: driver ${row.driver??'—'}, programming ${row.programming??'—'}, total ${row.total}`}</li>)}</ul><button disabled={busy} onClick={()=>apply(false)} className="bg-blue-700 text-white px-3 py-2 rounded-lg">Import once</button><button disabled={busy} onClick={()=>apply(true)} className="ml-2 bg-blue-700 text-white px-3 py-2 rounded-lg">Start syncing</button></div>}
- <label className="flex gap-2 text-sm"><input type="checkbox" checked={auto} disabled={!approved||busy} onChange={e=>setAuto(e.target.checked)}/> Automatically update this category every minute</label>
+ <label className="flex gap-2 text-sm"><input type="checkbox" checked={auto} disabled={!approved||busy} onChange={e=>setAuto(e.target.checked)}/> Automatically update this category every 15 seconds</label>
  {status&&<p role="status" className="text-sm">{status}</p>}{error&&<p role="alert" className="text-sm text-red-600">{error}</p>}
  <p className="text-xs text-slate-500">Closing this box keeps this category running alongside other active syncs. Uncheck automatic updates to stop. Switching events or League sessions, signing out, or reloading the app stops it.</p><button disabled={busy} onClick={onClose} className="border rounded-lg px-3 py-2">Close and continue using app</button>
  </section></div>;
-}
+});
 
 
 

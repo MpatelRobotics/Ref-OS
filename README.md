@@ -112,12 +112,12 @@ Available to cloud Admins in V5RC / VEX U events from **Rankings → VEX API Syn
 
 1. Confirm the saved event code. Divisions load automatically when a saved code is available; a single division is selected automatically. For a multi-division event, choose the division to import.
 2. Review the qualification rankings preview and confirm the target event and, for a League, the working session.
-3. Choose **Import once** for one update, or **Start syncing** to import and enable checks once a minute. The dialog closes so the rest of the app remains usable.
+3. Choose **Import once** for one update, or **Start syncing** to import and enable checks every 15 seconds. The dialog closes so the rest of the app remains usable.
 4. Use **Manage VEX sync** or **Stop sync** in the status bar to manage updates.
 
 The code is retained in the event settings after a successful lookup. Automatic checks continue while Ref OS is open, visible, and online, even with the dialog closed. They stop on errors, switching events or League sessions, signing out, or reloading. This is polling of published API data, so updates may lag scoring; it does not run while the app is closed or suspended. Empty snapshots keep existing data. Failed writes may partially succeed; review and retry the snapshot.
 
-**API sync is limited to qualification rankings.** Matches, scores, alliances, and skills use Tournament Manager imports. Each selected division is imported into the current target; Ref OS does not merge standings across divisions or calculate cumulative League standings.
+**Sync everything** starts qualification rankings, event-wide Skills, and scores for existing matches together. Confirm the event code, load divisions, select the division for rankings and scores, then choose **Start all syncs**. Each category checks every 15 seconds and can be stopped separately. Compact status cards show Manage/Stop controls; expand **Details** for update results. Match schedules still use Tournament Manager imports. Ref OS does not merge standings across divisions or calculate cumulative League standings.
 
 ### Team event history
 
@@ -481,13 +481,13 @@ Internet is required, reporting is best-effort and cannot block event work; olde
 
 ## Separate VEX API Skills sync
 
-Admins/Developers can open **Rankings → VEX API Sync · Skills Challenge** independently of qualification ranking sync. Confirm the saved event code, review the event-wide Skills snapshot, then choose Import once or Start syncing. No division selection is required. Skills and qualification rankings have separate previews, approval, timers and stop controls. Updates run every minute while the app is open, visible and online after the dialog closes. Switching events/League sessions, signing out or reloading stops them. League imports apply only to the working session; confirm that the VEX event code represents the intended session.
+Admins/Developers can open **Rankings → VEX API Sync · Skills Challenge** independently of qualification ranking sync. Confirm the saved event code, review the event-wide Skills snapshot, then choose Import once or Start syncing. No division selection is required. Skills and qualification rankings have separate previews, approval, timers and stop controls. Updates run every 15 seconds while the app is open, visible and online after the dialog closes. Switching events/League sessions, signing out or reloading stops them. League imports apply only to the working session; confirm that the VEX event code represents the intended session.
 
 Driving and programming results use each team's best published run and combine their totals; official Skills rank/tiebreakers are not invented. Empty snapshots preserve existing results. Redeploy `vex-event-lookup` for Skills support. No new SQL or token is required. Publication delays depend on VEX; live API delivery remains to be checked after deployment.
 
 ## VEX scores-only sync
 
-Admin/Developer: open **Matches**, scroll to the very bottom and choose **VEX API · Sync scores only**. Confirm the event code and division, review the published scored results, then Import once or Start syncing. Automatic checks continue every minute while Ref OS is open, visible and online after the dialog closes. Manage or stop the independent scores sync from its status bar. Event/session changes, signing out and reload stop syncing.
+Admin/Developer: open **Matches**, scroll to the very bottom and choose **VEX API · Sync scores only**. Confirm the event code and division, review the published scored results, then Import once or Start syncing. Automatic checks continue every 15 seconds while Ref OS is open, visible and online after the dialog closes. Manage or stop the independent scores sync from its status bar. Event/session changes, signing out and reload stop syncing.
 
 This option never creates matches or changes the schedule, field or alliance assignments. Only existing matches with the same phase, number and teams on each alliance receive scores and a score-derived winner/tie. Missing, unsupported or ambiguous results are skipped. Non-final elimination series containing multiple games cannot be represented safely by a single pairing and are skipped. Unscored results do not clear saved scores. Qualification rankings and Skills remain separate. Confirm the imported schedule and event/division; in Leagues, scores target only the current working session.
 

@@ -19,7 +19,7 @@ test('preview and approval precede periodic updates; changing category resets ap
  </script></body></html>`}));
  await page.goto('/vex-sync-test');await expect(page.getByRole('textbox')).toHaveValue('');await page.evaluate(()=>window.restoreCode());await expect(page.getByRole('combobox').first()).toHaveValue('1');await expect.poll(()=>page.evaluate(()=>window.savedCode)).toBe('VE-V5-27-6588');
  await expect(page.getByRole('combobox')).toHaveCount(1);await page.getByRole('button',{name:'Check for updates'}).click();expect(await page.evaluate(()=>window.applied.length)).toBe(0);
- await page.getByRole('button',{name:'Start syncing'}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByLabel('VEX sync status')).toBeVisible();await page.clock.fastForward(60000);
+ await page.getByRole('button',{name:'Start syncing'}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByLabel('VEX sync status')).toBeVisible();await page.clock.fastForward(15000);
  await expect.poll(()=>page.evaluate(()=>window.applied.length)).toBe(2);
  await page.getByRole('button',{name:'Manage VEX sync'}).click();await page.getByRole('checkbox').uncheck();await page.getByRole('combobox').first().selectOption('');await expect(page.getByRole('checkbox')).toBeDisabled();
 });
@@ -44,7 +44,7 @@ test('Skills preview imports Skills and continues with modal closed',async({page
  </script></body></html>`}));
  await page.goto('/vex-sync-test');await expect(page.getByRole('textbox')).toHaveValue('');await page.evaluate(()=>window.restoreCode());await expect(page.getByRole('combobox')).toHaveCount(0);await expect.poll(()=>page.evaluate(()=>window.savedCode)).toBe('VE-V5-27-6588');
  await expect(page.getByRole('combobox')).toHaveCount(0);await page.getByRole('button',{name:'Check for updates'}).click();expect(await page.evaluate(()=>window.applied.length)).toBe(0);
- await page.getByRole('button',{name:'Start syncing'}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByLabel('VEX Skills sync status')).toBeVisible();await page.clock.fastForward(60000);
+ await page.getByRole('button',{name:'Start syncing'}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByLabel('VEX Skills sync status')).toBeVisible();await page.clock.fastForward(15000);
  await expect.poll(()=>page.evaluate(()=>window.applied.length)).toBe(2);
  expect(await page.evaluate(()=>window.applied.every(entry=>entry.kind==='skills'))).toBe(true);await page.getByRole('button',{name:'Manage VEX Skills sync'}).click();await page.getByRole('checkbox').uncheck();
 });
@@ -58,7 +58,7 @@ test('scores-only previews scores and syncs independently with division selectio
  </script></body></html>`}));
  await page.goto('/vex-sync-test');await expect(page.getByRole('textbox')).toHaveValue('');await page.evaluate(()=>window.restoreCode());await expect(page.getByRole('combobox').first()).toHaveValue('1');await expect.poll(()=>page.evaluate(()=>window.savedCode)).toBe('VE-V5-27-6588');
  await expect(page.getByRole('combobox')).toHaveCount(1);await page.getByRole('button',{name:'Check for updates'}).click();expect(await page.evaluate(()=>window.applied.length)).toBe(0);
- await page.getByRole('button',{name:'Start syncing'}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByLabel('VEX scores sync status')).toBeVisible();await page.clock.fastForward(60000);
+ await page.getByRole('button',{name:'Start syncing'}).click();await expect(page.getByRole('dialog')).toHaveCount(0);await expect(page.getByLabel('VEX scores sync status')).toBeVisible();await page.clock.fastForward(15000);
  await expect.poll(()=>page.evaluate(()=>window.applied.length)).toBe(2);
  await page.getByRole('button',{name:'Manage VEX scores sync'}).click();await page.getByRole('checkbox').uncheck();await page.getByRole('combobox').first().selectOption('');await expect(page.getByRole('checkbox')).toBeDisabled();
 });

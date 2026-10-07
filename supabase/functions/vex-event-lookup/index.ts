@@ -19,7 +19,8 @@ Deno.serve(async request => {
     const now = Date.now();
     for (const [key,value] of requests) if (value.until < now) requests.delete(key);
     const usage = requests.get(data.user.id) || { count: 0, until: now + 60000 };
-    if (usage.count >= 10 || requests.size >= 10000) return json({ error: "Too many lookups. Try again in a minute." }, 429);
+    // Three categories polling every 15 seconds need 12 calls/minute plus setup.
+    if (usage.count >= 30 || requests.size >= 10000) return json({ error: "Too many lookups. Try again in a minute." }, 429);
     usage.count++; requests.set(data.user.id, usage);
     const raw = await request.text();
     if (raw.length > 1000) return json({ error: "Request too large." }, 400);
