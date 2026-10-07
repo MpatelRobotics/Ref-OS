@@ -1,4 +1,5 @@
 import {planScoreUpdates} from "./vexScoreSync.js";
+import {parseViolationRuleNotes,validViolationRuleDetails,formatViolationRuleNotes} from "./violationRuleNotes.js";
 import DeveloperLiveActivity from "./components/DeveloperLiveActivity.jsx";
 import useLiveActivity from "./useLiveActivity.js";
 import EventLocalClock from "./components/EventLocalClock.jsx";
@@ -5371,7 +5372,9 @@ function LogModal({ requiredRobotPhotos, isIQ = false, practice = false, teams, 
   });
   const code = selectedRules.map((r) => r.code).join(" | ");
   const desc = selectedRules.map((r) => r.desc || "").join(" | ");
-  const [notes, setNotes] = useState((edit && edit.notes) || "");
+  const [ruleDetails,setRuleDetails]=useState(()=>parseViolationRuleNotes(isIQ?'':edit?.notes||'').details);
+  const [notes, setNotes] = useState(()=>isIQ?edit?.notes||'':parseViolationRuleNotes(edit?.notes||'').notes);
+  const detailCodes=isIQ?[]:selectedRules.map(r=>r.code);
   const [photos, setPhotos] = useState([]);
   const [keepKeys, setKeepKeys] = useState((edit && edit.photoKeys) || []);
   const [busy, setBusy] = useState(false);
@@ -5387,7 +5390,7 @@ function LogModal({ requiredRobotPhotos, isIQ = false, practice = false, teams, 
   }, [teamScopedMatches, creatingNew, team, matches]);
 
   const addPhotos = async (files) => { const list = Array.from(files).slice(0, 4); const out = []; for (const f of list) { try { out.push(await compress(f)); } catch {} } setPhotos((p) => [...p, ...out].slice(0, 6)); };
-  const valid = (creatingNew ? newNumber.trim() : team) && (code.trim() || desc.trim()) && (!matchPhase.startsWith("skills") || !matchNum || /^[1-9]\d*$/.test(String(matchNum)));
+  const valid = (creatingNew ? newNumber.trim() : team) && (code.trim() || desc.trim()) && validViolationRuleDetails(detailCodes,ruleDetails) && (!matchPhase.startsWith("skills") || !matchNum || /^[1-9]\d*$/.test(String(matchNum)));
   const doSave = async () => {
     setBusy(true);
     try {
@@ -5398,7 +5401,7 @@ function LogModal({ requiredRobotPhotos, isIQ = false, practice = false, teams, 
         group.rules.push(rule);
         return groups;
       }, []).map((group) => ({ type: group.type, code: group.rules.map((rule) => rule.code).join(" | "), desc: group.rules.map((rule) => rule.desc || "").join(" | ") }));
-      await onSave({ team: creatingNew ? "" : team, newNumber, newName, type: ruleGroups[0]?.type || type, code, desc, notes, photos, keepKeys, match: { phase: matchPhase, num: matchNum }, ruleGroups });
+      await onSave({ team: creatingNew ? "" : team, newNumber, newName, type: ruleGroups[0]?.type || type, code, desc, notes:formatViolationRuleNotes(notes,detailCodes,ruleDetails), photos, keepKeys, match: { phase: matchPhase, num: matchNum }, ruleGroups });
     } catch (e) {
       alert("Could not save: " + (e.message || e));
       setBusy(false);
@@ -5606,7 +5609,7 @@ function LogModal({ requiredRobotPhotos, isIQ = false, practice = false, teams, 
         </div>
       </div>
       {showRulePicker && (
-        <RulePicker rules={rules} knownRules={knownRules} eventId={event.id}
+        <RulePicker ruleDetails={isIQ?null:ruleDetails} onSetRuleDetails={setRuleDetails} rules={rules} knownRules={knownRules} eventId={event.id}
           selectedCodes={selectedRules.map((r) => r.code)}
           selectedRules={selectedRules} showRuleTypes={type !== "inspection"}
           onSetRuleType={(code, ruleType) => setSelectedRules((rs) => rs.map((rule) => rule.code === code ? { ...rule, type: ruleType } : rule))}
@@ -5618,8 +5621,20 @@ function LogModal({ requiredRobotPhotos, isIQ = false, practice = false, teams, 
   );
 }
 
+function RuleViolationDetails({code,details,onChange}) { return <>
+            {code==='SG9'&&<fieldset className="mb-3 rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2">
+              <legend className="text-sm font-semibold">SG9 details (optional)</legend>
+              <label className="block text-sm">What happened?<select aria-label="What happened?" value={details.sg9Action} onChange={e=>onChange(d=>({...d,sg9Action:e.target.value,sg9Count:''}))} className="mt-1 w-full min-h-[44px] rounded-lg border bg-white dark:bg-slate-800 p-2"><option value="">Select action</option>{['Touch','Descore','Cover','Push'].map(action=><option key={action} value={action}>{action}</option>)}</select></label>
+              {['Touch','Descore'].includes(details.sg9Action)&&<label className="block text-sm">{details.sg9Action==='Touch'?'SG9: How many touched?':'SG9: How many descored?'}<input type="number" min="1" step="1" inputMode="numeric" value={details.sg9Count} onChange={e=>onChange(d=>({...d,sg9Count:e.target.value}))} className="mt-1 w-full min-h-[44px] rounded-lg border bg-transparent p-2"/></label>}
+            </fieldset>}
+            {code==='SG10'&&<fieldset className="mb-3 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+              <legend className="text-sm font-semibold">SG10 details (optional)</legend>
+              <label className="block text-sm">SG10: How many descored?<input type="number" min="1" step="1" inputMode="numeric" value={details.sg10Count} onChange={e=>onChange(d=>({...d,sg10Count:e.target.value}))} className="mt-1 w-full min-h-[44px] rounded-lg border bg-transparent p-2"/></label>
+            </fieldset>}
+</>; }
+
 /* ============================ RULE PICKER ============================ */
-function RulePicker({ rules, knownRules, eventId, selectedCodes = [], selectedRules = [], showRuleTypes = true, onSetRuleType, onPickRule, onPickCustom, onClose }) {
+function RulePicker({ ruleDetails, onSetRuleDetails, rules, knownRules, eventId, selectedCodes = [], selectedRules = [], showRuleTypes = true, onSetRuleType, onPickRule, onPickCustom, onClose }) {
   const [q, setQ] = useState("");
   const [favoriteCodes, setFavoriteCodes] = useState(() => { try { return JSON.parse(localStorage.getItem(`refosRuleFavorites:${eventId}`) || "[]"); } catch { return []; } });
   const [recentCodes, setRecentCodes] = useState(() => { try { return JSON.parse(localStorage.getItem(`refosRecentRules:${eventId}`) || "[]"); } catch { return []; } });
@@ -5693,6 +5708,7 @@ function RulePicker({ rules, knownRules, eventId, selectedCodes = [], selectedRu
                 <button type="button" onClick={(e) => toggleFavorite(r.code, e)} className={`px-3 shrink-0 ${favoriteCodes.includes(r.code) ? "text-amber-500" : "text-slate-300 hover:text-amber-500"}`}>
                   <Star size={17} fill={favoriteCodes.includes(r.code) ? "currentColor" : "none"} />
                 </button>
+                {ruleDetails&&selectedCodes.includes(r.code)&&['SG9','SG10'].includes(r.code)&&groups.find(group=>group.items.some(item=>item.code===r.code))?.cat===g.cat&&<div className="w-full px-4 pb-3"><RuleViolationDetails code={r.code} details={ruleDetails} onChange={onSetRuleDetails}/></div>}
               </div>
             ))}
           </div>
