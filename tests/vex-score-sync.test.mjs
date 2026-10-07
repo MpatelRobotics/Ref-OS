@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mapVexScores,fetchVexStandings} from '../supabase/functions/vex-event-lookup/matches.js';
+import {mapVexScores,fetchVexStandings,describeVexScores} from '../supabase/functions/vex-event-lookup/matches.js';
 import {planScoreUpdates} from '../src/vexScoreSync.js';
 const row={round:2,matchnum:3,instance:1,scored:true,alliances:[{color:'red',score:10,teams:[{team:{name:'2A'}},{team:{name:'3B'}}]},{color:'blue',score:0,teams:[{team:{name:'4C'}},{team:{name:'5D'}}]}]};
 test('scored results map with zero scores, unsupported rounds and unscored matches skip',()=>{const scores=mapVexScores([row,{...row,scored:false},{...row,round:9}]);assert.equal(scores.length,1);assert.deepEqual(scores[0],{phase:'qual',num:3,red:['2A','3B'],blue:['4C','5D'],redScore:10,blueScore:0});});
@@ -31,4 +31,18 @@ test('published scores without completion metadata import but placeholders and e
  assert.equal(result.scores.length,2);
  assert.deepEqual(result.scoreSummary,{received:3,notScored:1,unsupported:0});
  assert.equal(planScoreUpdates(Object.fromEntries(result.scores.map(score=>[score.num,{...score,redScore:null,blueScore:null}])),result.scores).updates.length,2);
+});
+
+test('diagnostics distinguish API placeholders from rejected published scores without exposing raw data',()=>{
+ const placeholders=Array.from({length:12},()=>({...row,scored:false,secret:'must-not-return',alliances:row.alliances.map(a=>({...a,score:0}))}));
+ const empty=describeVexScores(placeholders,[]);
+ assert.match(empty.message,/no nonzero alliance scores/);
+ assert.equal(empty.samples.length,5);
+ assert.equal(empty.samples[0].completion,'Marked unscored');
+ assert.equal(JSON.stringify(empty).includes('must-not-return'),false);
+ const rejected=describeVexScores([{...row,scored:false}],[]);
+ assert.match(rejected.message,/nonzero scores/);
+ assert.equal(rejected.samples[0].redScore,10);
+ assert.match(describeVexScores([],[]).message,/no matches/);
+ assert.match(describeVexScores([row],mapVexScores([row])).message,/ready to match/);
 });

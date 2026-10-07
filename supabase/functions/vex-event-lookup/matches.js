@@ -16,7 +16,7 @@ export async function fetchVexStandings(code, division, token, fetcher=fetch, ki
   const warnings=[];
   const scores=kind==='scores'?mapVexScores(rows):[];
   const notScored=kind==='scores'?rows.filter(row=>!vexMatchIsScored(row)).length:0;
-  return {code,divisions,kind,warnings,upstreamRows:rows.length,rankings:kind==='rankings'?mapVexRankings(rows):[],skills:kind==='skills'?mapVexSkills(rows):[],scores,scoreSummary:kind==='scores'?{received:rows.length,notScored,unsupported:rows.length-notScored-scores.length}:undefined,checkedAt:new Date().toISOString()};
+  return {code,divisions,kind,warnings,upstreamRows:rows.length,rankings:kind==='rankings'?mapVexRankings(rows):[],skills:kind==='skills'?mapVexSkills(rows):[],scores,scoreSummary:kind==='scores'?{received:rows.length,notScored,unsupported:rows.length-notScored-scores.length}:undefined,scoreDiagnostics:kind==='scores'?describeVexScores(rows,scores):undefined,checkedAt:new Date().toISOString()};
  }finally{clearTimeout(timer);}
 }
 
@@ -47,6 +47,20 @@ export function vexMatchIsScored(row){
  if(row.scored!==undefined && row.scored!==null && row.scored!=='')return false;
  const red=row.alliances?.find(a=>a.color==='red'),blue=row.alliances?.find(a=>a.color==='blue');
  return Number.isInteger(red?.score)&&red.score>=0&&Number.isInteger(blue?.score)&&blue.score>=0&&(red.score>0||blue.score>0);
+}
+// Bounded public match facts only; never return raw upstream objects or credentials.
+export function describeVexScores(rows,scores){
+ const alliance=(row,color)=>Array.isArray(row.alliances)?row.alliances.find(a=>a.color===color):null;
+ const published=rows.filter(row=>['red','blue'].some(color=>Number.isInteger(alliance(row,color)?.score)&&alliance(row,color).score>0));
+ const message=scores.length?'VEX returned scores ready to match against your imported schedule.':!rows.length?'VEX returned no matches for this division. Check the selected event and division.':published.length?'VEX returned nonzero scores, but the app rejected their completion status or match format. See the examples below.':'VEX returned no nonzero alliance scores for this division. The website may have newer results, or this may be a different division or League session.';
+ const samples=rows.slice(0,5).map(row=>({
+  round:Number.isInteger(row.round)?row.round:null,number:Number.isInteger(row.matchnum)?row.matchnum:null,
+  redScore:Number.isInteger(alliance(row,'red')?.score)?alliance(row,'red').score:null,
+  blueScore:Number.isInteger(alliance(row,'blue')?.score)?alliance(row,'blue').score:null,
+  completion:row.scored===false?'Marked unscored':row.scored===true?'Marked scored':row.scored==null||row.scored===''?'Completion flag missing':vexMatchIsScored(row)?'Scoring time supplied':'Unrecognized completion value',
+  accepted:vexMatchIsScored(row)
+ }));
+ return {message,samples};
 }
 export function mapVexScores(rows){
  const result=[];
