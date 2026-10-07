@@ -30,7 +30,7 @@ export default function VexSyncManager({visible,onOpen,onClose,onFetch,showLaunc
   }catch(e){if(active.current)setError(e.message||'Could not save event code.');}
   finally{if(active.current)setBusy(false);}
  };
- return <div aria-label="Independent VEX syncs">
+ return <div aria-label="Independent VEX syncs" className="px-4 pb-[calc(104px+env(safe-area-inset-bottom))] sm:pb-4">
   {showLaunch&&<button type="button" onClick={()=>{setOpen(true);setError('');}} className="my-3 min-h-[44px] rounded-lg bg-red-700 text-white px-4 py-2 font-semibold">Sync everything</button>}
   {open&&<div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3"><section role="dialog" aria-modal="true" aria-label="Sync everything" className="w-full max-w-xl max-h-[90dvh] overflow-y-auto rounded-xl bg-white dark:bg-slate-800 p-4 space-y-3">
    <h2 className="text-xl font-bold">Sync everything</h2><p className="text-sm">{props.target}</p>
