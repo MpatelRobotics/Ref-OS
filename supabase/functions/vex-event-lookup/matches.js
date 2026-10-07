@@ -41,10 +41,10 @@ export function mapVexSkills(rows) {
 
 export function vexMatchIsScored(row){
  // VEX can supply the scoring time instead of a boolean completion flag.
- // Some responses omit completion metadata but include published alliance scores.
- // Explicitly unscored matches and 0-0 placeholders must not overwrite scores.
+ // VEX can leave scored=false even after publishing nonzero alliance scores.
+ // Use those scores as evidence; 0-0 still requires explicit completion metadata.
  if(row.scored===true || typeof row.scored==='string' && /^\d{4}-\d{2}-\d{2}[T ]/.test(row.scored) && Number.isFinite(Date.parse(row.scored)))return true;
- if(row.scored!==undefined && row.scored!==null && row.scored!=='')return false;
+ if(row.scored!==false && row.scored!==undefined && row.scored!==null && row.scored!=='')return false;
  const red=row.alliances?.find(a=>a.color==='red'),blue=row.alliances?.find(a=>a.color==='blue');
  return Number.isInteger(red?.score)&&red.score>=0&&Number.isInteger(blue?.score)&&blue.score>=0&&(red.score>0||blue.score>0);
 }
@@ -57,7 +57,7 @@ export function describeVexScores(rows,scores){
   round:Number.isInteger(row.round)?row.round:null,number:Number.isInteger(row.matchnum)?row.matchnum:null,
   redScore:Number.isInteger(alliance(row,'red')?.score)?alliance(row,'red').score:null,
   blueScore:Number.isInteger(alliance(row,'blue')?.score)?alliance(row,'blue').score:null,
-  completion:row.scored===false?'Marked unscored':row.scored===true?'Marked scored':row.scored==null||row.scored===''?'Completion flag missing':vexMatchIsScored(row)?'Scoring time supplied':'Unrecognized completion value',
+  completion:row.scored===false?(vexMatchIsScored(row)?'Published scores detected despite unscored flag':'Marked unscored'):row.scored===true?'Marked scored':row.scored==null||row.scored===''?'Completion flag missing':vexMatchIsScored(row)?'Scoring time supplied':'Unrecognized completion value',
   accepted:vexMatchIsScored(row)
  }));
  return {message,samples};
