@@ -4976,7 +4976,6 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         onTwoDeviceSyncTest={() => openCommandCenterTool(() => setShowTwoDeviceSyncTest(true))}
         onDiagnosticReport={() => openCommandCenterTool(() => setShowDiagnosticReport(true))}
         onEventSetup={() => openCommandCenterTool(() => setShowEvent(true))}
-        onVexSync={!isIQ && !highlanderDemoLocked && !isVenueMode() ? () => openCommandCenterTool(() => setShowVexLiveSync(true)) : null}
         onTMSync={() => openCommandCenterTool(() => setShowTMSync(true))}
         onExportViolations={exportCSV}
         onExportNominations={exportNominations}
@@ -5035,10 +5034,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           </div>
         </div>
       )}
-      {!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode() && view === "rankings" && <button type="button" onClick={() => setShowVexLiveSync(true)} className="my-3 rounded-lg border border-blue-300 px-4 py-2 font-semibold">VEX API Sync · Qualification Rankings</button>}
-      {!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode() && view === "rankings" && <button type="button" onClick={()=>setShowVexSkillsSync(true)} className="my-3 ml-2 min-h-[44px] rounded-lg border border-blue-300 px-4 py-2 font-semibold">VEX API Sync · Skills Challenge</button>}
       {!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexSyncManager visible={{rankings:showVexLiveSync,skills:showVexSkillsSync,scores:showVexScoresSync}} onOpen={category=>{setShowVexLiveSync(category==='rankings');setShowVexSkillsSync(category==='skills');setShowVexScoresSync(category==='scores');}} key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onSaveCode={async code => { if (eventSettings?.vex_event?.value?.code === code) return; const saved = await api.upsertEventSetting(eventId, "vex_event", { ...(eventSettings?.vex_event?.value || {}), code }); setEventSettings(prev => ({ ...prev, vex_event:saved })); }} onFetch={api.getVexStandings} onApply={applyVexSnapshot} onClose={category=>{if(category==='rankings')setShowVexLiveSync(false);if(category==='skills')setShowVexSkillsSync(false);if(category==='scores')setShowVexScoresSync(false);}} />}
-      {!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode() && view === "matches" && <div className="mt-6 pb-4"><button type="button" onClick={()=>setShowVexScoresSync(true)} className="min-h-[44px] rounded-lg border border-blue-300 px-4 py-2 font-semibold">VEX API · Sync scores only</button></div>}
       {showFeedback && <FeedbackModal meName={meName} myRole={myRole} onSubmit={async (entry, screenshots) => { if (!screenshots?.length) return addFieldLog(entry); await submitFeedbackScreenshots({eventId, id:entry.id, note:entry.note, by:meName, sessionId:leagueSessionId || null, screenshots}); setFieldLog(await api.listFieldLog(eventId)); }} onClose={() => setShowFeedback(false)} />}
       {showOnboarding && <QuickStartModal step={onboardingStep} setStep={setOnboardingStep} onClose={closeOnboarding} />}
       {undoPrompt && (
