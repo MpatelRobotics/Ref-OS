@@ -5,11 +5,14 @@ const source = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
 const start = source.indexOf('function AllianceSelection(');
 const component = source.slice(start, source.indexOf('function AddMatchModal(', start));
 const compiled = transformSync(`import React from '/node_modules/.vite/deps/react.js';
+const {useState,useEffect}=React;
+import {tmMatchHighlights} from '/src/tmMatchHighlights.js';
+const TmFieldActivity=()=>null;
 const GitBranch = () => null, Check = () => null, Trophy = () => null;
-const fmtMatch = (phase, num) => phase + ' ' + num;
+const fmtMatch = m => m.phase + ' ' + m.num;
 ${component}
 export default AllianceSelection;`, {loader:'jsx',format:'esm'}).code;
-async function mount(page, {canImport=true, canEditBracket=true, phase='r16', empty=false, finalsBestOf=1, finalWins=0} = {}) {
+async function mount(page, {canImport=true, canEditBracket=true, phase='r16', empty=false, finalsBestOf=1, finalWins=0, live=false} = {}) {
   await page.route('**/alliance-test-component.js', route => route.fulfill({contentType:'text/javascript',body:compiled}));
   await page.route('**/alliance-import-test', route => route.fulfill({contentType:'text/html',body:`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
     import React from '/node_modules/.vite/deps/react.js';
@@ -18,6 +21,8 @@ async function mount(page, {canImport=true, canEditBracket=true, phase='r16', em
     window.importClicks=0; window.selectedWinner=null;
     ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Alliances, {
       matches: ${JSON.stringify(empty?{}:phase==='final'?Object.fromEntries([1,2,3].map(num=>['final-'+num,{id:'final-'+num,phase,num,red:['1A','2B'],blue:['3C','4D'],winner:num<=finalWins?'red':''}])):{test:{id:'test',phase,num:1,red:['1A','2B'],blue:['3C','4D']}})},
+      tmActivity: ${live ? JSON.stringify({updatedAt:Date.now(),fieldSets:[{connected:true,fields:[{status:'playing',match:{round:'QF',instance:1,match:1}}]}]}) : 'null'},
+      onOpenMatch:id=>window.openedMatch=id,
       finalsBestOf:${finalsBestOf},canImport:${canImport},canEditBracket:${canEditBracket},
       onImport:()=>window.importClicks++,onSetWinner:(match,side)=>window.selectedWinner={id:match.id,side}
     }));
@@ -71,4 +76,14 @@ test('automatic advancement creates the configured number of finals',async()=>{
   const map={'sf-1':{winner:'red',red:['1A','2B'],blue:[]},'sf-2':{winner:'blue',red:[],blue:['3C','4D']}};
   expect((await run({finalsBestOf:1},map)).filter(m=>m.phase==='final').map(m=>m.num)).toEqual([1]);
   expect((await run({finalsBestOf:3},map)).filter(m=>m.phase==='final').map(m=>m.num)).toEqual([1,2,3]);
+});
+
+
+test('elimination bracket highlights live match and only jumps on request', async ({page}) => {
+  await mount(page,{phase:'qf',live:true});
+  await expect(page.getByText('Playing now',{exact:true})).toBeVisible();
+  await expect(page.getByText('Playing now',{exact:true}).locator('..')).toHaveClass(/bg-emerald-50/);
+  expect(await page.evaluate(()=>window.openedMatch)).toBeUndefined();
+  await page.getByRole('button',{name:'Jump to current match · qf 1'}).click();
+  expect(await page.evaluate(()=>window.openedMatch)).toBe('test');
 });

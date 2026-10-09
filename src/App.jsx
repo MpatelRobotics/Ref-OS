@@ -4721,7 +4721,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         ) : view === "awp" ? (
           isIQ ? <p>AWP is a V5 tool. IQ teamwork has no autonomous win point.</p> : <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} fieldNames={fieldNames} />
         ) : view === "alliances" ? (
-          isIQ ? <IQMatches key={`iq-finals-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} parseCSV={parseCSV} /> : <AllianceSelection matches={matches} finalsBestOf={event?.finalsBestOf} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
+          isIQ ? <IQMatches key={`iq-finals-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} parseCSV={parseCSV} /> : <AllianceSelection tmActivity={eventSettings?.tm_field_activity?.value} onOpenMatch={id => { setOpenMatch(id); setView("matches"); }} matches={matches} finalsBestOf={event?.finalsBestOf} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
         ) : (
           <>
             {!!event?.quals && (
@@ -7381,7 +7381,11 @@ function TMSyncCenter({ isIQ = false, onClose, onConnectApi, onImportTeams, onIm
 }
 
 /* ============================ ALLIANCE SELECTION (admin) ============================ */
-function AllianceSelection({ matches, finalsBestOf = 1, onImport, onSetWinner, canImport = false, canEditBracket = false }) {
+function AllianceSelection({ tmActivity, onOpenMatch, matches, finalsBestOf = 1, onImport, onSetWinner, canImport = false, canEditBracket = false }) {
+  const [liveNow, setLiveNow] = useState(Date.now);
+  useEffect(() => { const timer = setInterval(() => setLiveNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
+  const liveHighlights = tmMatchHighlights(matches || {}, tmActivity, liveNow);
+  const currentMatches = Object.values(matches || {}).filter(m => m.phase !== 'qual' && m.phase !== 'practice' && liveHighlights[m.id] === 'current');
   const finalGames = Number(finalsBestOf) === 3 ? 3 : 1;
   const winsNeeded = Math.floor(finalGames / 2) + 1;
   const ROUNDS = [["r16", "Round of 16"], ["qf", "Quarterfinals"], ["sf", "Semifinals"], ["final", `Finals (best of ${finalGames})`]];
@@ -7408,6 +7412,8 @@ function AllianceSelection({ matches, finalsBestOf = 1, onImport, onSetWinner, c
   };
   return (
     <section className="refos-alliances min-w-0" aria-label="Alliances and elimination bracket">
+      <TmFieldActivity value={tmActivity} />
+      {currentMatches.map(m => <button key={m.id} type="button" onClick={() => onOpenMatch(m.id)} className="min-h-[44px] px-3 py-2 mb-3 mr-2 rounded-lg border border-emerald-500 bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 text-sm font-semibold">Jump to current match · {fmtMatch(m)}</button>)}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><GitBranch size={18} className="text-[#D7212B]" /> Import alliances</h2>
         <ol className="list-decimal pl-5 mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
@@ -7440,7 +7446,8 @@ function AllianceSelection({ matches, finalsBestOf = 1, onImport, onSetWinner, c
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">{label}</h3>
                 <div className="space-y-2">
                   {ms.map((m) => (
-                    <div key={m.id} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-2.5">
+                    <div key={m.id} className={`rounded-xl border p-2.5 ${liveHighlights[m.id] === 'current' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'bg-amber-50 dark:bg-amber-950 border-amber-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                      {liveHighlights[m.id] && <p className={`text-sm font-semibold mb-2 ${liveHighlights[m.id] === 'current' ? 'text-emerald-800 dark:text-emerald-200' : 'text-amber-800 dark:text-amber-200'}`}>{liveHighlights[m.id] === 'current' ? 'Playing now' : 'Up next'}</p>}
                       <div className="refos-bracket-match">
                         <span className="refos-bracket-label font-mono text-[11px] font-bold text-slate-400 w-16 shrink-0">{phase === "final" ? `Final ${m.num}` : fmtMatch({ phase: m.phase, num: m.num })}</span>
                         <Side m={m} side="red" />

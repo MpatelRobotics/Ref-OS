@@ -12,8 +12,10 @@ export function tmMatchHighlights(matches, activity, now = Date.now()) {
     const current = rows.filter(row => row.phase === phase && row.num === num);
     if (current.length !== 1) continue;
     result[current[0].id] = 'current';
-    const following = rows.filter(row => row.phase === phase && row.num > current[0].num && (row.redScore == null || row.blueScore == null)).sort((a, b) => a.num - b.num);
-    if (following.length && following.filter(row => row.num === following[0].num).length === 1 && result[following[0].id] !== 'current') result[following[0].id] = 'upcoming';
+    const rounds = ['r16', 'qf', 'sf', 'final'];
+    const order = rounds.indexOf(phase);
+    const following = rows.filter(row => (row.phase === phase && row.num > current[0].num || order >= 0 && rounds.indexOf(row.phase) > order) && (row.redScore == null || row.blueScore == null)).sort((a, b) => (rounds.indexOf(a.phase) - rounds.indexOf(b.phase)) || (a.num - b.num));
+    if (following.length && following.filter(row => row.phase === following[0].phase && row.num === following[0].num).length === 1 && result[following[0].id] !== 'current') result[following[0].id] = 'upcoming';
   }
   return result;
 }

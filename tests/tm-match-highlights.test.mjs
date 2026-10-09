@@ -26,3 +26,10 @@ test('live elimination highlights use pairing instance rather than game number',
     assert.deepEqual(tmMatchHighlights(matches,live,1001), {});
   }
 });
+
+
+test('next elimination round is amber after the last pairing in the current round', () => {
+  const matches = {a:{id:'a',phase:'qf',num:4}, b:{id:'b',phase:'sf',num:1}, c:{id:'c',phase:'final',num:1}};
+  const live = {updatedAt:1000,fieldSets:[{connected:true,fields:[{status:'playing',match:{round:'QF',instance:4,match:1}}]}]};
+  assert.deepEqual(tmMatchHighlights(matches,live,1001), {a:'current',b:'upcoming'});
+});
