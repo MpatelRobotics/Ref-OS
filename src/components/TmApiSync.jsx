@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { normalizeTmSnapshot } from '../tmSnapshot.js';
+import { matchTmDivision } from '../tmDivisionMapping.js';
 import { scopeTmFieldActivity } from '../tmFieldActivity.js';
 
-export default function TmApiSync({ open, onClose, target, onFetch, onApply, onActivity, onPublishActivity, onDisconnect, expectedCode = '' }) {
+export default function TmApiSync({ open, onClose, target, onFetch, onApply, onActivity, onPublishActivity, onDisconnect, expectedCode = '', refosDivisions=[], refosDivisionId=0, savedDivisionMappings={}, onSaveDivisionMapping }) {
   const desktop = Boolean(window.refosTmDesktop), mobile = Boolean(window.Capacitor?.isNativePlatform?.());
   const [address, setAddress] = useState(mobile ? '' : 'http://localhost:8080');
   const [pairing, setPairing] = useState(''), [apiKey, setApiKey] = useState('');
@@ -45,17 +46,23 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
       const data = await latest.current.onFetch({ ...settings(), division: null, liveFields: false });
       if (!alive.current || ticket !== version.current) return;
       if (!data.event || typeof data.event.name !== 'string' || data.event.code != null && typeof data.event.code !== 'string' || !Array.isArray(data.divisions) || !data.divisions.length || data.divisions.some(d => !Number.isSafeInteger(d.id) || d.id < 1 || typeof d.name !== 'string')) throw Error('TM returned no valid event or divisions.');
-      setRemoteEvent(data.event); setDivisions(data.divisions); setDivision(data.divisions.length === 1 ? String(data.divisions[0].id) : '');
+      const mapped=matchTmDivision(data.divisions,refosDivisions,refosDivisionId,savedDivisionMappings);
+      setRemoteEvent(data.event); setDivisions(data.divisions); setDivision(mapped?String(mapped.id):'');
+      setStatus(mapped?`${mapped.reason}: ${data.divisions.find(d=>d.id===mapped.id).name}`:'Choose the TM division for the selected Ref OS division.');
     } catch (e) { if (alive.current && ticket === version.current) setError(e.message || 'Could not connect to TM.'); }
     finally { if (alive.current) setBusy(false); }
   };
   const review = async () => {
+    if(refosDivisions.length>1 && !refosDivisionId){setError('Select a Ref OS division first, then connect its TM division.');return;}
     const ticket = ++version.current;
     setBusy(true); setError(''); setRaw(null);
     try {
       const data = await latest.current.onFetch({ ...settings(), liveFields: false });
       if (!alive.current || ticket !== version.current) return;
-      normalizeTmSnapshot(data); reviewedEvent.current = data.event.code || data.event.name; setRemoteEvent(data.event); setRaw(data); setSession('');
+      normalizeTmSnapshot(data);
+      await onSaveDivisionMapping?.(Number(division),data.divisions?.find(d=>d.id===Number(division))?.name || divisions.find(d=>d.id===Number(division))?.name);
+      if (!alive.current || ticket !== version.current) return;
+      reviewedEvent.current = data.event.code || data.event.name; setRemoteEvent(data.event); setRaw(data); setSession('');
     } catch (e) { if (alive.current && ticket === version.current) setError(e.message || 'Could not review TM data.'); }
     finally { if (alive.current) setBusy(false); }
   };
@@ -158,7 +165,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
         <p className="text-sm text-slate-500">The event key is kept in memory and cleared when you leave this event or reload.</p>
         <button className={buttonClass} disabled={(!desktop && !mobile) || !apiKey.trim() || !address.trim()} onClick={load}>Connect to TM</button>
         {remoteEvent && <p className="text-sm">Connected event: <b>{remoteEvent.name}</b>{remoteEvent.code && ` · ${remoteEvent.code}`}</p>}
-        {!!divisions.length && <><label className="block">TM division<select className={inputClass} value={division} onChange={e => { setDivision(e.target.value); setRaw(null); setSession(''); hashes.current = {}; }}><option value="">Choose a division</option>{divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label><button className={buttonClass} disabled={!division} onClick={review}>Review TM data</button></>}
+        {!!divisions.length && <><p className="text-sm">Ref OS division: <b>{refosDivisions.find(d=>Number(d.id)===Number(refosDivisionId))?.name || 'Current event'}</b>. Review confirms this mapping.</p><label className="block">TM division<select className={inputClass} value={division} onChange={e => { setDivision(e.target.value); setRaw(null); setSession(''); hashes.current = {}; }}><option value="">Choose a division</option>{divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label><button className={buttonClass} disabled={!division} onClick={review}>Review TM data</button></>}
         {preview && <><p className="text-sm">Missing matches are added automatically. Live fields show TM's assigned match and start/stop events in Matches for all event users. Sync teams, qualification rankings, skills, and scores. Scores only update matches with matching round, number, and teams. Existing fields and team assignments are kept. Empty lists do not clear data.</p>
           {preview.sessions.length > 1 && <label className="block">TM session<select className={inputClass} value={session} onChange={e => { setSession(e.target.value); hashes.current = {}; }}><option value="">Choose a TM session</option>{preview.sessions.map(id => <option key={id} value={id}>TM session {id}</option>)}</select></label>}
           <p className="text-sm">{preview.teams.length} teams · {preview.matches.length} matches · {preview.scores.length} scored matches · {preview.rankings.length} rankings · {preview.skills.length} skills results</p>

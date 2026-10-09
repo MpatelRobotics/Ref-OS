@@ -1,3 +1,4 @@
+import { eliminationPairingKey, eliminationPairingLabel, eliminationResultLabel } from './tmReplayGrouping.js';
 import { tmPairingNumber, tmGameNumber, tmMatchOrder } from './tmMatchIdentity.js';
 import {planScoreUpdates} from "./vexScoreSync.js";
 import {parseViolationRuleNotes,validViolationRuleDetails,formatViolationRuleNotes} from "./violationRuleNotes.js";
@@ -3562,7 +3563,7 @@ function DivisionTracker({ divisionId=0, divisionCatalog=[], league = null, init
   };
   const winnerTeams = (m) => (m && ["red", "blue"].includes(m.winner) ? (m.winner === "red" ? m.red : m.blue) : null);
   const advanceBracket = async (map) => {
-    const get = (phase, num) => map[`${phase}-${num}`];
+    const get = (phase, num) => Object.values(map).filter(m=>m.phase===phase&&tmPairingNumber(phase,m.num)===num).sort(tmMatchOrder).at(-1) || map[`${phase}-${num}`];
     const toCreate = [];
     const push = (phase, num, red, blue, label) => {
       const ex = get(phase, num);
@@ -4922,6 +4923,8 @@ function DivisionTracker({ divisionId=0, divisionCatalog=[], league = null, init
         key={`tm-${eventId}-${leagueSessionId || ''}`} open={showTmApiSync} onClose={() => setShowTmApiSync(false)}
         target={`${event?.name || 'Current event'}${league ? ' · ' + league.sessionName(leagueSessionId) : ''}`}
         expectedCode={eventSettings?.vex_event?.value?.code || ''}
+        refosDivisions={divisionCatalog} refosDivisionId={divisionId} savedDivisionMappings={eventSettings?.tm_division_mappings?.value || {}}
+        onSaveDivisionMapping={async(id,name)=>{if(!divisionId||!name)return;if(Object.entries(eventSettings?.tm_division_mappings?.value||{}).some(([local,mapping])=>Number(local)!==divisionId&&Number(mapping.id)===id))throw Error('This TM division is already mapped to another Ref OS division.');const saved=await api.upsertEventSetting(eventId,'tm_division_mappings',{...(eventSettings?.tm_division_mappings?.value||{}),[divisionId]:{id,name}},meName);setEventSettings(prev=>({...prev,tm_division_mappings:saved}));}}
         onFetch={settings => api.getTmSnapshot(eventId, settings)} onApply={applyTmApiSnapshot}
         onActivity={api.getTmFieldActivity} onDisconnect={(id, pairing) => api.getTmFieldActivity(id, pairing, true)}
         onPublishActivity={async (value, current) => { if (!current()) return; const row = await api.upsertEventSetting(eventId, 'tm_field_activity', value, meName); if (current()) setEventSettings(prev => ({ ...prev, tm_field_activity: row })); }}
@@ -5882,8 +5885,9 @@ function MatchList({ tmActivity, matches, teamName, teamRank = {}, viols, fieldL
         <Empty title={tab === "elim" ? "No elimination matches" : "No matches"} sub={tab === "elim" ? (canAdd ? "Add an elimination match, or import the bracket from Tournament Manager." : "Elimination matches will appear here once loaded.") : "Try a different match number or team."} />
       ) : (
         <ul className="space-y-2">
-          {filtered.map((m) => (
+          {filtered.map((m,index) => (
             <li key={m.id}>
+              {tab === "elim" && eliminationPairingKey(m)!==eliminationPairingKey(filtered[index-1]||{}) && <h3 className="pt-3 pb-2 font-semibold">{eliminationPairingLabel(m)} · Games</h3>}
               <button onClick={() => onOpen(m.id)} className={`w-full text-left rounded-xl border px-4 py-3 flex flex-wrap sm:flex-nowrap items-center gap-3 hover:shadow-sm transition ${liveHighlights[m.id] === 'current' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 dark:border-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'bg-amber-50 dark:bg-amber-950 border-amber-500 dark:border-amber-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}>
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-14 shrink-0">{rowLabel(m)}</span>
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
@@ -5896,6 +5900,7 @@ function MatchList({ tmActivity, matches, teamName, teamRank = {}, viols, fieldL
                 {m.redScore != null && m.blueScore != null && (
                   <span aria-label={`Score: red ${m.redScore}, blue ${m.blueScore}`} className="font-mono text-sm font-bold shrink-0"><span className="text-slate-500 mr-1">Score</span><span className={m.winner === "red" ? "text-red-700 dark:text-red-300" : "text-slate-400"}>{m.redScore}</span><span className="text-slate-300">-</span><span className={m.winner === "blue" ? "text-blue-700 dark:text-blue-300" : "text-slate-400"}>{m.blueScore}</span></span>
                 )}
+                {eliminationPairingKey(m) && eliminationResultLabel(m) && <span className="text-xs font-semibold text-amber-800 dark:text-amber-200">{eliminationResultLabel(m)}</span>}
                 {(m.redScore == null || m.blueScore == null) && <span className="text-xs text-slate-500 shrink-0">Awaiting score</span>}
                 {!emcee && replaySet.has(m.id) && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700 shrink-0"><RefreshCw size={10} /> REPLAY</span>}
                 {!emcee && timeoutSet.has(m.id) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700 shrink-0">TO</span>}
@@ -7414,9 +7419,9 @@ function AllianceSelection({ tmActivity, onOpenMatch, matches, finalsBestOf = 1,
   const finalGames = Number(finalsBestOf) === 3 ? 3 : 1;
   const winsNeeded = Math.floor(finalGames / 2) + 1;
   const ROUNDS = [["r16", "Round of 16"], ["qf", "Quarterfinals"], ["sf", "Semifinals"], ["final", `Finals (best of ${finalGames})`]];
-  const byPhase = (p) => Object.values(matches || {}).filter((m) => m.phase === p && (p !== "final" || Number(m.num) <= finalGames)).sort(tmMatchOrder);
+  const byPhase = (p) => Object.values(matches || {}).filter((m) => m.phase === p).sort(tmMatchOrder);
   const hasBracket = ROUNDS.some(([phase]) => byPhase(phase).length > 0);
-  // Count only finals in the configured series; preserve other saved matches.
+  // Replay games remain visible and only decisive results count toward the series.
   const finals = byPhase("final");
   let champion = null;
   if (finals.length) {
@@ -7470,17 +7475,21 @@ function AllianceSelection({ tmActivity, onOpenMatch, matches, finalsBestOf = 1,
               <div key={phase} className="mb-4">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">{label}</h3>
                 <div className="space-y-2">
-                  {ms.map((m) => (
-                    <div key={m.id} className={`rounded-xl border p-2.5 ${liveHighlights[m.id] === 'current' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'bg-amber-50 dark:bg-amber-950 border-amber-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                  {ms.map((m,index) => (
+                    <React.Fragment key={m.id}>
+                    {eliminationPairingKey(m)!==eliminationPairingKey(ms[index-1]||{}) && <h4 className="pt-2 font-semibold">{eliminationPairingLabel(m)} · Games</h4>}
+                    <div className={`rounded-xl border p-2.5 ${liveHighlights[m.id] === 'current' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'bg-amber-50 dark:bg-amber-950 border-amber-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                       {liveHighlights[m.id] && <p className={`text-sm font-semibold mb-2 ${liveHighlights[m.id] === 'current' ? 'text-emerald-800 dark:text-emerald-200' : 'text-amber-800 dark:text-amber-200'}`}>{liveHighlights[m.id] === 'current' ? 'Playing now' : 'Up next'}</p>}
                       <div className="refos-bracket-match">
                         <span className="refos-bracket-label font-mono text-[11px] font-bold text-slate-400 w-16 shrink-0">{phase === "final" ? `Final ${m.num}` : fmtMatch({ phase: m.phase, num: m.num })}</span>
                         <Side m={m} side="red" />
                         <span className="text-slate-300 text-xs font-sans shrink-0">vs</span>
                         <Side m={m} side="blue" />
-                        <span className="text-sm font-mono font-bold">{m.redScore != null && m.blueScore != null ? `Score ${m.redScore} – ${m.blueScore}${m.winner === "tie" ? " · Tie" : ""}` : "Awaiting score"}</span>
+                        <span className="text-sm font-mono font-bold">{m.redScore != null && m.blueScore != null ? `Score ${m.redScore} – ${m.blueScore}${eliminationResultLabel(m) ? " · "+eliminationResultLabel(m) : ""}` : "Awaiting score"}</span>
                       </div>
+                      {canEditBracket && m.redScore != null && m.blueScore != null && <button type="button" className="mt-2 min-h-[44px] rounded-lg border px-3 text-sm" onClick={()=>onSetWinner(m,'double_dq')}>{m.winner==='double_dq'?'Clear double DQ':'Mark double DQ'}</button>}
                     </div>
+                    </React.Fragment>
                   ))}
                 </div>
               </div>
