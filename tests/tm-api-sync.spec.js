@@ -46,7 +46,7 @@ test('wrong event is blocked and connection errors have a recoverable message',a
 });
 test('setup download and controls fit mobile and key stays password masked',async({page})=>{
   await mount(page, false);
-  await expect(page.getByRole('link',{name:'Download Ref OS TM Connect for Windows'})).toHaveAttribute('href','/Ref-OS-TM-Connect.exe');
+  await expect(page.getByRole('link',{name:'Download Ref OS TM Connect for Windows'})).toHaveAttribute('href','https://github.com/MpatelRobotics/Ref-OS/releases/download/tm-connect/Ref-OS-TM-Connect.exe');
   await expect(page.getByLabel('Event TM API key',{exact:true})).toHaveAttribute('type','password');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.getByRole('button',{name:'Start TM syncing'}).scrollIntoViewIfNeeded();

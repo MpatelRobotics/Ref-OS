@@ -16,7 +16,7 @@ npx supabase functions deploy tm-api-token --project-ref gcibsphjcllspzesqqsw --
 
 The function verifies the signed-in user with Supabase Auth and checks the event's server-side administrator role. OAuth uses the documented client-credentials flow, caches the bearer token until shortly before expiry, and coalesces simultaneous renewals. The gateway JWT check is disabled because the function handles authentication itself, matching the existing VEX function deployment.
 
-4. Publish the web app normally. The build prepares the Windows desktop download automatically. No database migration is needed.
+4. Publish the web app normally. The website build does not package Windows executables. The separate Windows workflow publishes the desktop download. No database migration is needed.
 
 ## Event organizer setup
 
@@ -29,7 +29,7 @@ The function verifies the signed-in user with Supabase Auth and checks the event
 
 ## Desktop build and distribution
 
-Run `npm run build:tm-desktop` on the developer computer. The portable Windows x64 executable is created in `desktop/release/Ref-OS-TM-Connect.exe` and copied to `public/Ref-OS-TM-Connect.exe`. Normal production builds also generate the download before Vite copies public files. Generated binaries are ignored by Git. To distribute through an external release instead, set `VITE_TM_DESKTOP_DOWNLOAD_URL` to that HTTPS download URL. This build is unsigned; Windows may display an unrecognized-publisher prompt. Configure signing before broad public distribution.
+Run `npm run build:tm-desktop` on the developer computer. The portable Windows x64 executable is created in `desktop/release/Ref-OS-TM-Connect.exe` and copied to `public/Ref-OS-TM-Connect.exe`. Website builds only validate the schema and run Vite; Vercel never runs Electron or NSIS. Generated binaries are ignored by Git. The `Build TM desktop download` GitHub Actions workflow runs on Windows after relevant pushes to `main`, tests the packaged app, and publishes the executable to the public `tm-connect` GitHub release. The website download button points to that asset, so it becomes available when the first workflow run completes. The workflow can also be started manually from GitHub Actions. It uses the built-in GitHub token with release write permissions; no TM credentials are passed to the workflow. To use another download host, set `VITE_TM_DESKTOP_DOWNLOAD_URL` to its HTTPS download URL. This build is unsigned; Windows may display an unrecognized-publisher prompt. Configure signing before broad public distribution.
 
 The desktop app loads your hosted Ref OS website and uses its existing sign-in and event permissions. Its isolated preload exposes only TM requests; developer client credentials remain in the Supabase token broker. The internal connector binds a random loopback port with a random private pairing secret. Neither the key nor pairing secret is saved to disk. Changing website from the tray stops the current connection. Reloading, signing out, or leaving the event stops sync. Do not shut down the event computer while sharing live updates.
 

@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check:schema": "node scripts/check-schema.mjs",
-    "prebuild": "node scripts/check-schema.mjs && node scripts/build-tm-desktop.mjs",
+    "prebuild": "node scripts/check-schema.mjs",
     "test:e2e": "playwright test",
     "security:access-sql": "node scripts/generate-access-security-sql.mjs > supabase/access-passwords-generated.sql",
     "push:vapid-keys": "node scripts/generate-vapid-keys.mjs",

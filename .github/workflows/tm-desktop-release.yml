@@ -1,0 +1,53 @@
+name: Build TM desktop download
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'tm-bridge/**'
+      - 'scripts/build-tm-desktop.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/tm-desktop-release.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tm-desktop-release
+  cancel-in-progress: false
+
+jobs:
+  windows-download:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build:tm-desktop
+      - name: Verify packaged desktop app
+        shell: pwsh
+        run: |
+          $env:REFOS_PACKAGED_EXE = (Resolve-Path 'desktop/release/win-unpacked/Ref OS TM Connect.exe').Path
+          node --test tests/tm-desktop.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop verification failed.' }
+      - name: Publish Windows download
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          gh release view tm-connect --json tagName
+          if ($LASTEXITCODE -ne 0) {
+            gh release create tm-connect --target "$env:RELEASE_COMMIT" --title "Ref OS TM Connect" --notes "Windows desktop app for sharing Tournament Manager updates with Ref OS Cloud. Open the app on a computer with access to TM and the internet. This download is unsigned." --latest=false
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create the desktop release.' }
+          }
+          gh release upload tm-connect desktop/release/Ref-OS-TM-Connect.exe --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Could not upload the desktop download.' }
