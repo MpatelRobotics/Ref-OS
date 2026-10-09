@@ -1,12 +1,12 @@
 import React,{forwardRef,useEffect,useImperativeHandle,useRef,useState} from 'react';
-export default forwardRef(function VexLiveSync({category='rankings',initialCode='',target='',onFetch,onApply,onClose,visible=true,onSaveCode=async()=>{},onOpen=()=>{}},ref){
+export default forwardRef(function VexLiveSync({category='rankings',initialCode='',target='',onFetch,onApply,onClose,visible=true,showStatus=true,onSaveCode=async()=>{},onOpen=()=>{}},ref){
  const [code,setCode]=useState(initialCode),[division,setDivision]=useState(''),[divisions,setDivisions]=useState([]),[preview,setPreview]=useState(null),[busy,setBusy]=useState(false),[auto,setAuto]=useState(false),[approved,setApproved]=useState(false),[status,setStatus]=useState(''),[error,setError]=useState('');
  const kind=['skills','scores'].includes(category)?category:'rankings';const categoryLabel=kind==='skills'?'Skills Challenge':kind==='scores'?'Scores only':'Qualification rankings';
  const running=useRef(false),last=useRef(''),active=useRef(true);useEffect(()=>{active.current=true;return()=>{active.current=false;};},[]);
  useEffect(()=>{if(initialCode && !code) setCode(initialCode);},[initialCode]);
  const reset=()=>{setAuto(false);setApproved(false);setPreview(null);last.current='';setStatus('');setError('');};
  const check=async(background=false)=>{
- if(running.current||document.hidden||!navigator.onLine)return;
+ if(running.current||(!window.refosTmDesktop && document.hidden)||!navigator.onLine)return;
  running.current=true;setBusy(true);setError('');
  try{const data=await onFetch(code,division||null,kind);if(!active.current)return;await onSaveCode(data.code || code.trim().toUpperCase());if(!active.current)return;setDivisions(data.divisions);
  if(kind!=='skills'&&!division){if(data.divisions.length===1){setDivision(String(data.divisions[0].id));const snapshot=await onFetch(code,data.divisions[0].id,kind);if(active.current)setPreview(snapshot);setStatus('Review '+categoryLabel+', then Start syncing.');}else setStatus('Select a division, then check for data.');return;}
@@ -34,6 +34,7 @@ export default forwardRef(function VexLiveSync({category='rankings',initialCode=
   finally{running.current=false;if(active.current)setBusy(false);}
  }}));
  const apply=async(start=false)=>{setBusy(true);try{const result=await onApply(preview,kind);last.current=JSON.stringify(preview[kind]||[]);setApproved(true);setPreview(null);setStatus(result?.message || categoryLabel+' imported.');if(start){setAuto(true);onClose();}}catch(e){setError(e.message||'Import failed. Retry this snapshot.');setAuto(false);}finally{setBusy(false);}};
+ if(!visible && !showStatus) return null;
  if(!visible) return (auto || error) ? <aside aria-label={kind==='skills'?'VEX Skills sync status':kind==='scores'?'VEX scores sync status':'VEX sync status'} className="min-w-0 rounded-lg border border-slate-200 dark:border-slate-700 px-2 py-1 text-xs">
   <div className="flex flex-wrap items-center gap-2"><span className="flex-1">{auto ? `VEX ${kind} sync active · 15s` : `VEX ${kind} sync stopped`}</span>
    <button type="button" aria-label={kind==='skills'?'Manage VEX Skills sync':kind==='scores'?'Manage VEX scores sync':'Manage VEX sync'} onClick={onOpen} className="min-h-[44px] rounded px-2 hover:bg-slate-100 dark:hover:bg-slate-700">Manage</button>

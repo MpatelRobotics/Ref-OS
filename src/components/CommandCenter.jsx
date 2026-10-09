@@ -142,6 +142,7 @@ export default function CommandCenter({ matches, viols, fieldLog, presence, rost
                 <ChevronRight size={20} className="shrink-0 text-slate-400"/>
               </button>
             )}
+            {onVexSync && <button type="button" onClick={onVexSync} className={tool}><RefreshCw size={16}/> Sync everything</button>}
             <button onClick={onEventSetup} className={tool}><CalendarDays size={16}/> Event Setup</button>
             {onEventSettings && <button onClick={onEventSettings} className={tool}><Settings size={16}/> Event Settings</button>}
             <button onClick={onRoleCodes} className={tool}><KeyRound size={16}/> Volunteer Access Codes</button>
