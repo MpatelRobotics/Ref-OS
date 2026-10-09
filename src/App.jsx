@@ -1792,6 +1792,16 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   const [fieldLog, setFieldLog] = useState([]);
   const [fieldResetChecks, setFieldResetChecks] = useState([]);
   const [eventSettings, setEventSettings] = useState({});
+  const lastLiveMatch = useRef('');
+  useEffect(() => {
+    if (view !== 'matches') { lastLiveMatch.current = ''; return; }
+    const highlights = tmMatchHighlights(matches, eventSettings?.tm_field_activity?.value);
+    const current = Object.values(matches).filter(m => highlights[m.id] === 'current').sort((a, b) => a.num - b.num);
+    const signature = current.map(m => m.id).join('|');
+    if (signature && signature !== lastLiveMatch.current) setOpenMatch(current[0].id);
+    lastLiveMatch.current = signature;
+  }, [view, matches, eventSettings?.tm_field_activity?.value]);
+
   const [programLookupError, setProgramLookupError] = useState("");
   const isIQ = (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq";
   const requiredRobotPhotos = normalizeRequiredRobotPhotos(eventSettings?.robot_photo_requirements?.value?.required);
@@ -4649,7 +4659,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={isIQ ? undefined : teamRecords[openTeam]}
             onLog={highlanderDemoLocked ? undefined : () => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked && !highlanderDemoLocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : openMatch ? (
-          isIQ ? <IQMatchDetail key={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols} fieldLog={fieldLog} canEdit={adminUnlocked && !highlanderDemoLocked} onSaveScore={saveIQScore} onLogTeam={!isEmcee && !isJudge ? number => { const m=matches[openMatch]; setLogFor(number); setLogMatch({phase:m.phase,num:m.num}); } : null} onAddField={!isEmcee && !isJudge ? addFieldLog : null} /> : <MatchDetail match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
+          isIQ ? <IQMatchDetail key={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols} fieldLog={fieldLog} canEdit={adminUnlocked && !highlanderDemoLocked} onSaveScore={saveIQScore} onLogTeam={!isEmcee && !isJudge ? number => { const m=matches[openMatch]; setLogFor(number); setLogMatch({phase:m.phase,num:m.num}); } : null} onAddField={!isEmcee && !isJudge ? addFieldLog : null} /> : <MatchDetail tmActivity={eventSettings?.tm_field_activity?.value} match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
             fieldLog={fieldLog} fieldResetChecks={fieldResetChecks} onVerifyFieldReset={verifyFieldResetQuadrant} onResetFieldReset={resetFieldResetMatch}
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={highlanderDemoLocked ? undefined : (n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} emcee={isEmcee} />
@@ -5959,7 +5969,7 @@ function AwpChecker({ onSave }) {
 
 const REPLAY_REASONS = ["Field fault", "Scoring or timer issue", "Match started incorrectly", "Safety interruption", "External interference", "Other"];
 
-function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, canManageViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
+function MatchDetail({ tmActivity, match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, canManageViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
   const [toOpen, setToOpen] = useState(false);
   const [toAlliance, setToAlliance] = useState("red");
   const [toTeam, setToTeam] = useState("");
@@ -5971,6 +5981,9 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
   const [awpOpen, setAwpOpen] = useState(false);
   const [fieldResetOpen, setFieldResetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [liveNow, setLiveNow] = useState(Date.now);
+  useEffect(() => { const timer = setInterval(() => setLiveNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
+  const liveHighlights = tmMatchHighlights(matches || {}, tmActivity, liveNow);
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
   const m = match;
   const heading = m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`);
@@ -6079,7 +6092,8 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
   );
   return (
     <>
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
+      <div className={`rounded-xl border p-4 mb-4 ${liveHighlights[m.id] === 'current' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'bg-amber-50 dark:bg-amber-950 border-amber-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+        {liveHighlights[m.id] && <p className={`text-sm font-semibold mb-2 ${liveHighlights[m.id] === 'current' ? 'text-emerald-800 dark:text-emerald-200' : 'text-amber-800 dark:text-amber-200'}`}>{liveHighlights[m.id] === 'current' ? 'Playing now' : 'Up next'}</p>}
         <div className="flex items-center justify-between gap-2">
           <div>
             <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">{heading}</div>
@@ -6103,7 +6117,7 @@ function MatchDetail({ match, matches, teamName, teamRank = {}, teamWatch = {}, 
         {ids.length > 1 && (
           <select value={m.id} onChange={(e) => onNav(e.target.value)}
             className="w-full mt-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-slate-300">
-            {siblings.map((x) => <option key={x.id} value={x.id}>Jump to {x.phase === "qual" ? `Q${x.num}` : (fmtMatch({ phase: x.phase, num: x.num }) || x.label)}</option>)}
+            {siblings.map((x) => <option key={x.id} value={x.id}>{liveHighlights[x.id] === 'current' ? 'Playing now · ' : liveHighlights[x.id] === 'upcoming' ? 'Up next · ' : ''}Jump to {x.phase === "qual" ? `Q${x.num}` : (fmtMatch({ phase: x.phase, num: x.num }) || x.label)}</option>)}
           </select>
         )}
       </div>
