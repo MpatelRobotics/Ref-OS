@@ -11,7 +11,16 @@ export function createTokenProvider({ clientId, clientSecret, fetcher = fetch, n
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, grant_type: 'client_credentials' }),
       });
-      if (!response.ok) throw new Error('TM authentication failed. Check the developer credentials.');
+      if (!response.ok) {
+        const hint = response.status === 400 || response.status === 401 || response.status === 403
+          ? 'Check that TM_CLIENT_ID and TM_CLIENT_SECRET match the approved credential pair, without added quotes or spaces.'
+          : response.status === 429
+            ? 'The token server is limiting requests. Wait a minute and try again.'
+            : response.status >= 500
+              ? 'The token server is unavailable. Try again later.'
+              : 'Check the token service configuration.';
+        throw new Error(`TM authentication failed (HTTP ${response.status}). ${hint}`);
+      }
       const data = await response.json();
       if (typeof data.access_token !== 'string' || !data.access_token || data.token_type?.toLowerCase() !== 'bearer' || !Number.isFinite(data.expires_in) || data.expires_in <= 30) {
         throw new Error('TM authentication returned an invalid token.');
