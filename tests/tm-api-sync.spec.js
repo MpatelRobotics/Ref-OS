@@ -23,18 +23,17 @@ async function review(page) {
   await page.getByRole('button',{name:'Connect to TM',exact:true}).click();
   await page.getByRole('button',{name:'Review TM data',exact:true}).click();
 }
-test('preview maps skills and scored zeros, closes on start, polls each minute and stops independently',async({page})=>{
+test('preview maps skills and scored zeros, closes on start, polls every 30 seconds and stops independently',async({page})=>{
   await mount(page);await page.clock.install();await review(page);
   await expect(page.getByText('1 teams · 1 matches · 1 scored matches · 1 rankings · 1 skills results')).toBeVisible();
   await expect(page.getByRole('checkbox')).toHaveCount(0);
-  await page.evaluate(() => { window.fieldData = {fieldSets:[]}; });
   await page.evaluate(() => { window.fieldData = {fieldSets:[]}; });
   await page.getByRole('button',{name:'Start TM syncing'}).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect.poll(()=>page.evaluate(()=>window.applies.length)).toBe(1);
   const imported=await page.evaluate(()=>window.applies[0]);expect(imported.data.scores[0].blueScore).toBe(0);expect(imported.includeSchedule).toBe(true);
   expect(await page.evaluate(()=>window.lastFetchSettings.liveFields)).toBe(true);
-  await page.clock.runFor(59000);expect(await page.evaluate(()=>window.reads)).toBe(3);
+  await page.clock.runFor(29000);expect(await page.evaluate(()=>window.reads)).toBe(3);
   await page.clock.runFor(1100);await expect.poll(()=>page.evaluate(()=>window.reads)).toBe(4);
   await page.getByRole('button',{name:'Stop TM sync',exact:true}).click();
   await page.clock.runFor(61000);expect(await page.evaluate(()=>window.reads)).toBe(4);
@@ -77,7 +76,7 @@ test('live events publish Playing now and Stopped, and disconnect when sync stop
   await expect.poll(() => page.evaluate(() => window.desktopActive)).toBe(true);
   await page.evaluate(() => Object.defineProperty(document, 'hidden', { configurable:true, value:true }));
   const reads = await page.evaluate(() => window.reads);
-  await page.clock.runFor(61000);
+  await page.clock.runFor(30100);
   await expect.poll(() => page.evaluate(() => window.reads)).toBe(reads + 1);
   await page.getByRole('button',{name:'Stop TM sync',exact:true}).click();
   await expect.poll(() => page.evaluate(() => window.desktopActive)).toBe(false);
@@ -90,15 +89,15 @@ test('match start triggers one score refresh after 30 seconds and stop cancels p
   const reads = await page.evaluate(() => window.reads);
   await page.evaluate(() => { window.fieldData.fieldSets[0].fields[0].status = 'playing'; });
   await page.clock.runFor(1000);
-  await page.clock.runFor(29000);
+  await page.clock.runFor(28000);
   expect(await page.evaluate(() => window.reads)).toBe(reads);
-  await page.clock.runFor(1100);
-  await expect.poll(() => page.evaluate(() => window.reads)).toBe(reads + 1);
+  await page.clock.runFor(2100);
+  await expect.poll(() => page.evaluate(() => window.reads)).toBe(reads + 2);
   await page.evaluate(() => { window.fieldData.fieldSets[0].fields[0].match.match = 3; });
   await page.clock.runFor(1000);
   await page.getByRole('button',{name:'Stop TM sync',exact:true}).click();
   await page.clock.runFor(31000);
-  expect(await page.evaluate(() => window.reads)).toBe(reads + 1);
+  expect(await page.evaluate(() => window.reads)).toBe(reads + 2);
 });
 
  test('native mobile connects with IP and key, hides desktop download, and pauses polling while hidden', async ({page}) => {
@@ -113,11 +112,11 @@ test('match start triggers one score refresh after 30 seconds and stop cancels p
   await page.evaluate(() => Object.defineProperty(document, 'hidden', { configurable:true, value:true }));
   await page.clock.runFor(61000); expect(await page.evaluate(() => window.reads)).toBe(reads);
   await page.evaluate(() => Object.defineProperty(document, 'hidden', { configurable:true, value:false }));
-  await page.clock.runFor(60000); await expect.poll(() => page.evaluate(() => window.reads)).toBe(reads+1);
+  await page.clock.runFor(30000); await expect.poll(() => page.evaluate(() => window.reads)).toBe(reads+1);
  });
 
 
-test('elimination schedule switches to fresh score sync every 30 seconds', async ({page}) => {
+test('elimination schedule continues fresh score sync every 30 seconds', async ({page}) => {
   await mount(page); await page.clock.install(); await review(page);
   await page.evaluate(() => { window.fieldData = {fieldSets:[]}; });
   await page.getByRole('button',{name:'Start TM syncing'}).click();
@@ -125,7 +124,7 @@ test('elimination schedule switches to fresh score sync every 30 seconds', async
   await page.clock.runFor(60100);
   await expect(page.getByRole('status')).toContainText('every 30 seconds');
   const reads = await page.evaluate(() => window.reads);
-  await page.clock.runFor(29000);
+  await page.clock.runFor(28000);
   expect(await page.evaluate(() => window.reads)).toBe(reads);
   await page.clock.runFor(1100);
   await expect.poll(() => page.evaluate(() => window.reads)).toBe(reads + 1);

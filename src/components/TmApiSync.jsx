@@ -26,8 +26,6 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
   let preview = null, previewError = '';
   try { if (raw) preview = normalizeTmSnapshot(raw, session === '' ? undefined : Number(session)); }
   catch (e) { previewError = e.message; }
-  const hasEliminations = Boolean(preview?.matches.some(match => ['r16', 'qf', 'sf', 'final'].includes(match.phase)));
-  const syncInterval = hasEliminations ? 30000 : 60000;
   const mismatched = expectedCode && remoteEvent?.code && expectedCode.trim().toUpperCase() !== remoteEvent.code.trim().toUpperCase();
   const validPreview = preview && !mismatched && (!preview.sessions.length || preview.selectedSession != null);
   const stop = () => {
@@ -89,12 +87,12 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
     const timer = setInterval(async () => {
       if ((!desktop && document.hidden) || !navigator.onLine || inFlight.current) return;
       inFlight.current = true;
-      try { const data = await latest.current.onFetch({ ...settings(), forceScores: hasEliminations }); if (alive.current && ticket === version.current) await apply(data, ticket); }
+      try { const data = await latest.current.onFetch({ ...settings(), forceScores: true }); if (alive.current && ticket === version.current) await apply(data, ticket); }
       catch (e) { if (alive.current && ticket === version.current) { setError(e.message || 'TM sync failed.'); stop(); } }
       finally { inFlight.current = false; }
-    }, syncInterval);
+    }, 30000);
     return () => clearInterval(timer);
-  }, [running, address, apiKey, pairing, division, session, expectedCode, syncInterval]);
+  }, [running, address, apiKey, pairing, division, session, expectedCode]);
   useEffect(() => {
     if (!running || !connectionId || !latest.current.onActivity) return;
     let active = true, pending = false, previous = '', publishedAt = 0;
@@ -147,7 +145,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
   const inputClass = 'w-full min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2';
   const buttonClass = 'min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 font-semibold disabled:opacity-50';
   return <>
-    {(running || status || error) && <div role="status" className="mx-4 mb-[calc(100px+env(safe-area-inset-bottom))] sm:mb-4 rounded-lg border border-blue-200 p-3 text-sm flex flex-wrap items-center gap-2"><span className="flex-1">{running ? `TM sync active · ${hasEliminations ? 'every 30 seconds' : 'every minute'}` : 'TM sync inactive'}{error ? ` · ${error}` : status ? ` · ${status}` : ''}{liveError && ` · ${liveError}`}</span>{running && <button className={buttonClass} onClick={stop}>Stop TM sync</button>}</div>}
+    {(running || status || error) && <div role="status" className="mx-4 mb-[calc(100px+env(safe-area-inset-bottom))] sm:mb-4 rounded-lg border border-blue-200 p-3 text-sm flex flex-wrap items-center gap-2"><span className="flex-1">{running ? 'TM sync active · every 30 seconds' : 'TM sync inactive'}{error ? ` · ${error}` : status ? ` · ${status}` : ''}{liveError && ` · ${liveError}`}</span>{running && <button className={buttonClass} onClick={stop}>Stop TM sync</button>}</div>}
     {open && <div className="fixed inset-0 z-[60] bg-black/40 p-3 flex items-center justify-center"><section role="dialog" aria-modal="true" aria-label="Tournament Manager API sync" className="w-full max-w-xl max-h-[90dvh] overflow-y-auto rounded-xl bg-white dark:bg-slate-800 p-4 space-y-4">
       <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold">Tournament Manager API <span className="text-sm text-amber-700 dark:text-amber-300">Experimental</span></h2><button className={buttonClass} onClick={onClose}>Close</button></div>
       <p className="text-sm">Target: {target}. {mobile ? 'Connect this device to the event Wi-Fi, then enter the TM address and event key.' : 'Open Ref OS TM Connect on a computer on the TM network.'} Other users receive the synced data through Ref OS Cloud.</p>
@@ -170,7 +168,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
       {busy && <p role="status">Working…</p>}
       {!running && <button className="w-full min-h-[44px] rounded-lg bg-red-700 text-white px-3 py-2 font-semibold disabled:opacity-50" disabled={!validPreview || busy} onClick={start}>Start TM syncing</button>}
       {running && <button className={buttonClass} onClick={stop}>Stop TM sync</button>}
-      <p className="text-sm text-slate-500">{desktop ? 'Checks run every 30 seconds when elimination matches exist, otherwise once a minute, including when minimized. Closing its window while syncing keeps it in the system tray. Choose Quit and stop syncing from the tray to exit.' : mobile ? 'Keep Ref OS open on the event Wi-Fi while syncing. Switching apps or locking your device can pause sync. On iPhone/iPad, allow Local Network access when prompted.' : 'Start TM sync in the Ref OS mobile app or Windows desktop app.'} Closing this dialog keeps sync running. Errors stop TM sync; leaving the event, signing out, or reloading clears the connection.</p>
+      <p className="text-sm text-slate-500">{desktop ? 'Checks run every 30 seconds, including when minimized. Closing its window while syncing keeps it in the system tray. Choose Quit and stop syncing from the tray to exit.' : mobile ? 'Keep Ref OS open on the event Wi-Fi while syncing. Switching apps or locking your device can pause sync. On iPhone/iPad, allow Local Network access when prompted.' : 'Start TM sync in the Ref OS mobile app or Windows desktop app.'} Closing this dialog keeps sync running. Errors stop TM sync; leaving the event, signing out, or reloading clears the connection.</p>
     </section></div>}
   </>;
 }
