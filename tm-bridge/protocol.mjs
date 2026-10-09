@@ -1,9 +1,7 @@
 import { createHmac } from 'node:crypto';
+import { normalizeTmAddress } from '../src/tmAddress.js';
 export function tmAddress(value) {
-  let url;
-  try { url = new URL(value); } catch { throw new Error('Enter the TM address including http:// or https://.'); }
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw new Error('Use only the TM server address and optional port.');
-  return url;
+  return new URL(normalizeTmAddress(value));
 }
 export function signedHeaders(url, path, apiKey, bearer, date = new Date().toUTCString()) {
   const message = `GET\n${path}\ntoken:${bearer}\nhost:${url.host}\nx-tm-date:${date}\n`;

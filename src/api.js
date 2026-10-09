@@ -3,11 +3,12 @@ import { OFFLINE_RULES } from "./offlineRules";
 import { putCachedBlob, deletePaths as deleteCachedPhotos } from "./photoCache";
 import { isVenueMode } from "./sync/syncConfig";
 import * as venue from "./sync/venueSync";
+import { normalizeTmAddress } from './tmAddress.js';
 
 export async function getTmSnapshot(eventId, settings) {
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session?.access_token) throw Error('Sign in before connecting TM.');
-  if (window.refosTmDesktop) return window.refosTmDesktop.request('snapshot', { ...settings, eventId, authorization: `Bearer ${data.session.access_token}`, anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY });
+  if (window.refosTmDesktop) return window.refosTmDesktop.request('snapshot', { ...settings, address: normalizeTmAddress(settings.address), eventId, authorization: `Bearer ${data.session.access_token}`, anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY });
   throw Error('Open Ref OS TM Connect for Windows to connect Tournament Manager.');
 }
 export async function getTmFieldActivity(connectionId, pairingCode, disconnect = false) {

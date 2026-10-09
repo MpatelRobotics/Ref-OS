@@ -11,6 +11,14 @@ const match = (state = 'SCORED', scores = [133, 0], session = 0) => ({ matchInfo
 const fixture = () => ({ event: { name: 'ButterNova', code: 'VE-V5-26-65633' }, teams: [{ number: '32092X', name: 'Team X' }], matches: [match()], rankings: [{ rank: 1, alliance: { teams: [{ number: '32092X' }] }, wins: 1, losses: 0, ties: 0, wp: 2, ap: 0, sp: 133 }], skills: [{ rank: 1, number: '1082C', totalScore: 10, progHighScore: 10, progAttempts: 1, driverHighScore: 0, driverAttempts: 0 }] });
 const json = (value, options = {}) => new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json', ...options.headers }, status: options.status || 200 });
 
+test('TM accepts plain IP addresses and hostnames while preserving ports and rejecting unsafe URLs', () => {
+  assert.equal(tmAddress('192.168.0.164').origin, 'http://192.168.0.164');
+  assert.equal(tmAddress(' 192.168.0.164:8080 ').origin, 'http://192.168.0.164:8080');
+  assert.equal(tmAddress('tm-server:8080').origin, 'http://tm-server:8080');
+  assert.equal(tmAddress('https://tm-server:8443/').origin, 'https://tm-server:8443');
+  for (const value of ['', 'ftp://tm-server', 'http://user:key@tm-server', 'tm-server/api/event', 'tm-server?key=secret', 'tm-server#fragment']) assert.throws(() => tmAddress(value));
+});
+
 test('OAuth uses form credentials, coalesces requests, caches and renews before expiry', async () => {
   let calls = 0, now = 1000;
   const token = createTokenProvider({ clientId: 'approved-id', clientSecret: 'private-secret', now: () => now, fetcher: async (url, options) => {
