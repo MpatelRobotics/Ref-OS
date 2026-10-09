@@ -12,9 +12,14 @@
     "test:e2e": "playwright test",
     "security:access-sql": "node scripts/generate-access-security-sql.mjs > supabase/access-passwords-generated.sql",
     "push:vapid-keys": "node scripts/generate-vapid-keys.mjs",
-    "build:tm-desktop": "node scripts/build-tm-desktop.mjs"
+    "build:tm-desktop": "node scripts/build-tm-desktop.mjs",
+    "mobile:sync": "node scripts/sync-mobile.mjs --android",
+    "mobile:android": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "@refos/tm-sockets": "file:mobile/tm-sockets",
     "@supabase/supabase-js": "^2.45.4",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.383.0",
@@ -24,6 +29,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@playwright/test": "^1.55.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",

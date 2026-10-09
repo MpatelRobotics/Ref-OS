@@ -12,3 +12,11 @@ public/tm-connector.mjs
 desktop/build/
 desktop/release/
 public/Ref-OS-TM-Connect.exe
+
+# Native build outputs and signing credentials
+mobile/tm-sockets/android/build/
+mobile/tm-sockets/.build/
+*.jks
+*.keystore
+*.p12
+*.mobileprovision

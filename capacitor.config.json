@@ -1,0 +1,8 @@
+{
+  "appId": "com.refos.app",
+  "appName": "Ref OS",
+  "webDir": "dist",
+  "server": { "androidScheme": "https" },
+  "android": { "allowMixedContent": false },
+  "ios": { "contentInset": "automatic" }
+}

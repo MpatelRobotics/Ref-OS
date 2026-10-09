@@ -1,0 +1,6 @@
+{
+  "name": "@refos/tm-sockets",
+  "version": "1.0.0",
+  "private": true,
+  "capacitor": { "android": { "src": "android" }, "ios": { "src": "ios" } }
+}

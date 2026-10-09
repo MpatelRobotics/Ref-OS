@@ -1,0 +1,73 @@
+name: Build downloadable Android TM connector
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: tm-android-release
+  cancel-in-progress: false
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
+      REFOS_ANDROID_VERSION_CODE: ${{ github.run_number }}
+      REFOS_ANDROID_VERSION_NAME: 2.0.${{ github.run_number }}
+      ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/ref-os-android.p12
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - name: Restore signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          python3 - <<'PY'
+          import base64, os, pathlib
+          for name in ['ANDROID_KEYSTORE_BASE64','ANDROID_KEYSTORE_PASSWORD','ANDROID_KEY_ALIAS','ANDROID_KEY_PASSWORD','VITE_SUPABASE_URL','VITE_SUPABASE_ANON_KEY']:
+              if not os.environ.get(name): raise SystemExit(f'Missing secret or variable: {name}')
+          pathlib.Path(os.environ['ANDROID_KEYSTORE_PATH']).write_bytes(base64.b64decode(os.environ['ANDROID_KEYSTORE_BASE64'], validate=True))
+          PY
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - run: npm ci
+      - run: node --test tests/tm-mobile.test.mjs tests/tm-live-fields.test.mjs tests/tm-api.test.mjs
+      - run: node scripts/sync-mobile.mjs --android
+      - name: Build signed APK
+        working-directory: android
+        run: bash gradlew assembleRelease --no-daemon
+      - name: Verify and prepare download
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify android/app/build/outputs/apk/release/app-release.apk
+          cp android/app/build/outputs/apk/release/app-release.apk Ref-OS-TM-Connect.apk
+          sha256sum Ref-OS-TM-Connect.apk > Ref-OS-TM-Connect.apk.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ref-OS-TM-Connect-Android
+          path: |
+            Ref-OS-TM-Connect.apk
+            Ref-OS-TM-Connect.apk.sha256
+          if-no-files-found: error
+      - name: Publish Android download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view tm-connect-android > /dev/null 2>&1; then
+            gh release create tm-connect-android --target "$GITHUB_SHA" --title 'Ref OS TM Connect for Android' --notes 'Install Ref-OS-TM-Connect.apk on one Android device on the TM network. Sign in, select the event, enter the TM IP and API key, and start syncing. Keep the app open. Android 7 or later is required. Physical-device and live-event verification is still pending.'
+          fi
+          gh release upload tm-connect-android Ref-OS-TM-Connect.apk Ref-OS-TM-Connect.apk.sha256 --clobber
+      - name: Remove temporary signing key
+        if: always()
+        run: python3 -c "import os,pathlib; pathlib.Path(os.environ['ANDROID_KEYSTORE_PATH']).unlink(missing_ok=True)"
