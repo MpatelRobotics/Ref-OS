@@ -68,6 +68,7 @@ test('live events publish Playing now and Stopped, and disconnect when sync stop
 
  test('desktop keeps polling with its document hidden and reports active state', async ({page}) => {
   await mount(page); await page.clock.install(); await review(page);
+  await page.evaluate(() => { window.fieldData.fieldSets[0].fields[0].status = 'queued'; });
   await page.getByRole('button',{name:'Start TM syncing'}).click();
   await expect.poll(() => page.evaluate(() => window.desktopActive)).toBe(true);
   await page.evaluate(() => Object.defineProperty(document, 'hidden', { configurable:true, value:true }));
@@ -77,3 +78,21 @@ test('live events publish Playing now and Stopped, and disconnect when sync stop
   await page.getByRole('button',{name:'Stop TM sync',exact:true}).click();
   await expect.poll(() => page.evaluate(() => window.desktopActive)).toBe(false);
  });
+
+test('match start triggers one score refresh after 30 seconds and stop cancels pending refresh', async ({page}) => {
+  await mount(page); await page.clock.install(); await review(page);
+  await page.evaluate(() => { window.fieldData.fieldSets[0].fields[0].status = 'queued'; });
+  await page.getByRole('button',{name:'Start TM syncing'}).click();
+  const reads = await page.evaluate(() => window.reads);
+  await page.evaluate(() => { window.fieldData.fieldSets[0].fields[0].status = 'playing'; });
+  await page.clock.runFor(1000);
+  await page.clock.runFor(29000);
+  expect(await page.evaluate(() => window.reads)).toBe(reads);
+  await page.clock.runFor(1100);
+  await expect.poll(() => page.evaluate(() => window.reads)).toBe(reads + 1);
+  await page.evaluate(() => { window.fieldData.fieldSets[0].fields[0].match.match = 3; });
+  await page.clock.runFor(1000);
+  await page.getByRole('button',{name:'Stop TM sync',exact:true}).click();
+  await page.clock.runFor(31000);
+  expect(await page.evaluate(() => window.reads)).toBe(reads + 1);
+});

@@ -14,6 +14,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [status, setStatus] = useState('');
   const alive = useRef(true), version = useRef(0), inFlight = useRef(false), hashes = useRef({});
   const lastActivity = useRef(null);
+  const delayedSync = useRef(null);
   const reviewedEvent = useRef(null);
   const latest = useRef({ onFetch, onApply, onActivity, onPublishActivity, onDisconnect }); latest.current = { onFetch, onApply, onActivity, onPublishActivity, onDisconnect };
   useEffect(() => { alive.current = true; return () => { alive.current = false; version.current++; }; }, []);
@@ -61,6 +62,12 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
     const applied = await latest.current.onApply(snapshot, { includeSchedule, hashes: hashes.current, current });
     if (current()) { setRemoteEvent(data.event); setRaw(data); setStatus(applied || 'TM data checked; no changes.'); setConnectionId(data.connectionId || ''); setLiveError(data.fieldError || ''); }
   };
+  delayedSync.current = async ticket => {
+    inFlight.current = true;
+    try { const data = await latest.current.onFetch({ ...settings(), forceScores: true }); if (alive.current && ticket === version.current) await apply(data, ticket); }
+    catch (e) { if (alive.current && ticket === version.current) { setError(e.message || 'TM score sync failed.'); stop(); } }
+    finally { inFlight.current = false; }
+  };
   const start = async () => {
     if (!validPreview || inFlight.current) return;
     const ticket = ++version.current; inFlight.current = true;
@@ -84,6 +91,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
   useEffect(() => {
     if (!running || !includeLive || !connectionId || !latest.current.onActivity) return;
     let active = true, pending = false, previous = '', publishedAt = 0;
+    const observed = new Map(), scoreTimers = new Set();
     const ticket = version.current;
     const current = () => active && alive.current && ticket === version.current;
     const poll = async () => {
@@ -93,6 +101,20 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
         const data = await latest.current.onActivity(connectionId, pairing.trim());
         if (!current()) return;
         const fieldSets = scopeTmFieldActivity(data, Number(division), preview?.selectedSession);
+        for (const set of fieldSets) for (const field of set.fields) {
+          const key = `${set.id}:${field.id}`;
+          const playing = set.connected && field.status === 'playing' && field.match ? JSON.stringify(field.match) : '';
+          if (playing && observed.get(key) !== playing) {
+            const refresh = () => {
+              scoreTimers.delete(timer);
+              if (!current()) return;
+              if (inFlight.current || !navigator.onLine) { timer = setTimeout(refresh, 1000); scoreTimers.add(timer); return; }
+              delayedSync.current(ticket);
+            };
+            let timer = setTimeout(refresh, 30000); scoreTimers.add(timer);
+          }
+          observed.set(key, playing);
+        }
         const fingerprint = JSON.stringify(fieldSets);
         if (fingerprint !== previous || Date.now() - publishedAt >= 30000) {
           await latest.current.onPublishActivity?.({ fieldSets, updatedAt: Date.now(), source: 'TM WebSocket' }, current);
@@ -113,7 +135,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
       finally { pending = false; }
     };
     poll(); const timer = setInterval(poll, 1000);
-    return () => { active = false; clearInterval(timer); latest.current.onDisconnect?.(connectionId, pairing.trim()).catch(() => {}); };
+    return () => { active = false; clearInterval(timer); for (const scoreTimer of scoreTimers) clearTimeout(scoreTimer); latest.current.onDisconnect?.(connectionId, pairing.trim()).catch(() => {}); };
   }, [running, includeLive, connectionId, pairing, division, preview?.selectedSession]);
   const inputClass = 'w-full min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2';
   const buttonClass = 'min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 font-semibold disabled:opacity-50';

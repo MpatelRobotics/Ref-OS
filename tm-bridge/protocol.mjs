@@ -9,10 +9,10 @@ export function signedHeaders(url, path, apiKey, bearer, date = new Date().toUTC
 }
 export function createResourceReader({ fetcher = fetch, now = Date.now } = {}) {
   const cache = new Map(), pending = new Map();
-  return async function read(url, path, apiKey, bearer) {
+  return async function read(url, path, apiKey, bearer, force = false) {
     const key = `${url.origin}|${createHmac('sha256', apiKey).update(path).digest('hex')}`;
     const old = cache.get(key);
-    if (old && now() - old.checkedAt < 60000) return old.data;
+    if (!force && old && now() - old.checkedAt < 60000) return old.data;
     if (pending.has(key)) return pending.get(key);
     const task = (async () => {
       const headers = signedHeaders(url, path, apiKey, bearer);
