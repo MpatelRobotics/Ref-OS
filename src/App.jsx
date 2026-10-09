@@ -1,3 +1,4 @@
+import { tmPairingNumber, tmGameNumber, tmMatchOrder } from './tmMatchIdentity.js';
 import {planScoreUpdates} from "./vexScoreSync.js";
 import {parseViolationRuleNotes,validViolationRuleDetails,formatViolationRuleNotes} from "./violationRuleNotes.js";
 import DeveloperLiveActivity from "./components/DeveloperLiveActivity.jsx";
@@ -590,6 +591,7 @@ const fmtMatch = (m) => {
   const num = String(m.num == null ? "" : m.num).trim();
   if (m.phase.startsWith("skills")) return num ? `${p.abbrev} ${num}` : p.abbrev;
   if (!num) return p.abbrev;
+  if (['r16', 'qf', 'sf'].includes(m.phase) && Number(num) >= 1000) return `${p.abbrev}${tmPairingNumber(m.phase, num)}-${tmGameNumber(m.phase, num)}`;
   return /\d$/.test(p.abbrev) ? `${p.abbrev}-${num}` : `${p.abbrev}${num}`;
 };
 const elimCounts = (bracket) => {
@@ -3536,7 +3538,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
     setTeams(freshTeams); setMatches(Object.fromEntries(freshMatches.map(m => [m.id, m]))); setEventSettings(settings);
     return message;
   };
-  const winnerTeams = (m) => (m && m.winner ? (m.winner === "red" ? m.red : m.blue) : null);
+  const winnerTeams = (m) => (m && ["red", "blue"].includes(m.winner) ? (m.winner === "red" ? m.red : m.blue) : null);
   const advanceBracket = async (map) => {
     const get = (phase, num) => map[`${phase}-${num}`];
     const toCreate = [];
@@ -5797,7 +5799,7 @@ function MatchList({ tmActivity, matches, teamName, teamRank = {}, viols, fieldL
   const faultSet = new Set(fieldLog.filter((e) => e.kind === "field_fault" && e.matchId).map((e) => e.matchId));
   const inTab = all.filter((m) => (tab === "qual" ? (m.phase || "qual") === "qual" : (m.phase && m.phase !== "qual")));
   const PHASE_ORDER = { qual: 0, practice: 1, r16: 2, qf: 3, sf: 4, final: 5 };
-  const list = inTab.sort((a, b) => (PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase]) || (a.num - b.num));
+  const list = inTab.sort((a, b) => (PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase]) || tmMatchOrder(a,b));
   const fields = [...new Set(list.map((m) => m.field).filter(Boolean))].sort();
   const vcount = {};
   for (const v of viols) {
@@ -7389,14 +7391,14 @@ function AllianceSelection({ tmActivity, onOpenMatch, matches, finalsBestOf = 1,
   const finalGames = Number(finalsBestOf) === 3 ? 3 : 1;
   const winsNeeded = Math.floor(finalGames / 2) + 1;
   const ROUNDS = [["r16", "Round of 16"], ["qf", "Quarterfinals"], ["sf", "Semifinals"], ["final", `Finals (best of ${finalGames})`]];
-  const byPhase = (p) => Object.values(matches || {}).filter((m) => m.phase === p && (p !== "final" || Number(m.num) <= finalGames)).sort((a, b) => a.num - b.num);
+  const byPhase = (p) => Object.values(matches || {}).filter((m) => m.phase === p && (p !== "final" || Number(m.num) <= finalGames)).sort(tmMatchOrder);
   const hasBracket = ROUNDS.some(([phase]) => byPhase(phase).length > 0);
   // Count only finals in the configured series; preserve other saved matches.
   const finals = byPhase("final");
   let champion = null;
   if (finals.length) {
     const tally = {};
-    for (const f of finals) { const w = f.winner ? (f.winner === "red" ? f.red : f.blue) : null; if (w) { const key = w.join(" "); tally[key] = (tally[key] || 0) + 1; } }
+    for (const f of finals) { const w = ["red", "blue"].includes(f.winner) ? (f.winner === "red" ? f.red : f.blue) : null; if (w) { const key = w.join(" "); tally[key] = (tally[key] || 0) + 1; } }
     for (const k in tally) if (tally[k] >= winsNeeded) champion = k;
   }
   const Side = ({ m, side }) => {
@@ -7453,7 +7455,7 @@ function AllianceSelection({ tmActivity, onOpenMatch, matches, finalsBestOf = 1,
                         <Side m={m} side="red" />
                         <span className="text-slate-300 text-xs font-sans shrink-0">vs</span>
                         <Side m={m} side="blue" />
-                        <span className="text-sm font-mono font-bold">{m.redScore != null && m.blueScore != null ? `Score ${m.redScore} – ${m.blueScore}` : "Awaiting score"}</span>
+                        <span className="text-sm font-mono font-bold">{m.redScore != null && m.blueScore != null ? `Score ${m.redScore} – ${m.blueScore}${m.winner === "tie" ? " · Tie" : ""}` : "Awaiting score"}</span>
                       </div>
                     </div>
                   ))}

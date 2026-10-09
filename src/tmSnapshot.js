@@ -20,10 +20,6 @@ export function normalizeTmSnapshot(data, session) {
     const info = m.matchInfo, tuple = info?.matchTuple;
     const identity = tmMatchIdentity(tuple);
     if (!identity || tuple.session !== selectedSession) return [];
-    if (['r16', 'qf', 'sf'].includes(identity.phase) && rawMatches.some(other => {
-      const t = other.matchInfo?.matchTuple;
-      return t?.session === tuple.session && t.division === tuple.division && t.round === tuple.round && t.instance === tuple.instance && t.match > 1;
-    })) return [];
     const alliances = info.alliances;
     if (!Array.isArray(alliances) || alliances.length !== 2) return [];
     const red = (alliances[0].teams || []).map(t => number(t.number));
@@ -39,7 +35,7 @@ export function normalizeTmSnapshot(data, session) {
   for (const row of candidates) { const key = `${row.phase}:${row.num}`; counts.set(key, (counts.get(key) || 0) + 1); }
   // Only genuinely duplicate pairing/game identities are ambiguous.
   const matches = candidates.filter(row => counts.get(`${row.phase}:${row.num}`) === 1);
-  if (rawMatches.length - matches.length) warnings.push(`${rawMatches.length - matches.length} matches outside the selected session or with invalid identities, duplicate pairings, or multi-game non-final series were skipped.`);
+  if (rawMatches.length - matches.length) warnings.push(`${rawMatches.length - matches.length} matches outside the selected session or with invalid identities, duplicate games were skipped.`);
   if (rankings.length !== data.rankings.length) warnings.push('Unsupported qualification ranking rows were skipped.');
   if (skills.length !== data.skills.length) warnings.push('Invalid skills rows were skipped.');
   if (teams.length !== data.teams.length) warnings.push('Invalid team rows were skipped.');

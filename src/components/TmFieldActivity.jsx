@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { tmMatchIdentity } from '../tmMatchIdentity.js';
+import { tmMatchIdentity, tmPairingNumber, tmGameNumber } from '../tmMatchIdentity.js';
 const rounds = { qual: 'Qualifier', practice: 'Practice', qf: 'Quarterfinal', sf: 'Semifinal', final: 'Final', r16: 'Round of 16' };
 export default function TmFieldActivity({ value }) {
   const [now, setNow] = useState(Date.now);
@@ -13,7 +13,7 @@ export default function TmFieldActivity({ value }) {
       const identity = tmMatchIdentity(field.match);
       const live = set.connected && !stale;
       const status = live ? { playing: 'Playing now', queued: 'Queued', stopped: 'Stopped', unknown: 'Waiting for field event' }[field.status] : 'Connection unavailable';
-      return <div key={`${set.id}-${field.id}`} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3"><p className="font-semibold">{field.name}{live && field.active ? ' · Active field' : ''}</p><p className="text-sm">{field.match ? `${rounds[identity?.phase] || field.match.round} #${identity?.num ?? field.match.match}` : 'Match identity not received'} · {status}</p><p className="text-sm text-slate-500">{set.name}</p></div>;
+      return <div key={`${set.id}-${field.id}`} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3"><p className="font-semibold">{field.name}{live && field.active ? ' · Active field' : ''}</p><p className="text-sm">{field.match ? `${rounds[identity?.phase] || field.match.round} #${identity ? tmPairingNumber(identity.phase, identity.num) : field.match.match}${identity && ['r16','qf','sf'].includes(identity.phase) && tmGameNumber(identity.phase,identity.num)>1 ? `-${tmGameNumber(identity.phase,identity.num)}` : ''}` : 'Match identity not received'} · {status}</p><p className="text-sm text-slate-500">{set.name}</p></div>;
     }))}</div>
     <p className="mt-2 text-sm text-slate-500">TM reports assignments and match starts/stops. When connecting mid-match, the identity is unknown until TM sends an assignment event.</p>
   </details>;

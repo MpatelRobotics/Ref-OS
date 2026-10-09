@@ -23,7 +23,7 @@ test('live elimination highlights use pairing instance rather than game number',
     const live = {updatedAt:1000,fieldSets:[{connected:true,fields:[{status:'playing',match:{round,instance:2,match:1}}]}]};
     assert.deepEqual(tmMatchHighlights(matches,live,1001), {b:'current',c:'upcoming'});
     live.fieldSets[0].fields[0].match.match = 2;
-    assert.deepEqual(tmMatchHighlights(matches,live,1001), {});
+    assert.deepEqual(tmMatchHighlights({...matches,replay:{id:'replay',phase,num:1002}},live,1001), {replay:'current',c:'upcoming'});
   }
 });
 

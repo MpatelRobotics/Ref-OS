@@ -182,14 +182,15 @@ test('TM elimination pairings with repeated game numbers import and sync distinc
   assert.equal(api.matches.find(m => m.phase === 'r16' && m.num === 8).redScore, 17);
 });
 
-test('multi-game non-final series cannot overwrite a single-game bracket score', () => {
+test('tied elimination game and replay remain distinct and both scores sync', () => {
   const data = fixture();
   data.matches = [1,2].map(game => {
-    const row = match();
-    row.matchInfo.matchTuple = {session: 0, division: 1, round: 'QF', instance: 3, match: game};
+    const row = match('SCORED', game === 1 ? [0,0] : [10,20]);
+    row.matchInfo.matchTuple = {session:0,division:1,round:'QF',instance:2,match:game};
     return row;
   });
   const snapshot = normalizeTmSnapshot(data);
-  assert.equal(snapshot.matches.length, 0);
-  assert.match(snapshot.warnings[0], /multi-game non-final series/);
+  assert.deepEqual(snapshot.matches.map(m=>m.num), [2,1002]);
+  assert.deepEqual(snapshot.scores.map(m=>[m.redScore,m.blueScore]), [[0,0],[10,20]]);
+  assert.deepEqual(snapshot.warnings, []);
 });
