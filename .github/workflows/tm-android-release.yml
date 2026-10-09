@@ -16,7 +16,6 @@ jobs:
       VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
       REFOS_ANDROID_VERSION_CODE: ${{ github.run_number }}
       REFOS_ANDROID_VERSION_NAME: 2.0.${{ github.run_number }}
-      ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/ref-os-android.p12
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
@@ -33,6 +32,7 @@ jobs:
       - uses: android-actions/setup-android@v3
       - name: Restore signing key
         env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/ref-os-android.p12
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           python3 - <<'PY'
@@ -46,6 +46,8 @@ jobs:
       - run: node --test tests/tm-mobile.test.mjs tests/tm-live-fields.test.mjs tests/tm-api.test.mjs
       - run: node scripts/sync-mobile.mjs --android
       - name: Build signed APK
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/ref-os-android.p12
         working-directory: android
         run: bash gradlew assembleRelease --no-daemon
       - name: Verify and prepare download
@@ -69,5 +71,7 @@ jobs:
           fi
           gh release upload tm-connect-android Ref-OS-TM-Connect.apk Ref-OS-TM-Connect.apk.sha256 --clobber
       - name: Remove temporary signing key
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/ref-os-android.p12
         if: always()
         run: python3 -c "import os,pathlib; pathlib.Path(os.environ['ANDROID_KEYSTORE_PATH']).unlink(missing_ok=True)"
