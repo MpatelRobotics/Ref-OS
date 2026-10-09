@@ -1,10 +1,9 @@
-import { isTmMobile } from '../tmMobile.js';
 import React, { useEffect, useRef, useState } from 'react';
 import { normalizeTmSnapshot } from '../tmSnapshot.js';
 import { scopeTmFieldActivity } from '../tmFieldActivity.js';
 
 export default function TmApiSync({ open, onClose, target, onFetch, onApply, onActivity, onPublishActivity, onDisconnect, expectedCode = '' }) {
-  const desktop = Boolean(window.refosTmDesktop), mobile = isTmMobile();
+  const desktop = Boolean(window.refosTmDesktop), mobile = Boolean(window.Capacitor?.isNativePlatform?.());
   const [address, setAddress] = useState(mobile ? '' : 'http://localhost:8080');
   const [pairing, setPairing] = useState(''), [apiKey, setApiKey] = useState('');
   const [divisions, setDivisions] = useState([]), [division, setDivision] = useState('');

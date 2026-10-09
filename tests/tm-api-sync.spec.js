@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 async function mount(page, desktop = true, mobile = false) {
-  if (mobile) await page.addInitScript(() => { window.CapacitorCustomPlatform = { name: 'ios' }; });
+  if (mobile) await page.addInitScript(() => { window.Capacitor = { isNativePlatform: () => true }; });
   if (desktop) await page.addInitScript(() => { window.refosTmDesktop = { setSyncActive: async active => { window.desktopActive = active; } }; });
   await page.route('**/tm-sync-test', route => route.fulfill({ contentType: 'text/html', body: `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
   import '/src/index.css';
