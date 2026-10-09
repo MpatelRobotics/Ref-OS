@@ -1792,15 +1792,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   const [fieldLog, setFieldLog] = useState([]);
   const [fieldResetChecks, setFieldResetChecks] = useState([]);
   const [eventSettings, setEventSettings] = useState({});
-  const lastLiveMatch = useRef('');
-  useEffect(() => {
-    if (view !== 'matches') { lastLiveMatch.current = ''; return; }
-    const highlights = tmMatchHighlights(matches, eventSettings?.tm_field_activity?.value);
-    const current = Object.values(matches).filter(m => highlights[m.id] === 'current').sort((a, b) => a.num - b.num);
-    const signature = current.map(m => m.id).join('|');
-    if (signature && signature !== lastLiveMatch.current) setOpenMatch(current[0].id);
-    lastLiveMatch.current = signature;
-  }, [view, matches, eventSettings?.tm_field_activity?.value]);
+
 
   const [programLookupError, setProgramLookupError] = useState("");
   const isIQ = (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq";
@@ -5762,6 +5754,7 @@ function MatchList({ tmActivity, matches, teamName, teamRank = {}, viols, fieldL
   const [liveNow, setLiveNow] = useState(Date.now);
   useEffect(() => { const timer = setInterval(() => setLiveNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
   const liveHighlights = tmMatchHighlights(matches, tmActivity, liveNow);
+  const currentMatches = Object.values(matches || {}).filter(row => liveHighlights[row.id] === 'current').sort((a, b) => a.num - b.num);
   const all = Object.values(matches);
   const hasElims = all.some((m) => m.phase && m.phase !== "qual");
   const [tab, setTab] = useState(() => hasElims ? "elim" : "qual"); // "qual" | "elim"
@@ -5800,6 +5793,7 @@ function MatchList({ tmActivity, matches, teamName, teamRank = {}, viols, fieldL
   const rowLabel = (m) => (m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`));
   return (
     <>
+      {currentMatches.map(current => <button key={current.id} type="button" onClick={() => onOpen(current.id)} className="min-h-[44px] px-3 py-2 mb-3 mr-2 rounded-lg border border-emerald-500 bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 text-sm font-semibold">Jump to current match · {current.phase === 'qual' ? `Q${current.num}` : (fmtMatch({ phase: current.phase, num: current.num }) || current.label)}</button>)}
       {!emcee && replaySet.size > 0 && (
         <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3">
           <p className="text-xs font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300 mb-1.5 flex items-center gap-1"><RefreshCw size={13} /> Matches to re-run ({replaySet.size})</p>
@@ -5984,6 +5978,7 @@ function MatchDetail({ tmActivity, match, matches, teamName, teamRank = {}, team
   const [liveNow, setLiveNow] = useState(Date.now);
   useEffect(() => { const timer = setInterval(() => setLiveNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
   const liveHighlights = tmMatchHighlights(matches || {}, tmActivity, liveNow);
+  const currentMatches = Object.values(matches || {}).filter(row => liveHighlights[row.id] === 'current').sort((a, b) => a.num - b.num);
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
   const m = match;
   const heading = m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`);
@@ -6093,6 +6088,7 @@ function MatchDetail({ tmActivity, match, matches, teamName, teamRank = {}, team
   return (
     <>
       <div className={`rounded-xl border p-4 mb-4 ${liveHighlights[m.id] === 'current' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'bg-amber-50 dark:bg-amber-950 border-amber-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+        {currentMatches.filter(current => current.id !== m.id).map(current => <button key={current.id} type="button" onClick={() => onNav(current.id)} className="min-h-[44px] px-3 py-2 mb-3 mr-2 rounded-lg border border-emerald-500 bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 text-sm font-semibold">Jump to current match · {current.phase === 'qual' ? `Q${current.num}` : (fmtMatch({ phase: current.phase, num: current.num }) || current.label)}</button>)}
         {liveHighlights[m.id] && <p className={`text-sm font-semibold mb-2 ${liveHighlights[m.id] === 'current' ? 'text-emerald-800 dark:text-emerald-200' : 'text-amber-800 dark:text-amber-200'}`}>{liveHighlights[m.id] === 'current' ? 'Playing now' : 'Up next'}</p>}
         <div className="flex items-center justify-between gap-2">
           <div>
