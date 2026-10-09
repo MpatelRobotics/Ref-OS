@@ -10,23 +10,24 @@ export default function VexSyncManager({visible,onOpen,onClose,onFetch,showLaunc
  const tail=useRef(Promise.resolve());
  const latest=useRef(onFetch);latest.current=onFetch;
  const fetchQueued=useCallback((...args)=>{
-  const task=tail.current.then(()=>latest.current(...args));
+  const task=tail.current.then(async()=>({...await latest.current(...args),division:args[1]||null}));
   tail.current=task.catch(()=>{});
   return task;
  },[]);
  const load=async()=>{
   setBusy(true);setError('');
-  try{const data=await fetchQueued(code.trim().toUpperCase(),null,'rankings');if(!active.current)return;setDivisions(data.divisions||[]);setDivision(data.divisions?.length===1?String(data.divisions[0].id):'');if(!data.divisions?.length)setError('No divisions found for this event.');}
+  try{const data=await fetchQueued(code.trim().toUpperCase(),null,'rankings');if(!active.current)return;setDivisions(data.divisions||[]);await props.onDiscoverDivisions?.(data.divisions||[]);setDivision(data.divisions?.length>1?'all':data.divisions?.length===1?String(data.divisions[0].id):'');if(!data.divisions?.length)setError('No divisions found for this event.');}
   catch(e){if(active.current)setError(e.message||'Could not load divisions.');}
   finally{if(active.current)setBusy(false);}
  };
- const start=async(selectedCode=code,selectedDivision=division)=>{
+ const start=async(selectedCode=code,selectedDivision=division,available=divisions)=>{
   setBusy(true);setError('');const failures=[];
   try{
-   const selected=selectedCode.trim().toUpperCase();await props.onSaveCode?.(selected,Number(selectedDivision));
+   const selected=selectedCode.trim().toUpperCase();const selectedIds=selectedDivision==='all'?available.map(d=>d.id):[Number(selectedDivision)];
+   await props.onSaveCode?.(selected,selectedDivision==='all'?undefined:Number(selectedDivision));
    for(const category of ['rankings','skills','scores']){
     if(!active.current)return;
-    try{await workers.current[category].start(selected,Number(selectedDivision));}catch(e){failures.push(category+': '+(e.message||'Sync failed.'));}
+    try{await workers.current[category].start(selected,category==='skills'?null:selectedIds.length===1?selectedIds[0]:selectedIds);}catch(e){failures.push(category+': '+(e.message||'Sync failed.'));}
    }
    if(active.current){if(failures.length)setError(failures.join(' '));else closeSetup();}
   }catch(e){if(active.current)setError(e.message||'Could not save event code.');}
@@ -44,11 +45,13 @@ export default function VexSyncManager({visible,onOpen,onClose,onFetch,showLaunc
     if(cancelled || !active.current)return;
     const choices=data.divisions||[];
     setCode(selected);setDivisions(choices);
+    await props.onDiscoverDivisions?.(choices);
+    if(cancelled || !active.current)return;
     const chosen=choices.find(d=>d.id===Number(props.initialDivision)) || (choices.length===1?choices[0]:null);
-    if(!chosen){setError('Choose a division in Sync everything to start automatic updates.');return;}
-    setDivision(String(chosen.id));
+    if(!choices.length){setError('No divisions found for this event.');return;}
+    setDivision(choices.length>1?'all':String(chosen.id));
     launching=true;
-    await start(selected,String(chosen.id));
+    await start(selected, choices.length>1?'all':String(chosen.id), choices);
    }catch(e){if(!cancelled && active.current)setError(e.message||'Automatic sync could not start.');}
   })();
   return()=>{cancelled=true;if(!launching)autoStarted.current=false;};
@@ -60,7 +63,7 @@ export default function VexSyncManager({visible,onOpen,onClose,onFetch,showLaunc
    <p className="text-sm">Import qualification rankings, Skills, and scores for existing matches, then check all three every 15 seconds while the app is open, visible and online. This is experimental; VEX publication may lag the event. No matches are added.</p>
    <label className="block">VEX event code<input disabled={busy} value={code} onChange={e=>{setCode(e.target.value.toUpperCase());setDivision('');setDivisions([]);setError('');}} className="w-full border rounded-lg bg-transparent p-2"/></label>
    <button type="button" disabled={busy||!code.trim()} onClick={load} className="min-h-[44px] border rounded-lg px-3 py-2">Load divisions</button>
-   {!!divisions.length&&<label className="block">Division for rankings and match scores<select disabled={busy} value={division} onChange={e=>setDivision(e.target.value)} className="w-full border rounded-lg bg-white dark:bg-slate-800 p-2"><option value="">Select division</option>{divisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label>}
+   {!!divisions.length&&<label className="block">Division for rankings and match scores<select disabled={busy} value={division} onChange={e=>setDivision(e.target.value)} className="w-full border rounded-lg bg-white dark:bg-slate-800 p-2"><option value="">Select division</option>{divisions.length>1&&<option value="all">All divisions, one after another</option>}{divisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label>}
    <p className="text-sm">Skills sync covers the whole event. Each category can be managed or stopped separately after starting.</p>
    {error&&<p role="alert" className="text-red-600">{error} Other categories that started successfully keep running.</p>}
    <button type="button" disabled={busy||!division} onClick={()=>start()} className="min-h-[44px] rounded-lg bg-red-700 text-white px-4 py-2">{busy?'Working…':'Start all syncs'}</button>

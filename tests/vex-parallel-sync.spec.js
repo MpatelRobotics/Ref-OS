@@ -48,11 +48,11 @@ test('opening an event automatically starts saved-division sync without TM or a 
  function Harness(){const [open,setOpen]=React.useState(null),[setup,setSetup]=React.useState(false),[status,setStatus]=React.useState(true);window.showSyncStatus=setStatus;return React.createElement(Manager,{autoStart:true,initialDivision:2,showLaunch:false,setupOpen:setup,onSetupClose:()=>setSetup(false),showStatus:status,visible:{rankings:open==='rankings',skills:open==='skills',scores:open==='scores'},onOpen:setOpen,onClose:()=>setOpen(null),initialCode:'VE-V5-26-65633',target:'Test event',onSaveCode:async code=>{window.saved=code;},onFetch:async(code,division,kind)=>{window.requests.push({code,division,kind});if(kind==='skills'&&window.failSkills)throw Error('Skills unavailable');return {divisions:[{id:1,name:'Main'},{id:2,name:'Other'}],rankings:[{number:'2A',rank:window.requests.length}],skills:[{number:'2A',total:window.requests.length}],scores:[{phase:'qual',num:1,redScore:133,blueScore:0}]};},onApply:async(data,kind)=>{window.applied.push(kind);return {message:kind+' updated'};}});}DOM.createRoot(document.getElementById('root')).render(React.createElement(Harness));
  </script></body></html>`}));
  await page.goto('/auto-sync-test');
- await expect.poll(()=>page.evaluate(()=>window.applied?.length || 0)).toBe(3);
+ await expect.poll(()=>page.evaluate(()=>window.applied?.length || 0)).toBe(5);
  await expect(page.getByRole('dialog')).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Sync everything',exact:true})).toHaveCount(0);
- expect(await page.evaluate(()=>window.requests.slice(1).map(r=>r.division))).toEqual([2,null,2]);
+ expect(await page.evaluate(()=>window.requests.slice(1).map(r=>r.division))).toEqual([1,2,null,1,2]);
  await page.evaluate(()=>window.showSyncStatus(false));
  await page.clock.fastForward(15000);
- await expect.poll(()=>page.evaluate(()=>window.applied?.length || 0)).toBe(6);
+ await expect.poll(()=>page.evaluate(()=>window.applied?.length || 0)).toBe(10);
 });

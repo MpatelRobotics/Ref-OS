@@ -1020,7 +1020,7 @@ export async function listMatches(eventId, { strict = false } = {}) {
   const sessionId = leagueSessionFor(eventId);
   const cacheKind = sessionId ? `matches@${sessionId}` : "matches";
   try {
-    let query = supabase.from("matches").select("num,red,blue,field,phase,label,winner,red_score,blue_score").eq("event_id", eventId);
+    let query = supabase.from("matches").select("num,red,blue,field,phase,label,winner,red_score,blue_score").eq("event_id", eventId).eq("division_id",0);
     // League: only this session's schedule. Match numbers repeat between sessions (Session 1 Q1,
     // Session 2 Q1), and within one session they are unique, so match ids below stay unique.
     if (sessionId) query = query.eq("session_id", sessionId);
@@ -1050,7 +1050,7 @@ export async function addMatch(eventId, m) {
   const sessionId = leagueSessionFor(eventId);
   if (sessionId) row.session_id = sessionId;
   // Re-importing a match updates that match in the same session only (event + session + phase + number).
-  const { error } = await upsertSessionKeyed("matches", row, "event_id,session_key,phase,num", "event_id,phase,num", { sessionId });
+  const { error } = await upsertSessionKeyed("matches", row, "event_id,session_key,division_id,phase,num", "event_id,phase,num", { sessionId });
   if (error) throw error;
 }
 // Insert-only: a concurrent schedule edit must never be overwritten by TM sync.
@@ -1078,17 +1078,17 @@ export async function updateMatchScore(eventId, phase, num, redScore, blueScore,
     })
     .eq("event_id", eventId)
     .eq("phase", phase)
-    .eq("num", Number(num))
+    .eq("num", Number(num)).eq("division_id",0)
     .match(leagueSessionFor(eventId) ? { session_id: leagueSessionFor(eventId) } : {});
   if (error) throw error;
 }
 
 export async function setMatchWinner(eventId, phase, num, winner) {
-  const { error } = await inSession(supabase.from("matches").update({ winner: winner || null }).eq("event_id", eventId).eq("phase", phase).eq("num", Number(num)), eventId);
+  const { error } = await inSession(supabase.from("matches").update({ winner: winner || null }).eq("event_id", eventId).eq("phase", phase).eq("num", Number(num)).eq("division_id",0), eventId);
   if (error) throw error;
 }
 export async function deleteMatch(eventId, phase, num) {
-  const { error } = await inSession(supabase.from("matches").delete().eq("event_id", eventId).eq("phase", phase).eq("num", Number(num)), eventId);
+  const { error } = await inSession(supabase.from("matches").delete().eq("event_id", eventId).eq("phase", phase).eq("num", Number(num)).eq("division_id",0), eventId);
   if (error) throw error;
 }
 
@@ -1506,7 +1506,7 @@ export async function clearTeams(eventId) {
   if (error) throw error;
 }
 export async function clearMatches(eventId) {
-  await inSession(supabase.from("matches").delete().eq("event_id", eventId), eventId);
+  await inSession(supabase.from("matches").delete().eq("event_id", eventId).eq("division_id", 0), eventId);
 }
 export async function clearRankings(eventId) {
   if (leagueSessionFor(eventId)) return deleteEventSetting(eventId, "rank_snapshot");
@@ -1869,7 +1869,7 @@ export async function getEventRobotPhotoRequirements(eventId) {
 export async function updateExistingVexScore(eventId,row){
  const {existing}=row;
  let query=supabase.from('matches').update({red_score:row.redScore,blue_score:row.blueScore,winner:row.redScore>row.blueScore?'red':row.blueScore>row.redScore?'blue':'tie'})
- .eq('event_id',eventId).eq('phase',row.phase).eq('num',Number(row.num))
+ .eq('event_id',eventId).eq('division_id',0).eq('phase',row.phase).eq('num',Number(row.num))
  .contains('red',existing.red).containedBy('red',existing.red).contains('blue',existing.blue).containedBy('blue',existing.blue);
  const session=leagueSessionFor(eventId);query=session?query.eq('session_id',session):query.is('session_id',null);
  const {data,error}=await query.select('num');if(error)throw error;return (data||[]).length;
