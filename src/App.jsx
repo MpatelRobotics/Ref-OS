@@ -4760,7 +4760,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         </div>
       </main>
 
-      {!highlanderDemoLocked && !isInspection && !footerVisible && !openTeam && !openMatch && !openRobot && view !== "judging" && !isEmcee && (
+      {!highlanderDemoLocked && !isInspection && !footerVisible && !openTeam && !openMatch && !openRobot && view !== "judging" && view !== "matches" && !isEmcee && (
         <button onClick={() => setLogFor("")} className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] sm:bottom-5 left-1/2 -translate-x-1/2 z-50 sm:z-20 bg-[#D7212B] text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
           <Plus size={20} /> Log violation
         </button>
