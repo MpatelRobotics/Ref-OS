@@ -151,3 +151,45 @@ test('forced refresh fetches fresh data without conditional-cache headers', asyn
   assert.equal(calls, 2);
   assert.equal(refreshed.rankings[0].rank, 2);
 });
+
+
+test('TM elimination pairings with repeated game numbers import and sync distinct scores', async () => {
+  const data = fixture();
+  data.matches = Array.from({length: 8}, (_, i) => {
+    const row = match('SCORED', [i + 10, i]);
+    row.matchInfo.matchTuple = {session: 0, division: 1, round: 'R16', instance: i + 1, match: 1};
+    return row;
+  });
+  for (const [round, instance, game] of [['QF', 3, 1], ['SF', 2, 1], ['FINAL', 1, 2]]) {
+    const row = match('SCORED', [44, 22]);
+    row.matchInfo.matchTuple = {session: 0, division: 1, round, instance, match: game};
+    data.matches.push(row);
+  }
+  const snapshot = normalizeTmSnapshot(data);
+  assert.equal(snapshot.matches.length, 11);
+  assert.deepEqual(snapshot.matches.slice(0, 8).map(row => row.num), [1,2,3,4,5,6,7,8]);
+  assert.equal(snapshot.matches[8].num, 3);
+  assert.equal(snapshot.matches[9].num, 2);
+  assert.equal(snapshot.matches[10].num, 2);
+  assert.deepEqual(snapshot.warnings, []);
+  const api = mockApi();
+  api.updateExistingVexScore = async (_event, row) => {
+    Object.assign(api.matches.find(m => m.phase === row.phase && m.num === row.num), {redScore: row.redScore, blueScore: row.blueScore});
+    return 1;
+  };
+  const result = await applyTmSnapshot(snapshot, {api, eventId: 'event', includeSchedule: true, hashes: {}, current: () => true});
+  assert.match(result, /11 matches added · 11 scores updated/);
+  assert.equal(api.matches.find(m => m.phase === 'r16' && m.num === 8).redScore, 17);
+});
+
+test('multi-game non-final series cannot overwrite a single-game bracket score', () => {
+  const data = fixture();
+  data.matches = [1,2].map(game => {
+    const row = match();
+    row.matchInfo.matchTuple = {session: 0, division: 1, round: 'QF', instance: 3, match: game};
+    return row;
+  });
+  const snapshot = normalizeTmSnapshot(data);
+  assert.equal(snapshot.matches.length, 0);
+  assert.match(snapshot.warnings[0], /multi-game non-final series/);
+});

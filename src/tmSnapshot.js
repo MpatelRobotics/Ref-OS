@@ -1,4 +1,4 @@
-const phases = { QUAL: 'qual', PRACTICE: 'practice', R16: 'r16', QF: 'qf', SF: 'sf', F: 'final', FINAL: 'final' };
+import { tmMatchIdentity } from './tmMatchIdentity.js';
 const number = value => typeof value === 'string' && /^[0-9]+[A-Z]*$/i.test(value.trim()) ? value.trim().toUpperCase() : null;
 const integer = value => Number.isSafeInteger(value) && value >= 0;
 const positive = value => integer(value) && value > 0;
@@ -18,13 +18,18 @@ export function normalizeTmSnapshot(data, session) {
   const selectedSession = session ?? (sessions.length === 1 ? sessions[0] : null);
   const candidates = rawMatches.flatMap(m => {
     const info = m.matchInfo, tuple = info?.matchTuple;
-    if (!tuple || tuple.session !== selectedSession || !phases[tuple.round] || !positive(tuple.match)) return [];
+    const identity = tmMatchIdentity(tuple);
+    if (!identity || tuple.session !== selectedSession) return [];
+    if (['r16', 'qf', 'sf'].includes(identity.phase) && rawMatches.some(other => {
+      const t = other.matchInfo?.matchTuple;
+      return t?.session === tuple.session && t.division === tuple.division && t.round === tuple.round && t.instance === tuple.instance && t.match > 1;
+    })) return [];
     const alliances = info.alliances;
     if (!Array.isArray(alliances) || alliances.length !== 2) return [];
     const red = (alliances[0].teams || []).map(t => number(t.number));
     const blue = (alliances[1].teams || []).map(t => number(t.number));
     if (red.length !== 2 || blue.length !== 2 || [...red, ...blue].some(t => !t) || new Set([...red,...blue]).size !== 4) return [];
-    const row = { phase: phases[tuple.round], num: tuple.match, red, blue };
+    const row = { ...identity, red, blue };
     if (info.state === 'SCORED' && Array.isArray(m.finalScore) && m.finalScore.length === 2 && m.finalScore.every(integer)) {
       row.redScore = m.finalScore[0]; row.blueScore = m.finalScore[1];
     }
@@ -32,9 +37,9 @@ export function normalizeTmSnapshot(data, session) {
   });
   const counts = new Map();
   for (const row of candidates) { const key = `${row.phase}:${row.num}`; counts.set(key, (counts.get(key) || 0) + 1); }
-  // TM elimination instances can repeat a match number; never merge ambiguous identities.
+  // Only genuinely duplicate pairing/game identities are ambiguous.
   const matches = candidates.filter(row => counts.get(`${row.phase}:${row.num}`) === 1);
-  if (rawMatches.length - matches.length) warnings.push(`${rawMatches.length - matches.length} matches outside the selected session or with unsupported/ambiguous identities were skipped.`);
+  if (rawMatches.length - matches.length) warnings.push(`${rawMatches.length - matches.length} matches outside the selected session or with invalid identities, duplicate pairings, or multi-game non-final series were skipped.`);
   if (rankings.length !== data.rankings.length) warnings.push('Unsupported qualification ranking rows were skipped.');
   if (skills.length !== data.skills.length) warnings.push('Invalid skills rows were skipped.');
   if (teams.length !== data.teams.length) warnings.push('Invalid team rows were skipped.');

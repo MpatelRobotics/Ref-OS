@@ -2489,10 +2489,30 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
     window.addEventListener("online", goOnline);
     window.addEventListener("offline", goOffline);
     const iv = setInterval(doFlush, 20000); // retry any stragglers
+    // Refresh desktop data without reloading the page and clearing TM credentials or drafts.
+    const desktop = Boolean(window.refosTmDesktop) ||
+      (!window.Capacitor?.isNativePlatform?.() && !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) &&
+        !(navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+    let refreshingDesktop = false;
+    let disposed = false;
+    const desktopRefresh = desktop ? setInterval(async () => {
+      if (!navigator.onLine || refreshingDesktop) return;
+      refreshingDesktop = true;
+      try {
+        await Promise.allSettled([
+          refresh(),
+          ...(!isInspection ? [api.listMatches(eventId, { strict: true }).then((list) => {
+            if (!disposed) setMatches(Object.fromEntries(list.map((match) => [match.id, match])));
+          })] : []),
+        ]);
+      } finally { refreshingDesktop = false; }
+    }, 5 * 60 * 1000) : null;
     return () => {
       unsub(); window.removeEventListener("focus", onFocus);
       window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline);
+      disposed = true;
       clearInterval(iv);
+      if (desktopRefresh !== null) clearInterval(desktopRefresh);
     };
   }, [eventId, isInspection, refresh, doFlush]);
 
