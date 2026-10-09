@@ -1,171 +1,90 @@
 #!/usr/bin/env node
-/**
- * Ref-OS ↔ Tournament Manager bridge  (OPTIONAL — see README)
- * --------------------------------------------------------------
- * Runs on a laptop on the SAME LOCAL NETWORK as the Tournament Manager machine.
- * It reads the match schedule/results from TM's Public API and upserts them into
- * the same Supabase your Ref-OS app already reads from. The web app is unchanged
- * and works fine without this — the bridge only *adds* automatic sync.
- *
- * Auth follows the TM Public API Guide v1.2:
- *   1) OAuth 2.0 client-credentials → bearer token (cached until it expires)
- *   2) Per-request HMAC-SHA256 signature using the Event Partner's API key
- *
- * Nothing is written back to TM. Read-only.
- *
- * Requires Node 18+ (built-in fetch + crypto). Config comes from environment
- * variables (see .env.example) — no secrets are hardcoded.
- */
-import crypto from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
+// Local, paired read-only TM connector. No developer secrets or database writes.
+import { createServer } from 'node:http';
+import { randomBytes, randomUUID, timingSafeEqual, createHash } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
+import { tmAddress, createResourceReader } from './protocol.mjs';
+import { LiveFieldStreams } from './live-fields.mjs';
 
-/* ----------------------------- config ----------------------------- */
-const {
-  TM_CLIENT_ID,
-  TM_CLIENT_SECRET,
-  TM_API_KEY,                 // the key the Event Partner generates in TM
-  TM_HOST,                    // TM machine host[:port], e.g. "10.0.0.5" or "localhost:8080"
-  TM_SCHEME = "http",         // TM local API is usually http on the LAN
-  SUPABASE_URL,
-  SUPABASE_KEY,               // service-role or anon key with insert/update on matches
-  EVENT_ID,                   // your Ref-OS event id (the UUID used in the app)
-  POLL_SECONDS = "60",        // guide says no faster than ~once per minute
-  DRY_RUN = "",               // set to "1" to log what it WOULD do, without writing
-} = process.env;
-
-const OAUTH_URL = "https://auth.vextm.dwabtech.com/oauth2/token";
-
-// ── Resource paths (confirmed from TM Public API Guide v1.2) ──
-//   Match List:  GET /api/matches/{division_id}
-//   Team List:   GET /api/teams            (or /api/teams/{division_id})
-//   Rankings:    GET /api/rankings/{division_id}/{match_round}
-// Most single-division events use division 1. Override with TM_DIVISION_ID if needed.
-const TM_DIVISION_ID = process.env.TM_DIVISION_ID || "1";
-const MATCHES_PATH = `/api/matches/${TM_DIVISION_ID}`;
-
-function requireEnv() {
-  const missing = ["TM_CLIENT_ID", "TM_CLIENT_SECRET", "TM_API_KEY", "TM_HOST", "SUPABASE_URL", "SUPABASE_KEY", "EVENT_ID"]
-    .filter((k) => !process.env[k]);
-  if (missing.length) { console.error("Missing env vars:", missing.join(", "), "\nSee .env.example."); process.exit(1); }
+export function createConnector({ origin, pairingCode, cloudUrl = 'https://gcibsphjcllspzesqqsw.supabase.co', fetcher = fetch }) {
+  const read = createResourceReader({ fetcher });
+  const live = new LiveFieldStreams();
+  let connectionId = '', connectionKey = '', leaseUntil = 0;
+  const expiry = setInterval(() => { if (connectionId && Date.now() > leaseUntil) { live.close(); connectionId = ''; connectionKey = ''; } }, 10000);
+  expiry.unref();
+  const server = createServer(async (request, response) => {
+    const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Vary': 'Origin' };
+    if (request.headers.origin !== origin) { response.writeHead(403, headers); response.end(JSON.stringify({ error: 'Open the Ref OS address used to start this connector.' })); return; }
+    Object.assign(headers, { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type, x-refos-pairing', 'Access-Control-Allow-Private-Network': 'true' });
+    const reply = (body, status = 200) => { response.writeHead(status, headers); response.end(JSON.stringify(body)); };
+    if (request.method === 'OPTIONS') { reply({}); return; }
+    if (request.method !== 'POST' || !['/snapshot', '/activity', '/disconnect'].includes(request.url)) { reply({ error: 'Unknown connector request.' }, 404); return; }
+    const supplied = Buffer.from(String(request.headers['x-refos-pairing'] || ''));
+    const expected = Buffer.from(pairingCode);
+    if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) { reply({ error: 'The connector pairing code is incorrect.' }, 403); return; }
+    try {
+      let raw = '';
+      for await (const chunk of request) { raw += chunk; if (raw.length > 20000) { reply({ error: 'Request too large.' }, 413); return; } }
+      const body = JSON.parse(raw);
+      if (request.url !== '/snapshot') {
+        if (!connectionId || body.connectionId !== connectionId || Date.now() > leaseUntil) { reply({ error: 'TM live field connection expired. Reconnect TM.' }, 409); return; }
+        if (request.url === '/disconnect') { live.close(); connectionId = ''; connectionKey = ''; reply({}); return; }
+        reply({ fieldSets: live.snapshot(), checkedAt: Date.now() }); return;
+      }
+      const url = tmAddress(body.address);
+      if (typeof body.apiKey !== 'string' || !body.apiKey.trim() || body.apiKey.length > 2000 || typeof body.authorization !== 'string' || !body.authorization.startsWith('Bearer ') || typeof body.anonKey !== 'string') throw new Error('Enter the event API key and sign in to Ref OS.');
+      if (body.division != null && (!Number.isSafeInteger(body.division) || body.division < 1)) throw new Error('Choose a TM division.');
+      // Ref OS's backend checks the current user's admin role every snapshot.
+      const authorized = await fetcher(`${cloudUrl}/functions/v1/tm-api-token`, {
+        method: 'POST', signal: AbortSignal.timeout(20000),
+        headers: { Authorization: body.authorization, apikey: body.anonKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId: body.eventId }),
+      });
+      const auth = await authorized.json();
+      if (!authorized.ok || typeof auth.accessToken !== 'string') throw new Error(auth.error || 'TM authorization failed.');
+      const get = path => read(url, path, body.apiKey, auth.accessToken);
+      const [event, divisions] = await Promise.all([get('/api/event'), get('/api/divisions')]);
+      if (body.division == null) { reply({ event: event.event, divisions: divisions.divisions }); return; }
+      if (!divisions.divisions?.some(row => row.id === body.division)) throw new Error('This TM division no longer exists. Load the event again.');
+      const [teams, matches, rankings, skills] = await Promise.all([
+        get(`/api/teams/${body.division}`), get(`/api/matches/${body.division}`), get(`/api/rankings/${body.division}/QUAL`), get('/api/skills'),
+      ]);
+      let fieldError = '';
+      if (body.liveFields === true) {
+        try {
+          const fieldSets = await get('/api/fieldsets');
+          if (!Array.isArray(fieldSets.fieldSets) || fieldSets.fieldSets.length > 30) throw Error('TM returned invalid field sets.');
+          const sets = await Promise.all(fieldSets.fieldSets.map(async set => {
+            if (!Number.isSafeInteger(set.id) || set.id < 1) throw Error('TM returned invalid field sets.');
+            const fields = await get(`/api/fieldsets/${set.id}/fields`);
+            if (!Array.isArray(fields.fields) || fields.fields.length > 30 || fields.fields.some(f => !Number.isSafeInteger(f.id) || f.id < 1)) throw Error('TM returned invalid fields.');
+            return { id: set.id, name: String(set.name || `Field set ${set.id}`), fields: fields.fields.map(f => ({ id: f.id, name: String(f.name || `Field ${f.id}`) })) };
+          }));
+          const identity = createHash('sha256').update(`${body.eventId}\n${url.origin}\n${body.apiKey}\n${body.division}`).digest('hex');
+          if (connectionKey !== identity) { live.close(); connectionId = randomUUID(); connectionKey = identity; }
+          live.configure(url, body.apiKey, auth.accessToken, sets);
+          leaseUntil = Date.now() + 90000;
+        } catch { live.close(); connectionId = ''; connectionKey = ''; fieldError = 'Live fields could not connect. Check that TM supports the field API; rankings and score sync can continue.'; }
+      } else { live.close(); connectionId = ''; connectionKey = ''; }
+      reply({ event: event.event, divisions: divisions.divisions, teams: teams.teams, matches: matches.matches, rankings: rankings.rankings, skills: skills.skillsRankings, connectionId, fieldError });
+    } catch (error) {
+      const message = error instanceof Error && /^(TM |Enter |Use |Choose |This TM|Event administrator|Sign in|Too many)/.test(error.message) ? error.message : 'Could not reach TM or authorize the connector. Check the address, local network, and internet connection.';
+      reply({ error: message }, 502);
+    }
+  });
+  server.on('close', () => { clearInterval(expiry); live.close(); });
+  return server;
 }
 
-/* --------------------------- OAuth token --------------------------- */
-let tokenCache = { value: null, expiresAt: 0 };
-async function getToken() {
-  if (tokenCache.value && Date.now() < tokenCache.expiresAt - 30_000) return tokenCache.value;
-  const body = new URLSearchParams({ grant_type: "client_credentials", client_id: TM_CLIENT_ID, client_secret: TM_CLIENT_SECRET });
-  const res = await fetch(OAUTH_URL, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
-  if (!res.ok) throw new Error(`OAuth token failed: ${res.status} ${await res.text()}`);
-  const json = await res.json();               // { access_token, token_type, expires_in }
-  tokenCache = { value: json.access_token, expiresAt: Date.now() + (json.expires_in || 300) * 1000 };
-  console.log(`[auth] got token, expires in ${json.expires_in}s`);
-  return tokenCache.value;
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const originIndex = process.argv.indexOf('--origin');
+  const enteredOrigin = originIndex >= 0 ? process.argv[originIndex + 1] : process.env.REFOS_ORIGIN;
+  let origin;
+  try { const url = new URL(enteredOrigin); if (!['http:', 'https:'].includes(url.protocol) || url.origin !== enteredOrigin) throw Error(); origin = url.origin; }
+  catch { console.error('Start with --origin followed by your Ref OS website address, without a trailing slash.'); process.exit(1); }
+  const pairingCode = randomBytes(16).toString('hex');
+  const port = Number(process.env.REFOS_CONNECTOR_PORT || 8787);
+  if (!Number.isSafeInteger(port) || port < 1024 || port > 65535) { console.error('Use a connector port from 1024 to 65535.'); process.exit(1); }
+  const server = createConnector({ origin, pairingCode, cloudUrl: process.env.SUPABASE_URL || undefined });
+  server.on('error', () => { console.error('Connector could not start. Check whether another connector is already running.'); process.exit(1); });
+  server.listen(port, '127.0.0.1', () => console.log(`Ref OS TM connector ready at http://127.0.0.1:${port}\nPairing code: ${pairingCode}\nOpen ${origin} on this computer, then use Tournament Manager Sync Center.\nKeep this window open while syncing.`));
 }
-
-/* --------------------- request signing (HMAC) ---------------------- */
-// StringToSign per the guide:
-//   VERB \n PATH+QUERY \n token:{bearer} \n host:{host} \n x-tm-date:{date} \n
-function signAndHeaders(method, pathAndQuery, bearer) {
-  const date = new Date().toUTCString();       // RFC 1123
-  const stringToSign =
-    method + "\n" +
-    pathAndQuery + "\n" +
-    "token:" + bearer + "\n" +
-    "host:" + TM_HOST + "\n" +
-    "x-tm-date:" + date + "\n";
-  const signature = crypto.createHmac("sha256", TM_API_KEY).update(stringToSign).digest("hex");
-  return {
-    "Host": TM_HOST,
-    "Authorization": `Bearer ${bearer}`,
-    "x-tm-date": date,
-    "x-tm-signature": signature,
-  };
-}
-
-// GET with signing + polite If-Modified-Since caching. Returns null on 304.
-const lastModified = {};    // pathAndQuery -> Last-Modified header value
-async function signedGet(pathAndQuery) {
-  const bearer = await getToken();
-  const headers = signAndHeaders("GET", pathAndQuery, bearer);
-  if (lastModified[pathAndQuery]) headers["If-Modified-Since"] = lastModified[pathAndQuery];
-  const res = await fetch(`${TM_SCHEME}://${TM_HOST}${pathAndQuery}`, { headers });
-  if (res.status === 304) return null;                       // unchanged since last poll
-  if (!res.ok) throw new Error(`GET ${pathAndQuery} → ${res.status} ${await res.text()}`);
-  const lm = res.headers.get("last-modified"); if (lm) lastModified[pathAndQuery] = lm;
-  return res.json();
-}
-
-/* -------------------- map TM match → Ref-OS row -------------------- */
-// Confirmed shape (TM Public API Guide v1.2):
-//   match.matchInfo.matchTuple = { session, division, round, instance, match }
-//   match.matchInfo.alliances  = [ { teams:[{number}] } (RED), { teams:[{number}] } (BLUE) ]
-//   match.matchInfo.state      = e.g. "SCORED"
-//   match.finalScore           = [redScore, blueScore]
-//   match.winningAlliance      = 0 (red) | 1 (blue) | -1/absent (none/tie)
-// Ref-OS phases: 'qual' | 'r16' | 'qf' | 'sf' | 'final'.
-const ROUND_TO_PHASE = {
-  QUAL: "qual", QUALIFICATION: "qual", PRACTICE: "practice",
-  R16: "r16", ROUND_OF_16: "r16", ROUNDOF16: "r16", RO16: "r16",
-  QF: "qf", QUARTER: "qf", QUARTERFINAL: "qf", QUARTER_FINAL: "qf",
-  SF: "sf", SEMI: "sf", SEMIFINAL: "sf", SEMI_FINAL: "sf",
-  F: "final", FINAL: "final", FINALS: "final",
-};
-function allianceTeams(alliance) {
-  return ((alliance && alliance.teams) || []).map((t) => String(t.number)).filter(Boolean);
-}
-function mapTmMatch(m) {
-  const info = m.matchInfo || m;
-  const tuple = info.matchTuple || {};
-  const phase = ROUND_TO_PHASE[String(tuple.round || "").toUpperCase()] || "qual";
-  const num = Number(tuple.match ?? tuple.instance ?? 0);
-  const alliances = info.alliances || [];
-  const red = allianceTeams(alliances[0]);
-  const blue = allianceTeams(alliances[1]);
-  // winner: 0 = red, 1 = blue; anything else = undecided
-  const wa = m.winningAlliance;
-  const winner = wa === 0 ? "red" : wa === 1 ? "blue" : null;
-  return { phase, num, red, blue, field: info.field ?? null, label: null, winner };
-}
-
-/* ------------------------- Supabase upsert ------------------------- */
-const supabase = SUPABASE_URL && SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } }) : null;
-const SYNC_WINNERS = !!process.env.SYNC_WINNERS; // off by default: the app's bracket manager stays authoritative
-async function upsertMatches(rows) {
-  const payload = rows
-    .filter((r) => r.num > 0 && (r.red.length || r.blue.length))
-    .map((r) => {
-      const row = { event_id: EVENT_ID, phase: r.phase, num: r.num, red: r.red, blue: r.blue, field: r.field, label: r.label };
-      if (SYNC_WINNERS && r.winner) row.winner = r.winner; // only touch winner when explicitly enabled
-      return row;
-    });
-  if (!payload.length) return 0;
-  if (DRY_RUN) { console.log(`[dry-run] would upsert ${payload.length} matches:`, JSON.stringify(payload.slice(0, 3), null, 2), payload.length > 3 ? "…" : ""); return payload.length; }
-  // When SYNC_WINNERS is off, `winner` is never sent, so app-set bracket winners are preserved.
-  const { error } = await supabase.from("matches").upsert(payload, { onConflict: "event_id,phase,num" });
-  if (error) throw error;
-  return payload.length;
-}
-
-/* ----------------------------- poll ------------------------------- */
-async function pollOnce() {
-  const data = await signedGet(MATCHES_PATH);
-  if (data === null) { console.log("[poll] no changes"); return; }
-  if (DRY_RUN) console.log("[dry-run] raw matches response (inspect this to finalize mapTmMatch + MATCHES_PATH):\n", JSON.stringify(data, null, 2).slice(0, 4000));
-  const list = Array.isArray(data) ? data : (data.matches ?? data.items ?? []);
-  const rows = list.map(mapTmMatch);
-  const n = await upsertMatches(rows);
-  console.log(`[poll] synced ${n} matches @ ${new Date().toLocaleTimeString()}`);
-}
-
-async function main() {
-  requireEnv();
-  const every = Math.max(30, Number(POLL_SECONDS)) * 1000;   // never faster than 30s; guide recommends ~60s
-  console.log(`Ref-OS ↔ TM bridge starting. host=${TM_HOST} event=${EVENT_ID} poll=${every / 1000}s ${DRY_RUN ? "(DRY RUN)" : ""}`);
-  // one immediate pass, then loop; keep running through transient TM/network errors
-  for (;;) {
-    try { await pollOnce(); }
-    catch (e) { console.error("[error]", e.message || e); }   // don't crash — TM tolerates short outages
-    await new Promise((r) => setTimeout(r, every));
-  }
-}
-main();

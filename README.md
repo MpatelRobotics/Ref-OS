@@ -388,13 +388,15 @@ supabase/                  SQL migrations (run in the Supabase SQL Editor)
 supabase/functions/        Edge Functions (including vex-event-lookup for VEX API integration)
 scripts/                   Build-time and setup helper scripts
 tests/                     Playwright tests
-tm-bridge/                 Optional Tournament Manager bridge utility
+tm-bridge/                 Paired TM API connector; download and control it from Sync Center
 venue-server/              Optional Local Venue Server (Node.js + SQLite); see VENUE-SERVER.md
 ```
 
 ---
 
 ## Attribution
+
+Tournament Manager API setup, secret names, deployment, and local connector instructions are in [TM-API-SETUP.md](TM-API-SETUP.md). The experimental integration syncs teams, rankings, skills, and completed scores; optional live field WebSockets show assignments and starts/stops in Matches. TM client credentials remain in Supabase secrets.
 
 Ref OS was designed and developed by **Maharshi Patel**.
 

@@ -6,3 +6,4 @@ dist
 # TM bridge secrets
 tm-bridge/.env
 tm-bridge/node_modules/
+public/tm-connector.mjs

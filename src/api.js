@@ -4,6 +4,31 @@ import { putCachedBlob, deletePaths as deleteCachedPhotos } from "./photoCache";
 import { isVenueMode } from "./sync/syncConfig";
 import * as venue from "./sync/venueSync";
 
+export async function getTmSnapshot(eventId, settings) {
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data.session?.access_token) throw Error('Sign in before connecting TM.');
+  let response;
+  try {
+    response = await fetch('http://127.0.0.1:8787/snapshot', {
+      method: 'POST', signal: AbortSignal.timeout(45000),
+      headers: { 'Content-Type': 'application/json', 'x-refos-pairing': settings.pairingCode },
+      body: JSON.stringify({ ...settings, eventId, authorization: `Bearer ${data.session.access_token}`, anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY }),
+    });
+  } catch { throw Error('Could not reach the local TM connector. Start it on this computer and allow local network access in your browser.'); }
+  const result = await response.json();
+  if (!response.ok) throw Error(result.error || 'TM connection failed.');
+  return result;
+}
+export async function getTmFieldActivity(connectionId, pairingCode, disconnect = false) {
+  const response = await fetch(`http://127.0.0.1:8787/${disconnect ? 'disconnect' : 'activity'}`, {
+    method: 'POST', signal: AbortSignal.timeout(5000),
+    headers: { 'Content-Type': 'application/json', 'x-refos-pairing': pairingCode }, body: JSON.stringify({ connectionId }),
+  });
+  const result = await response.json();
+  if (!response.ok) throw Error(result.error || 'Live field activity is unavailable.');
+  return result;
+}
+
 const E2E_MOCK = import.meta.env.VITE_E2E_MOCK === "1";
 const e2eState = { teams: [], violations: [] };
 let e2eRobotGeneration = "0";
@@ -22,7 +47,7 @@ export const uid = () =>
    SESSION-SCOPED: matches, violations, field log (except the league-wide kinds below), field
    reset checks, alliances, nominations, finalists, attendance, robot inspection photos, and the
    imported rankings / skills / qualification-record snapshots. */
-export const LEAGUE_SESSION_SETTING_KEYS = new Set(["skills_rankings", "qualification_records", "judging_rank_order", "rank_snapshot"]);
+export const LEAGUE_SESSION_SETTING_KEYS = new Set(["skills_rankings", "qualification_records", "judging_rank_order", "rank_snapshot", "tm_field_activity"]);
 export const LEAGUE_EVENT_SCOPED_FIELD_LOG_KINDS = new Set(["role_code_update", "role_code_request", "volunteer_contact", "sync_probe", "sync_ack", "system_test"]);
 let leagueContext = { eventId: "", sessionId: "", legacySessionId: "" };
 // legacySessionId: for a League converted from a Tournament, the session that owns the
@@ -1003,7 +1028,7 @@ export async function finishTeamPhotoCleanup(eventId, reset) {
 }
 
 /* ================= matches (qualification schedule) ================= */
-export async function listMatches(eventId) {
+export async function listMatches(eventId, { strict = false } = {}) {
   if (E2E_MOCK) return [];
   const sessionId = leagueSessionFor(eventId);
   const cacheKind = sessionId ? `matches@${sessionId}` : "matches";
@@ -1021,6 +1046,7 @@ export async function listMatches(eventId) {
     saveReadCache(eventId, cacheKind, matches);
     return matches;
   } catch (error) {
+    if (strict) throw error;
     const cached = loadReadCache(eventId, cacheKind) || (sessionId && sessionId === leagueLegacySessionFor(eventId) ? loadReadCache(eventId, "matches") : null);
     if (cached) {
       console.warn("Matches unavailable from Supabase; using last synced local cache.", error);
@@ -1039,6 +1065,16 @@ export async function addMatch(eventId, m) {
   // Re-importing a match updates that match in the same session only (event + session + phase + number).
   const { error } = await upsertSessionKeyed("matches", row, "event_id,session_key,phase,num", "event_id,phase,num", { sessionId });
   if (error) throw error;
+}
+// Insert-only: a concurrent schedule edit must never be overwritten by TM sync.
+export async function insertTmMatch(eventId, m) {
+  const row = { event_id: eventId, phase: m.phase, num: m.num, red: m.red, blue: m.blue };
+  const sessionId = leagueSessionFor(eventId);
+  if (sessionId) row.session_id = sessionId;
+  const { error } = await supabase.from('matches').insert(row);
+  if (error?.code === '23505') return false;
+  if (error) throw error;
+  return true;
 }
 // League sessions: restrict a match / alliance / check query to the current session.
 const inSession = (query, eventId) => {

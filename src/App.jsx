@@ -12,6 +12,9 @@ import IQManual from "./components/IQManual.jsx";
 import EventProgramChoice, {detectEventProgram, programLabel} from "./components/EventProgramChoice.jsx";
 import TeamRegisteredEvents from "./components/TeamRegisteredEvents.jsx";
 import VexSyncManager from "./components/VexSyncManager.jsx";
+import TmApiSync from "./components/TmApiSync.jsx";
+import TmFieldActivity from "./components/TmFieldActivity.jsx";
+import { applyTmSnapshot } from "./tmApplySnapshot.js";
 import VexEventLookup from "./components/VexEventLookup.jsx";
 import useMenuViewport from "./useMenuViewport.js";
 import Thumb from "./components/PhotoThumbnail.jsx";
@@ -1865,6 +1868,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   const [showFeedback, setShowFeedback] = useState(false);
   const [showFeedbackViewer, setShowFeedbackViewer] = useState(false);
   // League: choosing another session in the TM Sync Center reopens it in that session.
+  const [showTmApiSync, setShowTmApiSync] = useState(false);
   const [showTMSync, setShowTMSync] = useState(() => {
     try { const reopen = sessionStorage.getItem("refosOpenTMSync") === "1"; sessionStorage.removeItem("refosOpenTMSync"); return reopen; } catch { return false; }
   });
@@ -3500,6 +3504,15 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
     }
     if (missing.length || kind === "rankings") setTeams(await api.listTeams(eventId));
   };
+  const applyTmApiSnapshot = async (snapshot, options) => {
+    if (!adminUnlocked || highlanderDemoLocked || isVenueMode()) throw Error('Cloud administrator access is required.');
+    const message = await applyTmSnapshot(snapshot, { ...options, api, eventId, by: meName });
+    if (!options.current()) return;
+    const [freshTeams, freshMatches, settings] = await Promise.all([api.listTeams(eventId), api.listMatches(eventId, { strict: true }), api.listEventSettings(eventId)]);
+    if (!options.current()) return;
+    setTeams(freshTeams); setMatches(Object.fromEntries(freshMatches.map(m => [m.id, m]))); setEventSettings(settings);
+    return message;
+  };
   const winnerTeams = (m) => (m && m.winner ? (m.winner === "red" ? m.red : m.blue) : null);
   const advanceBracket = async (map) => {
     const get = (phase, num) => map[`${phase}-${num}`];
@@ -4630,6 +4643,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           <div><dt>Match schedule</dt><dd>{Object.keys(matches).length}<span> matches</span></dd></div>
           {!isJudge && !isEmcee && <div><dt>Shared log</dt><dd>{viols.length}<span> entries</span></dd></div>}
         </dl>}
+        {view === 'matches' && <TmFieldActivity value={eventSettings?.tm_field_activity?.value} />}
         {openTeam ? (
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={isIQ ? undefined : teamRecords[openTeam]}
             onLog={highlanderDemoLocked ? undefined : () => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked && !highlanderDemoLocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
@@ -4823,6 +4837,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         <TMSyncCenter isIQ={isIQ}
           protectedKeys={highlanderDemoLocked ? ["matches", "alliances", "scores"] : []}
           onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowTMSync(false)}
+          onConnectApi={!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode() ? () => { setShowTMSync(false); setShowTmApiSync(true); } : null}
           onImportTeams={() => teamFileRef.current?.click()}
           onImportMatches={() => matchFileRef.current?.click()}
           onImportRankings={() => rankingFileRef.current?.click()}
@@ -4856,6 +4871,14 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
           syncStatus={tmSyncStatus}
         />
       )}
+      {!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <TmApiSync
+        key={`tm-${eventId}-${leagueSessionId || ''}`} open={showTmApiSync} onClose={() => setShowTmApiSync(false)}
+        target={`${event?.name || 'Current event'}${league ? ' · ' + league.sessionName(leagueSessionId) : ''}`}
+        expectedCode={eventSettings?.vex_event?.value?.code || ''}
+        onFetch={settings => api.getTmSnapshot(eventId, settings)} onApply={applyTmApiSnapshot}
+        onActivity={api.getTmFieldActivity} onDisconnect={(id, pairing) => api.getTmFieldActivity(id, pairing, true)}
+        onPublishActivity={async (value, current) => { if (!current()) return; const row = await api.upsertEventSetting(eventId, 'tm_field_activity', value, meName); if (current()) setEventSettings(prev => ({ ...prev, tm_field_activity: row })); }}
+      />}
       <input ref={matchFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importMatchesFile(f); }} />
       <input ref={teamFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
@@ -7239,7 +7262,7 @@ function ImportPreviewModal({ preview, onImport, onCancel }) {
   );
 }
 
-function TMSyncCenter({ isIQ = false, onClose, onImportTeams, onImportMatches, onImportRankings, onImportSkills, onImportAlliances, onImportScores, onImportPackage, packageRunning = false, stats, syncStatus, leagueImport = null }) {
+function TMSyncCenter({ isIQ = false, onClose, onConnectApi, onImportTeams, onImportMatches, onImportRankings, onImportSkills, onImportAlliances, onImportScores, onImportPackage, packageRunning = false, stats, syncStatus, leagueImport = null }) {
   const items = [
     { key: "teams", title: "Teams", detail: `${stats.teams} teams loaded`, action: "Import teams", onClick: onImportTeams, Icon: Users },
     { key: "matches", title: "Match schedule", detail: `${stats.matches} matches loaded`, action: "Import matches", onClick: onImportMatches, Icon: ListOrdered },
@@ -7259,11 +7282,12 @@ function TMSyncCenter({ isIQ = false, onClose, onImportTeams, onImportMatches, o
         <div className="sticky top-0 bg-slate-50 dark:bg-slate-900 px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700 z-10">
           <div>
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><RefreshCw size={18} className="text-[#D7212B]" /> Tournament Manager Sync Center</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Import and refresh event data from Tournament Manager CSV exports.</p>
+            <p className="text-xs text-slate-400 mt-0.5">Connect to Tournament Manager or import its CSV exports.</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={22} /></button>
         </div>
         <div className="p-4 space-y-3">
+          {onConnectApi && <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-800 p-3"><h3 className="font-semibold">Automatic TM sync · Experimental</h3><p className="mt-1 text-sm text-slate-500">Connect the local TM API to sync teams, match scores, qualification rankings, and skills. You can also add missing matches.</p><button onClick={onConnectApi} className="mt-3 w-full min-h-[44px] rounded-lg bg-red-700 text-white px-3 py-2 font-semibold">Connect Tournament Manager</button></div>}
           {isIQ && <p className="text-sm">IQ: import categories individually. Schedule/results CSV uses Round, Match, Team1, Team2, Field and optional shared Score. Use Finals for ranked partnerships; no alliance-selection export is needed.</p>}
           {leagueImport && (
             <div className="bg-white dark:bg-slate-800 rounded-xl border-2 border-sky-300 dark:border-sky-800 p-4">
