@@ -16,7 +16,7 @@ export function createResourceReader({ fetcher = fetch, now = Date.now } = {}) {
     if (pending.has(key)) return pending.get(key);
     const task = (async () => {
       const headers = signedHeaders(url, path, apiKey, bearer);
-      if (old?.modified) headers['If-Modified-Since'] = old.modified;
+      if (!force && old?.modified) headers['If-Modified-Since'] = old.modified;
       const response = await fetcher(new URL(path, url), { headers, redirect: 'error', signal: AbortSignal.timeout(15000) });
       if (response.status === 304 && old) { old.checkedAt = now(); return old.data; }
       if (!response.ok) throw new Error(`TM could not read ${path} (HTTP ${response.status}). Check the event key, address, and computer clock.`);

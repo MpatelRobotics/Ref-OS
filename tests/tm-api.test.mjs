@@ -137,3 +137,17 @@ test('real connector HTTP flow authorizes admin and reads documented resources; 
   assert.deepEqual(paths.sort(),['/api/event','/api/divisions','/api/teams/1','/api/matches/1','/api/rankings/1/QUAL','/api/skills'].sort());
   denied=true;assert.equal((await send()).status,502);assert.equal(paths.length,6);
 });
+
+test('forced refresh fetches fresh data without conditional-cache headers', async () => {
+  let calls = 0;
+  const read = createResourceReader({ now: () => 1000, fetcher: async (_url, options) => {
+    calls++;
+    assert.equal(options.headers['If-Modified-Since'], undefined);
+    return json({rankings:[{rank:calls}]},{headers:{'last-modified':'Thu, 08 Oct 2026 00:00:00 GMT'}});
+  }});
+  const url = tmAddress('http://localhost:8080');
+  await read(url, '/api/rankings/1/QUAL', 'key', 'token');
+  const refreshed = await read(url, '/api/rankings/1/QUAL', 'key', 'token', true);
+  assert.equal(calls, 2);
+  assert.equal(refreshed.rankings[0].rank, 2);
+});

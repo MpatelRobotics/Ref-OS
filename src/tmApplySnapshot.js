@@ -54,5 +54,5 @@ export async function applyTmSnapshot(snapshot, { api, eventId, by, includeSched
     await api.upsertEventSetting(eventId, 'skills_rankings', { rows: snapshot.skills, importedAt: Date.now(), source: 'TM API' }, by);
     remember('skills', snapshot.skills);
   }
-  return `${added} matches added · ${scored} scores updated · ${skipped} unmatched scores skipped.`;
+  return `${added} matches added · ${scored} scores updated · ${snapshot.rankings.length} qualification rankings received · ${skipped} unmatched scores skipped.`;
 }
