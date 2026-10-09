@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-async function mount(page) {
+async function mount(page, desktop = true) {
+  if (desktop) await page.addInitScript(() => { window.refosTmDesktop = { setSyncActive: async active => { window.desktopActive = active; } }; });
   await page.route('**/tm-sync-test', route => route.fulfill({ contentType: 'text/html', body: `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
   import '/src/index.css';
   const React=(await import('/node_modules/.vite/deps/react.js')).default;
@@ -17,7 +18,6 @@ async function mount(page) {
   await page.goto('/tm-sync-test');
 }
 async function review(page) {
-  await page.getByLabel('Connector pairing code').fill('paired');
   await page.getByLabel('Event TM API key',{exact:true}).fill('event-key');
   await page.getByRole('button',{name:'Connect to TM',exact:true}).click();
   await page.getByRole('button',{name:'Review TM data',exact:true}).click();
@@ -45,8 +45,8 @@ test('wrong event is blocked and connection errors have a recoverable message',a
   await expect(page.getByRole('button',{name:'Start TM syncing'})).toBeEnabled();
 });
 test('setup download and controls fit mobile and key stays password masked',async({page})=>{
-  await mount(page);await page.getByText('Connection setup',{exact:true}).click();
-  await expect(page.getByRole('link',{name:'Download the TM connector'})).toHaveAttribute('href','/tm-connector.mjs');
+  await mount(page, false);
+  await expect(page.getByRole('link',{name:'Download Ref OS TM Connect for Windows'})).toHaveAttribute('href','/Ref-OS-TM-Connect.exe');
   await expect(page.getByLabel('Event TM API key',{exact:true})).toHaveAttribute('type','password');
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await page.getByRole('button',{name:'Start TM syncing'}).scrollIntoViewIfNeeded();
@@ -65,3 +65,15 @@ test('live events publish Playing now and Stopped, and disconnect when sync stop
   expect(await page.evaluate(()=>window.published.length)).toBe(count);
   await expect(page.getByText('Live updates unavailable. Showing last observed field activity.')).toBeVisible();
 });
+
+ test('desktop keeps polling with its document hidden and reports active state', async ({page}) => {
+  await mount(page); await page.clock.install(); await review(page);
+  await page.getByRole('button',{name:'Start TM syncing'}).click();
+  await expect.poll(() => page.evaluate(() => window.desktopActive)).toBe(true);
+  await page.evaluate(() => Object.defineProperty(document, 'hidden', { configurable:true, value:true }));
+  const reads = await page.evaluate(() => window.reads);
+  await page.clock.runFor(61000);
+  await expect.poll(() => page.evaluate(() => window.reads)).toBe(reads + 1);
+  await page.getByRole('button',{name:'Stop TM sync',exact:true}).click();
+  await expect.poll(() => page.evaluate(() => window.desktopActive)).toBe(false);
+ });

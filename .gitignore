@@ -7,3 +7,8 @@ dist
 tm-bridge/.env
 tm-bridge/node_modules/
 public/tm-connector.mjs
+
+# Generated desktop app
+desktop/build/
+desktop/release/
+public/Ref-OS-TM-Connect.exe

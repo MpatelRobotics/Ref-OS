@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { createHmac } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import { applyFieldEvent } from '../tm-bridge/live-fields.mjs';
-import { createConnector } from '../tm-bridge/bridge.mjs';
+import { createConnector } from '../tm-bridge/connector.mjs';
 import { scopeTmFieldActivity } from '../src/tmFieldActivity.js';
 const tuple = { division:1,session:0,round:'QUAL',match:2,instance:1 };
 const waitFor = async condition => { const until=Date.now()+5000; while(!condition()){if(Date.now()>until)throw Error('Timed out waiting for live field event');await new Promise(r=>setTimeout(r,20));} };

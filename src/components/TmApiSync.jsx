@@ -3,11 +3,13 @@ import { normalizeTmSnapshot } from '../tmSnapshot.js';
 import { scopeTmFieldActivity } from '../tmFieldActivity.js';
 
 export default function TmApiSync({ open, onClose, target, onFetch, onApply, onActivity, onPublishActivity, onDisconnect, expectedCode = '' }) {
+  const desktop = Boolean(window.refosTmDesktop);
   const [address, setAddress] = useState('http://localhost:8080');
   const [pairing, setPairing] = useState(''), [apiKey, setApiKey] = useState('');
   const [divisions, setDivisions] = useState([]), [division, setDivision] = useState('');
   const [remoteEvent, setRemoteEvent] = useState(null), [raw, setRaw] = useState(null), [session, setSession] = useState('');
   const [includeSchedule, setIncludeSchedule] = useState(false), [running, setRunning] = useState(false);
+  useEffect(() => { window.refosTmDesktop?.setSyncActive(running).catch(() => {}); return () => { window.refosTmDesktop?.setSyncActive(false).catch(() => {}); }; }, [running]);
   const [includeLive, setIncludeLive] = useState(true), [connectionId, setConnectionId] = useState(''), [liveError, setLiveError] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [status, setStatus] = useState('');
   const alive = useRef(true), version = useRef(0), inFlight = useRef(false), hashes = useRef({});
@@ -71,7 +73,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
     if (!running) return;
     const ticket = version.current;
     const timer = setInterval(async () => {
-      if (document.hidden || !navigator.onLine || inFlight.current) return;
+      if ((!desktop && document.hidden) || !navigator.onLine || inFlight.current) return;
       inFlight.current = true;
       try { const data = await latest.current.onFetch(settings()); if (alive.current && ticket === version.current) await apply(data, ticket); }
       catch (e) { if (alive.current && ticket === version.current) { setError(e.message || 'TM sync failed.'); stop(); } }
@@ -85,7 +87,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
     const ticket = version.current;
     const current = () => active && alive.current && ticket === version.current;
     const poll = async () => {
-      if (!current() || pending || document.hidden || !navigator.onLine) return;
+      if (!current() || pending || (!desktop && document.hidden) || !navigator.onLine) return;
       pending = true;
       try {
         const data = await latest.current.onActivity(connectionId, pairing.trim());
@@ -119,14 +121,14 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
     {(running || status || error) && <div role="status" className="mx-4 mb-[calc(100px+env(safe-area-inset-bottom))] sm:mb-4 rounded-lg border border-blue-200 p-3 text-sm flex flex-wrap items-center gap-2"><span className="flex-1">{running ? 'TM sync active · every minute' : 'TM sync inactive'}{error ? ` · ${error}` : status ? ` · ${status}` : ''}{liveError && ` · ${liveError}`}</span>{running && <button className={buttonClass} onClick={stop}>Stop TM sync</button>}</div>}
     {open && <div className="fixed inset-0 z-[60] bg-black/40 p-3 flex items-center justify-center"><section role="dialog" aria-modal="true" aria-label="Tournament Manager API sync" className="w-full max-w-xl max-h-[90dvh] overflow-y-auto rounded-xl bg-white dark:bg-slate-800 p-4 space-y-4">
       <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold">Tournament Manager API <span className="text-sm text-amber-700 dark:text-amber-300">Experimental</span></h2><button className={buttonClass} onClick={onClose}>Close</button></div>
-      <p className="text-sm">Target: {target}. Run the connector and Ref OS on a computer on the TM network. Other users receive the synced data through Ref OS Cloud.</p>
-      <details className="rounded-lg border p-3 text-sm"><summary className="cursor-pointer min-h-[44px] font-semibold">Connection setup</summary><ol className="list-decimal pl-5 space-y-2"><li>In TM, open Tools → Options → Web Publishing. Enable Local TM API and copy the event API key.</li><li><a href={`${import.meta.env.BASE_URL}tm-connector.mjs`} download="tm-connector.mjs" className="underline font-semibold">Download the TM connector</a>. With Node.js 18 or later installed, run this in the folder containing the downloaded file:<code className="block break-all mt-2">node tm-connector.mjs --origin {window.location.origin}</code></li><li>Keep the connector open and enter its pairing code below. Allow local network access if your browser asks.</li></ol><p className="mt-2">The developer configures the client ID and secret once in Supabase. Event organizers only need their event key. Use this on the connector computer; phones can read the shared results.</p></details>
+      <p className="text-sm">Target: {target}. Open Ref OS TM Connect on a computer on the TM network. Other users receive the synced data through Ref OS Cloud.</p>
+      <div className="rounded-lg border p-3 text-sm space-y-2"><p>In TM, open Tools, Options, then Web Publishing. Enable Local TM API and copy the event API key.</p>{!desktop && <><a href={import.meta.env.VITE_TM_DESKTOP_DOWNLOAD_URL || `${import.meta.env.BASE_URL}Ref-OS-TM-Connect.exe`} download className="inline-flex items-center min-h-[44px] underline font-semibold">Download Ref OS TM Connect for Windows</a><p>Double-click the app, enter this website address: <b className="break-all">{window.location.origin}</b>, then sign in and select this event. No commands or Node.js installation needed.</p></>}<p>The event computer needs access to TM and the internet. Other users receive updates through Ref OS Cloud.</p></div>
       <fieldset disabled={busy || running} className="space-y-3 disabled:opacity-70">
         <label className="block">TM server address<input className={inputClass} value={address} onChange={e => reset(setAddress)(e.target.value)} autoComplete="off" /></label>
-        <label className="block">Connector pairing code<input className={inputClass} value={pairing} onChange={e => reset(setPairing)(e.target.value)} autoComplete="off" /></label>
+
         <label className="block">Event TM API key<input className={inputClass} type="password" value={apiKey} onChange={e => reset(setApiKey)(e.target.value)} autoComplete="off" /></label>
         <p className="text-sm text-slate-500">The event key is kept in memory and cleared when you leave this event or reload.</p>
-        <button className={buttonClass} disabled={!pairing.trim() || !apiKey.trim() || !address.trim()} onClick={load}>Connect to TM</button>
+        <button className={buttonClass} disabled={!desktop || !apiKey.trim() || !address.trim()} onClick={load}>Connect to TM</button>
         {remoteEvent && <p className="text-sm">Connected event: <b>{remoteEvent.name}</b>{remoteEvent.code && ` · ${remoteEvent.code}`}</p>}
         {!!divisions.length && <><label className="block">TM division<select className={inputClass} value={division} onChange={e => { setDivision(e.target.value); setRaw(null); setSession(''); hashes.current = {}; }}><option value="">Choose a division</option>{divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label><button className={buttonClass} disabled={!division} onClick={review}>Review TM data</button></>}
         {preview && <><label className="flex gap-2 items-center min-h-[44px]"><input type="checkbox" checked={includeSchedule} onChange={e => { setIncludeSchedule(e.target.checked); hashes.current = {}; }} />Add missing matches from TM</label><label className="flex gap-2 items-center min-h-[44px]"><input type="checkbox" checked={includeLive} onChange={e => setIncludeLive(e.target.checked)} />Listen to live field activity</label><p className="text-sm">Live fields show TM's assigned match and start/stop events in Matches for all event users. Sync teams, qualification rankings, skills, and scores. Scores only update matches with matching round, number, and teams. Existing fields and team assignments are kept. Empty lists do not clear data.</p>
@@ -139,7 +141,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
       {busy && <p role="status">Working…</p>}
       {!running && <button className="w-full min-h-[44px] rounded-lg bg-red-700 text-white px-3 py-2 font-semibold disabled:opacity-50" disabled={!validPreview || busy} onClick={start}>Start TM syncing</button>}
       {running && <button className={buttonClass} onClick={stop}>Stop TM sync</button>}
-      <p className="text-sm text-slate-500">Checks run once a minute while this page is open, visible, and online. Closing this dialog keeps sync running. Errors stop TM sync; leaving the event, signing out, or reloading clears the connection.</p>
+      <p className="text-sm text-slate-500">{desktop ? 'Checks run once a minute while the app is online, including when minimized. Closing its window while syncing keeps it in the system tray. Choose Quit and stop syncing from the tray to exit.' : 'Start TM sync in the Windows desktop app.'} Closing this dialog keeps sync running. Errors stop TM sync; leaving the event, signing out, or reloading clears the connection.</p>
     </section></div>}
   </>;
 }

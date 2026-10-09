@@ -1868,7 +1868,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
   const [showFeedback, setShowFeedback] = useState(false);
   const [showFeedbackViewer, setShowFeedbackViewer] = useState(false);
   // League: choosing another session in the TM Sync Center reopens it in that session.
-  const [showTmApiSync, setShowTmApiSync] = useState(false);
+  const [showTmApiSync, setShowTmApiSync] = useState(() => Boolean(window.refosTmDesktop));
   const [showTMSync, setShowTMSync] = useState(() => {
     try { const reopen = sessionStorage.getItem("refosOpenTMSync") === "1"; sessionStorage.removeItem("refosOpenTMSync"); return reopen; } catch { return false; }
   });

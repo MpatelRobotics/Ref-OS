@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { createTokenProvider } from '../supabase/functions/tm-api-token/token.js';
 import { signedHeaders, tmAddress, createResourceReader } from '../tm-bridge/protocol.mjs';
-import { createConnector } from '../tm-bridge/bridge.mjs';
+import { createConnector } from '../tm-bridge/connector.mjs';
 import { normalizeTmSnapshot } from '../src/tmSnapshot.js';
 import { applyTmSnapshot } from '../src/tmApplySnapshot.js';
 

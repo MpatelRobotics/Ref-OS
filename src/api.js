@@ -7,26 +7,12 @@ import * as venue from "./sync/venueSync";
 export async function getTmSnapshot(eventId, settings) {
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session?.access_token) throw Error('Sign in before connecting TM.');
-  let response;
-  try {
-    response = await fetch('http://127.0.0.1:8787/snapshot', {
-      method: 'POST', signal: AbortSignal.timeout(45000),
-      headers: { 'Content-Type': 'application/json', 'x-refos-pairing': settings.pairingCode },
-      body: JSON.stringify({ ...settings, eventId, authorization: `Bearer ${data.session.access_token}`, anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY }),
-    });
-  } catch { throw Error('Could not reach the local TM connector. Start it on this computer and allow local network access in your browser.'); }
-  const result = await response.json();
-  if (!response.ok) throw Error(result.error || 'TM connection failed.');
-  return result;
+  if (window.refosTmDesktop) return window.refosTmDesktop.request('snapshot', { ...settings, eventId, authorization: `Bearer ${data.session.access_token}`, anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY });
+  throw Error('Open Ref OS TM Connect for Windows to connect Tournament Manager.');
 }
 export async function getTmFieldActivity(connectionId, pairingCode, disconnect = false) {
-  const response = await fetch(`http://127.0.0.1:8787/${disconnect ? 'disconnect' : 'activity'}`, {
-    method: 'POST', signal: AbortSignal.timeout(5000),
-    headers: { 'Content-Type': 'application/json', 'x-refos-pairing': pairingCode }, body: JSON.stringify({ connectionId }),
-  });
-  const result = await response.json();
-  if (!response.ok) throw Error(result.error || 'Live field activity is unavailable.');
-  return result;
+  if (window.refosTmDesktop) return window.refosTmDesktop.request(disconnect ? 'disconnect' : 'activity', { connectionId });
+  throw Error('Open Ref OS TM Connect for Windows to read live field activity.');
 }
 
 const E2E_MOCK = import.meta.env.VITE_E2E_MOCK === "1";

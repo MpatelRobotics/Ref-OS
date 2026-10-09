@@ -2,7 +2,6 @@
 // Local, paired read-only TM connector. No developer secrets or database writes.
 import { createServer } from 'node:http';
 import { randomBytes, randomUUID, timingSafeEqual, createHash } from 'node:crypto';
-import { pathToFileURL } from 'node:url';
 import { tmAddress, createResourceReader } from './protocol.mjs';
 import { LiveFieldStreams } from './live-fields.mjs';
 
@@ -75,16 +74,3 @@ export function createConnector({ origin, pairingCode, cloudUrl = 'https://gcibs
   return server;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const originIndex = process.argv.indexOf('--origin');
-  const enteredOrigin = originIndex >= 0 ? process.argv[originIndex + 1] : process.env.REFOS_ORIGIN;
-  let origin;
-  try { const url = new URL(enteredOrigin); if (!['http:', 'https:'].includes(url.protocol) || url.origin !== enteredOrigin) throw Error(); origin = url.origin; }
-  catch { console.error('Start with --origin followed by your Ref OS website address, without a trailing slash.'); process.exit(1); }
-  const pairingCode = randomBytes(16).toString('hex');
-  const port = Number(process.env.REFOS_CONNECTOR_PORT || 8787);
-  if (!Number.isSafeInteger(port) || port < 1024 || port > 65535) { console.error('Use a connector port from 1024 to 65535.'); process.exit(1); }
-  const server = createConnector({ origin, pairingCode, cloudUrl: process.env.SUPABASE_URL || undefined });
-  server.on('error', () => { console.error('Connector could not start. Check whether another connector is already running.'); process.exit(1); });
-  server.listen(port, '127.0.0.1', () => console.log(`Ref OS TM connector ready at http://127.0.0.1:${port}\nPairing code: ${pairingCode}\nOpen ${origin} on this computer, then use Tournament Manager Sync Center.\nKeep this window open while syncing.`));
-}
