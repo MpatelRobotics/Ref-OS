@@ -116,23 +116,23 @@ test('match start triggers one score refresh after 30 seconds and stop cancels p
  });
 
 
-test('elimination schedule continues fresh score sync every 30 seconds', async ({page}) => {
+test('elimination schedule switches to fresh score sync every 15 seconds', async ({page}) => {
   await mount(page); await page.clock.install(); await review(page);
   await page.evaluate(() => { window.fieldData = {fieldSets:[]}; });
   await page.getByRole('button',{name:'Start TM syncing'}).click();
-  await page.evaluate(() => { window.eliminations = true; });
-  await page.clock.runFor(60100);
   await expect(page.getByRole('status')).toContainText('every 30 seconds');
+  await page.evaluate(() => { window.eliminations = true; });
+  await page.clock.runFor(30100);
+  await expect(page.getByRole('status')).toContainText('every 15 seconds');
   const reads = await page.evaluate(() => window.reads);
-  await page.clock.runFor(28000);
+  await page.clock.runFor(14000);
   expect(await page.evaluate(() => window.reads)).toBe(reads);
   await page.clock.runFor(1100);
   await expect.poll(() => page.evaluate(() => window.reads)).toBe(reads + 1);
   expect(await page.evaluate(() => window.lastFetchSettings.forceScores)).toBe(true);
-  await page.clock.runFor(30100);
+  await page.clock.runFor(15100);
   await expect.poll(() => page.evaluate(() => window.reads)).toBe(reads + 2);
   await page.getByRole('button',{name:'Stop TM sync',exact:true}).click();
-  await page.clock.runFor(30100);
+  await page.clock.runFor(15100);
   expect(await page.evaluate(() => window.reads)).toBe(reads + 2);
 });
-
