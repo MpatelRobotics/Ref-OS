@@ -40,7 +40,7 @@ export function createConnector({ origin, pairingCode, cloudUrl = 'https://gcibs
       });
       const auth = await authorized.json();
       if (!authorized.ok || typeof auth.accessToken !== 'string') throw new Error(auth.error || 'TM authorization failed.');
-      const get = path => read(url, path, body.apiKey, auth.accessToken, body.forceScores === true && path === `/api/matches/${body.division}`);
+      const get = path => read(url, path, body.apiKey, auth.accessToken, body.forceScores === true && [`/api/matches/${body.division}`, `/api/rankings/${body.division}/QUAL`].includes(path));
       const [event, divisions] = await Promise.all([get('/api/event'), get('/api/divisions')]);
       if (body.division == null) { reply({ event: event.event, divisions: divisions.divisions }); return; }
       if (!divisions.divisions?.some(row => row.id === body.division)) throw new Error('This TM division no longer exists. Load the event again.');
