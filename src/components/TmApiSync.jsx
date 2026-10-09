@@ -5,7 +5,7 @@ import { scopeTmFieldActivity } from '../tmFieldActivity.js';
 
 export default function TmApiSync({ open, onClose, target, onFetch, onApply, onActivity, onPublishActivity, onDisconnect, expectedCode = '', refosDivisions=[], refosDivisionId=0, savedDivisionMappings={}, onSaveDivisionMapping }) {
   const androidBrowser = /Android/i.test(navigator.userAgent);
-  const androidDownload = import.meta.env.VITE_TM_ANDROID_DOWNLOAD_URL;
+  const androidDownload = import.meta.env.VITE_TM_ANDROID_DOWNLOAD_URL || 'https://github.com/MpatelRobotics/Ref-OS/releases/download/tm-connect-android/Ref-OS-TM-Connect.apk';
   const desktop = Boolean(window.refosTmDesktop), mobile = Boolean(window.Capacitor?.isNativePlatform?.());
   const [address, setAddress] = useState(mobile ? '' : 'http://localhost:8080');
   const [pairing, setPairing] = useState(''), [apiKey, setApiKey] = useState('');
