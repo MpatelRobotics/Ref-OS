@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-async function mount(page, desktop = true) {
+async function mount(page, desktop = true, mobile = false) {
+  if (mobile) await page.addInitScript(() => { window.CapacitorCustomPlatform = { name: 'ios' }; });
   if (desktop) await page.addInitScript(() => { window.refosTmDesktop = { setSyncActive: async active => { window.desktopActive = active; } }; });
   await page.route('**/tm-sync-test', route => route.fulfill({ contentType: 'text/html', body: `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
   import '/src/index.css';
@@ -12,7 +13,7 @@ async function mount(page, desktop = true) {
   window.reads=0;window.applies=[];window.fail=false;
   const snapshot={event:{name:'ButterNova',code:'VE-V5-26-65633'},divisions:[{id:1,name:'Division 1'}],teams:[{number:'32092X',name:'Team X'}],rankings:[{rank:1,alliance:{teams:[{number:'32092X'}]}}],skills:[{rank:1,number:'1082C',totalScore:10,driverHighScore:0,progHighScore:10}],matches:[{finalScore:[133,0],matchInfo:{state:'SCORED',matchTuple:{session:0,division:1,round:'QUAL',instance:1,match:1},alliances:[{teams:[{number:'32092X'},{number:'32092G'}]},{teams:[{number:'13713A'},{number:'32092H'}]}]}}]};
   window.fieldData={fieldSets:[{id:1,name:'Set 1',connected:true,fields:[{id:1,name:'Yellow Field',status:'playing',active:true,match:{division:1,session:0,round:'QUAL',match:2,instance:1}}]}]};window.published=[];window.disconnected=0;
-  function Harness(){const [open,setOpen]=React.useState(true),[activity,setActivity]=React.useState(null);return React.createElement(React.Fragment,null,React.createElement('button',{onClick:()=>setOpen(true)},'Manage TM'),React.createElement(Fields,{value:activity}),React.createElement(Component,{open,onClose:()=>setOpen(false),target:'ButterNova · Session 1',expectedCode:'VE-V5-26-65633',onFetch:async settings=>{window.reads++;if(window.fail)throw Error('Event administrator access is required.');return {...snapshot,connectionId:settings.liveFields?'live-id':'',event:{...snapshot.event,code:window.mismatch?'WRONG':snapshot.event.code}};},onActivity:async()=>window.fieldData,onDisconnect:async()=>{window.disconnected++;},onPublishActivity:async(value)=>{window.published.push(value);setActivity(value);},onApply:async(data,options)=>{window.applies.push({data,includeSchedule:options.includeSchedule});return '1 scores updated';}}));}
+  function Harness(){const [open,setOpen]=React.useState(true),[activity,setActivity]=React.useState(null);return React.createElement(React.Fragment,null,React.createElement('button',{onClick:()=>setOpen(true)},'Manage TM'),React.createElement(Fields,{value:activity}),React.createElement(Component,{open,onClose:()=>setOpen(false),target:'ButterNova · Session 1',expectedCode:'VE-V5-26-65633',onFetch:async settings=>{window.reads++;window.lastFetchSettings=settings;if(window.eliminations && !snapshot.matches.some(m=>m.matchInfo.matchTuple.round==='QF'))snapshot.matches.push({...snapshot.matches[0],matchInfo:{...snapshot.matches[0].matchInfo,matchTuple:{session:0,division:1,round:'QF',instance:2,match:1}}});if(window.fail)throw Error('Event administrator access is required.');return {...snapshot,connectionId:settings.liveFields?'live-id':'',event:{...snapshot.event,code:window.mismatch?'WRONG':snapshot.event.code}};},onActivity:async()=>window.fieldData,onDisconnect:async()=>{window.disconnected++;},onPublishActivity:async(value)=>{window.published.push(value);setActivity(value);},onApply:async(data,options)=>{window.applies.push({data,includeSchedule:options.includeSchedule});return '1 scores updated';}}));}
   DOM.createRoot(document.getElementById('root')).render(React.createElement(Harness));
   </script></body></html>` }));
   await page.goto('/tm-sync-test');
@@ -55,6 +56,7 @@ test('setup download and controls fit mobile and key stays password masked',asyn
 test('live events publish Playing now and Stopped, and disconnect when sync stops',async({page})=>{
   await mount(page);await page.clock.install();await review(page);
   await page.getByRole('button',{name:'Start TM syncing'}).click();
+  await page.getByLabel('Live TM fields',{exact:true}).locator('summary').click();
   await expect(page.getByText('Qualifier #2 · Playing now',{exact:true})).toBeVisible();
   await page.evaluate(()=>window.fieldData.fieldSets[0].fields[0].status='stopped');
   await page.clock.runFor(1100);await expect(page.getByText('Qualifier #2 · Stopped',{exact:true})).toBeVisible();
@@ -96,3 +98,40 @@ test('match start triggers one score refresh after 30 seconds and stop cancels p
   await page.clock.runFor(31000);
   expect(await page.evaluate(() => window.reads)).toBe(reads + 1);
 });
+
+ test('native mobile connects with IP and key, hides desktop download, and pauses polling while hidden', async ({page}) => {
+  await mount(page, false, true); await page.clock.install();
+  await expect(page.getByRole('link',{name:'Download Ref OS TM Connect for Windows'})).toHaveCount(0);
+  await expect(page.getByText('Connect this device to the event Wi-Fi, then enter the TM address and event key.',{exact:false})).toBeVisible();
+  await page.getByLabel('TM server address',{exact:true}).fill('192.168.0.164');
+  await review(page);
+  await page.getByLabel('Listen to live field activity').uncheck();
+  await page.getByRole('button',{name:'Start TM syncing'}).click();
+  const reads = await page.evaluate(() => window.reads);
+  await page.evaluate(() => Object.defineProperty(document, 'hidden', { configurable:true, value:true }));
+  await page.clock.runFor(61000); expect(await page.evaluate(() => window.reads)).toBe(reads);
+  await page.evaluate(() => Object.defineProperty(document, 'hidden', { configurable:true, value:false }));
+  await page.clock.runFor(60000); await expect.poll(() => page.evaluate(() => window.reads)).toBe(reads+1);
+ });
+
+
+test('elimination schedule switches to fresh score sync every 30 seconds', async ({page}) => {
+  await mount(page); await page.clock.install(); await review(page);
+  await page.getByLabel('Listen to live field activity').uncheck();
+  await page.getByRole('button',{name:'Start TM syncing'}).click();
+  await page.evaluate(() => { window.eliminations = true; });
+  await page.clock.runFor(60100);
+  await expect(page.getByRole('status')).toContainText('every 30 seconds');
+  const reads = await page.evaluate(() => window.reads);
+  await page.clock.runFor(29000);
+  expect(await page.evaluate(() => window.reads)).toBe(reads);
+  await page.clock.runFor(1100);
+  await expect.poll(() => page.evaluate(() => window.reads)).toBe(reads + 1);
+  expect(await page.evaluate(() => window.lastFetchSettings.forceScores)).toBe(true);
+  await page.clock.runFor(30100);
+  await expect.poll(() => page.evaluate(() => window.reads)).toBe(reads + 2);
+  await page.getByRole('button',{name:'Stop TM sync',exact:true}).click();
+  await page.clock.runFor(30100);
+  expect(await page.evaluate(() => window.reads)).toBe(reads + 2);
+});
+
