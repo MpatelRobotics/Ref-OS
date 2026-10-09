@@ -14,6 +14,7 @@ import TeamRegisteredEvents from "./components/TeamRegisteredEvents.jsx";
 import VexSyncManager from "./components/VexSyncManager.jsx";
 import TmApiSync from "./components/TmApiSync.jsx";
 import TmFieldActivity from "./components/TmFieldActivity.jsx";
+import { tmMatchHighlights } from "./tmMatchHighlights.js";
 import { applyTmSnapshot } from "./tmApplySnapshot.js";
 import VexEventLookup from "./components/VexEventLookup.jsx";
 import useMenuViewport from "./useMenuViewport.js";
@@ -4657,7 +4658,7 @@ function Tracker({ league = null, initialEvent, meName, meFullName, mePhone, isD
         ) : view === "lost-found" ? (
           <LostFoundBoard embedded key={eventId} eventId={eventId} eventName={event?.name || "Current event"} meName={meName} canManage={adminUnlocked}/>
         ) : view === "matches" ? (
-          isIQ ? <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} parseCSV={parseCSV} /> : <MatchList matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
+          isIQ ? <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} parseCSV={parseCSV} /> : <MatchList tmActivity={eventSettings?.tm_field_activity?.value} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
           <RobotList requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
         ) : view === "judging" ? (
@@ -5746,8 +5747,11 @@ function RulePicker({ ruleDetails, onSetRuleDetails, rules, knownRules, eventId,
 
 /* ============================ ADD TEAM MODAL ============================ */
 
-function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
+function MatchList({ tmActivity, matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
   const [field, setField] = useState("all");
+  const [liveNow, setLiveNow] = useState(Date.now);
+  useEffect(() => { const timer = setInterval(() => setLiveNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
+  const liveHighlights = tmMatchHighlights(matches, tmActivity, liveNow);
   const all = Object.values(matches);
   const hasElims = all.some((m) => m.phase && m.phase !== "qual");
   const [tab, setTab] = useState(() => hasElims ? "elim" : "qual"); // "qual" | "elim"
@@ -5831,13 +5835,14 @@ function MatchList({ matches, teamName, teamRank = {}, viols, fieldLog = [], que
         <ul className="space-y-2">
           {filtered.map((m) => (
             <li key={m.id}>
-              <button onClick={() => onOpen(m.id)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
+              <button onClick={() => onOpen(m.id)} className={`w-full text-left rounded-xl border px-4 py-3 flex flex-wrap sm:flex-nowrap items-center gap-3 hover:shadow-sm transition ${liveHighlights[m.id] === 'current' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 dark:border-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'bg-amber-50 dark:bg-amber-950 border-amber-500 dark:border-amber-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}>
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-14 shrink-0">{rowLabel(m)}</span>
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
                   <span className="text-red-700 dark:text-red-300 font-semibold">{m.red.join("  ")}</span>
                   <span className="text-slate-300 dark:text-slate-400 font-sans">vs</span>
                   <span className="text-blue-700 dark:text-blue-300 font-semibold">{m.blue.join("  ")}</span>
                 </div>
+                {liveHighlights[m.id] && <span className={`text-xs font-semibold shrink-0 ${liveHighlights[m.id] === 'current' ? 'text-emerald-800 dark:text-emerald-200' : 'text-amber-800 dark:text-amber-200'}`}>{liveHighlights[m.id] === 'current' ? 'Playing now' : 'Up next'}</span>}
                 {m.field && <span className="text-[11px] text-slate-400 shrink-0">{fieldDisplayName(m.field, fieldNames)}</span>}
                 {m.redScore != null && m.blueScore != null && (
                   <span aria-label={`Score: red ${m.redScore}, blue ${m.blueScore}`} className="font-mono text-sm font-bold shrink-0"><span className="text-slate-500 mr-1">Score</span><span className={m.winner === "red" ? "text-red-700 dark:text-red-300" : "text-slate-400"}>{m.redScore}</span><span className="text-slate-300">-</span><span className={m.winner === "blue" ? "text-blue-700 dark:text-blue-300" : "text-slate-400"}>{m.blueScore}</span></span>
