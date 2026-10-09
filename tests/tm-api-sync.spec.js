@@ -26,16 +26,18 @@ async function review(page) {
 test('preview maps skills and scored zeros, closes on start, polls each minute and stops independently',async({page})=>{
   await mount(page);await page.clock.install();await review(page);
   await expect(page.getByText('1 teams · 1 matches · 1 scored matches · 1 rankings · 1 skills results')).toBeVisible();
-  await page.getByLabel('Add missing matches from TM').check();
-  await page.getByLabel('Listen to live field activity').uncheck();
+  await expect(page.getByRole('checkbox')).toHaveCount(0);
+  await page.evaluate(() => { window.fieldData = {fieldSets:[]}; });
+  await page.evaluate(() => { window.fieldData = {fieldSets:[]}; });
   await page.getByRole('button',{name:'Start TM syncing'}).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect.poll(()=>page.evaluate(()=>window.applies.length)).toBe(1);
   const imported=await page.evaluate(()=>window.applies[0]);expect(imported.data.scores[0].blueScore).toBe(0);expect(imported.includeSchedule).toBe(true);
-  await page.clock.runFor(59000);expect(await page.evaluate(()=>window.reads)).toBe(2);
-  await page.clock.runFor(1100);await expect.poll(()=>page.evaluate(()=>window.reads)).toBe(3);
+  expect(await page.evaluate(()=>window.lastFetchSettings.liveFields)).toBe(true);
+  await page.clock.runFor(59000);expect(await page.evaluate(()=>window.reads)).toBe(3);
+  await page.clock.runFor(1100);await expect.poll(()=>page.evaluate(()=>window.reads)).toBe(4);
   await page.getByRole('button',{name:'Stop TM sync',exact:true}).click();
-  await page.clock.runFor(61000);expect(await page.evaluate(()=>window.reads)).toBe(3);
+  await page.clock.runFor(61000);expect(await page.evaluate(()=>window.reads)).toBe(4);
 });
 test('wrong event is blocked and connection errors have a recoverable message',async({page})=>{
   await mount(page);await page.evaluate(()=>window.mismatch=true);await review(page);
@@ -105,7 +107,7 @@ test('match start triggers one score refresh after 30 seconds and stop cancels p
   await expect(page.getByText('Connect this device to the event Wi-Fi, then enter the TM address and event key.',{exact:false})).toBeVisible();
   await page.getByLabel('TM server address',{exact:true}).fill('192.168.0.164');
   await review(page);
-  await page.getByLabel('Listen to live field activity').uncheck();
+  await page.evaluate(() => { window.fieldData = {fieldSets:[]}; });
   await page.getByRole('button',{name:'Start TM syncing'}).click();
   const reads = await page.evaluate(() => window.reads);
   await page.evaluate(() => Object.defineProperty(document, 'hidden', { configurable:true, value:true }));
@@ -117,7 +119,7 @@ test('match start triggers one score refresh after 30 seconds and stop cancels p
 
 test('elimination schedule switches to fresh score sync every 30 seconds', async ({page}) => {
   await mount(page); await page.clock.install(); await review(page);
-  await page.getByLabel('Listen to live field activity').uncheck();
+  await page.evaluate(() => { window.fieldData = {fieldSets:[]}; });
   await page.getByRole('button',{name:'Start TM syncing'}).click();
   await page.evaluate(() => { window.eliminations = true; });
   await page.clock.runFor(60100);

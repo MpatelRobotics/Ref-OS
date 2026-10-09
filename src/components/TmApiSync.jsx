@@ -9,9 +9,9 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
   const [pairing, setPairing] = useState(''), [apiKey, setApiKey] = useState('');
   const [divisions, setDivisions] = useState([]), [division, setDivision] = useState('');
   const [remoteEvent, setRemoteEvent] = useState(null), [raw, setRaw] = useState(null), [session, setSession] = useState('');
-  const [includeSchedule, setIncludeSchedule] = useState(false), [running, setRunning] = useState(false);
+  const [running, setRunning] = useState(false);
   useEffect(() => { window.refosTmDesktop?.setSyncActive(running).catch(() => {}); return () => { window.refosTmDesktop?.setSyncActive(false).catch(() => {}); }; }, [running]);
-  const [includeLive, setIncludeLive] = useState(true), [connectionId, setConnectionId] = useState(''), [liveError, setLiveError] = useState('');
+  const [connectionId, setConnectionId] = useState(''), [liveError, setLiveError] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [status, setStatus] = useState('');
   const alive = useRef(true), version = useRef(0), inFlight = useRef(false), hashes = useRef({});
   const lastActivity = useRef(null);
@@ -38,7 +38,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
     }
   };
   const reset = setter => value => { setter(value); setRaw(null); setRemoteEvent(null); setDivisions([]); setDivision(''); setSession(''); setError(''); hashes.current = {}; reviewedEvent.current = null; };
-  const settings = () => ({ address: address.trim(), apiKey: apiKey.trim(), pairingCode: pairing.trim(), division: division === '' ? null : Number(division), liveFields: includeLive });
+  const settings = () => ({ address: address.trim(), apiKey: apiKey.trim(), pairingCode: pairing.trim(), division: division === '' ? null : Number(division), liveFields: true });
   const load = async () => {
     const ticket = ++version.current;
     setBusy(true); setError(''); setRaw(null);
@@ -66,7 +66,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
     if (reviewedEvent.current && reviewedEvent.current !== (data.event?.code || data.event?.name)) throw Error('TM is serving a different event from the reviewed snapshot. Sync stopped.');
     const snapshot = normalizeTmSnapshot(data, session === '' ? undefined : Number(session));
     if (snapshot.sessions.length && snapshot.selectedSession == null) throw Error('Choose the TM session to sync.');
-    const applied = await latest.current.onApply(snapshot, { includeSchedule, hashes: hashes.current, current });
+    const applied = await latest.current.onApply(snapshot, { includeSchedule: true, hashes: hashes.current, current });
     if (current()) { setRemoteEvent(data.event); setRaw(data); setStatus(applied || 'TM data checked; no changes.'); activeConnection.current = data.connectionId || ''; setConnectionId(data.connectionId || ''); setLiveError(data.fieldError || ''); }
   };
   delayedSync.current = async ticket => {
@@ -79,7 +79,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
     if (!validPreview || inFlight.current) return;
     const ticket = ++version.current; inFlight.current = true;
     setBusy(true); setError('');
-    try { const data = includeLive ? await latest.current.onFetch(settings()) : raw; if (alive.current && ticket === version.current) await apply(data, ticket); if (alive.current && ticket === version.current) { setRunning(true); onClose(); } }
+    try { const data = await latest.current.onFetch(settings()); if (alive.current && ticket === version.current) await apply(data, ticket); if (alive.current && ticket === version.current) { setRunning(true); onClose(); } }
     catch (e) { if (alive.current && ticket === version.current) setError(e.message || 'TM sync failed.'); }
     finally { inFlight.current = false; if (alive.current) setBusy(false); }
   };
@@ -94,9 +94,9 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
       finally { inFlight.current = false; }
     }, syncInterval);
     return () => clearInterval(timer);
-  }, [running, address, apiKey, pairing, division, session, includeSchedule, includeLive, expectedCode, syncInterval]);
+  }, [running, address, apiKey, pairing, division, session, expectedCode, syncInterval]);
   useEffect(() => {
-    if (!running || !includeLive || !connectionId || !latest.current.onActivity) return;
+    if (!running || !connectionId || !latest.current.onActivity) return;
     let active = true, pending = false, previous = '', publishedAt = 0;
     const observed = new Map(), scoreTimers = new Set();
     const ticket = version.current;
@@ -143,7 +143,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
     };
     poll(); const timer = setInterval(poll, 1000);
     return () => { active = false; clearInterval(timer); for (const scoreTimer of scoreTimers) clearTimeout(scoreTimer); latest.current.onDisconnect?.(connectionId, pairing.trim()).catch(() => {}); };
-  }, [running, includeLive, connectionId, pairing, division, preview?.selectedSession]);
+  }, [running, connectionId, pairing, division, preview?.selectedSession]);
   const inputClass = 'w-full min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2';
   const buttonClass = 'min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 font-semibold disabled:opacity-50';
   return <>
@@ -160,7 +160,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
         <button className={buttonClass} disabled={(!desktop && !mobile) || !apiKey.trim() || !address.trim()} onClick={load}>Connect to TM</button>
         {remoteEvent && <p className="text-sm">Connected event: <b>{remoteEvent.name}</b>{remoteEvent.code && ` · ${remoteEvent.code}`}</p>}
         {!!divisions.length && <><label className="block">TM division<select className={inputClass} value={division} onChange={e => { setDivision(e.target.value); setRaw(null); setSession(''); hashes.current = {}; }}><option value="">Choose a division</option>{divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label><button className={buttonClass} disabled={!division} onClick={review}>Review TM data</button></>}
-        {preview && <><label className="flex gap-2 items-center min-h-[44px]"><input type="checkbox" checked={includeSchedule} onChange={e => { setIncludeSchedule(e.target.checked); hashes.current = {}; }} />Add missing matches from TM</label><label className="flex gap-2 items-center min-h-[44px]"><input type="checkbox" checked={includeLive} onChange={e => setIncludeLive(e.target.checked)} />Listen to live field activity</label><p className="text-sm">Live fields show TM's assigned match and start/stop events in Matches for all event users. Sync teams, qualification rankings, skills, and scores. Scores only update matches with matching round, number, and teams. Existing fields and team assignments are kept. Empty lists do not clear data.</p>
+        {preview && <><p className="text-sm">Missing matches are added automatically. Live fields show TM's assigned match and start/stop events in Matches for all event users. Sync teams, qualification rankings, skills, and scores. Scores only update matches with matching round, number, and teams. Existing fields and team assignments are kept. Empty lists do not clear data.</p>
           {preview.sessions.length > 1 && <label className="block">TM session<select className={inputClass} value={session} onChange={e => { setSession(e.target.value); hashes.current = {}; }}><option value="">Choose a TM session</option>{preview.sessions.map(id => <option key={id} value={id}>TM session {id}</option>)}</select></label>}
           <p className="text-sm">{preview.teams.length} teams · {preview.matches.length} matches · {preview.scores.length} scored matches · {preview.rankings.length} rankings · {preview.skills.length} skills results</p>
           {preview.warnings.map(w => <p key={w} className="text-sm text-amber-700 dark:text-amber-300">{w}</p>)}
