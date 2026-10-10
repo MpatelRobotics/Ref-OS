@@ -180,6 +180,24 @@ The TM Sync Center (Event Command Center → *TM Sync Center*) supports:
 - **Change previews before writes.** Every import shows what will be added, changed, or left untouched, and nothing is written until the Admin applies the changes.
 - **Event scoping.** Imports only ever write to the currently selected event.
 
+### Live TM connectors for Windows and Android
+
+One Admin or Developer runs **Ref OS TM Connect** on a device that can reach the TM server and the internet. Other volunteers use Ref OS Cloud without the connector or venue network access.
+
+1. Enable the Local TM API in Tournament Manager's Web Publishing options.
+2. On Windows, open the desktop connector and enter the Ref OS website address. On Android, install the connector APK. Sign in and open the event.
+3. Enter the TM server IP address and event API key. Review the event and start syncing.
+4. For two divisions on **one TM server**, choose **Sync both TM divisions → Load TM divisions**, select both TM divisions and their Ref OS destinations, review each, and start. Each division's matches, scores, rankings and live activity remain separate; Skills syncs once for the whole event.
+
+Qualification data syncs every **30 seconds**; a division with elimination matches syncs every **15 seconds**. A match start also schedules a score refresh after **30 seconds**. Missing scheduled matches are added from TM without replacing existing teams or field assignments. Elimination replay games remain distinct and grouped under their pairing. The API cannot confirm a double DQ from a 0–0 score alone.
+
+Live field activity is enabled during sync. Current matches are green and upcoming matches amber. **Jump to current match** is manual, so officials can finish logging the previous match. Switching the displayed Ref OS division keeps the connector syncing its configured divisions.
+
+Windows continues while minimized and hides in the tray when its window is closed during sync. Android must remain open and awake. Leaving the event, signing out, reloading or stopping sync ends the connection. Updated native connector features require a new Windows download or Android APK; a website refresh cannot update the installed Android app.
+
+See [TM API setup](TM-API-SETUP.md) and [Android download setup](mobile/ANDROID-DOWNLOAD.md). Developer credential **values must never appear in this README, source code, build logs or release files**. Store them only in server-side secrets; event keys remain in connector memory.
+
+
 ---
 
 ## Referee and field operations
@@ -396,7 +414,7 @@ venue-server/              Optional Local Venue Server (Node.js + SQLite); see V
 
 ## Attribution
 
-Tournament Manager API setup, secret names, deployment, and local connector instructions are in [TM-API-SETUP.md](TM-API-SETUP.md). The experimental integration syncs teams, rankings, skills, and completed scores; optional live field WebSockets show assignments and starts/stops in Matches. TM client credentials remain in Supabase secrets.
+Tournament Manager API setup, secret names, deployment, and local connector instructions are in [TM-API-SETUP.md](TM-API-SETUP.md). The experimental integration syncs teams, rankings, skills, and completed scores; live field WebSockets show assignments and starts/stops in Matches, with separate division activity. TM client credentials remain in Supabase secrets.
 
 Ref OS was designed and developed by **Maharshi Patel**.
 
