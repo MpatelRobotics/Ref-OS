@@ -22,6 +22,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
   const activeConnection = useRef('');
   const delayedSync = useRef(null);
   const reviewedEvent = useRef(null);
+  const sourceDivision=useRef(refosDivisionId);
   const latest = useRef({ onFetch, onApply, onActivity, onPublishActivity, onDisconnect }); latest.current = { onFetch, onApply, onActivity, onPublishActivity, onDisconnect };
   useEffect(() => { alive.current = true; return () => {
     alive.current = false; version.current++;
@@ -38,7 +39,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
     const ticket = ++version.current; setRunning(false); setStatus('TM sync stopped.');
     if (lastActivity.current) {
       const value = { ...lastActivity.current, updatedAt: Date.now(), fieldSets: lastActivity.current.fieldSets.map(set => ({ ...set, connected: false })) };
-      latest.current.onPublishActivity?.(value, () => alive.current && ticket === version.current).catch(() => {});
+      latest.current.onPublishActivity?.(value, () => alive.current && ticket === version.current,sourceDivision.current).catch(() => {});
     }
   };
   const reset = setter => value => { setter(value); setRaw(null); setRemoteEvent(null); setDivisions([]); setDivision(''); setSession(''); setError(''); hashes.current = {}; reviewedEvent.current = null; };
@@ -66,7 +67,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
       normalizeTmSnapshot(data);
       await onSaveDivisionMapping?.(Number(division),data.divisions?.find(d=>d.id===Number(division))?.name || divisions.find(d=>d.id===Number(division))?.name);
       if (!alive.current || ticket !== version.current) return;
-      reviewedEvent.current = data.event.code || data.event.name; setRemoteEvent(data.event); setRaw(data); setSession('');
+      sourceDivision.current=refosDivisionId; reviewedEvent.current = data.event.code || data.event.name; setRemoteEvent(data.event); setRaw(data); setSession('');
     } catch (e) { if (alive.current && ticket === version.current) setError(e.message || 'Could not review TM data.'); }
     finally { if (alive.current) setBusy(false); }
   };
@@ -76,7 +77,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
     if (reviewedEvent.current && reviewedEvent.current !== (data.event?.code || data.event?.name)) throw Error('TM is serving a different event from the reviewed snapshot. Sync stopped.');
     const snapshot = normalizeTmSnapshot(data, session === '' ? undefined : Number(session));
     if (snapshot.sessions.length && snapshot.selectedSession == null) throw Error('Choose the TM session to sync.');
-    const applied = await latest.current.onApply(snapshot, { includeSchedule: true, hashes: hashes.current, current });
+    const applied = await latest.current.onApply(snapshot, { includeSchedule: true, refosDivisionId:sourceDivision.current, hashes: hashes.current, current });
     if (current()) { setRemoteEvent(data.event); setRaw(data); setStatus(applied || 'TM data checked; no changes.'); activeConnection.current = data.connectionId || ''; setConnectionId(data.connectionId || ''); setLiveError(data.fieldError || ''); }
   };
   delayedSync.current = async ticket => {
@@ -134,7 +135,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
         }
         const fingerprint = JSON.stringify(fieldSets);
         if (fingerprint !== previous || Date.now() - publishedAt >= 30000) {
-          await latest.current.onPublishActivity?.({ fieldSets, updatedAt: Date.now(), source: 'TM WebSocket' }, current);
+          await latest.current.onPublishActivity?.({ fieldSets, updatedAt: Date.now(), source: 'TM WebSocket' }, current,sourceDivision.current);
           if (current()) { lastActivity.current = { fieldSets, updatedAt: Date.now(), source: 'TM WebSocket' }; previous = fingerprint; publishedAt = Date.now(); setLiveError(''); }
         }
       } catch {
@@ -144,7 +145,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
             const fieldSets = lastActivity.current.fieldSets.map(set => ({ ...set, connected: false }));
             const fingerprint = JSON.stringify(fieldSets);
             if (fingerprint !== previous) {
-              try { await latest.current.onPublishActivity?.({ fieldSets, updatedAt: Date.now(), source: 'TM WebSocket' }, current); if (current()) previous = fingerprint; } catch { /* Shared snapshot expires if Cloud is unavailable. */ }
+              try { await latest.current.onPublishActivity?.({ fieldSets, updatedAt: Date.now(), source: 'TM WebSocket' }, current,sourceDivision.current); if (current()) previous = fingerprint; } catch { /* Shared snapshot expires if Cloud is unavailable. */ }
             }
           }
         }

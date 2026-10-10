@@ -14,7 +14,7 @@ import IQManual from "./components/IQManual.jsx";
 import EventProgramChoice, {detectEventProgram, programLabel} from "./components/EventProgramChoice.jsx";
 import TeamRegisteredEvents from "./components/TeamRegisteredEvents.jsx";
 import VexSyncManager from "./components/VexSyncManager.jsx";
-import TmApiSync from "./components/TmApiSync.jsx";
+import {EventTmSync,EventTmSyncRegistration,useEventTmSync} from "./components/EventTmSync.jsx";
 import TmFieldActivity from "./components/TmFieldActivity.jsx";
 import { tmMatchHighlights } from "./tmMatchHighlights.js";
 import { applyTmSnapshot } from "./tmApplySnapshot.js";
@@ -1665,10 +1665,10 @@ function Tracker(props) {
     load();const timer=setInterval(load,15000);return()=>{active=false;clearInterval(timer);};
   },[eventId]);
   const divisionId=divisions.length>1?(selected===0?0:divisions.some(d=>d.id===selected)?selected:divisions[0].id):0;
-  return <>
+  return <EventTmSync>
 
     <DivisionTracker key={`${eventId}:${divisionId}`} {...props} divisionId={divisionId} divisionCatalog={divisions} divisionSelector={divisions.length>1 && <div className="px-4 py-3 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700"><label className="flex flex-wrap items-center gap-3 font-semibold">Division<select aria-label="Event division" value={divisionId} onChange={e=>{const value=Number(e.target.value);setSelected(value);localStorage.setItem(storageKey,String(value));}} className="min-h-[44px] min-w-0 max-w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3"><option value={0}>Unassigned schedule</option>{divisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label></div>} onDiscoverTmDivisions={async rows=>{const saved=await eventApi.upsertEventSetting(eventId,'vex_divisions',{divisions:rows});setDivisions(rows);return rows;}}/>
-  </>;
+  </EventTmSync>;
 }
 function DivisionTracker({ divisionId=0, divisionCatalog=[], divisionSelector=null, onDiscoverTmDivisions, league = null, initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf, onEventFormatChanged }) {
   // League events: this workspace is bound to ONE league session (league.session). Session-scoped
@@ -1894,7 +1894,7 @@ function DivisionTracker({ divisionId=0, divisionCatalog=[], divisionSelector=nu
   const [showFeedback, setShowFeedback] = useState(false);
   const [showFeedbackViewer, setShowFeedbackViewer] = useState(false);
   // League: choosing another session in the TM Sync Center reopens it in that session.
-  const [showTmApiSync, setShowTmApiSync] = useState(() => Boolean(window.refosTmDesktop));
+  const {open:showTmApiSync,setOpen:setShowTmApiSync}=useEventTmSync();
   const [showTMSync, setShowTMSync] = useState(() => {
     try { const reopen = sessionStorage.getItem("refosOpenTMSync") === "1"; sessionStorage.removeItem("refosOpenTMSync"); return reopen; } catch { return false; }
   });
@@ -4925,16 +4925,21 @@ function DivisionTracker({ divisionId=0, divisionCatalog=[], divisionSelector=nu
           syncStatus={tmSyncStatus}
         />
       )}
-      {!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <TmApiSync
-        key={`tm-${eventId}-${leagueSessionId || ''}`} open={showTmApiSync} onClose={() => setShowTmApiSync(false)}
-        target={`${event?.name || 'Current event'}${league ? ' · ' + league.sessionName(leagueSessionId) : ''}`}
-        expectedCode={eventSettings?.vex_event?.value?.code || ''}
-        onDiscoverDivisions={onDiscoverTmDivisions} refosDivisions={divisionCatalog} refosDivisionId={divisionId} savedDivisionMappings={eventSettings?.tm_division_mappings?.value || {}}
-        onSaveDivisionMapping={async(id,name)=>{if(!divisionId||!name)return;if(Object.entries(eventSettings?.tm_division_mappings?.value||{}).some(([local,mapping])=>Number(local)!==divisionId&&Number(mapping.id)===id))throw Error('This TM division is already mapped to another Ref OS division.');const saved=await api.upsertEventSetting(eventId,'tm_division_mappings',{...(eventSettings?.tm_division_mappings?.value||{}),[divisionId]:{id,name}},meName);setEventSettings(prev=>({...prev,tm_division_mappings:saved}));}}
-        onFetch={settings => api.getTmSnapshot(eventId, settings)} onApply={applyTmApiSnapshot}
-        onActivity={api.getTmFieldActivity} onDisconnect={(id, pairing) => api.getTmFieldActivity(id, pairing, true)}
-        onPublishActivity={async (value, current, targetDivision=divisionId) => { if (!current()) return; if(targetDivision&&!divisionCatalog.some(d=>Number(d.id)===targetDivision))throw Error('Invalid Ref OS division.');const targetApi=targetDivision===divisionId?api:createDivisionApi(eventApi,eventId,targetDivision);const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', value, meName); if (current()&&targetDivision===divisionId) setEventSettings(prev => ({ ...prev, tm_field_activity: row })); }}
-      />}
+      <EventTmSyncRegistration config={{enabled:!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode(),
+target:`${event?.name || 'Current event'}${league ? ' · ' + league.sessionName(leagueSessionId) : ''}`,
+expectedCode:eventSettings?.vex_event?.value?.code || '',
+onDiscoverDivisions:onDiscoverTmDivisions,
+refosDivisions:divisionCatalog,
+refosDivisionId:divisionId,
+savedDivisionMappings:eventSettings?.tm_division_mappings?.value || {},
+onSaveDivisionMapping:async(id,name)=>{if(!divisionId||!name)return;if(Object.entries(eventSettings?.tm_division_mappings?.value||{}).some(([local,mapping])=>Number(local)!==divisionId&&Number(mapping.id)===id))throw Error('This TM division is already mapped to another Ref OS division.');const saved=await api.upsertEventSetting(eventId,'tm_division_mappings',{...(eventSettings?.tm_division_mappings?.value||{}),[divisionId]:{id,name}},meName);setEventSettings(prev=>({...prev,tm_division_mappings:saved}));},
+onFetch:settings => api.getTmSnapshot(eventId, settings),
+onApply:applyTmApiSnapshot,
+onActivity:api.getTmFieldActivity,
+onDisconnect:(id, pairing) => api.getTmFieldActivity(id, pairing, true),
+onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!current()) return; if(targetDivision&&!divisionCatalog.some(d=>Number(d.id)===targetDivision))throw Error('Invalid Ref OS division.');const targetApi=targetDivision===divisionId?api:createDivisionApi(eventApi,eventId,targetDivision);const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', value, meName); if (current()&&targetDivision===divisionId) setEventSettings(prev => ({ ...prev, tm_field_activity: row })); },
+      }}/>
+
       <input ref={matchFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importMatchesFile(f); }} />
       <input ref={teamFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"

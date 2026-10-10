@@ -297,3 +297,5 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
   .refos-bracket-match { grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); }
   .refos-bracket-label { grid-column:1 / -1; }
 }
+
+@media (min-width:1024px) { body:has(.refos-desktop-nav) .refos-event-tm-sync { margin-left:272px; } }
