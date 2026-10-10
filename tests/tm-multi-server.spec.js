@@ -9,8 +9,11 @@ test('two divisions on one server sync sequentially to distinct divisions; one f
  </script></body></html>`}));
  await page.goto('/two-server-test');
  await page.getByLabel('TM server IP address').fill('192.168.0.10');await page.getByLabel('Event API key').fill('event-key');
+ await page.getByRole('button',{name:'Load TM divisions',exact:true}).click();
  const fields=page.getByRole('group').filter({has:page.getByLabel('Ref OS division')});
+ await expect(fields.nth(0).getByLabel('TM division',{exact:true})).toHaveValue('1');await expect(fields.nth(1).getByLabel('TM division',{exact:true})).toHaveValue('2');
  for(let i=0;i<2;i++){
+  await fields.nth(i).getByLabel('TM division',{exact:true}).selectOption(String(i+1));
   await page.getByRole('button',{name:'Review division '+(i+1),exact:true}).click();
   await expect(fields.nth(i).getByRole('status')).toContainText('1 matches');
  }

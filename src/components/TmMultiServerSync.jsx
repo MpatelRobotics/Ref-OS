@@ -6,7 +6,7 @@ import {scopeTmFieldActivity} from '../tmFieldActivity.js';
 export default function TmMultiServerSync({open,onClose,onExit,refosDivisions=[],expectedCode='',...props}) {
  const [rows,setRows]=useState(()=>[0,1].map(i=>({id:`server-${i+1}`,address:'',apiKey:'',target:String(refosDivisions[i]?.id||''),division:'',session:'',remote:[],sessions:[],reviewed:null,ready:false,status:''})));
  const [address,setAddress]=useState(''),[apiKey,setApiKey]=useState('');
- const credentialsChanged=value=>{setRows(old=>old.map(row=>({...row,division:'',remote:[],session:'',sessions:[],ready:false,reviewed:null,status:''})));};
+ const credentialsChanged=()=>{setRows(old=>old.map(row=>({...row,division:'',remote:[],session:'',sessions:[],ready:false,reviewed:null,status:''})));};
  const [running,setRunning]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const latest=useRef(props);latest.current=props;
  const runtime=useRef(new Map()),currentRows=useRef(rows);currentRows.current=rows;
@@ -19,6 +19,17 @@ export default function TmMultiServerSync({open,onClose,onExit,refosDivisions=[]
  const stop=async()=>{epoch.current++;runningRef.current=false;setRunning(false);setBusy(true);const ticket=epoch.current;for(const row of currentRows.current){const state=runtime.current.get(row.id);if(state?.fields)await latest.current.onPublishActivity?.({fieldSets:state.fields.map(set=>({...set,connected:false})),updatedAt:Date.now(),source:'TM WebSocket'},()=>active.current&&ticket===epoch.current,Number(row.target)).catch(()=>{});}await disconnect();if(active.current)setBusy(false);};
  useEffect(()=>{active.current=true;return()=>{active.current=false;epoch.current++;runningRef.current=false;disconnect();};},[]);
  useEffect(()=>{window.refosTmDesktop?.setSyncActive(running).catch(()=>{});return()=>{window.refosTmDesktop?.setSyncActive(false).catch(()=>{});};},[running]);
+ const loadDivisions=async()=>{
+  if(working.current)return;working.current=true;setBusy(true);setError('');const ticket=epoch.current;
+  try{
+   const data=await latest.current.onFetch({...request(rows[0]),division:null,liveFields:false});
+   if(!active.current||ticket!==epoch.current)return;validEvent(data);
+   if(!data.multiServer)throw Error('Update the connector to enable multi-division syncing.');
+   if(!Array.isArray(data.divisions)||data.divisions.length<2)throw Error('TM must have at least two divisions to sync both.');
+   setRows(old=>old.map(row=>({...row,remote:data.divisions,division:String(matchTmDivision(data.divisions,refosDivisions,Number(row.target))?.id||''),session:'',sessions:[],ready:false,reviewed:null,status:''})));
+  }catch(e){if(active.current&&ticket===epoch.current)setError(e.message||'Could not load TM divisions.');}
+  finally{working.current=false;if(active.current)setBusy(false);}
+ };
  const review=async row=>{
   if(working.current)return;working.current=true;setBusy(true);setError('');
   const ticket=epoch.current;
@@ -92,9 +103,10 @@ export default function TmMultiServerSync({open,onClose,onExit,refosDivisions=[]
     <label>TM server IP address<input className={input} value={address} onChange={e=>{setAddress(e.target.value);credentialsChanged();}} autoCapitalize="none" autoComplete="off"/></label>
     <label>Event API key<input type="password" className={input} value={apiKey} onChange={e=>{setApiKey(e.target.value);credentialsChanged();}} autoComplete="off"/></label>
    </fieldset>
+   <button className="min-h-[44px] rounded-lg border px-3" disabled={busy||running||!address||!apiKey} onClick={loadDivisions}>Load TM divisions</button>
    {rows.map((row,index)=><fieldset key={row.id} disabled={busy||running} className="border rounded-xl p-3 space-y-3"><legend className="px-1 font-semibold">Division mapping {index+1}</legend>
     <label>Ref OS division<select className={input} value={row.target} onChange={e=>patch(row.id,{target:e.target.value})}><option value="">Choose division</option>{refosDivisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label>
-    {!!row.remote.length&&<label>TM division<select className={input} value={row.division} onChange={e=>patch(row.id,{division:e.target.value,session:''})}><option value="">Choose division</option>{row.remote.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label>}
+    <label>TM division<select aria-label="TM division" className={input} disabled={!row.remote.length} value={row.division} onChange={e=>patch(row.id,{division:e.target.value,session:''})}><option value="">Choose division</option>{row.remote.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label>
     {row.sessions.length>1&&<label>TM session<select className={input} value={row.session} onChange={e=>patch(row.id,{session:e.target.value})}><option value="">Choose session</option>{row.sessions.map(id=><option key={id} value={id}>Session {id}</option>)}</select></label>}
     <button className="min-h-[44px] rounded-lg border px-3" disabled={!address||!apiKey||!row.target} onClick={()=>review(row)}>Review division {index+1}</button><p role="status">{row.status}</p>
    </fieldset>)}
