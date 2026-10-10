@@ -135,7 +135,10 @@ test('real connector HTTP flow authorizes admin and reads documented resources; 
   assert.equal((await send('https://other.test')).status,403);assert.equal((await send(undefined,'wrong')).status,403);assert.equal(cloudCalls,0);
   const response=await send();assert.equal(response.status,200);assert.equal(normalizeTmSnapshot(await response.json()).scores[0].redScore,133);
   assert.deepEqual(paths.sort(),['/api/event','/api/divisions','/api/teams/1','/api/matches/1','/api/rankings/1/QUAL','/api/skills'].sort());
-  denied=true;assert.equal((await send()).status,502);assert.equal(paths.length,6);
+  resources.matches[0].finalScore=[144,3];
+  const fresh=await send();assert.equal(fresh.status,200);assert.equal(normalizeTmSnapshot(await fresh.json()).scores[0].redScore,144);
+  for(const path of ['/api/matches/1','/api/rankings/1/QUAL','/api/skills','/api/teams/1'])assert.equal(paths.filter(value=>value===path).length,2);
+  denied=true;assert.equal((await send()).status,502);assert.equal(paths.length,12);
 });
 
 test('forced refresh fetches fresh data without conditional-cache headers', async () => {

@@ -8,6 +8,10 @@ on:
       - 'desktop/**'
       - 'tm-bridge/**'
       - 'scripts/build-tm-desktop.mjs'
+      - 'src/tmFieldEvent.js'
+      - 'tests/tm-desktop.test.mjs'
+      - 'tests/tm-api.test.mjs'
+      - 'tests/tm-live-fields.test.mjs'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/tm-desktop-release.yml'
@@ -23,13 +27,17 @@ jobs:
   windows-download:
     runs-on: windows-latest
     timeout-minutes: 25
+    env:
+      REFOS_DESKTOP_VERSION: 2.0.${{ github.run_number }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Verify TM sync and live field behavior
+        run: node --test tests/tm-api.test.mjs tests/tm-live-fields.test.mjs tests/tm-mobile.test.mjs tests/tm-client-pool.test.mjs
       - run: npm run build:tm-desktop
       - name: Verify packaged desktop app
         shell: pwsh
@@ -37,6 +45,11 @@ jobs:
           $env:REFOS_PACKAGED_EXE = (Resolve-Path 'desktop/release/win-unpacked/Ref OS TM Connect.exe').Path
           node --test tests/tm-desktop.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Desktop verification failed.' }
+      - name: Generate download checksum
+        shell: pwsh
+        run: |
+          $taskHash = (Get-FileHash -LiteralPath 'desktop/release/Ref-OS-TM-Connect.exe' -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$taskHash  Ref-OS-TM-Connect.exe" | Set-Content -LiteralPath 'desktop/release/SHA256SUMS.txt' -Encoding ascii
       - name: Publish Windows download
         shell: pwsh
         env:
@@ -49,5 +62,5 @@ jobs:
             gh release create tm-connect --target "$env:RELEASE_COMMIT" --title "Ref OS TM Connect" --notes "Windows desktop app for sharing Tournament Manager updates with Ref OS Cloud. Open the app on a computer with access to TM and the internet. This download is unsigned." --latest=false
             if ($LASTEXITCODE -ne 0) { throw 'Could not create the desktop release.' }
           }
-          gh release upload tm-connect desktop/release/Ref-OS-TM-Connect.exe --clobber
+          gh release upload tm-connect desktop/release/Ref-OS-TM-Connect.exe desktop/release/SHA256SUMS.txt --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Could not upload the desktop download.' }
