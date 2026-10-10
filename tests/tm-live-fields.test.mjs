@@ -56,5 +56,9 @@ test('real signed WebSocket receives live events, reconnects without guessing, a
   state=await activity();assert.equal(state.fieldSets[0].fields[0].status,'unknown');
   sockets[1].send(JSON.stringify({type:'matchStopped',fieldID:1}));
   await new Promise(r=>setTimeout(r,30));assert.equal((await activity()).fieldSets[0].fields[0].status,'stopped');assert.equal(commands,0);
+  const second=await (await send('snapshot',{address:`http://127.0.0.1:${tm.address().port}`,apiKey:'event-key',authorization:'Bearer user-token',anonKey:'public',eventId:'event',division:1,liveFields:true,channelId:'server-2'})).json();
+  assert.equal(second.multiServer,true);assert.notEqual(second.connectionId,snapshot.connectionId);await waitFor(()=>sockets.length===3);
   await send('disconnect',{connectionId:snapshot.connectionId});assert.equal((await send('activity',{connectionId:snapshot.connectionId})).status,409);
+  assert.equal((await send('activity',{connectionId:second.connectionId})).status,200);assert.equal(sockets[2].readyState,1);
+  await send('disconnect',{connectionId:second.connectionId});
 });

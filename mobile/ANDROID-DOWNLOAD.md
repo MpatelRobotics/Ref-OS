@@ -39,3 +39,11 @@ Keep the app open and the device awake while syncing. Switching apps or locking 
 ## Verification status
 
 Website build, Capacitor Android synchronization, and automated native-transport tests have passed. A signed APK has not yet been compiled locally: this machine has no Android SDK or Java. GitHub must successfully compile the release, and a physical Android device should be tested with a live TM event before event use.
+
+## Two TM divisions on one server
+
+In TM setup choose **Sync both TM divisions**. Enter one server IP and event API key, map each TM division to a different Ref OS division, review both, then start. Requests run sequentially; each division refreshes every 30 seconds, or every 15 seconds when its elimination schedule exists. Live activity is scoped to each division. Skills syncs once for the whole event.
+
+Keep the connector on the same event and Ref OS division while syncing; switching divisions or leaving stops sync. Other devices can use the division selector normally. Android must stay open and awake. Keys stay in memory.
+
+Push the changes, rebuild the Android connector through GitHub Actions and install the updated APK. Windows also needs an updated connector build.

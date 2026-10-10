@@ -1,7 +1,7 @@
 import { planScoreUpdates } from './vexScoreSync.js';
 
 // All writes use the app's authenticated API and selected league session.
-export async function applyTmSnapshot(snapshot, { api, eventId, by, includeSchedule, hashes, current }) {
+export async function applyTmSnapshot(snapshot, { api, eventId, by, includeSchedule, includeSkills=true, hashes, current }) {
   const changed = (kind, rows) => rows.length && hashes[kind] !== JSON.stringify(rows);
   const remember = (kind, rows) => { hashes[kind] = JSON.stringify(rows); };
   let added = 0, scored = 0, skipped = 0;
@@ -50,7 +50,7 @@ export async function applyTmSnapshot(snapshot, { api, eventId, by, includeSched
     remember('rankings', snapshot.rankings);
   }
   if (!current()) return;
-  if (changed('skills', snapshot.skills)) {
+  if (includeSkills && changed('skills', snapshot.skills)) {
     await api.upsertEventSetting(eventId, 'skills_rankings', { rows: snapshot.skills, importedAt: Date.now(), source: 'TM API' }, by);
     remember('skills', snapshot.skills);
   }

@@ -3554,7 +3554,11 @@ function DivisionTracker({ divisionId=0, divisionCatalog=[], league = null, init
   };
   const applyTmApiSnapshot = async (snapshot, options) => {
     if (!adminUnlocked || highlanderDemoLocked || isVenueMode()) throw Error('Cloud administrator access is required.');
-    const message = await applyTmSnapshot(snapshot, { ...options, api, eventId, by: meName });
+    const targetDivision=options.refosDivisionId ?? divisionId;
+    if(targetDivision && !divisionCatalog.some(d=>Number(d.id)===targetDivision))throw Error('Choose a valid Ref OS division.');
+    const targetApi=targetDivision===divisionId?api:createDivisionApi(eventApi,eventId,targetDivision);
+    const message = await applyTmSnapshot(snapshot, { ...options, api:targetApi, eventId, by: meName });
+    if(targetDivision!==divisionId)return message;
     if (!options.current()) return;
     const [freshTeams, freshMatches, settings] = await Promise.all([api.listTeams(eventId), api.listMatches(eventId, { strict: true }), api.listEventSettings(eventId)]);
     if (!options.current()) return;
@@ -4927,7 +4931,7 @@ function DivisionTracker({ divisionId=0, divisionCatalog=[], league = null, init
         onSaveDivisionMapping={async(id,name)=>{if(!divisionId||!name)return;if(Object.entries(eventSettings?.tm_division_mappings?.value||{}).some(([local,mapping])=>Number(local)!==divisionId&&Number(mapping.id)===id))throw Error('This TM division is already mapped to another Ref OS division.');const saved=await api.upsertEventSetting(eventId,'tm_division_mappings',{...(eventSettings?.tm_division_mappings?.value||{}),[divisionId]:{id,name}},meName);setEventSettings(prev=>({...prev,tm_division_mappings:saved}));}}
         onFetch={settings => api.getTmSnapshot(eventId, settings)} onApply={applyTmApiSnapshot}
         onActivity={api.getTmFieldActivity} onDisconnect={(id, pairing) => api.getTmFieldActivity(id, pairing, true)}
-        onPublishActivity={async (value, current) => { if (!current()) return; const row = await api.upsertEventSetting(eventId, 'tm_field_activity', value, meName); if (current()) setEventSettings(prev => ({ ...prev, tm_field_activity: row })); }}
+        onPublishActivity={async (value, current, targetDivision=divisionId) => { if (!current()) return; if(targetDivision&&!divisionCatalog.some(d=>Number(d.id)===targetDivision))throw Error('Invalid Ref OS division.');const targetApi=targetDivision===divisionId?api:createDivisionApi(eventApi,eventId,targetDivision);const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', value, meName); if (current()&&targetDivision===divisionId) setEventSettings(prev => ({ ...prev, tm_field_activity: row })); }}
       />}
       <input ref={matchFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importMatchesFile(f); }} />

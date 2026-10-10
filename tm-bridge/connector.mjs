@@ -7,9 +7,8 @@ import { LiveFieldStreams } from './live-fields.mjs';
 
 export function createConnector({ origin, pairingCode, cloudUrl = 'https://gcibsphjcllspzesqqsw.supabase.co', fetcher = fetch }) {
   const read = createResourceReader({ fetcher });
-  const live = new LiveFieldStreams();
-  let connectionId = '', connectionKey = '', leaseUntil = 0;
-  const expiry = setInterval(() => { if (connectionId && Date.now() > leaseUntil) { live.close(); connectionId = ''; connectionKey = ''; } }, 10000);
+  const connections = new Map();
+  const expiry = setInterval(() => { for (const state of connections.values()) if(state.connectionId && Date.now()>state.leaseUntil){state.live.close();state.connectionId='';state.connectionKey='';} },10000);
   expiry.unref();
   const server = createServer(async (request, response) => {
     const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Vary': 'Origin' };
@@ -21,10 +20,17 @@ export function createConnector({ origin, pairingCode, cloudUrl = 'https://gcibs
     const supplied = Buffer.from(String(request.headers['x-refos-pairing'] || ''));
     const expected = Buffer.from(pairingCode);
     if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) { reply({ error: 'The connector pairing code is incorrect.' }, 403); return; }
+    let state, live, connectionId, connectionKey, leaseUntil, writeState=false;
     try {
       let raw = '';
       for await (const chunk of request) { raw += chunk; if (raw.length > 20000) { reply({ error: 'Request too large.' }, 413); return; } }
       const body = JSON.parse(raw);
+      const channel = request.url === '/snapshot' ? (body.channelId || 'default') : [...connections.entries()].find(([,value])=>value.connectionId===body.connectionId)?.[0];
+      if(!channel){reply({error:'TM live field connection expired. Reconnect TM.'},409);return;}
+      if(typeof channel!=='string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(channel)) throw Error('TM connection is unavailable.');
+      if(!connections.has(channel)) {if(connections.size>=3)throw Error('Too many TM connections. Restart the connector.');connections.set(channel,{live:new LiveFieldStreams(),connectionId:'',connectionKey:'',leaseUntil:0});}
+      state=connections.get(channel);({live,connectionId,connectionKey,leaseUntil}=state);
+      writeState=request.url!=='/activity';
       if (request.url !== '/snapshot') {
         if (!connectionId || body.connectionId !== connectionId || Date.now() > leaseUntil) { reply({ error: 'TM live field connection expired. Reconnect TM.' }, 409); return; }
         if (request.url === '/disconnect') { live.close(); connectionId = ''; connectionKey = ''; reply({}); return; }
@@ -42,7 +48,7 @@ export function createConnector({ origin, pairingCode, cloudUrl = 'https://gcibs
       if (!authorized.ok || typeof auth.accessToken !== 'string') throw new Error(auth.error || 'TM authorization failed.');
       const get = path => read(url, path, body.apiKey, auth.accessToken, path === `/api/rankings/${body.division}/QUAL` || body.forceScores === true && path === `/api/matches/${body.division}`);
       const [event, divisions] = await Promise.all([get('/api/event'), get('/api/divisions')]);
-      if (body.division == null) { reply({ event: event.event, divisions: divisions.divisions }); return; }
+      if (body.division == null) { reply({ multiServer: true, event: event.event, divisions: divisions.divisions }); return; }
       if (!divisions.divisions?.some(row => row.id === body.division)) throw new Error('This TM division no longer exists. Load the event again.');
       const [teams, matches, rankings, skills] = await Promise.all([
         get(`/api/teams/${body.division}`), get(`/api/matches/${body.division}`), get(`/api/rankings/${body.division}/QUAL`), get('/api/skills'),
@@ -64,13 +70,13 @@ export function createConnector({ origin, pairingCode, cloudUrl = 'https://gcibs
           leaseUntil = Date.now() + 90000;
         } catch { live.close(); connectionId = ''; connectionKey = ''; fieldError = 'Live fields could not connect. Check that TM supports the field API; rankings and score sync can continue.'; }
       } else { live.close(); connectionId = ''; connectionKey = ''; }
-      reply({ event: event.event, divisions: divisions.divisions, teams: teams.teams, matches: matches.matches, rankings: rankings.rankings, skills: skills.skillsRankings, connectionId, fieldError });
+      reply({ multiServer: true, event: event.event, divisions: divisions.divisions, teams: teams.teams, matches: matches.matches, rankings: rankings.rankings, skills: skills.skillsRankings, connectionId, fieldError });
     } catch (error) {
       const message = error instanceof Error && /^(TM |Enter |Use |Choose |This TM|Event administrator|Sign in|Too many)/.test(error.message) ? error.message : 'Could not reach TM or authorize the connector. Check the address, local network, and internet connection.';
       reply({ error: message }, 502);
-    }
+    } finally { if(state && writeState)Object.assign(state,{connectionId,connectionKey,leaseUntil}); }
   });
-  server.on('close', () => { clearInterval(expiry); live.close(); });
+  server.on('close', () => { clearInterval(expiry); for(const state of connections.values())state.live.close(); });
   return server;
 }
 

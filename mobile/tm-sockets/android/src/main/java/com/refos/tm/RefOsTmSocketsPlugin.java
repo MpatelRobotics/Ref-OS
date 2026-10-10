@@ -82,6 +82,11 @@ public class RefOsTmSocketsPlugin extends Plugin {
             call.resolve();
         } catch (Exception error) { call.reject("Could not open the TM live field connection."); }
     }
+    @PluginMethod public void close(PluginCall call) {
+        String id=call.getString("id");
+        if(id!=null){WebSocket socket=sockets.remove(id);if(socket!=null)socket.cancel();}
+        call.resolve();
+    }
     @PluginMethod public void closeAll(PluginCall call) { closeSockets(); call.resolve(); }
     private void closeSockets() {
         synchronized (sockets) {
