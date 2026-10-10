@@ -3,9 +3,9 @@ import {normalizeTmSnapshot} from '../tmSnapshot.js';
 import {matchTmDivision} from '../tmDivisionMapping.js';
 import {scopeTmFieldActivity} from '../tmFieldActivity.js';
 
-export default function TmMultiServerSync({open,onClose,onExit,refosDivisions=[],expectedCode='',...props}) {
+export default function TmMultiServerSync({open,onClose,onExit,refosDivisions=[],expectedCode='',initialAddress='',initialApiKey='',onDiscoverDivisions,...props}) {
  const [rows,setRows]=useState(()=>[0,1].map(i=>({id:`server-${i+1}`,address:'',apiKey:'',target:String(refosDivisions[i]?.id||''),division:'',session:'',remote:[],sessions:[],reviewed:null,ready:false,status:''})));
- const [address,setAddress]=useState(''),[apiKey,setApiKey]=useState('');
+ const [address,setAddress]=useState(initialAddress),[apiKey,setApiKey]=useState(initialApiKey);
  const credentialsChanged=()=>{setRows(old=>old.map(row=>({...row,division:'',remote:[],session:'',sessions:[],ready:false,reviewed:null,status:''})));};
  const [running,setRunning]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const latest=useRef(props);latest.current=props;
@@ -25,8 +25,10 @@ export default function TmMultiServerSync({open,onClose,onExit,refosDivisions=[]
    const data=await latest.current.onFetch({...request(rows[0]),division:null,liveFields:false});
    if(!active.current||ticket!==epoch.current)return;validEvent(data);
    if(!data.multiServer)throw Error('Update the connector to enable multi-division syncing.');
-   if(!Array.isArray(data.divisions)||data.divisions.length<2)throw Error('TM must have at least two divisions to sync both.');
-   setRows(old=>old.map(row=>({...row,remote:data.divisions,division:String(matchTmDivision(data.divisions,refosDivisions,Number(row.target))?.id||''),session:'',sessions:[],ready:false,reviewed:null,status:''})));
+   if(!Array.isArray(data.divisions)||data.divisions.length<2||data.divisions.some(d=>!Number.isSafeInteger(d.id)||d.id<1||typeof d.name!=='string')||new Set(data.divisions.map(d=>d.id)).size!==data.divisions.length)throw Error('TM must have at least two divisions to sync both.');
+   const catalog=refosDivisions.length?refosDivisions:await onDiscoverDivisions?.(data.divisions)||[];
+   if(!active.current||ticket!==epoch.current)return;
+   setRows(old=>old.map((row,index)=>({...row,target:row.target||String(catalog[index]?.id||''),remote:data.divisions,division:String(matchTmDivision(data.divisions,catalog,Number(row.target||catalog[index]?.id))?.id||''),session:'',sessions:[],ready:false,reviewed:null,status:''})));
   }catch(e){if(active.current&&ticket===epoch.current)setError(e.message||'Could not load TM divisions.');}
   finally{working.current=false;if(active.current)setBusy(false);}
  };

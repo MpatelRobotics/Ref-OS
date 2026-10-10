@@ -143,3 +143,12 @@ test('setup matches division names despite different Ref OS IDs and remembers th
  expect(await page.evaluate(()=>window.savedMapping)).toEqual({id:1,name:'Division 1'});
  await expect(page.getByRole('combobox',{name:'TM division',exact:true})).toHaveValue('1');
 });
+
+test('two-division setup stays available without an existing Ref OS division catalog',async({page})=>{
+ await mount(page);
+ await page.getByLabel('Event TM API key',{exact:true}).fill('event-key');
+ await page.getByRole('button',{name:'Sync both TM divisions',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'Sync both TM divisions',exact:true})).toBeVisible();
+ await expect(page.getByLabel('Event API key',{exact:true})).toHaveValue('event-key');
+ await expect(page.getByRole('combobox',{name:'TM division',exact:true})).toHaveCount(2);
+});

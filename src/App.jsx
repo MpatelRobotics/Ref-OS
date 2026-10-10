@@ -1667,10 +1667,10 @@ function Tracker(props) {
   const divisionId=divisions.length>1?(selected===0?0:divisions.some(d=>d.id===selected)?selected:divisions[0].id):0;
   return <>
     {divisions.length>1 && <div className="px-4 py-3 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700"><label className="flex items-center gap-3 font-semibold">Division<select aria-label="Event division" value={divisionId} onChange={e=>{const value=Number(e.target.value);setSelected(value);localStorage.setItem(storageKey,String(value));}} className="min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3"><option value={0}>Unassigned schedule</option>{divisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label></div>}
-    <DivisionTracker key={`${eventId}:${divisionId}`} {...props} divisionId={divisionId} divisionCatalog={divisions}/>
+    <DivisionTracker key={`${eventId}:${divisionId}`} {...props} divisionId={divisionId} divisionCatalog={divisions} onDiscoverTmDivisions={async rows=>{const saved=await eventApi.upsertEventSetting(eventId,'vex_divisions',{divisions:rows});setDivisions(rows);return rows;}}/>
   </>;
 }
-function DivisionTracker({ divisionId=0, divisionCatalog=[], league = null, initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf, onEventFormatChanged }) {
+function DivisionTracker({ divisionId=0, divisionCatalog=[], onDiscoverTmDivisions, league = null, initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf, onEventFormatChanged }) {
   // League events: this workspace is bound to ONE league session (league.session). Session-scoped
   // reads and writes are limited to it by api.js; null for Tournament events.
   const leagueSessionId = league?.session?.id || null;
@@ -4927,7 +4927,7 @@ function DivisionTracker({ divisionId=0, divisionCatalog=[], league = null, init
         key={`tm-${eventId}-${leagueSessionId || ''}`} open={showTmApiSync} onClose={() => setShowTmApiSync(false)}
         target={`${event?.name || 'Current event'}${league ? ' · ' + league.sessionName(leagueSessionId) : ''}`}
         expectedCode={eventSettings?.vex_event?.value?.code || ''}
-        refosDivisions={divisionCatalog} refosDivisionId={divisionId} savedDivisionMappings={eventSettings?.tm_division_mappings?.value || {}}
+        onDiscoverDivisions={onDiscoverTmDivisions} refosDivisions={divisionCatalog} refosDivisionId={divisionId} savedDivisionMappings={eventSettings?.tm_division_mappings?.value || {}}
         onSaveDivisionMapping={async(id,name)=>{if(!divisionId||!name)return;if(Object.entries(eventSettings?.tm_division_mappings?.value||{}).some(([local,mapping])=>Number(local)!==divisionId&&Number(mapping.id)===id))throw Error('This TM division is already mapped to another Ref OS division.');const saved=await api.upsertEventSetting(eventId,'tm_division_mappings',{...(eventSettings?.tm_division_mappings?.value||{}),[divisionId]:{id,name}},meName);setEventSettings(prev=>({...prev,tm_division_mappings:saved}));}}
         onFetch={settings => api.getTmSnapshot(eventId, settings)} onApply={applyTmApiSnapshot}
         onActivity={api.getTmFieldActivity} onDisconnect={(id, pairing) => api.getTmFieldActivity(id, pairing, true)}
