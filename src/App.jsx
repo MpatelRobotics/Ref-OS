@@ -1666,11 +1666,11 @@ function Tracker(props) {
   },[eventId]);
   const divisionId=divisions.length>1?(selected===0?0:divisions.some(d=>d.id===selected)?selected:divisions[0].id):0;
   return <>
-    {divisions.length>1 && <div className="px-4 py-3 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700"><label className="flex items-center gap-3 font-semibold">Division<select aria-label="Event division" value={divisionId} onChange={e=>{const value=Number(e.target.value);setSelected(value);localStorage.setItem(storageKey,String(value));}} className="min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3"><option value={0}>Unassigned schedule</option>{divisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label></div>}
-    <DivisionTracker key={`${eventId}:${divisionId}`} {...props} divisionId={divisionId} divisionCatalog={divisions} onDiscoverTmDivisions={async rows=>{const saved=await eventApi.upsertEventSetting(eventId,'vex_divisions',{divisions:rows});setDivisions(rows);return rows;}}/>
+
+    <DivisionTracker key={`${eventId}:${divisionId}`} {...props} divisionId={divisionId} divisionCatalog={divisions} divisionSelector={divisions.length>1 && <div className="px-4 py-3 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700"><label className="flex flex-wrap items-center gap-3 font-semibold">Division<select aria-label="Event division" value={divisionId} onChange={e=>{const value=Number(e.target.value);setSelected(value);localStorage.setItem(storageKey,String(value));}} className="min-h-[44px] min-w-0 max-w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3"><option value={0}>Unassigned schedule</option>{divisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label></div>} onDiscoverTmDivisions={async rows=>{const saved=await eventApi.upsertEventSetting(eventId,'vex_divisions',{divisions:rows});setDivisions(rows);return rows;}}/>
   </>;
 }
-function DivisionTracker({ divisionId=0, divisionCatalog=[], onDiscoverTmDivisions, league = null, initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf, onEventFormatChanged }) {
+function DivisionTracker({ divisionId=0, divisionCatalog=[], divisionSelector=null, onDiscoverTmDivisions, league = null, initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf, onEventFormatChanged }) {
   // League events: this workspace is bound to ONE league session (league.session). Session-scoped
   // reads and writes are limited to it by api.js; null for Tournament events.
   const leagueSessionId = league?.session?.id || null;
@@ -4494,6 +4494,8 @@ function DivisionTracker({ divisionId=0, divisionCatalog=[], onDiscoverTmDivisio
           );
         })()}
       </header>
+
+      {divisionSelector}
 
       {!openTeam && !openMatch && !openRobot && !showIdentity && !logFor && !editing && (() => {
         const primary = isInspection ? [
