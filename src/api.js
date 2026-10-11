@@ -37,7 +37,7 @@ export const uid = () =>
    SESSION-SCOPED: matches, violations, field log (except the league-wide kinds below), field
    reset checks, alliances, nominations, finalists, attendance, robot inspection photos, and the
    imported rankings / skills / qualification-record snapshots. */
-export const LEAGUE_SESSION_SETTING_KEYS = new Set(["skills_rankings", "qualification_records", "judging_rank_order", "rank_snapshot", "tm_field_activity"]);
+export const LEAGUE_SESSION_SETTING_KEYS = new Set(["skills_rankings", "qualification_records", "judging_rank_order", "rank_snapshot", "tm_field_activity", "tm_check_in"]);
 export const LEAGUE_EVENT_SCOPED_FIELD_LOG_KINDS = new Set(["role_code_update", "role_code_request", "volunteer_contact", "sync_probe", "sync_ack", "system_test"]);
 let leagueContext = { eventId: "", sessionId: "", legacySessionId: "" };
 // legacySessionId: for a League converted from a Tournament, the session that owns the

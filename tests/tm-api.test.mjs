@@ -93,6 +93,24 @@ function mockApi() {
     upsertEventSetting: async (event,key,value) => { calls.push([key,event]); settings[key] = value; },
   };
 }
+test('TM check-in changes sync independently of roster changes and missing status stays unknown', async () => {
+  const data = fixture(), api = mockApi(), hashes = {};
+  const options = { api, eventId: 'event', hashes, current: () => true };
+  data.teams[0].checkedIn = false;
+  await applyTmSnapshot(normalizeTmSnapshot(data), options);
+  assert.equal(api.settings.tm_check_in.rows[0].checkedIn, false);
+  const rosterWrites = api.calls.filter(call => call[0] === 'teams').length;
+  data.teams[0].checkedIn = true;
+  await applyTmSnapshot(normalizeTmSnapshot(data), options);
+  assert.equal(api.settings.tm_check_in.rows[0].checkedIn, true);
+  assert.equal(api.calls.filter(call => call[0] === 'teams').length, rosterWrites);
+  delete data.teams[0].checkedIn;
+  await applyTmSnapshot(normalizeTmSnapshot(data), options);
+  assert.equal(api.settings.tm_check_in.rows[0].checkedIn, null);
+  const writes = api.calls.length;
+  await applyTmSnapshot(normalizeTmSnapshot(data), options);
+  assert.equal(api.calls.length, writes);
+});
 test('whole snapshot imports through event API, adds opt-in schedule and avoids unchanged writes', async () => {
   const api = mockApi(), hashes = {}, snapshot = normalizeTmSnapshot(fixture());
   const options = { api, eventId: 'selected-league-event', includeSchedule: true, hashes, current: () => true, by: 'Admin' };

@@ -16,6 +16,7 @@ import TeamRegisteredEvents from "./components/TeamRegisteredEvents.jsx";
 import VexSyncManager from "./components/VexSyncManager.jsx";
 import {EventTmSync,EventTmSyncRegistration,useEventTmSync} from "./components/EventTmSync.jsx";
 import TmFieldActivity from "./components/TmFieldActivity.jsx";
+import RobotCheckIn from "./components/RobotCheckIn.jsx";
 import { tmMatchHighlights } from "./tmMatchHighlights.js";
 import { applyTmSnapshot } from "./tmApplySnapshot.js";
 import VexEventLookup from "./components/VexEventLookup.jsx";
@@ -4713,7 +4714,7 @@ function DivisionTracker({ divisionId=0, divisionCatalog=[], divisionSelector=nu
         ) : view === "matches" ? (
           isIQ ? <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} parseCSV={parseCSV} /> : <MatchList tmActivity={eventSettings?.tm_field_activity?.value} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
-          <RobotList requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} />
+          <><RobotCheckIn teams={teams} checkIn={eventSettings?.tm_check_in?.value} onOpen={setOpenRobot} /><RobotList requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} /></>
         ) : view === "judging" ? (
           <>
           <JudgingView noms={noms} viols={viols} teamName={teamNameMap} finalists={finalists} rankOrder={eventSettings?.judging_rank_order?.value || {}} canReorder={adminUnlocked} onMoveRank={moveJudgingRank} emcee={isEmcee}

@@ -42,5 +42,6 @@ export function normalizeTmSnapshot(data, session) {
   for (const [name, rows] of Object.entries({ teams, rankings, skills })) {
     if (new Set(rows.map(r => r.number)).size !== rows.length) throw Error(`TM returned duplicate ${name} rows. Existing data is kept.`);
   }
-  return { event: data.event, teams, rankings, skills, matches, scores: matches.filter(m => m.redScore != null), sessions, selectedSession, warnings };
+  const checkIns = data.teams.filter(t => number(t.number)).map(t => ({ number: number(t.number), checkedIn: typeof t.checkedIn === 'boolean' ? t.checkedIn : null }));
+  return { event: data.event, teams, checkIns, rankings, skills, matches, scores: matches.filter(m => m.redScore != null), sessions, selectedSession, warnings };
 }

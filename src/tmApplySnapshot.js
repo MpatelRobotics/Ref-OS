@@ -14,6 +14,11 @@ export async function applyTmSnapshot(snapshot, { api, eventId, by, includeSched
   }
   if (!current()) return;
   // Skills are event-wide, so their teams may be outside the chosen division.
+  if (changed('checkIns', snapshot.checkIns || [])) {
+    await api.upsertEventSetting(eventId, 'tm_check_in', { rows: snapshot.checkIns, importedAt: Date.now(), source: 'TM API' }, by);
+    if (!current()) return;
+    remember('checkIns', snapshot.checkIns);
+  }
   const known = new Set((await api.listTeams(eventId)).map(t => t.number));
   const missing = [...new Set([...snapshot.rankings, ...snapshot.skills].map(r => r.number))].filter(n => !known.has(n));
   if (!current()) return;
