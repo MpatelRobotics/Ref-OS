@@ -1657,6 +1657,7 @@ const ConfigError = () => (
 /* ==================================================================== */
 function Tracker(props) {
   const eventId=props.initialEvent.id;
+  const [view, setView] = useState(props.role === "judge" ? "judging" : props.role === "inspection" ? "robots" : "matches");
   const [divisions,setDivisions]=useState([]);
   const storageKey=`refosDivision:${eventId}:${props.league?.session?.id||''}`;
   const [selected,setSelected]=useState(()=>{try{return Number(localStorage.getItem(storageKey))||0;}catch{return 0;}});
@@ -1668,10 +1669,10 @@ function Tracker(props) {
   const divisionId=divisions.length>1?(selected===0?0:divisions.some(d=>d.id===selected)?selected:divisions[0].id):0;
   return <EventTmSync>
 
-    <DivisionTracker key={`${eventId}:${divisionId}`} {...props} divisionId={divisionId} divisionCatalog={divisions} divisionSelector={divisions.length>1 && <div className="px-4 py-3 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700"><label className="flex flex-wrap items-center gap-3 font-semibold">Division<select aria-label="Event division" value={divisionId} onChange={e=>{const value=Number(e.target.value);setSelected(value);localStorage.setItem(storageKey,String(value));}} className="min-h-[44px] min-w-0 max-w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3"><option value={0}>Unassigned schedule</option>{divisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label></div>} onDiscoverTmDivisions={async rows=>{const saved=await eventApi.upsertEventSetting(eventId,'vex_divisions',{divisions:rows});setDivisions(rows);return rows;}}/>
+    <DivisionTracker key={`${eventId}:${divisionId}`} {...props} view={view} setView={setView} divisionId={divisionId} divisionCatalog={divisions} divisionSelector={divisions.length>1 && <div className="px-4 py-3 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700"><label className="flex flex-wrap items-center gap-3 font-semibold">Division<select aria-label="Event division" value={divisionId} onChange={e=>{const value=Number(e.target.value);setSelected(value);localStorage.setItem(storageKey,String(value));}} className="min-h-[44px] min-w-0 max-w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3"><option value={0}>Unassigned schedule</option>{divisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label></div>} onDiscoverTmDivisions={async rows=>{const saved=await eventApi.upsertEventSetting(eventId,'vex_divisions',{divisions:rows});setDivisions(rows);return rows;}}/>
   </EventTmSync>;
 }
-function DivisionTracker({ divisionId=0, divisionCatalog=[], divisionSelector=null, onDiscoverTmDivisions, league = null, initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf, onEventFormatChanged }) {
+function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divisionSelector=null, onDiscoverTmDivisions, league = null, initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf, onEventFormatChanged }) {
   // League events: this workspace is bound to ONE league session (league.session). Session-scoped
   // reads and writes are limited to it by api.js; null for Tournament events.
   const leagueSessionId = league?.session?.id || null;
@@ -1759,7 +1760,6 @@ function DivisionTracker({ divisionId=0, divisionCatalog=[], divisionSelector=nu
     catch { return { phase: "qual", num: "" }; }
   });
 
-  const [view, setView] = useState(role === "judge" ? "judging" : role === "inspection" ? "robots" : "matches");
   const [openTeam, setOpenTeam] = useState(null);
   const [openMatch, setOpenMatch] = useState(null);
   const [openRobot, setOpenRobot] = useState(null);
