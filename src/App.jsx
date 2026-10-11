@@ -1951,6 +1951,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     setShowDiagnosticReport(false);
     setShowEvent(false);
     setShowTMSync(false);
+    setShowVexSyncSetup(false);
     setShowActivity(false);
     setShowRankings(false);
     setShowClear(false);
@@ -5068,7 +5069,7 @@ onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!cu
         onTwoDeviceSyncTest={() => openCommandCenterTool(() => setShowTwoDeviceSyncTest(true))}
         onDiagnosticReport={() => openCommandCenterTool(() => setShowDiagnosticReport(true))}
         onEventSetup={() => openCommandCenterTool(() => setShowEvent(true))}
-        onVexSync={!isIQ && !highlanderDemoLocked && !isVenueMode() ? () => setShowVexSyncSetup(true) : undefined}
+        onVexSync={!isIQ && !highlanderDemoLocked && !isVenueMode() ? () => openCommandCenterTool(() => setShowVexSyncSetup(true)) : undefined}
         onTMSync={() => openCommandCenterTool(() => setShowTMSync(true))}
         onExportViolations={exportCSV}
         onExportNominations={exportNominations}
@@ -5132,7 +5133,7 @@ onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!cu
           </div>
         </div>
       )}
-      {!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexSyncManager onDiscoverDivisions={async divisions=>{await eventApi.upsertEventSetting(eventId,"vex_divisions",{divisions},meName);}} autoStart initialDivision={eventSettings?.vex_event?.value?.division} showLaunch={false} setupOpen={showVexSyncSetup} onSetupClose={()=>setShowVexSyncSetup(false)} showStatus={showCommandCenter || showVexSyncSetup} visible={{rankings:showVexLiveSync,skills:showVexSkillsSync,scores:showVexScoresSync}} onOpen={category=>{setShowVexLiveSync(category==='rankings');setShowVexSkillsSync(category==='skills');setShowVexScoresSync(category==='scores');}} key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || event?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onSaveCode={async (code, division) => { if (eventSettings?.vex_event?.value?.code === code && (division == null || eventSettings?.vex_event?.value?.division === division)) return; const saved = await api.upsertEventSetting(eventId, "vex_event", { ...(eventSettings?.vex_event?.value || {}), code, ...(division != null ? {division} : {}) }); setEventSettings(prev => ({ ...prev, vex_event:saved })); }} onFetch={api.getVexStandings} onApply={applyVexSnapshot} onClose={category=>{if(category==='rankings')setShowVexLiveSync(false);if(category==='skills')setShowVexSkillsSync(false);if(category==='scores')setShowVexScoresSync(false);}} />}
+      {!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexSyncManager onDiscoverDivisions={async divisions=>{await eventApi.upsertEventSetting(eventId,"vex_divisions",{divisions},meName);}} autoStart initialDivision={eventSettings?.vex_event?.value?.division} showLaunch={false} setupOpen={showVexSyncSetup} onSetupClose={()=>commandCenterChildOpen ? returnToCommandCenter() : setShowVexSyncSetup(false)} showStatus={showCommandCenter || showVexSyncSetup} visible={{rankings:showVexLiveSync,skills:showVexSkillsSync,scores:showVexScoresSync}} onOpen={category=>{setShowVexLiveSync(category==='rankings');setShowVexSkillsSync(category==='skills');setShowVexScoresSync(category==='scores');}} key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || event?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onSaveCode={async (code, division) => { if (eventSettings?.vex_event?.value?.code === code && (division == null || eventSettings?.vex_event?.value?.division === division)) return; const saved = await api.upsertEventSetting(eventId, "vex_event", { ...(eventSettings?.vex_event?.value || {}), code, ...(division != null ? {division} : {}) }); setEventSettings(prev => ({ ...prev, vex_event:saved })); }} onFetch={api.getVexStandings} onApply={applyVexSnapshot} onClose={category=>{if(category==='rankings')setShowVexLiveSync(false);if(category==='skills')setShowVexSkillsSync(false);if(category==='scores')setShowVexScoresSync(false);}} />}
       {showFeedback && <FeedbackModal meName={meName} myRole={myRole} onSubmit={async (entry, screenshots) => { if (!screenshots?.length) return addFieldLog(entry); await submitFeedbackScreenshots({eventId, id:entry.id, note:entry.note, by:meName, sessionId:leagueSessionId || null, screenshots}); setFieldLog(await api.listFieldLog(eventId)); }} onClose={() => setShowFeedback(false)} />}
       {showOnboarding && <QuickStartModal step={onboardingStep} setStep={setOnboardingStep} onClose={closeOnboarding} />}
       {undoPrompt && (
