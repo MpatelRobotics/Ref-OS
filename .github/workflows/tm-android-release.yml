@@ -1,6 +1,25 @@
 name: Build downloadable Android TM connector
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'desktop/**'
+      - 'tm-bridge/**'
+      - 'scripts/build-tm-desktop.mjs'
+      - 'android/**'
+      - 'mobile/tm-sockets/**'
+      - 'scripts/sync-mobile.mjs'
+      - 'capacitor.config.*'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tests/tm-api.test.mjs'
+      - 'tests/tm-mobile.test.mjs'
+      - 'tests/tm-live-fields.test.mjs'
+      - 'tests/tm-client-pool.test.mjs'
+      - '.github/workflows/tm-android-release.yml'
 permissions:
   contents: write
 concurrency:
@@ -46,7 +65,7 @@ jobs:
           PY
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - run: npm ci
-      - run: node --test tests/tm-mobile.test.mjs tests/tm-live-fields.test.mjs tests/tm-api.test.mjs
+      - run: node --test tests/tm-mobile.test.mjs tests/tm-live-fields.test.mjs tests/tm-api.test.mjs tests/tm-client-pool.test.mjs
       - run: node scripts/sync-mobile.mjs --android
       - name: Build signed APK
         env:
