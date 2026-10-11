@@ -1,12 +1,12 @@
 import { planScoreUpdates } from './vexScoreSync.js';
 
 // All writes use the app's authenticated API and selected league session.
-export async function applyTmSnapshot(snapshot, { api, eventId, by, includeSchedule, includeSkills=true, hashes, current }) {
+export async function applyTmSnapshot(snapshot, { api, eventId, by, includeSchedule, includeSkills=true, checkInOnly=false, hashes, current }) {
   const changed = (kind, rows) => rows.length && hashes[kind] !== JSON.stringify(rows);
   const remember = (kind, rows) => { hashes[kind] = JSON.stringify(rows); };
   let added = 0, scored = 0, skipped = 0;
   if (!current()) return;
-  if (changed('teams', snapshot.teams)) {
+  if (!checkInOnly && changed('teams', snapshot.teams)) {
     const existing = await api.listTeams(eventId);
     if (!current()) return;
     await api.bulkUpsertTeams(eventId, snapshot.teams.map(row => ({ ...row, name: row.name || existing.find(t => t.number === row.number)?.name || '' })));
@@ -19,6 +19,7 @@ export async function applyTmSnapshot(snapshot, { api, eventId, by, includeSched
     if (!current()) return;
     remember('checkIns', snapshot.checkIns);
   }
+  if (checkInOnly) return 'TM check-in status checked.';
   const known = new Set((await api.listTeams(eventId)).map(t => t.number));
   const missing = [...new Set([...snapshot.rankings, ...snapshot.skills].map(r => r.number))].filter(n => !known.has(n));
   if (!current()) return;

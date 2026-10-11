@@ -3561,6 +3561,11 @@ function DivisionTracker({ divisionId=0, divisionCatalog=[], divisionSelector=nu
     const message = await applyTmSnapshot(snapshot, { ...options, api:targetApi, eventId, by: meName });
     if(targetDivision!==divisionId)return message;
     if (!options.current()) return;
+    if (options.checkInOnly) {
+      const settings = await api.listEventSettings(eventId);
+      if (options.current()) setEventSettings(settings);
+      return message;
+    }
     const [freshTeams, freshMatches, settings] = await Promise.all([api.listTeams(eventId), api.listMatches(eventId, { strict: true }), api.listEventSettings(eventId)]);
     if (!options.current()) return;
     setTeams(freshTeams); setMatches(Object.fromEntries(freshMatches.map(m => [m.id, m]))); setEventSettings(settings);
@@ -4928,6 +4933,7 @@ function DivisionTracker({ divisionId=0, divisionCatalog=[], divisionSelector=nu
       )}
       <EventTmSyncRegistration config={{enabled:!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode(),
 target:`${event?.name || 'Current event'}${league ? ' · ' + league.sessionName(leagueSessionId) : ''}`,
+robotsActive:view === 'robots',
 expectedCode:eventSettings?.vex_event?.value?.code || '',
 onDiscoverDivisions:onDiscoverTmDivisions,
 refosDivisions:divisionCatalog,

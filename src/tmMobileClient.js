@@ -92,6 +92,10 @@ export function createMobileTmClient({ http, sockets, cloudUrl, now = Date.now }
       const [event, divisions] = await Promise.all([get('/api/event'), get('/api/divisions')]);
       if (body.division == null) { await close(); return { event: event.event, divisions: divisions.divisions }; }
       if (!divisions.divisions?.some(d => d.id === body.division)) throw Error('This TM division no longer exists. Load the event again.');
+      if (body.checkInOnly === true) {
+        const teams = await get(`/api/teams/${body.division}`);
+        return { multiServer: true, event: event.event, teams: teams.teams, matches: [], rankings: [], skills: [] };
+      }
       const [teams, matches, rankings, skills] = await Promise.all([get(`/api/teams/${body.division}`), get(`/api/matches/${body.division}`), get(`/api/rankings/${body.division}/QUAL`), get('/api/skills')]);
       let fieldError = '';
       if (body.liveFields) {

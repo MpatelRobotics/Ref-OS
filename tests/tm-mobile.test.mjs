@@ -91,6 +91,21 @@ test('lease expires safely and invalid divisions never open live sockets', async
     assert.equal(h.hasListener(), false);
   } finally { await h.client.close(); }
 });
+test('check-in-only refresh leaves live fields connected and skips score and ranking requests', async () => {
+  const h = harness();
+  try {
+    const full = await h.client.request('snapshot', settings);
+    const before = h.requests.length;
+    const fast = await h.client.request('snapshot', { ...settings, checkInOnly: true });
+    assert.deepEqual(fast.teams, h.resources['/api/teams/1'].teams);
+    const paths = h.requests.slice(before).map(request => new URL(request.url).pathname);
+    assert.ok(paths.includes('/api/teams/1'));
+    assert.ok(!paths.some(path => /matches|rankings|skills|fieldsets/.test(path)));
+    await h.client.request('activity', { connectionId: full.connectionId });
+    assert.equal(h.opens.length, 1);
+    assert.equal(h.hasListener(), true);
+  } finally { await h.client.close(); }
+});
 
 test('authentication rejection never sends a request or session token to TM', async () => {
   let calls = 0;

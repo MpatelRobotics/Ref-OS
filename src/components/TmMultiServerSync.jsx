@@ -67,7 +67,13 @@ export default function TmMultiServerSync({open,onClose,onExit,refosDivisions=[]
      await latest.current.onApply(snapshot,{includeSchedule:true,includeSkills:row.id===currentRows.current[0].id,hashes:state.hashes,current,refosDivisionId:Number(row.target)});
      if(!current())return;state.session=snapshot.selectedSession;state.connectionId=data.connectionId;if(state.refresh&&Date.now()>=state.refresh)state.refresh=0;
      const seconds=snapshot.matches.some(m=>['r16','qf','sf','final'].includes(m.phase))?15:30;
-     state.due=Date.now()+seconds*1000;update(row.id,{status:`Synced · every ${seconds}s · ${new Date().toLocaleTimeString()}`});
+     state.due=Date.now()+seconds*1000;state.checkInDue=Date.now()+5000;update(row.id,{status:`Synced · every ${seconds}s · ${new Date().toLocaleTimeString()}`});
+    }
+    if(latest.current.robotsActive&&!document.hidden&&navigator.onLine&&Date.now()>=(state.checkInDue||0)){
+     const data=await latest.current.onFetch({...request(row),checkInOnly:true});if(!current())return;validEvent(data);
+     if((data.event?.code||data.event?.name)!==row.reviewed)throw Error('TM event changed. Stop and review the divisions again.');
+     await latest.current.onApply(normalizeTmSnapshot(data),{checkInOnly:true,hashes:state.hashes,current,refosDivisionId:Number(row.target)});
+     state.checkInDue=Date.now()+5000;
     }
     if(state.connectionId&&latest.current.onActivity){
      const data=await latest.current.onActivity(state.connectionId,'');if(!current())return;

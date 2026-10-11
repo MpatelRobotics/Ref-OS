@@ -9,7 +9,7 @@ export default function RobotCheckIn({ teams, checkIn, onOpen }) {
   return <details className="mb-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
     <summary className="min-h-[44px] cursor-pointer p-4 font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600">TM check-in status <span className="text-sm font-normal text-slate-500 dark:text-slate-400">{rows.length ? `· ${checked} of ${rows.length} checked in` : '· Waiting for TM sync'}</span></summary>
     <div className="px-4 pb-4">
-      <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">Check-in status updates with TM sync for the selected division. Manage check-in in Tournament Manager.</p>
+      <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">With TM sync running, check-in status refreshes every 5 seconds while Robots is open and visible on the connector device. Manage check-in in Tournament Manager.</p>
       {checkIn?.importedAt && <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">Last TM check-in update: {new Date(checkIn.importedAt).toLocaleString()}</p>}
       <label className="block mb-3 text-sm font-semibold">Show teams
         <select value={filter} onChange={event => setFilter(event.target.value)} className="mt-1 w-full min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 p-2">

@@ -111,6 +111,13 @@ test('TM check-in changes sync independently of roster changes and missing statu
   await applyTmSnapshot(normalizeTmSnapshot(data), options);
   assert.equal(api.calls.length, writes);
 });
+test('fast check-in refresh writes only check-in status without importing matches or standings', async () => {
+  const api = mockApi();
+  api.listMatches = async () => { throw Error('Fast check-in must not read matches'); };
+  api.listTeams = async () => { throw Error('Fast check-in must not read the roster'); };
+  await applyTmSnapshot(normalizeTmSnapshot(fixture()), { api, eventId: 'event', checkInOnly: true, hashes: {}, current: () => true });
+  assert.deepEqual(api.calls.map(call => call[0]), ['tm_check_in']);
+});
 test('whole snapshot imports through event API, adds opt-in schedule and avoids unchanged writes', async () => {
   const api = mockApi(), hashes = {}, snapshot = normalizeTmSnapshot(fixture());
   const options = { api, eventId: 'selected-league-event', includeSchedule: true, hashes, current: () => true, by: 'Admin' };

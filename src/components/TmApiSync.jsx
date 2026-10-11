@@ -4,7 +4,7 @@ import { normalizeTmSnapshot } from '../tmSnapshot.js';
 import { matchTmDivision } from '../tmDivisionMapping.js';
 import { scopeTmFieldActivity } from '../tmFieldActivity.js';
 
-export default function TmApiSync({ open, onClose, target, onFetch, onApply, onActivity, onPublishActivity, onDisconnect, expectedCode = '', refosDivisions=[], refosDivisionId=0, savedDivisionMappings={}, onSaveDivisionMapping, onDiscoverDivisions }) {
+export default function TmApiSync({ open, onClose, target, onFetch, onApply, onActivity, onPublishActivity, onDisconnect, robotsActive=false, expectedCode = '', refosDivisions=[], refosDivisionId=0, savedDivisionMappings={}, onSaveDivisionMapping, onDiscoverDivisions }) {
   const androidBrowser = /Android/i.test(navigator.userAgent);
   const androidDownload = import.meta.env.VITE_TM_ANDROID_DOWNLOAD_URL || 'https://github.com/MpatelRobotics/Ref-OS/releases/download/tm-connect-android/Ref-OS-TM-Connect.apk';
   const desktop = Boolean(window.refosTmDesktop), mobile = Boolean(window.Capacitor?.isNativePlatform?.());
@@ -107,6 +107,24 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
     return () => clearInterval(timer);
   }, [running, address, apiKey, pairing, division, session, expectedCode, syncInterval]);
   useEffect(() => {
+    if (!running || !robotsActive) return;
+    const ticket = version.current;
+    const refresh = async () => {
+      if (document.hidden || !navigator.onLine || inFlight.current) return;
+      inFlight.current = true;
+      try {
+        const data = await latest.current.onFetch({ ...settings(), checkInOnly: true });
+        if (!alive.current || ticket !== version.current) return;
+        if (reviewedEvent.current !== (data.event?.code || data.event?.name)) throw Error('TM event changed. Reconnect TM.');
+        await latest.current.onApply(normalizeTmSnapshot(data), { checkInOnly: true, refosDivisionId: sourceDivision.current, hashes: hashes.current, current: () => alive.current && ticket === version.current });
+      } catch (e) { if (alive.current && ticket === version.current) setError(e.message || 'TM check-in refresh failed; retrying.'); }
+      finally { inFlight.current = false; }
+    };
+    refresh();
+    const timer = setInterval(refresh, 5000);
+    return () => clearInterval(timer);
+  }, [running, robotsActive, address, apiKey, division]);
+  useEffect(() => {
     if (!running || !connectionId || !latest.current.onActivity) return;
     let active = true, pending = false, previous = '', publishedAt = 0;
     const observed = new Map(), scoreTimers = new Set();
@@ -157,7 +175,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
   }, [running, connectionId, pairing, division, preview?.selectedSession]);
   const inputClass = 'w-full min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2';
   const buttonClass = 'min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 font-semibold disabled:opacity-50';
-  if(multiple)return <TmMultiServerSync open={open} onClose={onClose} onExit={()=>setMultiple(false)} initialAddress={address} initialApiKey={apiKey} onDiscoverDivisions={onDiscoverDivisions} refosDivisions={refosDivisions} expectedCode={expectedCode} onFetch={onFetch} onApply={onApply} onActivity={onActivity} onPublishActivity={onPublishActivity} onDisconnect={onDisconnect}/>;
+  if(multiple)return <TmMultiServerSync open={open} onClose={onClose} onExit={()=>setMultiple(false)} robotsActive={robotsActive} initialAddress={address} initialApiKey={apiKey} onDiscoverDivisions={onDiscoverDivisions} refosDivisions={refosDivisions} expectedCode={expectedCode} onFetch={onFetch} onApply={onApply} onActivity={onActivity} onPublishActivity={onPublishActivity} onDisconnect={onDisconnect}/>;
   return <>
     {(running || status || error) && <div role="status" className="mx-4 mb-[calc(100px+env(safe-area-inset-bottom))] sm:mb-4 rounded-lg border border-blue-200 p-3 text-sm flex flex-wrap items-center gap-2"><span className="flex-1">{running ? `TM sync active · every ${hasEliminations ? '15' : '30'} seconds` : 'TM sync inactive'}{error ? ` · ${error}` : status ? ` · ${status}` : ''}{liveError && ` · ${liveError}`}</span>{running && <button className={buttonClass} onClick={stop}>Stop TM sync</button>}</div>}
     {open && <div className="fixed inset-0 z-[60] bg-black/40 p-3 flex items-center justify-center"><section role="dialog" aria-modal="true" aria-label="Tournament Manager API sync" className="w-full max-w-xl max-h-[90dvh] overflow-y-auto rounded-xl bg-white dark:bg-slate-800 p-4 space-y-4">

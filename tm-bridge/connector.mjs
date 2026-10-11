@@ -50,6 +50,10 @@ export function createConnector({ origin, pairingCode, cloudUrl = 'https://gcibs
       const [event, divisions] = await Promise.all([get('/api/event'), get('/api/divisions')]);
       if (body.division == null) { reply({ multiServer: true, event: event.event, divisions: divisions.divisions }); return; }
       if (!divisions.divisions?.some(row => row.id === body.division)) throw new Error('This TM division no longer exists. Load the event again.');
+      if (body.checkInOnly === true) {
+        const teams = await get(`/api/teams/${body.division}`);
+        reply({ multiServer: true, event: event.event, teams: teams.teams, matches: [], rankings: [], skills: [] }); return;
+      }
       const [teams, matches, rankings, skills] = await Promise.all([
         get(`/api/teams/${body.division}`), get(`/api/matches/${body.division}`), get(`/api/rankings/${body.division}/QUAL`), get('/api/skills'),
       ]);
