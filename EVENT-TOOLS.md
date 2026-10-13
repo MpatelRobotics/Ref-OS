@@ -63,3 +63,5 @@ Review the proposal, then **Apply proposal to draft** and **Save optimized sched
 Optimizer PDFs list teams under judge-group headings (or Unassigned judge group), with interviews sorted by time inside each group. Each team has After match / Before match references based on its nearest known scheduled matches. References are not live completion promises; missing times are marked unknown.
 
 TM scheduled match times are also displayed in the match list and match details, using the event timezone. Times appear only when the imported match identity and team assignments agree. Scheduled times are not actual start times.
+
+Navigation: **Nominations** contains award nominations and finalists. **Judging** contains judge-group assignments, Interview Scheduler and the separate Interview Optimizer dropdown. Judging retains Admin/Judge Advisor access.

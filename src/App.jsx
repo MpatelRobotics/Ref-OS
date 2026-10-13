@@ -1689,7 +1689,7 @@ const ConfigError = () => (
 /* ==================================================================== */
 function Tracker(props) {
   const eventId=props.initialEvent.id;
-  const [view, setView] = useState(props.role === "judge" ? "judging" : props.role === "inspection" ? "robots" : "matches");
+  const [view, setView] = useState(props.role === "judge" ? "interviews" : props.role === "inspection" ? "robots" : "matches");
   const [divisions,setDivisions]=useState([]);
   const storageKey=`refosDivision:${eventId}:${props.league?.session?.id||''}`;
   const [selected,setSelected]=useState(()=>{try{return Number(localStorage.getItem(storageKey))||0;}catch{return 0;}});
@@ -2584,7 +2584,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     return () => { clearInterval(iv); leave(); };
   }, [eventId, isInspection, meName, myRole]);
 
-  const activityScreen = showCommandCenter ? 'Command Center' : showEventSettings || showEvent ? 'Event Settings' : showFeatures || showUserGuide ? 'Features & Guide' : showFeedback || showFeedbackViewer ? 'Feedback' : showOnline ? 'Volunteer status' : ({matches:'Matches',teams:'Teams',rulebook:'Rules',robots:'Robots',alliances:isIQ?'Finals':'Alliances',judging:'Judging',rankings:'Rankings','lost-found':'Lost & Found'}[view] || 'Other');
+  const activityScreen = showCommandCenter ? 'Command Center' : showEventSettings || showEvent ? 'Event Settings' : showFeatures || showUserGuide ? 'Features & Guide' : showFeedback || showFeedbackViewer ? 'Feedback' : showOnline ? 'Volunteer status' : ({matches:'Matches',teams:'Teams',rulebook:'Rules',robots:'Robots',alliances:isIQ?'Finals':'Alliances',judging:'Nominations',interviews:'Judging',rankings:'Rankings','lost-found':'Lost & Found'}[view] || 'Other');
   const liveAction = editing ? 'Editing violation' : logFor !== null ? 'Entering violation' : nominating ? 'Adding nomination' : showTMSync ? 'Importing event data' : openTeam ? 'Viewing team' : openMatch ? 'Viewing match' : openRobot ? 'Viewing robot photos' : 'Viewing';
   useLiveActivity({eventId,sessionId:leagueSessionId,name:meName,screen:activityScreen,activity:liveAction});
 
@@ -4473,7 +4473,8 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             { k: "robots", label: "Robots", Icon: Camera },
             ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])
           ] : isJudge ? [
-            { k: "judging", label: "Judging", Icon: Trophy },
+            { k: "judging", label: "Nominations", Icon: Trophy },
+            ...((adminUnlocked || isJudge) ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
             { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch }
           ] : [
             { k: "matches", label: "Matches", Icon: ListOrdered },
@@ -4481,7 +4482,8 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
             { k: "robots", label: "Robots", Icon: Camera },
             { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch },
-            { k: "judging", label: "Judging", Icon: Trophy },
+            { k: "judging", label: "Nominations", Icon: Trophy },
+            ...((adminUnlocked || isJudge) ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
             ...(adminUnlocked ? [{ k: "rankings", label: "Rankings", Icon: BarChart3 }] : [])
           ];
           navItems.push({ k: "lost-found", label: "Lost & Found", Icon: Flag });
@@ -4525,7 +4527,8 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           { k: "robots", label: "Robots", Icon: Camera },
           ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])
         ] : isJudge ? [
-          { k: "judging", label: "Judging", Icon: Trophy },
+          { k: "judging", label: "Nominations", Icon: Trophy },
+            ...((adminUnlocked || isJudge) ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
           { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch }
         ] : [
           { k: "matches", label: "Matches", Icon: ListOrdered },
@@ -4550,7 +4553,8 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           { k: "robots", label: "Robots", Icon: Camera },
           ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])
         ] : isJudge ? [
-          { k: "judging", label: "Judging", Icon: Trophy },
+          { k: "judging", label: "Nominations", Icon: Trophy },
+            ...((adminUnlocked || isJudge) ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
           { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch }
         ] : [
           { k: "teams", label: "Teams", Icon: Users },
@@ -4558,7 +4562,8 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
           { k: "robots", label: "Robots", Icon: Camera },
           { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch },
-          { k: "judging", label: "Judging", Icon: Trophy },
+          { k: "judging", label: "Nominations", Icon: Trophy },
+            ...((adminUnlocked || isJudge) ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
           ...(adminUnlocked ? [{ k: "rankings", label: "Rankings", Icon: BarChart3 }] : [])
         ];
         return (
@@ -4691,7 +4696,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       })()}
       <main id="workspace" tabIndex={-1} className="refos-workspace mx-auto px-4 pb-28 pt-4">
         <button type="button" onClick={() => {
-          setGuideArticleId(({ "lost-found": "lost-found", teams: "teams", matches: "matches", rulebook: "rules", robots: isEmcee ? "emcee-start" : "photos", alliances: "alliances", judging: "judging", rankings: "rankings" })[view] || "navigation");
+          setGuideArticleId(({ "lost-found": "lost-found", teams: "teams", matches: "matches", rulebook: "rules", robots: isEmcee ? "emcee-start" : "photos", alliances: "alliances", judging: "judging", interviews: "judging", rankings: "rankings" })[view] || "navigation");
           setShowUserGuide(true); setShowFeatures(true);
         }} className="min-h-[44px] mb-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 inline-flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600"><BookOpen size={17} aria-hidden="true" />Help with this section</button>
         {league && !league.isActiveSession && (
@@ -4711,7 +4716,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           {view === "awp" && <button onClick={() => { if (commandCenterChildOpen) return returnToCommandCenter(); setView("matches"); setQuery(""); }} className="refos-back-button mb-3" aria-label={commandCenterChildOpen ? "Back to Command Center" : "Back to Matches"}>
             <ChevronLeft size={18} /> Back
           </button>}
-          <p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: isIQ ? "IQ Teamwork Finals" : "Alliances & bracket", rankings: "Rankings"}[view] || "Event workspace"}</h2>
+          <p className="refos-eyebrow">EVENT WORKSPACE</p><h2>{{teams: "Team overview", matches: "Match center", robots: "Robot inspection", judging: "Nominations", interviews: "Judging", rulebook: "Rule library", awp: "Autonomous history", alliances: isIQ ? "IQ Teamwork Finals" : "Alliances & bracket", rankings: "Rankings"}[view] || "Event workspace"}</h2>
           <p className="refos-description">{{teams: "Find a team. Review its history. Keep your crew informed.", matches: "Your schedule, field activity, and match details in one place.", robots: "A shared visual reference for every robot.", judging: "Capture the moments that deserve recognition.", rulebook: "Find the right rule when you need it.", awp: "Review autonomous observations across the event.", alliances: isIQ ? "Ranked partnerships, one shared score, and finals results." : "Import official alliances, then follow the bracket to the final.", rankings: "Qualification standings and Skills Challenge scores."}[view]}</p></div>
           <span className="refos-role">{adminUnlocked ? (isDeveloper ? "Developer" : "Admin") : isInspection ? "Inspection" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
         </section>}
@@ -4720,7 +4725,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           <div><dt>Match schedule</dt><dd>{Object.keys(matches).length}<span> matches</span></dd></div>
           {!isJudge && !isEmcee && <div><dt>Shared log</dt><dd>{viols.length}<span> entries</span></dd></div>}
         </dl>}
-        {!openTeam&&!openMatch&&!openRobot&&['matches','teams','robots','judging'].includes(view)&&<EventOperations key={`${divisionId}:${leagueSessionId||''}:${view}`} eventId={eventId} sessionId={leagueSessionId} division={divisionId} divisions={divisionCatalog} area={view==='robots'?'robots':view==='judging'?'judging':'communication'} onRows={setOperationRows} teams={teams} canManage={adminUnlocked&&!highlanderDemoLocked} canInspect={!isJudge&&!isEmcee&&!highlanderDemoLocked} canJudge={isJudge&&!highlanderDemoLocked}/> }
+        {!openTeam&&!openMatch&&!openRobot&&['matches','teams','robots','interviews'].includes(view)&&<EventOperations key={`${divisionId}:${leagueSessionId||''}:${view}`} eventId={eventId} sessionId={leagueSessionId} division={divisionId} divisions={divisionCatalog} area={view==='robots'?'robots':view==='interviews'?'judging':'communication'} onRows={setOperationRows} teams={teams} canManage={adminUnlocked&&!highlanderDemoLocked} canInspect={!isJudge&&!isEmcee&&!highlanderDemoLocked} canJudge={isJudge&&!highlanderDemoLocked}/> }
         {view === 'matches' && <TmFieldActivity value={eventSettings?.tm_field_activity?.value} />}
         {!showCommandCenter&&!openTeam&&!openRobot&&!openMatch&&['robots','matches'].includes(view)&&<OfflineEventTools eventId={eventId} sessionId={leagueSessionId} division={divisionId} teams={teams} matches={matches} failed={failedSyncItems} onRetry={retryFailedSync}/>}
         {openTeam ? (
@@ -4745,8 +4750,9 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             onToggleFinalist={(award, team) => (isJudge ? toggleFinalist(award, team) : requireAdmin(() => toggleFinalist(award, team)))}
             onNominate={(award) => setNominating(award || "sportsmanship")} onDeleteNom={removeNomination}
             onExport={isEmcee ? undefined : () => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
-          {(adminUnlocked || isJudge) && <InterviewScheduler eventName={event?.name||'Event'} key={`${eventId}:${leagueSessionId || ""}`} eventId={eventId} sessionId={leagueSessionId || null} sessionName={league?.sessionName(leagueSessionId) || ""} teams={teams} matches={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone || 'UTC'} onSaveTimezone={adminUnlocked ? async zone => { const saved = await api.upsertEventSetting(eventId, 'event_timezone', {zone}); setEventSettings(prev=>({...prev,event_timezone:saved})); } : undefined}/>}
           </>
+        ) : view === "interviews" && (adminUnlocked || isJudge) ? (
+          <InterviewScheduler eventName={event?.name||'Event'} key={`${eventId}:${leagueSessionId || ""}`} eventId={eventId} sessionId={leagueSessionId || null} sessionName={league?.sessionName(leagueSessionId) || ""} teams={teams} matches={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone || 'UTC'} onSaveTimezone={adminUnlocked ? async zone => { const saved = await api.upsertEventSetting(eventId, 'event_timezone', {zone}); setEventSettings(prev=>({...prev,event_timezone:saved})); } : undefined}/>
         ) : view === "rulebook" ? (
           (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq" ? <IQRules /> : <RuleBook rules={rules} online={online} accent={brand.accent}
             qaUrl={officialResourcesFor(eventSettings?.rules_template?.value?.ruleset).qaUrl} />
@@ -4837,7 +4843,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         </div>
       </main>
 
-      {!highlanderDemoLocked && !isInspection && !footerVisible && !openTeam && !openMatch && !openRobot && view !== "judging" && view !== "matches" && !isEmcee && (
+      {!highlanderDemoLocked && !isInspection && !footerVisible && !openTeam && !openMatch && !openRobot && view !== "judging" && view !== "interviews" && view !== "matches" && !isEmcee && (
         <button onClick={() => setLogFor("")} className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] sm:bottom-5 left-1/2 -translate-x-1/2 z-50 sm:z-20 bg-[#D7212B] text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
           <Plus size={20} /> Log violation
         </button>
