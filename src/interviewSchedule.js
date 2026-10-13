@@ -41,3 +41,7 @@ export function addInterviewSlots(existing,teams,start,minutes,panel,buffer=0,gr
  const issue=validateInterviews(next,length);if(issue)throw Error(issue);
  return next;
 }
+export function formatInterviewDisplay(iso,zone='UTC'){
+ if(!Number.isFinite(Date.parse(iso)))return 'Time unavailable';
+ return new Intl.DateTimeFormat('en-US',{timeZone:zone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit',hour12:true}).format(new Date(iso));
+}

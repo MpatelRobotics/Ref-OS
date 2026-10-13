@@ -2,7 +2,7 @@ import React,{useState} from 'react';
 import {optimizerSchedulePDF} from '../interviewOptimizerExport';
 import {downloadFile} from '../eventArchive';
 import {optimizeJudgeGroups} from '../interviewOptimizer';
-import {interviewTimeToUTC,localInterviewTime} from '../interviewSchedule';
+import {interviewTimeToUTC,formatInterviewDisplay} from '../interviewSchedule';
 
 export default function InterviewOptimizer({teams,entries,matches,zone,disabled,onApply,eventName,sessionName,onSave,canSave}) {
  const [selected,setSelected]=useState([]),[start,setStart]=useState(''),[duration,setDuration]=useState(10),[buffer,setBuffer]=useState(0),[panel,setPanel]=useState('Judge panel 1');
@@ -31,9 +31,9 @@ export default function InterviewOptimizer({teams,entries,matches,zone,disabled,
  {error&&<p role="alert" className="text-red-700 dark:text-red-300">{error}</p>}
  {proposal&&<div className="space-y-3">{!current&&<p role="status">Inputs changed. Generate a new proposal before applying it.</p>}<p role="status">{proposal.entries.length} interviews proposed · {proposal.teamsWithTimes} selected teams have known match times.</p>
  <div className="space-y-2">{proposal.groups.map(g=><div key={g.name} className="rounded border p-2"><b>{g.name} · {g.teams.length} teams</b><p className="text-sm break-words">{g.teams.join(', ')||'No teams assigned'}</p>{g.unplaced?.length>0&&<p className="text-sm text-amber-800 dark:text-amber-300">Not fitted: {g.unplaced.join(', ')}</p>}</div>)}</div>
- <ol className="space-y-2">{proposal.entries.map((r,i)=><li key={r.id} className="rounded border p-2 break-words"><b>{i+1}. {r.team}</b> · {teams.find(t=>t.number===r.team)?.name||'Team'}<p>{localInterviewTime(r.start,zone).replace('T',' ')} – {localInterviewTime(new Date(Date.parse(r.start)+Number(r.minutes)*60000).toISOString(),zone).slice(11)} · {r.panel} · {r.group}</p></li>)}</ol>
+ <ol className="space-y-2">{proposal.entries.map((r,i)=><li key={r.id} className="rounded border p-2 break-words"><b>{i+1}. {r.team}</b> · {teams.find(t=>t.number===r.team)?.name||'Team'}<p>{formatInterviewDisplay(r.start,zone)} – {formatInterviewDisplay(new Date(Date.parse(r.start)+Number(r.minutes)*60000).toISOString(),zone)} · {r.panel} · {r.group}</p></li>)}</ol>
  {proposal.unplaced.length>0&&<p className="text-amber-800 dark:text-amber-300">Could not fit: {proposal.unplaced.join(', ')}. Extend the time window or add panels and regenerate.</p>}
- <button type="button" disabled={disabled||!current||!proposal.entries.length} onClick={()=>{setApplied({...proposal,...metadata});onApply(proposal.entries);setSelected([]);setProposal(null);}} className="min-h-[44px] rounded bg-sky-800 px-3 text-white">Apply proposal to draft</button><p className="text-sm">Applying adds these interviews to your draft. Use Save interview schedule to share them with staff.</p></div>}
+ <button type="button" disabled={disabled||!current||!proposal.entries.length} onClick={()=>{setApplied({...proposal,...metadata});onApply(proposal.entries,proposal.groups);setSelected([]);setProposal(null);}} className="min-h-[44px] rounded bg-sky-800 px-3 text-white">Apply proposal to draft</button><p className="text-sm">Applying adds these interviews to your draft. Use Save interview schedule to share them with staff.</p></div>}
  {exportable&&<div className="space-y-2"><button type="button" disabled={disabled} className="min-h-[44px] rounded border px-3" onClick={async()=>{try{downloadFile(await optimizerSchedulePDF(exportable),'optimized-interview-schedule.pdf','application/pdf');setError('');}catch(e){setError('Could not export the optimizer schedule. Try again.');}}}>Export optimizer schedule PDF</button><p className="text-sm">Exports the most recent generated or applied optimizer proposal. Later manual edits are available in the judging handover export.</p></div>}
  <button type="button" disabled={disabled||!canSave} onClick={onSave} className="min-h-[44px] rounded bg-sky-800 px-3 text-white">Save optimized schedule</button><p className="text-sm">Shares the current interview draft, including any changes made in the Interview Scheduler.</p>
  </div></details>;

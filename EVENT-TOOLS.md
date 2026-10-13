@@ -67,3 +67,11 @@ TM scheduled match times are also displayed in the match list and match details,
 Navigation: **Nominations** contains award nominations and finalists. **Judging** contains judge-group assignments, Interview Scheduler and the separate Interview Optimizer dropdown. Judging retains Admin/Judge Advisor access.
 
 The optimizer now asks for **Number of judge groups** and displays all group-name fields together. Selected unscheduled teams are split in numeric team order across those groups with a count difference of at most one. Each group gets its own numbered panel; match and lunch constraints are applied within each group. Teams that cannot fit remain assigned to their group and are listed as not fitted rather than silently reassigned. Existing interviews are preserved. Group assignments appear in the preview and PDF.
+
+## Judge-group access and interview timer
+
+Run `supabase/judge-groups.sql` after the existing interview and operations migrations. Save the optimized schedule first, then open **Judging → Judge-group logins** to create a separate code for each named group. Codes are shown only at creation; replacing or disabling a code revokes existing group sessions. Give a group its own code. It uses **Judge-group login** on the event sign-in page.
+
+This separate read-only portal shows the group's saved interview assignments, including assigned teams without a fitted interview, their imported match schedules, and live TM field activity. It does not grant Judge Advisor access or access to nominations. It refreshes every 15 seconds while open, and requires the TM connector to publish live activity. Stale or unavailable activity is labeled; judges should confirm actual team availability. Group sessions last 12 hours. The code is event-scoped and covers that named group's saved league-session assignments.
+
+Display and PDF times use 12-hour AM/PM formatting; native date/time entry controls follow the device's locale. **Show interview timer** opens a screen-wide countdown using that interview's duration, with Start/resume, Pause, Reset and Close. Device fullscreen is offered where supported. Timer state stays on the judge's device; closing it or reloading does not mark the interview complete. Assigned teams without an interview use the schedule's default duration.

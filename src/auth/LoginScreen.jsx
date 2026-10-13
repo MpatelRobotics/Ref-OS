@@ -1,3 +1,4 @@
+import JudgeGroupPortal from '../components/JudgeGroupPortal';
 import React, { useEffect, useState } from "react";
 import * as api from "../api";
 import { APP_VERSION } from "../appVersion";
@@ -16,6 +17,7 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
   const highlander = profile.highlander;
   const accent = profile.accent;
   const showShortName = profile.hasSavedShortName && profile.shortName.toLowerCase() !== profile.name.toLowerCase();
+  const [groupPortal,setGroupPortal]=useState(false);
   const [mode, setMode] = useState("code");
   const [pw, setPw] = useState("");
   const [code, setCode] = useState("");
@@ -111,6 +113,7 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
     await finishServerLogin(clean);
   };
 
+  if(groupPortal)return <JudgeGroupPortal eventId={eventId} eventName={eventName} onClose={()=>setGroupPortal(false)}/>;
   return (
     <div className="refos-safe-login min-h-screen bg-[#F4F6FA] text-[#11172F] grid place-items-center p-6 font-sans">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white px-6 py-7 sm:px-8 shadow-[0_24px_70px_rgba(15,23,42,0.12)] overflow-hidden relative">
@@ -222,6 +225,7 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
             </button>
           </>
         )}
+        <button type="button" onClick={()=>setGroupPortal(true)} className="w-full mt-4 min-h-[44px] rounded-lg border px-4 py-3 font-semibold">Judge-group login</button>
         <button type="button" onClick={signInDeveloperPasskey} disabled={checkingCode||unlocking} className="w-full mt-4 min-h-[44px] rounded-lg border border-slate-300 px-4 py-3 font-semibold text-[#11172F] disabled:opacity-50">Sign in as Developer with passkey</button>
         <button onClick={onChooseEvent} className="w-full mt-5 rounded-lg border border-slate-300 px-4 py-2.5 font-semibold text-[#11172F]">Choose or configure an event</button>
         {canEmergencyDelete && (
