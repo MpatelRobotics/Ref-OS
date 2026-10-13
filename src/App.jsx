@@ -1360,6 +1360,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
   const [deletedIds, setDeletedIds] = useState(() => new Set());
   const [archivedNotice, setArchivedNotice] = useState("");
   const activeEvents = events.filter((ev) => !ev.archivedAt && !deletedIds.has(ev.id));
+  const selectorEvents = developerPage ? events.filter(ev => !deletedIds.has(ev.id)) : activeEvents;
   const archivedEvents = events.filter((ev) => ev.archivedAt && !deletedIds.has(ev.id))
     .sort((a, b) => new Date(b.archivedAt).getTime() - new Date(a.archivedAt).getTime());
 
@@ -1552,10 +1553,10 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 space-y-3">
         {loading && <p className="text-center text-slate-500 py-8">Loading events…</p>}
         {!loading && error && <p className="text-center text-red-600 py-5">{error}</p>}
-        {!loading && !error && activeEvents.length === 0 && (
+        {!loading && !error && selectorEvents.length === 0 && (
           <p className="text-center text-slate-500 py-8">No active Ref OS events are available.</p>
         )}
-        {!loading && !error && activeEvents.map((ev) => {
+        {!loading && !error && selectorEvents.map((ev) => {
           const profile = resolveEventBranding(ev.id, ev, ev.branding);
           const showShort = profile.hasSavedShortName && profile.shortName.toLowerCase() !== profile.name.toLowerCase();
           const branded = profile.accentSource !== "default";
@@ -1565,7 +1566,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
               style={branded ? { borderLeftWidth: 4, borderLeftColor: profile.accent } : undefined}>
               <EventLogo src={profile.logo} fallback={profile.highlander ? "/logo.svg" : "/refos-logo.svg"} className="w-12 h-12 object-contain rounded-lg shrink-0" />
               <span className="min-w-0 flex-1">
-                <span className="block font-semibold text-slate-900 dark:text-white truncate">{profile.name}</span>
+                <span className="block font-semibold text-slate-900 dark:text-white truncate">{profile.name}{ev.archivedAt ? ' · Archived' : ''}</span>
                 <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
                   {ev.format === "league"
                     ? <><span className="font-semibold text-slate-700 dark:text-slate-200">League</span>{ev.activeSessionName ? ` • ${ev.activeSessionName} Active` : " • No session active"}{showShort ? ` · ${profile.shortName}` : ""}</>
@@ -1577,7 +1578,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
           );
         })}
       </div>
-        {!loading && !error && (
+        {!developerPage && !loading && !error && (
           <button type="button" onClick={() => { setView("archived"); setNotice(""); }}
             className="w-full mt-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300">
             Archived Events ({archivedEvents.length})
