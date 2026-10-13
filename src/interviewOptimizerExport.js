@@ -10,7 +10,7 @@ export async function optimizerSchedulePDF(plan){
  if(plan.groups){line('GROUP ASSIGNMENTS');for(const g of plan.groups){line(`${g.name} (${g.teams.length} teams): ${g.teams.join(', ')||'No teams'}`);if(g.unplaced?.length)line(`Not fitted in this group: ${g.unplaced.join(', ')}`);}line('');}
  for(const section of groupOptimizerEntries(plan.entries)){
  line(`JUDGE GROUP: ${section.name}`);line(`Teams: ${section.entries.map(r=>r.team).join(', ')}`);line('');
- section.entries.forEach((r,i)=>{line(`${i+1}. Team ${r.team}${plan.teamNames?.[r.team]?` - ${plan.teamNames[r.team]}`:''}`);line(`${formatInterviewDisplay(r.start,plan.zone)} to ${formatInterviewDisplay(new Date(Date.parse(r.start)+r.minutes*60000).toISOString(),plan.zone)} | ${r.panel}`);line(`Interview: ${r.minutes} min | Buffer: ${r.buffer||0} min`);
+ section.entries.forEach((r,i)=>{line(`${i+1}. Team ${r.team}${plan.teamNames?.[r.team]?` - ${plan.teamNames[r.team]}`:''}`);line(`${formatInterviewDisplay(r.start,plan.zone)} to ${formatInterviewDisplay(new Date(Date.parse(r.start)+r.minutes*60000).toISOString(),plan.zone)}`);line(`Interview: ${r.minutes} min | Buffer: ${r.buffer||0} min`);
  const window=interviewMatchWindow(r,plan.matches||[]);const ref=m=>`${interviewMatchLabel(m)} (scheduled ${formatInterviewDisplay(m.scheduledAt,plan.zone)})`;
  line(`After match: ${window.after?ref(window.after):window.known?'No earlier scheduled match':'Unknown - match times unavailable'}`);
  line(`Before match: ${window.before?ref(window.before):window.known?'No later scheduled match':'Unknown - match times unavailable'}`);

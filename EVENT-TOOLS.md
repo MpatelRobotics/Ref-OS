@@ -87,3 +87,7 @@ Manual TM match schedule CSV/JSON imports now populate the same scoped `tm_match
 New judge-group codes use number–letter–number–letter–number, such as 3A7B2. Run the updated `supabase/judge-groups.sql` again, then Create / replace code for each group to get the shorter format. Existing longer codes remain valid until replaced. Replacing a code revokes existing group sessions. Failed-login throttling remains in effect.
 
 TM **MatchStartTimes.csv** is now recognized as a times-only export. Import the team/match list first, then select this file with the existing match schedule import. It matches labels such as Q1 to matches in the selected division/session and updates only their scheduled times. The Unix timestamp column takes priority over the duplicate formatted Time Scheduled column. Time Started and Time Resumed do not become scheduled times or live status. Unmatched labels are reported and skipped; no teams, matches or scores are created/changed by this times-only import. Import the full match list and time file separately if the package importer reports duplicate match categories.
+
+The optimizer panel/location field has been removed. Each judge group name is now its panel/location in the saved schedule and export.
+
+Interview locations are no longer displayed or requested. Judge group names identify assignments in the optimizer, saved interviews, judge portal and PDF.
