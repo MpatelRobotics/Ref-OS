@@ -1,3 +1,4 @@
+import ScheduledMatchTime from './components/ScheduledMatchTime';
 import { eliminationPairingKey, eliminationPairingLabel, eliminationResultLabel } from './tmReplayGrouping.js';
 import { tmPairingNumber, tmGameNumber, tmMatchOrder } from './tmMatchIdentity.js';
 import {planScoreUpdates} from "./vexScoreSync.js";
@@ -4726,7 +4727,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={isIQ ? undefined : teamRecords[openTeam]}
             onLog={highlanderDemoLocked ? undefined : () => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked && !highlanderDemoLocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : openMatch ? (
-          isIQ ? <IQMatchDetail key={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols} fieldLog={fieldLog} canEdit={adminUnlocked && !highlanderDemoLocked} onSaveScore={saveIQScore} onLogTeam={!isEmcee && !isJudge ? number => { const m=matches[openMatch]; setLogFor(number); setLogMatch({phase:m.phase,num:m.num}); } : null} onAddField={!isEmcee && !isJudge ? addFieldLog : null} /> : <MatchDetail tmActivity={eventSettings?.tm_field_activity?.value} match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
+          isIQ ? <IQMatchDetail key={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols} fieldLog={fieldLog} canEdit={adminUnlocked && !highlanderDemoLocked} onSaveScore={saveIQScore} onLogTeam={!isEmcee && !isJudge ? number => { const m=matches[openMatch]; setLogFor(number); setLogMatch({phase:m.phase,num:m.num}); } : null} onAddField={!isEmcee && !isJudge ? addFieldLog : null} /> : <MatchDetail tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
             fieldLog={fieldLog} fieldResetChecks={fieldResetChecks} onVerifyFieldReset={verifyFieldResetQuadrant} onResetFieldReset={resetFieldResetMatch}
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={highlanderDemoLocked ? undefined : (n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} emcee={isEmcee} />
@@ -4735,7 +4736,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         ) : view === "lost-found" ? (
           <LostFoundBoard embedded key={eventId} eventId={eventId} eventName={event?.name || "Current event"} meName={meName} canManage={adminUnlocked}/>
         ) : view === "matches" ? (
-          isIQ ? <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} parseCSV={parseCSV} /> : <MatchList tmActivity={eventSettings?.tm_field_activity?.value} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
+          isIQ ? <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} parseCSV={parseCSV} /> : <MatchList tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
           <><RobotCheckIn teams={teams} checkIn={eventSettings?.tm_check_in?.value} onOpen={setOpenRobot} /><RobotList followups={operationRows.filter(r=>r.kind==='inspection-followup'&&r.payload.status==='open'&&(r.session_id||null)===(leagueSessionId||null)&&(r.division_id===0||r.division_id===divisionId))} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} /></>
         ) : view === "judging" ? (
@@ -5839,7 +5840,7 @@ function RulePicker({ ruleDetails, onSetRuleDetails, rules, knownRules, eventId,
 
 /* ============================ ADD TEAM MODAL ============================ */
 
-function MatchList({ tmActivity, matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
+function MatchList({ tmTimes=[], eventTimezone='UTC', tmActivity, matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
   const [field, setField] = useState("all");
   const [liveNow, setLiveNow] = useState(Date.now);
   useEffect(() => { const timer = setInterval(() => setLiveNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
@@ -5937,6 +5938,7 @@ function MatchList({ tmActivity, matches, teamName, teamRank = {}, viols, fieldL
                   <span className="text-slate-300 dark:text-slate-400 font-sans">vs</span>
                   <span className="text-blue-700 dark:text-blue-300 font-semibold">{m.blue.join("  ")}</span>
                 </div>
+                <ScheduledMatchTime match={m} times={tmTimes} zone={eventTimezone}/>
                 {liveHighlights[m.id] && <span className={`text-xs font-semibold shrink-0 ${liveHighlights[m.id] === 'current' ? 'text-emerald-800 dark:text-emerald-200' : 'text-amber-800 dark:text-amber-200'}`}>{liveHighlights[m.id] === 'current' ? 'Playing now' : 'Up next'}</span>}
                 {m.field && <span className="text-[11px] text-slate-400 shrink-0">{fieldDisplayName(m.field, fieldNames)}</span>}
                 {m.redScore != null && m.blueScore != null && (
@@ -6055,7 +6057,7 @@ function AwpChecker({ onSave }) {
 
 const REPLAY_REASONS = ["Field fault", "Scoring or timer issue", "Match started incorrectly", "Safety interruption", "External interference", "Other"];
 
-function MatchDetail({ tmActivity, match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, canManageViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
+function MatchDetail({ tmTimes=[], eventTimezone='UTC', tmActivity, match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, canManageViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
   const [toOpen, setToOpen] = useState(false);
   const [toAlliance, setToAlliance] = useState("red");
   const [toTeam, setToTeam] = useState("");
@@ -6210,6 +6212,7 @@ function MatchDetail({ tmActivity, match, matches, teamName, teamRank = {}, team
         )}
       </div>
 
+      <div className="mb-3"><ScheduledMatchTime match={m} times={tmTimes} zone={eventTimezone}/></div>
       {/* Match readiness: one-glance operational status for the Head Ref. */}
       <div className="mb-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
         <div className="flex items-center justify-between gap-2 mb-2.5">

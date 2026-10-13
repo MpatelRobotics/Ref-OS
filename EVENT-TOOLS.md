@@ -61,3 +61,5 @@ The heuristic selects the earliest feasible interview, giving priority to teams 
 Review the proposal, then **Apply proposal to draft** and **Save optimized schedule**. Changing inputs invalidates the proposal. **Export optimizer schedule PDF** exports the generated/applied proposal separately, including lunch settings and unplaced teams. Later manual edits belong in the existing judging handover export. No additional database migration is required for the optimizer. These settings are local planning inputs, not shared event lunch rules.
 
 Optimizer PDFs list teams under judge-group headings (or Unassigned judge group), with interviews sorted by time inside each group. Each team has After match / Before match references based on its nearest known scheduled matches. References are not live completion promises; missing times are marked unknown.
+
+TM scheduled match times are also displayed in the match list and match details, using the event timezone. Times appear only when the imported match identity and team assignments agree. Scheduled times are not actual start times.
