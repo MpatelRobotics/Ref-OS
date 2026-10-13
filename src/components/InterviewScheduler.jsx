@@ -1,12 +1,13 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import useUnsavedWork from '../unsavedWork';
+import InterviewOptimizer from './InterviewOptimizer';
 import {matchInterviewConflicts,suggestInterview} from '../interviewPlanning';
 import {PDFDocument,StandardFonts} from 'pdf-lib';
 import {downloadFile} from '../eventArchive';
 import * as scheduleApi from '../interviewScheduleApi';
 import {addInterviewSlots,localInterviewTime,interviewTimeToUTC,validateInterviews} from '../interviewSchedule';
 
-export default function InterviewScheduler({eventId,sessionId=null,sessionName='',teams,eventTimezone='UTC',onSaveTimezone,matches=[],api=scheduleApi}) {
+export default function InterviewScheduler({eventId,sessionId=null,sessionName='',teams,eventTimezone='UTC',eventName='Event',onSaveTimezone,matches=[],api=scheduleApi}) {
  const [entries,setEntries]=useState([]),[duration,setDuration]=useState(10),[start,setStart]=useState(''),[panel,setPanel]=useState('Judge panel 1'),[selected,setSelected]=useState([]);
  const [loaded,setLoaded]=useState(false),[busy,setBusy]=useState(false),[dirty,setDirty]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
  const [buffer,setBuffer]=useState(0),[group,setGroup]=useState('');
@@ -35,7 +36,7 @@ export default function InterviewScheduler({eventId,sessionId=null,sessionName='
  const issue=validateInterviews(entries,duration);
  const save=async()=>{if(flight.current||issue)return;flight.current=true;setBusy(true);setError('');try{const result=await api.saveInterviewSchedule(eventId,sessionId,{duration:Number(duration),entries},version.current);version.current=result.version;setDirty(false);localStorage.removeItem(draftKey);setMessage('Interview schedule saved for staff in this event/session.');}catch(e){setError(e.message);}finally{flight.current=false;setBusy(false);}};
  const scheduled=new Set(entries.map(entry=>entry.team));
- return <details aria-label="Experimental Interview Scheduler" className="group mb-5 rounded-xl border border-amber-300 bg-white p-4 dark:bg-slate-800">
+ return <><details aria-label="Experimental Interview Scheduler" className="group mb-5 rounded-xl border border-amber-300 bg-white p-4 dark:bg-slate-800">
   <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-3 rounded-lg font-bold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sky-700 [&::-webkit-details-marker]:hidden"><span>Interview Scheduler <span className="rounded bg-amber-100 px-2 py-1 text-sm text-amber-900">Experimental</span>{dirty&&<span className="ml-2 text-sm font-normal">Unsaved changes</span>}</span><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5 shrink-0 group-open:rotate-180"><path d="m6 9 6 6 6-6"/></svg></summary>
   <div className="mt-4 space-y-4">
   <div><p className="text-sm">Shared with Admin and Judge Advisor only. {sessionName?`Schedule for ${sessionName}. `:''}Review times before using them. Match warnings use imported TM scheduled times with a ten-minute planning margin either side; they cannot cover matches without a scheduled time. Review suggestions before rescheduling. No invitations or notifications are sent.</p></div>
@@ -55,5 +56,7 @@ export default function InterviewScheduler({eventId,sessionId=null,sessionName='
   {loaded&&!entries.length&&<p>No interviews scheduled yet.</p>}
   <div className="flex flex-wrap gap-3"><button type="button" disabled={!loaded||busy||!dirty||Boolean(issue)} onClick={save} className="min-h-[44px] rounded-lg bg-sky-800 px-4 text-white">{busy?'Working…':'Save interview schedule'}</button><button type="button" disabled={busy} onClick={reload} className="min-h-[44px] rounded-lg border px-3">Reload saved schedule</button>{dirty&&<span className="self-center text-sm">Unsaved changes · Save before leaving Judging</span>}</div>
   </div>
- </details>;
+ </details>
+  <InterviewOptimizer eventName={eventName} sessionName={sessionName} teams={teams} entries={entries} matches={matches} zone={zone} onSave={save} canSave={dirty&&!issue} disabled={!loaded||busy} onApply={proposal=>{setEntries(old=>[...old,...proposal]);setSelected([]);changed();setMessage('Interview proposal added to your draft. Save to share it with staff.');}}/>
+ </>;
 }

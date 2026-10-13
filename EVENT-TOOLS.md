@@ -49,3 +49,13 @@ node --test tests/event-operations-sql.test.mjs tests/interview-scheduler.test.m
 npx playwright test tests/event-tools.spec.js tests/event-operations-ui.spec.js tests/interview-scheduler.spec.js --project=chromium
 npm run mobile:sync
 ```
+
+## Interview optimizer
+
+In Judging, open the separate **Interview Optimizer** dropdown. It has its own team selection, first interview time, length, buffer, panel/location, end time and panel count. The Interview Scheduler can stay closed. Multiple panels use the panel/location name as a numbered prefix.
+
+**Use lunch block** enables lunch start/end times. With **Interview during lunch only** off, interviews and their buffers avoid lunch. With it on, new interviews and buffers must fit completely within lunch. Existing interviews are preserved and are not automatically moved.
+
+The heuristic selects the earliest feasible interview, giving priority to teams whose next known match leaves less room. It respects existing panel reservations and imported match times with the existing ten-minute margin. Without match times, it falls back to team-number order. It is not a guarantee of the globally best schedule. Unplaced teams are listed; extend the window or add panels to fit more teams.
+
+Review the proposal, then **Apply proposal to draft** and **Save optimized schedule**. Changing inputs invalidates the proposal. **Export optimizer schedule PDF** exports the generated/applied proposal separately, including lunch settings and unplaced teams. Later manual edits belong in the existing judging handover export. No additional database migration is required for the optimizer. These settings are local planning inputs, not shared event lunch rules.
