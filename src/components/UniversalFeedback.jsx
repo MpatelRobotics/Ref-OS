@@ -1,7 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import FeedbackViewer from './FeedbackViewer';
 import * as api from '../api';
-export default function UniversalFeedback({ events = [], onClose, listFeedback = api.listUniversalFeedback, claimAccess = api.claimEventAccess, saveStatus = api.setUniversalFeedbackStatus }) {
+export default function UniversalFeedback({ events = [], isDeveloper = false, onClose, listFeedback = api.listUniversalFeedback, claimAccess = api.claimEventAccess, saveStatus = api.setUniversalFeedbackStatus }) {
  const [verified,setVerified]=useState(false);
  const [code,setCode]=useState('');
  const [authEvent,setAuthEvent]=useState(events.find(e=>!e.archivedAt)?.id || '');
@@ -12,6 +12,7 @@ export default function UniversalFeedback({ events = [], onClose, listFeedback =
    const rows=await listFeedback();setEntries(rows);
    return rows.map(r=>({feedback_id:r.id,status:r.status}));
  },[listFeedback]);
+ useEffect(()=>{if(!isDeveloper)return;let active=true;load().then(()=>{if(active)setVerified(true);}).catch(()=>{if(active)setError('Could not load feedback. Developer access and a connection are required.');});return()=>{active=false;};},[isDeveloper,load]);
  const signIn=async(e)=>{
    e.preventDefault();if(busy)return;setBusy(true);setError('');
    try {

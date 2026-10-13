@@ -76,6 +76,7 @@ import FeedbackModal from "./components/modals/FeedbackModal.jsx";
 import FeedbackViewer from "./components/FeedbackViewer.jsx";
 import { submitFeedbackScreenshots } from "./feedbackScreenshots";
 import UniversalFeedback from "./components/UniversalFeedback.jsx";
+import DeveloperPageLock from "./components/DeveloperPageLock.jsx";
 import LostFoundBoard from "./components/LostFoundBoard.jsx";
 import InterviewScheduler from "./components/InterviewScheduler.jsx";
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
@@ -1342,6 +1343,8 @@ const formatEventDate = (value) => {
 };
 
 const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, initialNotice = "" }) => {
+  const developerPage = new URLSearchParams(window.location.search).get('page') === 'developer' || new URLSearchParams(window.location.search).get('open') === 'universal-feedback';
+  const [developerPageUnlocked, setDeveloperPageUnlocked] = useState(false);
   const [liveActivityOpen,setLiveActivityOpen] = useState(false);
   const [universalFeedbackOpen, setUniversalFeedbackOpen] = useState(()=>new URLSearchParams(window.location.search).get("open") === "universal-feedback");
   const [creating, setCreating] = useState(false);
@@ -1465,8 +1468,12 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{view === "archived" ? "Archived events keep all of their data. An event Admin can restore one." : "Select the event this device is working at."}</p>
       </div>
-      {liveActivityOpen ? <DeveloperLiveActivity events={events} onClose={()=>setLiveActivityOpen(false)}/> : <button type="button" onClick={()=>setLiveActivityOpen(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 bg-white dark:bg-slate-800 p-3 font-semibold">Live user activity · Developer only</button>}
-      {universalFeedbackOpen ? <UniversalFeedback events={events} onClose={()=>setUniversalFeedbackOpen(false)}/> : <button type="button" onClick={()=>setUniversalFeedbackOpen(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 bg-white dark:bg-slate-800 p-3 font-semibold">Universal Feedback · Developer only</button>}
+      {developerPage && !developerPageUnlocked ? <DeveloperPageLock events={events} onUnlock={()=>setDeveloperPageUnlocked(true)}/> : <>
+      {developerPage && <>
+      <a href="/" className="inline-flex items-center min-h-[44px] mb-3 font-semibold text-slate-600 dark:text-slate-300">Back to main page</a>
+      {liveActivityOpen ? <DeveloperLiveActivity isDeveloper events={events} onClose={()=>setLiveActivityOpen(false)}/> : <button type="button" onClick={()=>setLiveActivityOpen(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 bg-white dark:bg-slate-800 p-3 font-semibold">Live user activity · Developer only</button>}
+      {universalFeedbackOpen ? <UniversalFeedback isDeveloper events={events} onClose={()=>setUniversalFeedbackOpen(false)}/> : <button type="button" onClick={()=>setUniversalFeedbackOpen(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 bg-white dark:bg-slate-800 p-3 font-semibold">Universal Feedback · Developer only</button>}
+      </>}
       {!universalFeedbackOpen && <>
       {notice && view === "active" && (
         <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">{notice}</div>
@@ -1631,6 +1638,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
       )}
       </>}
       <p className="text-xs text-center text-slate-400 mt-4">Ref OS 2.0 · Event Selector</p>
+      </>}
       {deleteTarget && (
         <DeleteEventModal event={deleteTarget} profile={resolveEventBranding(deleteTarget.id, deleteTarget, deleteTarget.branding)}
           onDelete={deletePermanently} onClose={() => setDeleteTarget(null)} />
