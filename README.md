@@ -197,6 +197,8 @@ Windows continues while minimized and hides in the tray when its window is close
 
 See [TM API setup](TM-API-SETUP.md) and [Android download setup](mobile/ANDROID-DOWNLOAD.md). Developer credential **values must never appear in this README, source code, build logs or release files**. Store them only in server-side secrets; event keys remain in connector memory.
 
+Developer login also supports passkeys after server setup. See [Developer passkey setup](DEVELOPER-PASSKEYS.md) for Windows Hello enrollment, deployment, recovery and revocation. The Developer code remains a fallback.
+
 
 ---
 

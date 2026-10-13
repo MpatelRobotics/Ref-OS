@@ -1,0 +1,40 @@
+import { test, expect } from '@playwright/test';
+import { generateRegistrationOptions, generateAuthenticationOptions, verifyRegistrationResponse, verifyAuthenticationResponse } from '@simplewebauthn/server';
+
+test('Developer passkey registers and signs in through a verified WebAuthn ceremony', async ({page,context}) => {
+ const session=await context.newCDPSession(page);
+ await session.send('WebAuthn.enable');
+ await session.send('WebAuthn.addVirtualAuthenticator',{options:{protocol:'ctap2',transport:'internal',hasResidentKey:true,hasUserVerification:true,isUserVerified:true,automaticPresenceSimulation:true}});
+ let challenge, credential, registrations=0, authentications=0;
+ await page.route('https://example.supabase.co/functions/v1/refos-developer-passkey',async route=>{
+  const body=route.request().postDataJSON();
+  let reply;
+  if(body.action==='register-options'){
+   expect(body.credential).toBe('test-code');
+   const options=await generateRegistrationOptions({rpName:'Ref OS',rpID:'localhost',userName:'Developer',authenticatorSelection:{residentKey:'required',userVerification:'required'}});
+   challenge=options.challenge;reply={options,challengeId:'registration'};
+  }else if(body.action==='register-verify'){
+   expect(body.challengeId).toBe('registration');
+   const verified=await verifyRegistrationResponse({response:body.response,expectedChallenge:challenge,expectedOrigin:'http://localhost:4173',expectedRPID:'localhost',requireUserVerification:true});
+   expect(verified.verified).toBe(true);credential=verified.registrationInfo.credential;registrations++;
+   // Invalid origin and challenge must never verify the same response.
+   await expect(verifyRegistrationResponse({response:body.response,expectedChallenge:'different',expectedOrigin:'http://localhost:4173',expectedRPID:'localhost'})).rejects.toThrow();
+   await expect(verifyRegistrationResponse({response:body.response,expectedChallenge:challenge,expectedOrigin:'https://wrong.example',expectedRPID:'localhost'})).rejects.toThrow();
+   reply={ok:true};
+  }else if(body.action==='authenticate-options'){
+   const options=await generateAuthenticationOptions({rpID:'localhost',userVerification:'required'});challenge=options.challenge;reply={options,challengeId:'authentication'};
+  }else{
+   const verified=await verifyAuthenticationResponse({response:body.response,expectedChallenge:challenge,expectedOrigin:'http://localhost:4173',expectedRPID:'localhost',requireUserVerification:true,credential});
+   expect(verified.verified).toBe(true);authentications++;reply={ok:true};
+  }
+  await route.fulfill({contentType:'application/json',body:JSON.stringify(reply)});
+ });
+ await page.route('**/passkey-test',route=>route.fulfill({contentType:'text/html',body:`<div id="root"></div><script type="module">import '/@vite/client';import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;const React=(await import('/node_modules/.vite/deps/react.js')).default;const DOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default;const View=(await import('/src/components/DeveloperPageLock.jsx')).default;window.unlocks=0;DOM.createRoot(document.getElementById('root')).render(React.createElement(View,{events:[{id:'event'}],onUnlock:()=>window.unlocks++}));</script>`}));
+ await page.goto('http://localhost:4173/passkey-test');
+ await page.getByLabel('Developer code').fill('test-code');
+ await page.getByRole('button',{name:'Set up fingerprint / passkey'}).click();
+ await expect.poll(()=>page.evaluate(()=>window.unlocks)).toBe(1);
+ await page.getByRole('button',{name:'Sign in with passkey'}).click();
+ await expect.poll(()=>page.evaluate(()=>window.unlocks)).toBe(2);
+ expect(registrations).toBe(1);expect(authentications).toBe(1);
+});
