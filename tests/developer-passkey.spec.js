@@ -1,6 +1,21 @@
 import { test, expect } from '@playwright/test';
 import { generateRegistrationOptions, generateAuthenticationOptions, verifyRegistrationResponse, verifyAuthenticationResponse } from '@simplewebauthn/server';
 
+test('Developer passkey page stays unlocked while active and locks after three idle minutes',async({page})=>{
+ await page.route(/\/src\/components\/DeveloperPageLock\.jsx(?:\?.*)?$/,route=>route.fulfill({contentType:'application/javascript',body:`import React from '/node_modules/.vite/deps/react.js';export default function Lock({onUnlock}){return React.createElement('button',{onClick:()=>onUnlock('passkey')},'Test passkey login');}`}));
+ await page.clock.install();
+ await page.goto('/?page=developer');
+ await page.getByRole('button',{name:'Test passkey login'}).click();
+ await expect(page.getByRole('button',{name:'Universal Feedback · Developer only'})).toBeVisible();
+ await page.clock.runFor(120000);
+ await page.getByRole('heading',{name:'Choose VEX Event'}).click();
+ await page.clock.runFor(179000);
+ await expect(page.getByRole('button',{name:'Test passkey login'})).toHaveCount(0);
+ await page.clock.runFor(1001);
+ await expect(page.getByRole('button',{name:'Test passkey login'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Universal Feedback · Developer only'})).toHaveCount(0);
+});
+
 test('Developer passkey registers and signs in through a verified WebAuthn ceremony', async ({page,context}) => {
  const session=await context.newCDPSession(page);
  await session.send('WebAuthn.enable');

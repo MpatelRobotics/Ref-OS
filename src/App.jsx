@@ -1345,6 +1345,20 @@ const formatEventDate = (value) => {
 const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, initialNotice = "" }) => {
   const developerPage = new URLSearchParams(window.location.search).get('page') === 'developer' || new URLSearchParams(window.location.search).get('open') === 'universal-feedback';
   const [developerPageUnlocked, setDeveloperPageUnlocked] = useState(false);
+  const [developerPasskeySession, setDeveloperPasskeySession] = useState(false);
+  useEffect(() => {
+    if (!developerPageUnlocked || !developerPasskeySession) return;
+    let lastActive = Date.now(), timer;
+    const lock = () => { setDeveloperPageUnlocked(false); setDeveloperPasskeySession(false); setLiveActivityOpen(false); setUniversalFeedbackOpen(false); };
+    const check = () => { clearTimeout(timer); const remaining = 180000 - (Date.now() - lastActive); if (remaining <= 0) lock(); else timer = setTimeout(check, remaining); };
+    const activity = () => { if (Date.now() - lastActive >= 180000) { lock(); return; } lastActive = Date.now(); check(); };
+    const visible = () => { if (!document.hidden) check(); };
+    const events = ['pointerdown', 'keydown', 'wheel', 'scroll'];
+    events.forEach(name => window.addEventListener(name, activity, { passive: true, capture: true }));
+    document.addEventListener('visibilitychange', visible);
+    check();
+    return () => { clearTimeout(timer); events.forEach(name => window.removeEventListener(name, activity, true)); document.removeEventListener('visibilitychange', visible); };
+  }, [developerPageUnlocked, developerPasskeySession]);
   const [liveActivityOpen,setLiveActivityOpen] = useState(false);
   const [universalFeedbackOpen, setUniversalFeedbackOpen] = useState(()=>new URLSearchParams(window.location.search).get("open") === "universal-feedback");
   const [creating, setCreating] = useState(false);
@@ -1469,7 +1483,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{view === "archived" ? "Archived events keep all of their data. An event Admin can restore one." : "Select the event this device is working at."}</p>
       </div>
-      {developerPage && !developerPageUnlocked ? <DeveloperPageLock events={events} onUnlock={()=>setDeveloperPageUnlocked(true)}/> : <>
+      {developerPage && !developerPageUnlocked ? <DeveloperPageLock events={events} onUnlock={method=>{setDeveloperPasskeySession(method==='passkey');setDeveloperPageUnlocked(true);}}/> : <>
       {developerPage && <>
       <a href="/" className="inline-flex items-center min-h-[44px] mb-3 font-semibold text-slate-600 dark:text-slate-300">Back to main page</a>
       {liveActivityOpen ? <DeveloperLiveActivity isDeveloper events={events} onClose={()=>setLiveActivityOpen(false)}/> : <button type="button" onClick={()=>setLiveActivityOpen(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 bg-white dark:bg-slate-800 p-3 font-semibold">Live user activity · Developer only</button>}

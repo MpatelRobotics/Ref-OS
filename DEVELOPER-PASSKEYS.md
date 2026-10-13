@@ -2,6 +2,8 @@
 
 The Developer page supports WebAuthn passkeys. Set up Windows Hello in Windows Settings first. Enter the Developer code on the Ref OS Developer login screen and choose **Set up fingerprint / passkey**. On later visits use **Sign in with passkey**. Windows Hello chooses fingerprint, face, or PIN; Ref OS cannot force fingerprint-only verification or access biometric data.
 
+After passkey sign-in, the Developer page locks after three minutes without clicks, typing or scrolling. Activity restarts the idle timer. This locks the page and stops its developer viewers; it does not revoke existing event sessions. Developer-code sign-ins retain their existing behavior.
+
 ## Server setup
 
 1. Run `supabase/developer-passkeys.sql` in the Supabase SQL Editor after `refos-2-developer-access.sql`.

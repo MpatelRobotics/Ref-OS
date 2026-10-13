@@ -7,7 +7,7 @@ export default function DeveloperPageLock({ events, onUnlock }) {
   const [code, setCode] = useState(''), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const usePasskey = async register => {
     if(busy)return;setBusy(true);setError('');
-    try { await developerPasskey(event,register?code:undefined);setCode('');onUnlock(); }
+    try { await developerPasskey(event,register?code:undefined);setCode('');onUnlock('passkey'); }
     catch(err) {setError(err.name==='NotAllowedError'?'Passkey request cancelled. Try again or use your Developer code.':err.message || 'Passkey unavailable. Use your Developer code.');}
     finally{setCode('');setBusy(false);}
   };
