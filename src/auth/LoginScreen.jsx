@@ -23,6 +23,7 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
   const [checkingCode, setCheckingCode] = useState(false);
   const signInDeveloperPasskey = async () => {
     if(checkingCode || unlocking)return;
+    if(!passkeysSupported()) { setErr(window.isSecureContext ? 'Passkeys are unavailable in this browser. Open https://www.ref-os.fyi in an updated Chrome, Edge or Safari browser.' : 'Passkeys require a secure connection. Open https://www.ref-os.fyi to sign in.'); return; }
     setCheckingCode(true);setErr('');
     try {
       await developerPasskey(eventId);
@@ -221,7 +222,7 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
             </button>
           </>
         )}
-        {passkeysSupported() && <button type="button" onClick={signInDeveloperPasskey} disabled={checkingCode||unlocking} className="w-full mt-4 min-h-[44px] rounded-lg border border-slate-300 px-4 py-3 font-semibold text-[#11172F] disabled:opacity-50">Sign in as Developer with passkey</button>}
+        <button type="button" onClick={signInDeveloperPasskey} disabled={checkingCode||unlocking} className="w-full mt-4 min-h-[44px] rounded-lg border border-slate-300 px-4 py-3 font-semibold text-[#11172F] disabled:opacity-50">Sign in as Developer with passkey</button>
         <button onClick={onChooseEvent} className="w-full mt-5 rounded-lg border border-slate-300 px-4 py-2.5 font-semibold text-[#11172F]">Choose or configure an event</button>
         {canEmergencyDelete && (
           <button type="button" onClick={() => setShowDelete(true)} className="block mx-auto mt-3 text-xs font-semibold text-red-600 hover:text-red-700 underline underline-offset-2">
