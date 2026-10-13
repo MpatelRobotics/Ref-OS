@@ -84,7 +84,7 @@ import UniversalFeedback from "./components/UniversalFeedback.jsx";
 import DeveloperPageLock from "./components/DeveloperPageLock.jsx";
 import DeveloperAccessManager from "./components/DeveloperAccessManager.jsx";
 import LostFoundBoard from "./components/LostFoundBoard.jsx";
-import InterviewScheduler from "./components/InterviewScheduler.jsx";
+import JudgingInterviews from "./components/JudgingInterviews.jsx";
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
 import HelpRequestModal from "./components/modals/HelpRequestModal.jsx";
 import manualQuickLinks from "./manualQuickLinks.json";
@@ -4752,7 +4752,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             onExport={isEmcee ? undefined : () => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
           </>
         ) : view === "interviews" && (adminUnlocked || isJudge) ? (
-          <InterviewScheduler eventName={event?.name||'Event'} key={`${eventId}:${leagueSessionId || ""}`} eventId={eventId} sessionId={leagueSessionId || null} sessionName={league?.sessionName(leagueSessionId) || ""} teams={teams} matches={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone || 'UTC'} onSaveTimezone={adminUnlocked ? async zone => { const saved = await api.upsertEventSetting(eventId, 'event_timezone', {zone}); setEventSettings(prev=>({...prev,event_timezone:saved})); } : undefined}/>
+          <JudgingInterviews eventName={event?.name||'Event'} key={`${eventId}:${leagueSessionId || ""}`} eventId={eventId} sessionId={leagueSessionId || null} sessionName={league?.sessionName(leagueSessionId) || ""} teams={teams} matches={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone || 'UTC'} onSaveTimezone={adminUnlocked ? async zone => { const saved = await api.upsertEventSetting(eventId, 'event_timezone', {zone}); setEventSettings(prev=>({...prev,event_timezone:saved})); } : undefined}/>
         ) : view === "rulebook" ? (
           (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq" ? <IQRules /> : <RuleBook rules={rules} online={online} accent={brand.accent}
             qaUrl={officialResourcesFor(eventSettings?.rules_template?.value?.ruleset).qaUrl} />
