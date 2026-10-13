@@ -38,11 +38,14 @@ revoke all on public.judge_group_credentials,public.judge_group_sessions from an
 
 create or replace function public.create_judge_group_code(p_event uuid,p_group text)
 returns text language plpgsql security definer set search_path=public,extensions as $$
-declare code text;
+declare code text;bytes bytea;
 begin
  if not public.has_event_role(p_event,array['admin','judge']) then raise exception 'Judge Advisor access required'; end if;
  if length(trim(p_group)) not between 1 and 100 or p_group is null then raise exception 'Enter a judge group name';end if;
- code=upper(encode(gen_random_bytes(8),'hex'));
+ loop
+ bytes=gen_random_bytes(5);code=(get_byte(bytes,0)%10)::text||chr(65+get_byte(bytes,1)%26)||(get_byte(bytes,2)%10)::text||chr(65+get_byte(bytes,3)%26)||(get_byte(bytes,4)%10)::text;
+ exit when not exists(select 1 from public.judge_group_credentials where event_id=p_event and code_hash=encode(digest(code,'sha256'),'hex'));
+ end loop;
  insert into public.judge_group_credentials(event_id,group_name,code_hash) values(p_event,trim(p_group),encode(digest(code,'sha256'),'hex'))
  on conflict(event_id,group_name) do update set code_hash=excluded.code_hash,enabled=true,generation=gen_random_uuid();
  return code;

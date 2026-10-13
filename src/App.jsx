@@ -1,3 +1,4 @@
+import {parseManualScheduledTime,mergeManualMatchTimes} from './manualTmTimes';
 import ScheduledMatchTime from './components/ScheduledMatchTime';
 import { eliminationPairingKey, eliminationPairingLabel, eliminationResultLabel } from './tmReplayGrouping.js';
 import { tmPairingNumber, tmGameNumber, tmMatchOrder } from './tmMatchIdentity.js';
@@ -343,7 +344,9 @@ function phaseFrom(roundVal, matchVal) {
 const _numFrom = (s) => { const m = String(s == null ? "" : s).match(/\d+/); return m ? Number(m[0]) : null; };
 
 // Returns { rows:[{phase,num,red,blue,field}], warnings:[] }
-function parseMatchesFile(text, filename = "") {
+function parseMatchesFile(text, filename = "", timeContext={}) {
+  const timingWarnings=[];let needsDate=false;
+  const readTime=(value,date)=>{try{return parseManualScheduledTime(value,{...timeContext,date:date||timeContext.date});}catch(error){if(error.message==='Schedule date required')needsDate=true;else timingWarnings.push('Some scheduled times could not be read and were skipped.');return null;}};
   const t = text.trim();
   if (filename.toLowerCase().endsWith(".json") || t.startsWith("{") || t.startsWith("[")) {
     const data = JSON.parse(t);
@@ -353,10 +356,11 @@ function parseMatchesFile(text, filename = "") {
       const al = info.alliances || [];
       const teams = (a) => ((a && a.teams) || []).map((x) => String(x.number)).filter(Boolean);
       const fs = m.finalScore || info.finalScore || [];
+      const rawTime=info.timeScheduled??info.scheduledAt??info.scheduledTime;const scheduledAt=readTime(rawTime,info.date);
       const scored = String(info.state || "").toUpperCase() === "SCORED" || (Array.isArray(fs) && fs.length === 2);
-      return { phase: phaseFrom(tuple.round, ""), num: Number(tuple.match ?? tuple.instance ?? 0), red: teams(al[0]), blue: teams(al[1]), field: info.field || "", redScore: scored ? Number(fs[0]) : null, blueScore: scored ? Number(fs[1]) : null, scored };
+      return { phase: phaseFrom(tuple.round, ""), num: Number(tuple.match ?? tuple.instance ?? 0), red: teams(al[0]), blue: teams(al[1]), field: info.field || "", scheduledAt,timeInvalid:Boolean(rawTime&&!scheduledAt), redScore: scored ? Number(fs[0]) : null, blueScore: scored ? Number(fs[1]) : null, scored };
     }).filter((r) => r.num > 0 && (r.red.length || r.blue.length));
-    return { rows, warnings: [] };
+    return { rows, warnings: [...new Set(timingWarnings)], needsDate };
   }
   // CSV
   const table = parseCSV(text);
@@ -367,6 +371,8 @@ function parseMatchesFile(text, filename = "") {
   const roundCol = (() => { const exact = header.indexOf("round"); return exact >= 0 ? exact : find("round", "type", "phase"); })();
   const instanceCol = header.indexOf("instance");
   const fieldCol = find("field");
+  const timeCol=header.findIndex(h=>['time','scheduledtime','timescheduled','scheduledat','starttime','matchtime'].includes(h.replace(/[^a-z]/g,'')));
+  const dateCol=header.findIndex(h=>['date','matchdate','scheduleddate'].includes(h.replace(/[^a-z]/g,'')));
   const redScoreCol = header.findIndex((h) => h.includes("red") && h.includes("score"));
   const blueScoreCol = header.findIndex((h) => h.includes("blue") && h.includes("score"));
   const stateCol = (() => { const exact = header.indexOf("scored"); return exact >= 0 ? exact : header.findIndex((h) => h.includes("state") || h.includes("scored") || h.includes("status")); })();
@@ -399,15 +405,17 @@ function parseMatchesFile(text, filename = "") {
     const num = ["r16", "qf", "sf"].includes(phase) && instance > 0 ? instance : matchNumber;
     const red = redCols.map((c) => clean(r[c])).filter(isTeam);
     const blue = blueCols.map((c) => clean(r[c])).filter(isTeam);
+    const scheduledAt=timeCol>=0?readTime(r[timeCol],dateCol>=0?r[dateCol]:null):null;
+    const timeInvalid=timeCol>=0&&String(r[timeCol]||'').trim()&&!scheduledAt;
     const field = fieldCol >= 0 ? String(r[fieldCol] || "").trim() : "";
     const rs = redScoreCol >= 0 ? _numFrom(r[redScoreCol]) : null;
     const bs = blueScoreCol >= 0 ? _numFrom(r[blueScoreCol]) : null;
     const scored = stateCol >= 0 ? /scored|complete|final|done|true|1/i.test(String(r[stateCol] || "")) : ((rs != null || bs != null) && ((rs || 0) > 0 || (bs || 0) > 0));
     const tmWinner = winnerCol >= 0 ? String(r[winnerCol] || "").trim().toLowerCase() : "";
     const winner = scored && rs != null && bs != null ? (["red", "blue", "tie"].includes(tmWinner) ? tmWinner : tmScoreWinner(rs, bs)) : null;
-    if (num > 0 && (red.length || blue.length)) rows.push({ phase, num, red, blue, field, redScore: scored ? rs : null, blueScore: scored ? bs : null, scored, winner });
+    if (num > 0 && (red.length || blue.length)) rows.push({ phase, num, red, blue, field, scheduledAt,timeInvalid, redScore: scored ? rs : null, blueScore: scored ? bs : null, scored, winner });
   }
-  return { rows, warnings };
+  return { rows, warnings: [...new Set([...warnings,...timingWarnings])], needsDate };
 }
 
 const tmClean = (v) => String(v == null ? "" : v).trim();
@@ -3398,7 +3406,15 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     if (highlanderDemoLocked) { explainDemoLock(); return; }
     try {
       const text = await file.text();
-      const { rows, warnings } = parseMatchesFile(text, file.name);
+      const timeContext={zone:eventSettings?.event_timezone?.value?.zone||'UTC'};
+      let parsed=parseMatchesFile(text,file.name,timeContext);
+      let timezoneToSave=null;if(!eventSettings?.event_timezone?.value?.zone&&(parsed.needsDate||parsed.rows.some(r=>r.scheduledAt))){const zone=prompt('Enter the event timezone for this schedule (for example America/New_York or America/Denver).',Intl.DateTimeFormat().resolvedOptions().timeZone);if(zone===null)return;new Intl.DateTimeFormat('en-US',{timeZone:zone.trim()});timeContext.zone=zone.trim();timezoneToSave=zone.trim();parsed=parseMatchesFile(text,file.name,timeContext);}
+      if(parsed.needsDate){const date=prompt('This file has scheduled times without a date. Enter the schedule date as YYYY-MM-DD. Times use '+timeContext.zone+'.');if(date===null)return;timeContext.date=date.trim();if(!/^\d{4}-\d{2}-\d{2}$/.test(timeContext.date))throw Error('Enter the schedule date as YYYY-MM-DD.');parseManualScheduledTime('12:00 AM',timeContext);parsed=parseMatchesFile(text,file.name,timeContext);if(parsed.needsDate)throw Error('A schedule date is required to import these times.');}
+      const {rows,warnings}=parsed;
+      const priorTimes=(await api.getEventSetting(eventId,'tm_match_times'))?.value?.rows||[];
+      const nextTimes=mergeManualMatchTimes(priorTimes,rows);
+      const timeChanges=JSON.stringify(priorTimes)!==JSON.stringify(nextTimes);
+      if(rows.some(r=>r.scheduledAt))warnings.push('Scheduled times use '+timeContext.zone+'.');
       if (!rows.length) { alert("No matches found in that file.\n" + warnings.join("\n")); return; }
       const counts = rows.reduce((a, r) => { a[r.phase] = (a[r.phase] || 0) + 1; return a; }, {});
       const summary = Object.entries(counts).map(([p, n]) => `${n} ${p}`).join(", ");
@@ -3421,6 +3437,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       const inFileKeys = new Set(rows.map((r) => tmMatchKey(r.phase, r.num)));
       const existingNotInFile = Object.values(matches).filter((m) => !inFileKeys.has(tmMatchKey(m.phase || "qual", m.num))).length;
       const chips = [
+        { label: `${rows.filter(r=>r.scheduledAt).length} scheduled times imported${timeChanges?' / updated':''}` },
         { label: `${addedMatches} match${addedMatches === 1 ? "" : "es"} added` },
         { label: `${changedMatches} match${changedMatches === 1 ? "" : "es"} changed` },
         { label: `${unchangedMatches} unchanged` },
@@ -3428,7 +3445,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         { label: `${existingNotInFile} existing match${existingNotInFile === 1 ? "" : "es"} not in file remain untouched` },
         { label: `${unknown} unknown team${unknown === 1 ? "" : "s"}`, warn: unknown > 0 },
       ];
-      if (!(await confirmImport({ title: "Match schedule — change preview", chips, warnings, noChanges: addedMatches === 0 && changedMatches === 0 && scoreUpdates === 0 && unknown === 0 }))) return;
+      if (!(await confirmImport({ title: "Match schedule — change preview", chips, warnings, noChanges: !timeChanges && !timezoneToSave && addedMatches === 0 && changedMatches === 0 && scoreUpdates === 0 && unknown === 0 }))) return;
       const elimLabel = { r16: "R16", qf: "QF", sf: "SF", final: "Final" };
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i];
@@ -3443,6 +3460,8 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       const newTeams = [...inFile].filter((x) => !roster.has(x)).map((number) => ({ number, name: "" }));
       if (newTeams.length) { await api.bulkUpsertTeams(eventId, newTeams); const t = await api.listTeams(eventId); setTeams((cur) => { const pending = cur.filter((x) => x._pending && !t.some((s) => s.number === x.number)); return [...t, ...pending]; }); }
       await reloadMatches();
+      if(timezoneToSave){const setting=await api.upsertEventSetting(eventId,'event_timezone',{zone:timezoneToSave},meName);setEventSettings(cur=>({...cur,event_timezone:setting}));}
+      if(timeChanges){const saved=await api.upsertEventSetting(eventId,'tm_match_times',{rows:nextTimes,importedAt:Date.now(),source:'Manual TM import'},meName);setEventSettings(cur=>({...cur,tm_match_times:saved}));}
       markTMSync("matches");
       alert(`Imported ${rows.length} matches (${summary}).` + (warnings.length ? "\n\nNote:\n" + warnings.join("\n") : ""));
     } catch (e) {

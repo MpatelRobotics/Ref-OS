@@ -79,3 +79,9 @@ Display and PDF times use 12-hour AM/PM formatting; native date/time entry contr
 The manual Interview Scheduler dropdown has been removed. Judging now offers Interview Optimizer, Saved group interviews for review/removal and draft recovery, and Judge-group logins. Optimized interviews still save to the same shared schedules used by judges.
 
 Judge-group assignments now shows optimizer assignments from the shared interview schedule as well as manual records. Draft assignments are labeled unsaved until the optimized schedule is saved. Optimizer assignments cover the selected event/session across divisions; manual records retain their division scope. Refresh records also reloads saved optimizer assignments, with confirmation before discarding a draft.
+
+## Manual scheduled-time import and shorter judge-group codes
+
+Manual TM match schedule CSV/JSON imports now populate the same scoped `tm_match_times` data used by match pages, the optimizer and judge-group views. Recognized CSV headers include Time, Scheduled Time, Time Scheduled, Scheduled At, Start Time and Match Time; optional Date/Match Date/Scheduled Date columns are supported. JSON supports TM `matchInfo.timeScheduled` Unix seconds and explicit scheduledAt timestamps. AM/PM clock values, 24-hour clocks, ISO timestamps and US dates with four-digit years are accepted. Time-only files prompt for the schedule date. If the event timezone is unset, the import asks for it before confirmation. Invalid times are skipped with a warning; no live match status is inferred from a scheduled time. Partial imports preserve unrelated match times.
+
+New judge-group codes use number–letter–number–letter–number, such as 3A7B2. Run the updated `supabase/judge-groups.sql` again, then Create / replace code for each group to get the shorter format. Existing longer codes remain valid until replaced. Replacing a code revokes existing group sessions. Failed-login throttling remains in effect.
