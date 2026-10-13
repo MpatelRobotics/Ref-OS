@@ -13,7 +13,7 @@ export default function InterviewOptimizer({teams,entries,matches,zone,disabled,
  // Bind the preview to its inputs so edits cannot apply an outdated proposal.
  const context=JSON.stringify({selected,entries,matches,start,duration,buffer,panel,group,zone,end,count,useLunch,lunchOnly,lunchStart,lunchEnd});
  const current=proposal?.context===context;
- const metadata={zone,start,end,useLunch,lunchOnly,lunchStart,lunchEnd,eventName,sessionName,teamNames:Object.fromEntries(teams.map(t=>[t.number,t.name]))};
+ const metadata={zone,start,end,useLunch,lunchOnly,lunchStart,lunchEnd,eventName,sessionName,matches,teamNames:Object.fromEntries(teams.map(t=>[t.number,t.name]))};
  const exportable=current?{...proposal,...metadata}:applied;
  const generate=()=>{try{const result=optimizeInterviews({teams:selected.filter(t=>!scheduled.has(t)),existing:entries,matches,start:interviewTimeToUTC(start,zone),end:interviewTimeToUTC(end,zone),minutes:duration,buffer,panels:Array.from({length:count},(_,i)=>count===1?panel:`${panel.trim()} ${i+1}`),group,lunchMode:useLunch?(lunchOnly?'only':'avoid'):'off',lunchStart:useLunch?interviewTimeToUTC(lunchStart,zone):undefined,lunchEnd:useLunch?interviewTimeToUTC(lunchEnd,zone):undefined});setProposal({...result,context});setError('');}catch(e){setError(e.message);setProposal(null);}};
  return <details aria-label="Interview Optimizer" className="mb-5 rounded-xl border border-amber-300 bg-white p-4 dark:bg-slate-800"><summary className="min-h-[44px] cursor-pointer font-semibold">Interview Optimizer</summary><div className="mt-3 space-y-3">
