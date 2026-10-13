@@ -1638,6 +1638,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
       )}
       </>}
       <p className="text-xs text-center text-slate-400 mt-4">Ref OS 2.0 · Event Selector</p>
+      {!developerPage && <a href="/?page=developer" className="mx-auto mt-1 flex w-fit min-h-[44px] items-center justify-center rounded px-2 text-xs font-medium text-slate-500 dark:text-slate-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600">Developer login</a>}
       </>}
       {deleteTarget && (
         <DeleteEventModal event={deleteTarget} profile={resolveEventBranding(deleteTarget.id, deleteTarget, deleteTarget.branding)}
