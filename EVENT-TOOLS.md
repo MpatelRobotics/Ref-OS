@@ -65,3 +65,5 @@ Optimizer PDFs list teams under judge-group headings (or Unassigned judge group)
 TM scheduled match times are also displayed in the match list and match details, using the event timezone. Times appear only when the imported match identity and team assignments agree. Scheduled times are not actual start times.
 
 Navigation: **Nominations** contains award nominations and finalists. **Judging** contains judge-group assignments, Interview Scheduler and the separate Interview Optimizer dropdown. Judging retains Admin/Judge Advisor access.
+
+The optimizer now asks for **Number of judge groups** and displays all group-name fields together. Selected unscheduled teams are split in numeric team order across those groups with a count difference of at most one. Each group gets its own numbered panel; match and lunch constraints are applied within each group. Teams that cannot fit remain assigned to their group and are listed as not fitted rather than silently reassigned. Existing interviews are preserved. Group assignments appear in the preview and PDF.
