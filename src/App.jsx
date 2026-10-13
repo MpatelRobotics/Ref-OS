@@ -77,6 +77,7 @@ import FeedbackViewer from "./components/FeedbackViewer.jsx";
 import { submitFeedbackScreenshots } from "./feedbackScreenshots";
 import UniversalFeedback from "./components/UniversalFeedback.jsx";
 import DeveloperPageLock from "./components/DeveloperPageLock.jsx";
+import DeveloperAccessManager from "./components/DeveloperAccessManager.jsx";
 import LostFoundBoard from "./components/LostFoundBoard.jsx";
 import InterviewScheduler from "./components/InterviewScheduler.jsx";
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
@@ -1345,6 +1346,7 @@ const formatEventDate = (value) => {
 const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, initialNotice = "" }) => {
   const developerPage = new URLSearchParams(window.location.search).get('page') === 'developer' || new URLSearchParams(window.location.search).get('open') === 'universal-feedback';
   const [developerPageUnlocked, setDeveloperPageUnlocked] = useState(false);
+  const lockDeveloperPage=useCallback(()=>{setDeveloperPageUnlocked(false);setDeveloperPasskeySession(false);setLiveActivityOpen(false);setUniversalFeedbackOpen(false);},[]);
   const [developerPasskeySession, setDeveloperPasskeySession] = useState(false);
   useEffect(() => {
     if (!developerPageUnlocked || !developerPasskeySession) return;
@@ -1486,6 +1488,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
       {developerPage && !developerPageUnlocked ? <DeveloperPageLock events={events} onUnlock={method=>{setDeveloperPasskeySession(method==='passkey');setDeveloperPageUnlocked(true);}}/> : <>
       {developerPage && <>
       <a href="/" className="inline-flex items-center min-h-[44px] mb-3 font-semibold text-slate-600 dark:text-slate-300">Back to main page</a>
+      <DeveloperAccessManager onLock={lockDeveloperPage}/>
       {liveActivityOpen ? <DeveloperLiveActivity isDeveloper events={events} onClose={()=>setLiveActivityOpen(false)}/> : <button type="button" onClick={()=>setLiveActivityOpen(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 bg-white dark:bg-slate-800 p-3 font-semibold">Live user activity · Developer only</button>}
       {universalFeedbackOpen ? <UniversalFeedback isDeveloper events={events} onClose={()=>setUniversalFeedbackOpen(false)}/> : <button type="button" onClick={()=>setUniversalFeedbackOpen(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 bg-white dark:bg-slate-800 p-3 font-semibold">Universal Feedback · Developer only</button>}
       </>}

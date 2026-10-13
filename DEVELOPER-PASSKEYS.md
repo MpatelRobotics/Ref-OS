@@ -32,3 +32,11 @@ Revocation prevents future passkey sign-ins; it does not revoke previously grant
 Use the production website in a browser that supports passkeys. Native Android WebView support varies; the Developer code remains available in both connectors. The Windows connector uses the same website, but Windows Hello also requires support from its embedded browser. Use Edge or Chrome if the embedded browser does not offer Windows Hello.
 
 Validation includes a Chromium virtual authenticator with registration, discoverable sign-in, and rejection of incorrect origins/challenges. Physical Windows Hello enrollment and production deployment still need verification on the user's laptop.
+
+## Passkey and device management
+
+Run `supabase/developer-access-management.sql` after the passkey and live-activity migrations, then redeploy `refos-developer-passkey`. The Developer page offers **Passkey manager** and **Signed-in devices**. Name passkeys to identify them, view their creation/last-use dates, and revoke individual keys. Last-use dates start recording after this migration.
+
+Device entries represent authenticated browser/device identities with event membership, including inactive ones. Event access and heartbeat information are shown; an absent heartbeat does not prove the device is online or offline. Logging out removes all event memberships for that identity and clears its challenges/activity atomically, without deleting event records or its account. Event workspaces check membership every five seconds when connected; offline cached screens may remain until reconnect. The Developer manager checks authorization every fifteen seconds while visible.
+
+Revoking a passkey prevents new authentication with that key but does not end existing event sessions. Logging out a device ends its current Ref OS access but does not revoke its passkeys. Use both actions for a lost device; synced passkeys may exist on more than one device. Device sessions can sign in again with a still-valid passkey or code. These operations do not invalidate the underlying Supabase authentication token; server-side event permissions are removed.

@@ -1,0 +1,27 @@
+import React,{useCallback,useEffect,useState} from 'react';
+import {supabase} from '../supabaseClient';
+async function request(action,values={}){
+ const {data,error}=await supabase.functions.invoke('refos-developer-passkey',{body:{action,...values}});
+ if(error){let failure;try{failure=await error.context?.json();}catch{}const denied=failure?.reason==='access';throw Object.assign(Error(denied?'Developer access ended. Sign in again.':'Could not update access. Check your connection and developer-access-management.sql setup.'),{denied});}
+ if(!data || data.error)throw Error('Could not load access management.');return data;
+}
+const button='min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm font-semibold disabled:opacity-50';
+export default function DeveloperAccessManager({onLock,invoke=request}){
+ const [data,setData]=useState({passkeys:[],devices:[]}),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loaded,setLoaded]=useState(false),[editing,setEditing]=useState(''),[label,setLabel]=useState('');
+ const load=useCallback(async()=>{try{const next=await invoke('manage-list');setData(next);setLoaded(true);setError('');}catch(err){setError(err.message);if(err.denied)onLock();}},[invoke,onLock]);
+ useEffect(()=>{let active=true,flight=false;const refresh=async()=>{if(!active||flight||document.hidden)return;flight=true;await load();flight=false;};refresh();const timer=setInterval(refresh,15000);document.addEventListener('visibilitychange',refresh);return()=>{active=false;clearInterval(timer);document.removeEventListener('visibilitychange',refresh);};},[load]);
+ const change=async(action,values)=>{setBusy(true);setError('');try{const result=await invoke(action,values);if(result.self){onLock();return;}setEditing('');await load();}catch(err){setError(err.message);if(err.denied)onLock();}finally{setBusy(false);}};
+ const date=value=>value?new Date(value).toLocaleString():'Not used yet';
+ return <section className="mb-4 space-y-3 text-slate-900 dark:text-slate-100">
+  {error&&<p role="alert" className="rounded-lg border border-red-200 p-3 text-sm text-red-700 dark:text-red-300">{error}</p>}
+  <details className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"><summary className="min-h-[44px] cursor-pointer p-4 font-bold">Passkey manager</summary><div className="px-4 pb-4 space-y-3">
+   <p className="text-sm text-slate-600 dark:text-slate-300">Revoking a passkey prevents future logins. To end access on a lost device, also log it out below. Your Developer code remains a fallback.</p>
+   {!loaded&&!error&&<p>Loading passkeys…</p>}{loaded&&!data.passkeys.length&&<p>No active passkeys registered.</p>}
+   {data.passkeys.map(key=><article key={key.id} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2"><h3 className="font-semibold">{key.label}</h3><p className="text-xs text-slate-500">Created: {date(key.created_at)}<br/>Last used: {date(key.last_used_at)}</p>{editing===key.id?<form onSubmit={e=>{e.preventDefault();change('manage-rename',{id:key.id,label:label.trim()});}} className="space-y-2"><label className="block text-sm">Passkey name<input autoFocus value={label} maxLength={80} onChange={e=>setLabel(e.target.value)} className="block w-full min-h-[44px] rounded-lg border bg-transparent p-2"/></label><button className={button} disabled={busy||!label.trim()}>Save name</button> <button type="button" className={button} onClick={()=>setEditing('')} disabled={busy}>Cancel</button></form>:<div className="flex flex-wrap gap-2"><button className={button} disabled={busy} onClick={()=>{setEditing(key.id);setLabel(key.label);}}>Rename</button><button className={button+' text-red-700 dark:text-red-300'} disabled={busy} onClick={()=>{if(window.confirm(`Revoke "${key.label}"? You will need another passkey or your Developer code for future logins.`))change('manage-revoke',{id:key.id});}}>Revoke passkey</button></div>}</article>)}
+  </div></details>
+  <details className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800"><summary className="min-h-[44px] cursor-pointer p-4 font-bold">Signed-in devices</summary><div className="px-4 pb-4 space-y-3">
+   <p className="text-sm text-slate-600 dark:text-slate-300">Each browser sign-in is listed separately. Log out removes all event access for that sign-in. Offline devices will be locked when they reconnect. A retained passkey can still be used to sign in again.</p>
+   {!loaded&&!error&&<p>Loading devices…</p>}{data.devices.map(device=><article key={device.userId} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 space-y-2"><h3 className="font-semibold">{device.name}{device.current?' · This device':''}</h3><p className="text-xs text-slate-500">Device reference: {device.userId.slice(-8)}</p><ul className="text-sm">{device.events.map((event,i)=><li key={i}>{event.name} · {event.role}</li>)}</ul>{device.activity.length?<p className="text-xs text-slate-500">{device.activity[0].screen} · Last activity: {date(device.activity[0].updated_at)}</p>:<p className="text-xs text-slate-500">No recent activity reported.</p>}<button disabled={busy} className={button+' text-red-700 dark:text-red-300'} onClick={()=>{if(window.confirm(`Log out ${device.current?'this device':device.name} from every Ref OS event?`))change('manage-logout',{userId:device.userId});}}>Log out{device.current?' this device':''}</button></article>)}
+  </div></details>
+ </section>;
+}
