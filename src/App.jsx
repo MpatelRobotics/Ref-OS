@@ -1,4 +1,4 @@
-import {parseManualScheduledTime,mergeManualMatchTimes} from './manualTmTimes';
+import {parseManualScheduledTime,mergeManualMatchTimes,isTmTimesOnlyTable,parseTmTimesOnly} from './manualTmTimes';
 import ScheduledMatchTime from './components/ScheduledMatchTime';
 import { eliminationPairingKey, eliminationPairingLabel, eliminationResultLabel } from './tmReplayGrouping.js';
 import { tmPairingNumber, tmGameNumber, tmMatchOrder } from './tmMatchIdentity.js';
@@ -501,6 +501,7 @@ function tmCategoryFromContent(text, filename = "") {
     if (!csvTable.length) return undefined;
     keys = csvTable[0].map(tmNormKey).filter(Boolean);
   }
+  if(csvTable&&isTmTimesOnlyTable(csvTable))return "matches";
   const has = (re) => keys.some((k) => re.test(k));
   const isOneOf = (...names) => keys.some((k) => names.includes(k));
 
@@ -3406,6 +3407,18 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     if (highlanderDemoLocked) { explainDemoLock(); return; }
     try {
       const text = await file.text();
+      const timeTable=parseCSV(text);
+      if(isTmTimesOnlyTable(timeTable)){
+        let zone=eventSettings?.event_timezone?.value?.zone;let saveZone=false;
+        if(!zone){const answer=prompt('Enter the event timezone for displaying imported match times (e.g. America/New_York).',Intl.DateTimeFormat().resolvedOptions().timeZone);if(answer===null)return;zone=answer.trim();new Intl.DateTimeFormat('en-US',{timeZone:zone});saveZone=true;}
+        const result=parseTmTimesOnly(timeTable,Object.values(matches),{zone});
+        if(!result.rows.length){alert('No times matched existing matches. Import the TM match list first, select the correct division/session, then import MatchStartTimes.csv.\n'+result.warnings.join('\n'));return;}
+        const prior=(await api.getEventSetting(eventId,'tm_match_times'))?.value?.rows||[];const next=mergeManualMatchTimes(prior,result.rows);const changed=JSON.stringify(prior)!==JSON.stringify(next);
+        if(!(await confirmImport({title:'Match scheduled times — change preview',chips:[{label:`${result.rows.length} scheduled times matched`},{label:`${result.unmatched} unmatched labels`,warn:result.unmatched>0},{label:'Teams, matches and scores stay unchanged'}],warnings:[...result.warnings,'Display timezone: '+zone+'. Scheduled timestamps are used; Time Started/Resumed columns are not imported as scheduled times.'],noChanges:!changed&&!saveZone})))return;
+        if(saveZone){const saved=await api.upsertEventSetting(eventId,'event_timezone',{zone},meName);setEventSettings(cur=>({...cur,event_timezone:saved}));}
+        if(changed){const saved=await api.upsertEventSetting(eventId,'tm_match_times',{rows:next,importedAt:Date.now(),source:'TM MatchStartTimes export'},meName);setEventSettings(cur=>({...cur,tm_match_times:saved}));}
+        markTMSync('matches');alert(`Imported scheduled times for ${result.rows.length} existing matches.`);return;
+      }
       const timeContext={zone:eventSettings?.event_timezone?.value?.zone||'UTC'};
       let parsed=parseMatchesFile(text,file.name,timeContext);
       let timezoneToSave=null;if(!eventSettings?.event_timezone?.value?.zone&&(parsed.needsDate||parsed.rows.some(r=>r.scheduledAt))){const zone=prompt('Enter the event timezone for this schedule (for example America/New_York or America/Denver).',Intl.DateTimeFormat().resolvedOptions().timeZone);if(zone===null)return;new Intl.DateTimeFormat('en-US',{timeZone:zone.trim()});timeContext.zone=zone.trim();timezoneToSave=zone.trim();parsed=parseMatchesFile(text,file.name,timeContext);}
