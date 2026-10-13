@@ -4,6 +4,18 @@
 
 html, body, #root { height: 100%; }
 body { margin: 0; -webkit-tap-highlight-color: transparent; }
+:root {
+  --refos-safe-top: env(safe-area-inset-top, 0px);
+  --refos-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (max-width:1023px) {
+  .refos-safe-page { min-height:100dvh; padding-top:calc(1.25rem + var(--refos-safe-top)); padding-bottom:calc(1.25rem + var(--refos-safe-bottom)); }
+  .refos-safe-login { min-height:100dvh; padding-top:calc(1.5rem + var(--refos-safe-top)); padding-bottom:calc(1.5rem + var(--refos-safe-bottom)); }
+  .refos-safe-league { min-height:100dvh; padding-top:calc(1rem + var(--refos-safe-top)); padding-bottom:calc(1rem + var(--refos-safe-bottom)); }
+  .refos-header { padding-top:var(--refos-safe-top); }
+  .refos-safe-dialog { padding-bottom:var(--refos-safe-bottom); max-height:calc(100dvh - var(--refos-safe-top) - 12px); }
+  .fixed.inset-0.flex.flex-col { padding-top:var(--refos-safe-top); padding-bottom:var(--refos-safe-bottom); }
+}
 
 /* dark mode page background */
 .dark body { background-color: #0f172a; }
@@ -266,7 +278,7 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
   .refos-online-cluster { padding-left:0; padding-right:0; }
   .refos-user-chip { padding-right:4px; }
   .refos-user-name { display:none; }
-  .refos-workspace { padding-bottom:104px !important; }
+  .refos-workspace { padding-bottom:calc(104px + var(--refos-safe-bottom)) !important; }
   .refos-shell>button.fixed { bottom:calc(78px + env(safe-area-inset-bottom)); }
   .refos-page-heading { align-items:center; }
   .refos-page-heading h2 { font-size:1.55rem; }

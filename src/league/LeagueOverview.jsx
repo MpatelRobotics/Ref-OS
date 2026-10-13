@@ -256,7 +256,7 @@ export default function LeagueOverview({
 
   if (mode === "page") {
     return (
-      <div className="min-h-screen bg-slate-100 dark:bg-slate-900 p-4 sm:p-6">
+      <div className="refos-safe-league min-h-screen bg-slate-100 dark:bg-slate-900 p-4 sm:p-6">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-2 mb-4">
             {onChooseEvent && <button type="button" onClick={onChooseEvent} className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 dark:text-slate-300"><ChevronLeft size={18} /> Events</button>}
@@ -275,7 +275,7 @@ export default function LeagueOverview({
   return (
     <div className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-labelledby="league-overview-title" onClick={(e) => e.stopPropagation()}
-        className="bg-slate-50 dark:bg-slate-900 w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[92vh] overflow-y-auto">
+        className="refos-safe-dialog bg-slate-50 dark:bg-slate-900 w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[92dvh] overflow-y-auto">
         <div className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 px-4 py-3 flex items-center gap-2 border-b border-slate-200 dark:border-slate-700">
           <div className="min-w-0">
             <h2 id="league-overview-title" className="font-bold text-slate-900 dark:text-white truncate">{eventName}</h2>

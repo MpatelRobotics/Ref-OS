@@ -111,7 +111,7 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6FA] text-[#11172F] grid place-items-center p-6 font-sans">
+    <div className="refos-safe-login min-h-screen bg-[#F4F6FA] text-[#11172F] grid place-items-center p-6 font-sans">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white px-6 py-7 sm:px-8 shadow-[0_24px_70px_rgba(15,23,42,0.12)] overflow-hidden relative">
         {profile.accentSource === "saved" && <div className="absolute inset-x-0 top-0 h-1.5" style={{ backgroundColor: accent }} />}
         <div className="flex flex-col items-center text-center mb-6">
