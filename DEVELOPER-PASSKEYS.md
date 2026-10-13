@@ -4,6 +4,8 @@ The Developer page supports WebAuthn passkeys. Set up Windows Hello in Windows S
 
 After passkey sign-in, the Developer page locks after three minutes without clicks, typing or scrolling. Activity restarts the idle timer. This locks the page and stops its developer viewers; it does not revoke existing event sessions. Developer-code sign-ins retain their existing behavior.
 
+The same registered Developer passkey can sign into any active event using **Sign in as Developer with passkey** on its login screen. Ref OS confirms server-granted Developer/Admin membership for the selected event before opening it. Normal event role codes remain available. Archived events retain their existing restore requirements.
+
 ## Server setup
 
 1. Run `supabase/developer-passkeys.sql` in the Supabase SQL Editor after `refos-2-developer-access.sql`.

@@ -1,6 +1,20 @@
 import { test, expect } from '@playwright/test';
 import { generateRegistrationOptions, generateAuthenticationOptions, verifyRegistrationResponse, verifyAuthenticationResponse } from '@simplewebauthn/server';
 
+test('event passkey login requires server-confirmed Developer access for that event',async({page})=>{
+ await page.route(/\/src\/developerPasskey\.js(?:\?.*)?$/,route=>route.fulfill({contentType:'application/javascript',body:`export const passkeysSupported=()=>true;export async function developerPasskey(event){window.passkeyEvent=event;}`}));
+ await page.route(/\/src\/api(?:\.js)?(?:\?.*)?$/,async route=>{const response=await route.fetch();const source=await response.text();await route.fulfill({response,body:source.replace('export async function getMyEventAccessChecked(eventId) {','export async function getMyEventAccessChecked(eventId) { return window.testAccess;')});});
+ await page.route('**/event-passkey-test',route=>route.fulfill({contentType:'text/html',body:`<div id="root"></div><script type="module">import '/@vite/client';import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;const React=(await import('/node_modules/.vite/deps/react.js')).default;const DOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default;const View=(await import('/src/auth/LoginScreen.jsx')).default;window.testAccess={role:'admin',developer:false};window.logins=[];DOM.createRoot(document.getElementById('root')).render(React.createElement(View,{eventId:'event-two',eventName:'Event Two',onUnlock:(...args)=>window.logins.push(args),onChooseEvent:()=>{}}));</script>`}));
+ await page.goto('/event-passkey-test');
+ await page.getByRole('button',{name:'Sign in as Developer with passkey'}).click();
+ await expect(page.getByText('Developer access could not be confirmed.')).toBeVisible();
+ expect(await page.evaluate(()=>window.logins)).toEqual([]);
+ await page.evaluate(()=>{window.testAccess={role:'admin',developer:true};});
+ await page.getByRole('button',{name:'Sign in as Developer with passkey'}).click();
+ await expect.poll(()=>page.evaluate(()=>window.logins)).toEqual([['ref',true,'admin','',true]]);
+ expect(await page.evaluate(()=>window.passkeyEvent)).toBe('event-two');
+});
+
 test('Developer passkey page stays unlocked while active and locks after three idle minutes',async({page})=>{
  await page.route(/\/src\/components\/DeveloperPageLock\.jsx(?:\?.*)?$/,route=>route.fulfill({contentType:'application/javascript',body:`import React from '/node_modules/.vite/deps/react.js';export default function Lock({onUnlock}){return React.createElement('button',{onClick:()=>onUnlock('passkey')},'Test passkey login');}`}));
  await page.clock.install();

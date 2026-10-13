@@ -4,6 +4,7 @@ import { APP_VERSION } from "../appVersion";
 import { resolveEventBranding } from "../eventProfiles.js";
 import EventLogo from "../components/EventLogo.jsx";
 import DeleteEventModal from "../components/modals/DeleteEventModal.jsx";
+import { developerPasskey, passkeysSupported } from '../developerPasskey';
 
 // Phase 6: `branding` is the selected event's PUBLIC branding only ({ shortName, logoUrl, accent }),
 // read before login. No admin settings or access credentials are available here.
@@ -20,6 +21,17 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   const [checkingCode, setCheckingCode] = useState(false);
+  const signInDeveloperPasskey = async () => {
+    if(checkingCode || unlocking)return;
+    setCheckingCode(true);setErr('');
+    try {
+      await developerPasskey(eventId);
+      const access = await api.getMyEventAccessChecked(eventId);
+      if(access?.role !== 'admin' || !access.developer)throw Error('Developer access could not be confirmed.');
+      setCode('');setPw('');onUnlock('ref',true,'admin','',true);
+    }catch(error){setErr(error.name==='NotAllowedError'?'Passkey request cancelled. You can try again or use an access code.':error.message || 'Passkey sign-in failed.');}
+    finally{setCheckingCode(false);}
+  };
   // Locked device: show "Unlock as <role>" until the user asks for a different access code.
   const [useDifferentCode, setUseDifferentCode] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
@@ -209,6 +221,7 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
             </button>
           </>
         )}
+        {passkeysSupported() && <button type="button" onClick={signInDeveloperPasskey} disabled={checkingCode||unlocking} className="w-full mt-4 min-h-[44px] rounded-lg border border-slate-300 px-4 py-3 font-semibold text-[#11172F] disabled:opacity-50">Sign in as Developer with passkey</button>}
         <button onClick={onChooseEvent} className="w-full mt-5 rounded-lg border border-slate-300 px-4 py-2.5 font-semibold text-[#11172F]">Choose or configure an event</button>
         {canEmergencyDelete && (
           <button type="button" onClick={() => setShowDelete(true)} className="block mx-auto mt-3 text-xs font-semibold text-red-600 hover:text-red-700 underline underline-offset-2">
