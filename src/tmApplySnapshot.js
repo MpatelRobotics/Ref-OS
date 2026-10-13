@@ -20,6 +20,8 @@ export async function applyTmSnapshot(snapshot, { api, eventId, by, includeSched
     remember('checkIns', snapshot.checkIns);
   }
   if (checkInOnly) return 'TM check-in status checked.';
+  const times=snapshot.matches.filter(m=>m.scheduledAt).map(m=>({phase:m.phase,num:m.num,red:m.red,blue:m.blue,scheduledAt:m.scheduledAt}));
+  if(hashes.matchTimes!==JSON.stringify(times)){await api.upsertEventSetting(eventId,'tm_match_times',{rows:times,importedAt:Date.now()},by);remember('matchTimes',times);}
   const known = new Set((await api.listTeams(eventId)).map(t => t.number));
   const missing = [...new Set([...snapshot.rankings, ...snapshot.skills].map(r => r.number))].filter(n => !known.has(n));
   if (!current()) return;

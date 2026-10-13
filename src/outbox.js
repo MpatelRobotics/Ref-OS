@@ -41,6 +41,8 @@ async function kvSet(key, val) {
 const qKey = (eventId) => `outbox:${eventId}`;
 const failedKey = (eventId) => `failed:${eventId}`;
 export async function loadQueue(eventId) { return (await kvGet(qKey(eventId))) || []; }
+export async function saveEventSnapshot(event,session,division,value){return kvSet(`eventSnapshot:${event}:${session||''}:${division}`,value);}
+export async function loadEventSnapshot(event,session,division){return kvGet(`eventSnapshot:${event}:${session||''}:${division}`);}
 async function saveQueue(eventId, q) { await kvSet(qKey(eventId), q); return q; }
 export async function loadFailed(eventId) { return (await kvGet(failedKey(eventId))) || []; }
 async function saveFailed(eventId, items) { await kvSet(failedKey(eventId), items); return items; }

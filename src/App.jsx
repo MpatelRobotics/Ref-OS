@@ -15,6 +15,10 @@ import EventProgramChoice, {detectEventProgram, programLabel} from "./components
 import TeamRegisteredEvents from "./components/TeamRegisteredEvents.jsx";
 import VexSyncManager from "./components/VexSyncManager.jsx";
 import {EventTmSync,EventTmSyncRegistration,useEventTmSync} from "./components/EventTmSync.jsx";
+import EventOperations from './components/EventOperations';
+import EventArchiveTools from './components/EventArchiveTools';
+import OfflineEventTools from './components/OfflineEventTools';
+import {collectArchive,downloadFile} from './eventArchive';
 import TmFieldActivity from "./components/TmFieldActivity.jsx";
 import RobotCheckIn from "./components/RobotCheckIn.jsx";
 import { tmMatchHighlights } from "./tmMatchHighlights.js";
@@ -1751,6 +1755,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const [queuedWrites, setQueuedWrites] = useState(0);
   const [lastCloudError, setLastCloudError] = useState("");
   const [matches, setMatches] = useState({}); // { [num]: {red:[], blue:[]} }
+  const [operationRows,setOperationRows]=useState([]);
   const [rules, setRules] = useState([]);      // [{ code, desc, category }]
   const [presence, setPresence] = useState([]); // [{ name, ... }] currently online
   const [refRoster, setRefRoster] = useState([]); // refs seen at this event, including offline
@@ -3587,6 +3592,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     if(targetDivision && !divisionCatalog.some(d=>Number(d.id)===targetDivision))throw Error('Choose a valid Ref OS division.');
     const targetApi=targetDivision===divisionId?api:createDivisionApi(eventApi,eventId,targetDivision);
     const message = await applyTmSnapshot(snapshot, { ...options, api:targetApi, eventId, by: meName });
+    if(!options.checkInOnly&&options.current()){const prior=await eventApi.getEventSetting(eventId,'tm_team_divisions');await eventApi.upsertEventSetting(eventId,'tm_team_divisions',{...(prior?.value||{}),[targetDivision]:snapshot.teams.map(t=>t.number)},meName);}
     if(targetDivision!==divisionId)return message;
     if (!options.current()) return;
     if (options.checkInOnly) {
@@ -3938,27 +3944,9 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   }, [watchNotes]);
   const matchNums = useMemo(() => Object.keys(matches), [matches]);
 
-  const backupAll = () => {
-    const snapshot = {
-      app: "Ref-OS",
-      exportedAt: new Date().toISOString(),
-      event: { id: eventId, name: event.name || "", ...event },
-      counts: { teams: teams.length, violations: viols.length, nominations: noms.length, matches: Object.keys(matches).length, watchNotes: watchNotes.length, fieldLog: fieldLog.length },
-      teams,
-      matches: Object.values(matches),
-      violations: viols,
-      nominations: noms,
-      finalists: Array.from(finalists),
-      watchNotes,
-      fieldLog,
-      eventSettings,
-      failedSyncItems,
-    };
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" }));
-    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
-    a.download = `${(event.name || "vex").replace(/\W+/g, "-").toLowerCase()}-backup-${stamp}.json`;
-    a.click(); setMenu(false);
+  const backupAll = async () => {
+    try { const snapshot=await collectArchive(eventId,event?.name||'Event');downloadFile(JSON.stringify(snapshot,null,2),'ref-os-event-archive.json');setMenu(false); }
+    catch(error){alert(error.message||'Could not export a complete backup.');}
   };
 
   const sendAnnouncement = async (message) => {
@@ -4731,7 +4719,9 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           <div><dt>Match schedule</dt><dd>{Object.keys(matches).length}<span> matches</span></dd></div>
           {!isJudge && !isEmcee && <div><dt>Shared log</dt><dd>{viols.length}<span> entries</span></dd></div>}
         </dl>}
+        {!openTeam&&!openMatch&&!openRobot&&['matches','teams','robots','judging'].includes(view)&&<EventOperations key={`${divisionId}:${leagueSessionId||''}:${view}`} eventId={eventId} sessionId={leagueSessionId} division={divisionId} divisions={divisionCatalog} area={view==='robots'?'robots':view==='judging'?'judging':'communication'} onRows={setOperationRows} teams={teams} canManage={adminUnlocked&&!highlanderDemoLocked} canInspect={!isJudge&&!isEmcee&&!highlanderDemoLocked} canJudge={isJudge&&!highlanderDemoLocked}/> }
         {view === 'matches' && <TmFieldActivity value={eventSettings?.tm_field_activity?.value} />}
+        {!showCommandCenter&&!openTeam&&!openRobot&&!openMatch&&['robots','matches'].includes(view)&&<OfflineEventTools eventId={eventId} sessionId={leagueSessionId} division={divisionId} teams={teams} matches={matches} failed={failedSyncItems} onRetry={retryFailedSync}/>}
         {openTeam ? (
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={isIQ ? undefined : teamRecords[openTeam]}
             onLog={highlanderDemoLocked ? undefined : () => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked && !highlanderDemoLocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
@@ -4747,14 +4737,14 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         ) : view === "matches" ? (
           isIQ ? <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} parseCSV={parseCSV} /> : <MatchList tmActivity={eventSettings?.tm_field_activity?.value} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
-          <><RobotCheckIn teams={teams} checkIn={eventSettings?.tm_check_in?.value} onOpen={setOpenRobot} /><RobotList requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} /></>
+          <><RobotCheckIn teams={teams} checkIn={eventSettings?.tm_check_in?.value} onOpen={setOpenRobot} /><RobotList followups={operationRows.filter(r=>r.kind==='inspection-followup'&&r.payload.status==='open'&&(r.session_id||null)===(leagueSessionId||null)&&(r.division_id===0||r.division_id===divisionId))} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} /></>
         ) : view === "judging" ? (
           <>
           <JudgingView noms={noms} viols={viols} teamName={teamNameMap} finalists={finalists} rankOrder={eventSettings?.judging_rank_order?.value || {}} canReorder={adminUnlocked} onMoveRank={moveJudgingRank} emcee={isEmcee}
             onToggleFinalist={(award, team) => (isJudge ? toggleFinalist(award, team) : requireAdmin(() => toggleFinalist(award, team)))}
             onNominate={(award) => setNominating(award || "sportsmanship")} onDeleteNom={removeNomination}
             onExport={isEmcee ? undefined : () => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
-          {(adminUnlocked || isJudge) && <InterviewScheduler key={`${eventId}:${leagueSessionId || ""}`} eventId={eventId} sessionId={leagueSessionId || null} sessionName={league?.sessionName(leagueSessionId) || ""} teams={teams} eventTimezone={eventSettings?.event_timezone?.value?.zone || 'UTC'} onSaveTimezone={adminUnlocked ? async zone => { const saved = await api.upsertEventSetting(eventId, 'event_timezone', {zone}); setEventSettings(prev=>({...prev,event_timezone:saved})); } : undefined}/>}
+          {(adminUnlocked || isJudge) && <InterviewScheduler key={`${eventId}:${leagueSessionId || ""}`} eventId={eventId} sessionId={leagueSessionId || null} sessionName={league?.sessionName(leagueSessionId) || ""} teams={teams} matches={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone || 'UTC'} onSaveTimezone={adminUnlocked ? async zone => { const saved = await api.upsertEventSetting(eventId, 'event_timezone', {zone}); setEventSettings(prev=>({...prev,event_timezone:saved})); } : undefined}/>}
           </>
         ) : view === "rulebook" ? (
           (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq" ? <IQRules /> : <RuleBook rules={rules} online={online} accent={brand.accent}
@@ -4816,6 +4806,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
                     <li key={t.number}>
                       <button onClick={() => setOpenTeam(t.number)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
                         <span className="font-mono font-bold text-lg text-slate-900 dark:text-slate-100">{t.number}</span>
+                        {divisionCatalog.filter(d=>(eventSettings?.tm_team_divisions?.value?.[d.id]||[]).includes(t.number)).map(d=><span key={d.id} className="rounded border px-2 py-0.5 text-xs">{d.name}</span>)}
                         {t.rank != null && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-200 dark:border-indigo-800 text-xs font-bold shrink-0">Rank {t.rank}</span>}
                         {!isEmcee && teamWatch[t.number]?.length > 0 && <span title={teamWatch[t.number].map((w) => `${w.by || "Ref"}: ${w.note}`).join("\n")} className="inline-flex items-center gap-1 text-amber-600 text-xs font-semibold shrink-0"><Star size={15} fill="currentColor" /> WATCH{teamWatch[t.number].length > 1 ? ` ${teamWatch[t.number].length}` : ""}</span>}
                         {t.name && <span className="text-sm text-slate-500 dark:text-slate-400 truncate flex-1">{t.name}</span>}
@@ -5070,7 +5061,7 @@ onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!cu
         onSave={saveFieldNames}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowFieldNameConfigurator(false)} />}
       {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowOfflineTest(false)} />}
-      {showCommandCenter && adminUnlocked && <CommandCenter matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
+      {showCommandCenter && adminUnlocked && <CommandCenter extraTools={<><EventArchiveTools eventId={eventId} eventName={event?.name||'Event'} divisions={divisionCatalog} isLeague={Boolean(league)}/><OfflineEventTools eventId={eventId} sessionId={leagueSessionId} division={divisionId} teams={teams} matches={matches} failed={failedSyncItems} onRetry={retryFailedSync}/></>} matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
         eventMembers={eventMembers} meName={meName} onSetAdmin={setVolunteerAdmin}
         alertStats={alertStats} alertStatsLoading={alertStatsLoading} onRefreshAlertStats={loadAlertStats} onResetAlertStats={resetAlertStats}
         alertDeliveryLabel={notificationDeliveryLabel}
@@ -6847,7 +6838,7 @@ function robotAngleCount(team, requiredRobotPhotos) {
   return normalizeRequiredRobotPhotos(requiredRobotPhotos).filter(key=>angles.has(key)).length;
 }
 
-function RobotList({ requiredRobotPhotos, isIQ = false, teams, query, setQuery, onOpen }) {
+function RobotList({ followups=[], requiredRobotPhotos, isIQ = false, teams, query, setQuery, onOpen }) {
   const q = query.trim().toUpperCase();
   const list = [...teams].sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }));
   const filtered = q ? list.filter((t) => t.number.toUpperCase().includes(q) || (t.name || "").toUpperCase().includes(q)) : list;
@@ -6878,6 +6869,7 @@ function RobotList({ requiredRobotPhotos, isIQ = false, teams, query, setQuery, 
                   <div className="px-2.5 py-2 flex items-center gap-1.5">
                     <span className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm truncate">{t.number}</span>
                     <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${angleCount === required.length ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"}`}>{required.length ? `${angleCount}/${required.length}` : "Optional"}</span>
+                    {followups.some(row=>row.payload.team===t.number)&&<span className="text-[10px] font-bold text-amber-800 dark:text-amber-300">Inspection follow-up</span>}
                     {pendingCount > 0 && <span className="text-[9px] font-bold text-sky-600 dark:text-sky-300">{pendingCount} queued</span>}
                   </div>
                 </button>

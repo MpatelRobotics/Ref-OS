@@ -1,0 +1,32 @@
+import React,{useEffect,useState} from 'react';
+import {listOperations,saveOperation,scopedOperations} from '../eventOperations';
+import useUnsavedWork from '../unsavedWork';
+const input='block w-full min-h-[44px] rounded-lg border bg-white dark:bg-slate-900 p-2';
+export default function EventOperations({eventId,sessionId=null,division=0,divisions=[],area,teams,canManage=false,canInspect=false,canJudge=false,onRows}){
+ const [rows,setRows]=useState([]),[error,setError]=useState(''),[busy,setBusy]=useState(false),[kind,setKind]=useState(area==='robots'?'robot-change':area==='judging'?'judge-group':'announcement'),[team,setTeam]=useState(''),[text,setText]=useState(''),[owner,setOwner]=useState(''),[target,setTarget]=useState(division);
+ const reload=async()=>{try{const data=await listOperations(eventId);setRows(data);onRows?.(data);setError('');}catch(e){setError(e.message);}};
+ useUnsavedWork(Boolean(text.trim()||owner.trim()));
+ const draftKey=`refosOperationDraft:${eventId}:${sessionId||''}:${division}:${area}`;
+ useEffect(()=>{if(!text.trim()&&!owner.trim())return;try{localStorage.setItem(draftKey,JSON.stringify({kind,team,text,owner,target}));}catch{}},[draftKey,kind,team,text,owner,target]);
+ useEffect(()=>{reload();},[eventId,sessionId,division]);
+ const kinds=area==='robots'?['robot-change','inspection-followup']:area==='judging'?['judge-group']:['announcement','assignment'];
+ const labels={'robot-change':'Robot modification note','inspection-followup':'Inspection follow-up','judge-group':'Judge-group assignment',announcement:'Division announcement',assignment:'Volunteer assignment'};
+ const visible=scopedOperations(rows,sessionId,division).filter(r=>kinds.includes(r.kind));
+ const canWrite=canManage||(area==='robots'&&canInspect)||(area==='judging'&&canJudge);
+ const save=async(payload,row,scope=target)=>{setBusy(true);try{await saveOperation(eventId,sessionId,scope,row?.kind||kind,payload,row);await reload();if(!row){setText('');setOwner('');try{localStorage.removeItem(draftKey);}catch{}}}catch(e){setError(e.message);}finally{setBusy(false);}};
+ return <details className="mb-4 rounded-xl border bg-white dark:bg-slate-800 p-4"><summary className="min-h-[44px] cursor-pointer font-bold">{area==='robots'?'Robot changes & inspection follow-ups':area==='judging'?'Judge-group assignments':'Division announcements & volunteer assignments'}</summary><div className="space-y-3 mt-3">
+ {error&&<p role="alert" className="text-red-700 dark:text-red-300">{error}</p>}
+ {canWrite&&<form className="space-y-3" onSubmit={e=>{e.preventDefault();save({team:team||null,note:text.trim(),owner:owner.trim(),status:'open'});}}>
+ <button type="button" className="min-h-[44px] rounded border px-3" onClick={()=>{try{const draft=JSON.parse(localStorage.getItem(draftKey)||'null');if(!draft||!kinds.includes(draft.kind)||typeof draft.text!=='string'||draft.text.length>3000)throw Error('No valid saved draft for this division/session.');if((text||owner)&&!confirm('Replace the current unsaved record with the saved draft?'))return;setKind(draft.kind);setTeam(teams.some(t=>t.number===draft.team)?draft.team:'');setText(draft.text);setOwner(String(draft.owner||'').slice(0,100));setTarget(divisions.some(d=>Number(d.id)===draft.target)?draft.target:division);}catch(e){setError(e.message);}}}>Recover unsaved record</button>
+ <label>Record type<select value={kind} onChange={e=>setKind(e.target.value)} className={input}>{kinds.map(k=><option key={k} value={k}>{labels[k]}</option>)}</select></label>
+ {(area==='robots'||area==='judging')&&<label>Team<select required value={team} onChange={e=>setTeam(e.target.value)} className={input}><option value="">Choose team</option>{teams.map(t=><option key={t.number}>{t.number}</option>)}</select></label>}
+ <label>{kind==='assignment'?'Volunteer and field/shift':kind==='judge-group'?'Judge group':'Assigned inspector / owner (optional)'}<input value={owner} maxLength={100} required={kind==='judge-group'||kind==='assignment'} onChange={e=>setOwner(e.target.value)} className={input}/></label>
+ <label>Details<textarea required maxLength={3000} value={text} onChange={e=>setText(e.target.value)} className={input}/></label>
+ {canManage&&<label>Division<select value={target} onChange={e=>setTarget(Number(e.target.value))} className={input}><option value={0}>Whole event</option>{divisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label>}
+ <button disabled={busy||!text.trim()} className="min-h-[44px] rounded-lg border px-4">Save record</button></form>}
+ {!visible.length&&<p className="text-sm text-slate-500">No records for this division/session.</p>}
+ {visible.map(row=><article key={row.id} className="rounded-lg border p-3 space-y-2"><h3 className="font-semibold">{labels[row.kind]}{row.payload.team?` · ${row.payload.team}`:''}</h3><p className="whitespace-pre-wrap break-words">{row.payload.note}</p><p className="text-sm">{row.payload.owner?`Assigned: ${row.payload.owner} · `:''}{row.payload.status} · {row.division_id?divisions.find(d=>Number(d.id)===row.division_id)?.name:'Whole event'}</p>
+ {canWrite&&<div className="flex flex-wrap gap-2"><button disabled={busy} className="min-h-[44px] rounded border px-3" onClick={()=>{const owner=prompt(row.kind==='judge-group'?'Assign judge group':'Assign inspector / volunteer / owner',row.payload.owner||'');if(owner!==null)save({...row.payload,owner:owner.trim().slice(0,100)},row,row.division_id);}}>Assign / change owner</button><button disabled={busy} className="min-h-[44px] rounded border px-3" onClick={()=>save({...row.payload,status:row.payload.status==='closed'?'open':'closed'},row,row.division_id)}>{row.payload.status==='closed'?'Reopen':'Mark completed'}</button>{canManage&&divisions.length>1&&<label>Move to division<select aria-label={`Move ${labels[row.kind]} to division`} value={row.division_id} disabled={busy} className="min-h-[44px] rounded border bg-transparent p-2" onChange={e=>{const next=Number(e.target.value);if(confirm(`Move this record from ${row.division_id?'its current division':'the whole event'} to ${next?divisions.find(d=>Number(d.id)===next)?.name:'the whole event'}? It will no longer appear in the previous division.`))save(row.payload,row,next);}}><option value={0}>Whole event</option>{divisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label>}</div>}
+ </article>)}<button onClick={reload} disabled={busy} className="min-h-[44px] rounded border px-3">Refresh records</button>
+ </div></details>;
+}

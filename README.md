@@ -2,6 +2,8 @@
 
 **Ref OS by Maharshi Patel**
 
+See [Event operations tools](EVENT-TOOLS.md) for division announcements, league attendance, inspection follow-ups, interview planning, offline snapshots, reports and the required database migration.
+
 Ref OS is a referee operations and event coordination platform built specifically for VEX Robotics competitions. It brings referee, field, judging, inspection, event administration, and Tournament Manager related workflows into one shared, event-scoped workspace that runs on phones, tablets, and desktop operations stations.
 
 Ref OS was originally developed for the Highlander Summit Signature Event and has since evolved into a multi-event platform: one deployment can host several independent VEX events, each with its own access codes, data, branding, and lifecycle.

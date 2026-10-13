@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, CalendarDays, CheckCircle2, ChevronLeft, Flag, LogOut, Pencil, Play, Plus, RotateCcw, Trash2, Trophy, Users, X } from "lucide-react";
 import * as api from "../api";
+import LeagueTools from '../components/LeagueTools';
+import EventArchiveTools from '../components/EventArchiveTools';
 import {
   SESSION_STATUS_LABELS, activeSessionOf, nextSessionOf, sortSessions,
   formatSessionDate, sessionTimeRange,
@@ -267,6 +269,8 @@ export default function LeagueOverview({
             <h1 className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{eventName}</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">League Overview</p>
           </div>
+          <LeagueTools eventId={eventId} sessions={sessions} isAdmin={isAdmin} onOpenSession={onOpenSession}/>
+          {isAdmin&&<EventArchiveTools eventId={eventId} eventName={eventName} isLeague/>}
           {body}
         </div>
       </div>

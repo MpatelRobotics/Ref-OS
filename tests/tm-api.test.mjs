@@ -118,6 +118,12 @@ test('fast check-in refresh writes only check-in status without importing matche
   await applyTmSnapshot(normalizeTmSnapshot(fixture()), { api, eventId: 'event', checkInOnly: true, hashes: {}, current: () => true });
   assert.deepEqual(api.calls.map(call => call[0]), ['tm_check_in']);
 });
+test('TM scheduled match times are saved for interview planning and missing times clear the old snapshot',async()=>{
+ const data=fixture(),api=mockApi(),hashes={};data.matches[0].matchInfo.timeScheduled=1791914400;
+ let snapshot=normalizeTmSnapshot(data);assert.equal(snapshot.matches[0].scheduledAt,new Date(1791914400000).toISOString());
+ const options={api,eventId:'event',hashes,current:()=>true};await applyTmSnapshot(snapshot,options);assert.equal(api.settings.tm_match_times.rows.length,1);
+ delete data.matches[0].matchInfo.timeScheduled;await applyTmSnapshot(normalizeTmSnapshot(data),options);assert.deepEqual(api.settings.tm_match_times.rows,[]);
+});
 test('whole snapshot imports through event API, adds opt-in schedule and avoids unchanged writes', async () => {
   const api = mockApi(), hashes = {}, snapshot = normalizeTmSnapshot(fixture());
   const options = { api, eventId: 'selected-league-event', includeSchedule: true, hashes, current: () => true, by: 'Admin' };

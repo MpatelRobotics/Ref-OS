@@ -26,6 +26,7 @@ export function normalizeTmSnapshot(data, session) {
     const blue = (alliances[1].teams || []).map(t => number(t.number));
     if (red.length !== 2 || blue.length !== 2 || [...red, ...blue].some(t => !t) || new Set([...red,...blue]).size !== 4) return [];
     const row = { ...identity, red, blue };
+    if(Number.isSafeInteger(info.timeScheduled)&&info.timeScheduled>0&&Number.isFinite(new Date(info.timeScheduled*1000).getTime()))row.scheduledAt=new Date(info.timeScheduled*1000).toISOString();
     if (info.state === 'SCORED' && Array.isArray(m.finalScore) && m.finalScore.length === 2 && m.finalScore.every(integer)) {
       row.redScore = m.finalScore[0]; row.blueScore = m.finalScore[1];
     }

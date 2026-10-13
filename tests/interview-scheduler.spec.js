@@ -4,7 +4,7 @@ test('scheduler is available inside the real Judging tab',async({page,isMobile})
  await page.route('**/src/interviewScheduleApi*',r=>r.fulfill({contentType:'text/javascript',body:'export const loadInterviewSchedule=async()=>({value:{duration:10,entries:[]},version:0});export const saveInterviewSchedule=async()=>({version:1});'}));
  await page.goto('/');await page.getByRole('button',{name:/Highlander Summit/}).first().click();await page.getByRole('button',{name:'Admin login',exact:true}).click();await page.getByPlaceholder('Admin password').fill('test-judge');await page.getByRole('button',{name:'Enter',exact:true}).click();await page.getByPlaceholder('e.g. Maharshi').fill('InterviewTester');await page.getByPlaceholder('Required for exports').nth(0).fill('Interview');await page.getByPlaceholder('Required for exports').nth(1).fill('Tester');await page.getByRole('button',{name:'Start logging',exact:true}).click();await page.getByRole('button',{name:'Close Quick Start'}).click();
  await page.getByRole('navigation',{name:isMobile?'Mobile navigation':'Main navigation',exact:true}).getByRole('button',{name:'Judging',exact:true}).click();
- await expect(page.getByRole('region',{name:'Experimental Interview Scheduler'})).toBeVisible();await expect(page.getByLabel('Interview length (minutes)',{exact:true})).toBeEnabled();
+ await expect(page.getByRole('group',{name:'Experimental Interview Scheduler'})).toBeVisible();await page.locator('details[aria-label="Experimental Interview Scheduler"] > summary').click();await expect(page.getByLabel('Interview length (minutes)',{exact:true})).toBeEnabled();
 });
 async function mount(page,fail=false){
  await page.route('**/src/interviewScheduleApi*',r=>r.fulfill({contentType:'text/javascript',body:'export const loadInterviewSchedule=async()=>({value:{duration:10,entries:[]},version:0});export const saveInterviewSchedule=async()=>({version:1});'}));
@@ -13,7 +13,7 @@ async function mount(page,fail=false){
  const React=(await import('/node_modules/.vite/deps/react.js')).default;const ReactDOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default;const Scheduler=(await import('/src/components/InterviewScheduler.jsx')).default;
  window.saved=[];let value={duration:10,entries:[]};let version=0;const api={loadInterviewSchedule:async()=>({value,version}),saveInterviewSchedule:async(event,session,next,expected)=>{window.saved.push({event,session,next,expected});if(${fail})throw Error('Another organizer changed this schedule. Reload saved schedule before making more changes. Your draft is still here.');value=next;version++;return {value,version};}};
  ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Scheduler,{eventId:'event-one',sessionId:'session-one',sessionName:'Session 1',teams:[{number:'10A',name:'Ten'},{number:'2A',name:'Two'}],api}));
- </script></body></html>`}));await page.goto('/interview-test');await expect(page.getByRole('button',{name:'Select unscheduled teams'})).toBeEnabled();
+ </script></body></html>`}));await page.goto('/interview-test');await page.locator('summary').click();await expect(page.getByRole('button',{name:'Select unscheduled teams'})).toBeEnabled();
 }
 async function generate(page){await page.getByLabel('Interview length (minutes)',{exact:true}).fill('15');await page.getByLabel('First interview time').fill('2026-10-06T09:00');await page.getByRole('button',{name:'Select unscheduled teams'}).click();await page.getByRole('button',{name:'Add selected interviews'}).click();}
 test('experimental scheduler saves configurable interview slots in the selected League session',async({page})=>{
@@ -25,5 +25,5 @@ test('overlap prevents saving and can be resolved by editing the panel',async({p
  await mount(page);await generate(page);await page.getByLabel('Length (minutes)',{exact:true}).first().fill('20');await expect(page.getByRole('alert')).toContainText('overlap');await expect(page.getByRole('button',{name:'Save interview schedule'})).toBeDisabled();await page.getByLabel('Panel/location',{exact:true}).nth(2).fill('Judge panel 2');await expect(page.getByRole('button',{name:'Save interview schedule'})).toBeEnabled();
 });
 test('concurrent-save failure keeps the draft visible instead of replacing shared data',async({page})=>{
- await mount(page,true);await generate(page);await page.getByRole('button',{name:'Save interview schedule'}).click();await expect(page.getByRole('alert')).toContainText('Another organizer');await expect(page.getByText('Team 2A',{exact:true})).toBeVisible();await expect(page.getByText(/Unsaved changes/)).toBeVisible();
+ await mount(page,true);await generate(page);await page.getByRole('button',{name:'Save interview schedule'}).click();await expect(page.getByRole('alert')).toContainText('Another organizer');await expect(page.getByText('Team 2A',{exact:true})).toBeVisible();await expect(page.getByText(/Unsaved changes/).first()).toBeVisible();
 });

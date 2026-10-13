@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 export const divisionSettingKey = (division, key, session) => `division:${division}:${key}${session ? '@'+session : ''}`;
-const settingKeys = new Set(['qualification_records','rank_snapshot','tm_field_activity','division_alliances','tm_check_in']);
+const settingKeys = new Set(['qualification_records','rank_snapshot','tm_field_activity','division_alliances','tm_check_in','tm_match_times']);
 const sameTeams = (a,b) => [...a].sort().join('|') === [...b].sort().join('|');
 export function createDivisionApi(base, eventId, division, client = supabase) {
  if (!division) return base;
