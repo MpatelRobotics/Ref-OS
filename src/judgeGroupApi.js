@@ -19,3 +19,7 @@ export const deleteJudgeGroups=(event,groups)=>rpc('delete_judge_groups',{p_even
 export const listJudgingOperations=event=>rpc('list_judging_operations',{p_event:event});
 export const saveJudgingOperation=args=>rpc('save_judging_operation',args);
 export const listJudgeAssignmentHistory=event=>rpc('list_judge_assignment_history',{p_event:event});
+
+export const manageSharedJudgeCode=(event,disable=false)=>rpc('manage_shared_judge_code',{p_event:event,p_disable:disable});
+export const sharedJudgeCodeStatus=event=>rpc('shared_judge_code_status',{p_event:event});
+export const chooseSharedJudgeGroup=(event,group)=>rpc('choose_shared_judge_group',{p_event:event,p_group:group});
