@@ -12,7 +12,7 @@ test('field events preserve assigned identity and reject unsupported fields/mess
   const set={fields:[{id:1,status:'unknown',match:null},{id:2,status:'unknown',match:null}]};
   assert.equal(applyFieldEvent(set,{type:'fieldMatchAssigned',fieldID:1,match:tuple},100),true);
   applyFieldEvent(set,{type:'fieldActivated',fieldID:1});assert.equal(set.fields[0].active,true);assert.equal(set.fields[1].active,false);
-  applyFieldEvent(set,{type:'matchStarted',fieldID:1});assert.equal(set.fields[0].status,'playing');
+  applyFieldEvent(set,{type:'matchStarted',fieldID:1},123456);assert.equal(set.fields[0].status,'playing');assert.equal(set.fields[0].startedAt,123456);applyFieldEvent(set,{type:'fieldActivated',fieldID:1},123500);assert.equal(set.fields[0].startedAt,123456);
   applyFieldEvent(set,{type:'matchStopped',fieldID:1});assert.equal(set.fields[0].status,'stopped');assert.equal(set.fields[0].match.match,2);
   assert.equal(applyFieldEvent(set,{type:'matchStarted',fieldID:999}),false);
   assert.equal(applyFieldEvent(set,{cmd:'start',fieldID:1}),false);
