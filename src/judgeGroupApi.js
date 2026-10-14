@@ -13,3 +13,5 @@ export const listJudgeGroupConflicts=event=>rpc('list_judge_group_conflicts',{p_
 export const myJudgeGroupConflicts=event=>rpc('my_judge_group_conflicts',{p_event:event});
 export const saveJudgeGroupConflicts=args=>rpc('save_judge_group_conflicts',args);
 export const reassignJudgeTeam=args=>rpc('reassign_judge_team',args);
+
+export const deleteJudgeGroups=(event,groups)=>rpc('delete_judge_groups',{p_event:event,p_groups:groups});
