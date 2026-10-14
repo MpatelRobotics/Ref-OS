@@ -109,3 +109,6 @@ Run `supabase/judge-group-conflicts.sql` after judge-group-reschedule.sql. Creat
 The optimizer excludes declared teams, balancing eligible assignments where possible. It warns when an equal split is impossible or no group is eligible. Those teams are not assigned to a conflicting group. Existing assignments reported as conflicts later require advisor review; group interview actions are blocked for declared conflicts.
 
 Judge Advisors, Admins and Developers can move an assigned team using **Universal interview tracker → New judge group → Move team**. Targets must be enabled, declared and conflict-free. The confirmation explains that the old interview time and completion flag are cleared; the new group sees the team as pending and can reschedule it. Save/discard existing interview drafts before moving teams. Conflict declarations and assignment moves use server-side role checks and version checks.
+
+### Guided Judging setup
+Judging uses four visible steps: set up groups and collect their conflict declarations; plan interviews; review and save; track interviews and resolve conflicts. Use **Use groups from setup** in the optimizer to load enabled group names. Apply a generated proposal to the draft, then use **Save interview changes** in the review step. The universal tracker is the shared assignment and completion view.
