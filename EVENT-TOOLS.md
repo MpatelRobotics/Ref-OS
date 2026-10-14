@@ -91,3 +91,13 @@ TM **MatchStartTimes.csv** is now recognized as a times-only export. Import the 
 The optimizer panel/location field has been removed. Each judge group name is now its panel/location in the saved schedule and export.
 
 Interview locations are no longer displayed or requested. Judge group names identify assignments in the optimizer, saved interviews, judge portal and PDF.
+
+## Group rescheduling and shared interview progress
+
+Run `supabase/judge-group-reschedule.sql` after judge-groups.sql. This updates the portal response and adds restricted rescheduling/completion functions; judge-group logins still cannot edit other groups' interviews or nomination records.
+
+Each assigned team has **Reschedule after match**: select that team's match, review the proposed AM/PM time, then confirm. Suggestions start at least ten minutes after its scheduled time and no earlier than the next minute. They avoid known team match windows and existing interviews for the judge group. New optimizer plans retain their end time and lunch rules for this purpose. Older plans without saved rules use an eight-hour search window. Missing match times block the action. This is based on scheduled times, so confirm the selected match has actually finished if the event is delayed. Rescheduling changes the shared interview and returns it to pending.
+
+When fresh TM activity is available, portal matches use green **Playing now** and amber **Up next**. Upcoming is based on the whole match sequence for that field/session/division, not merely the next match involving this team. Stale or disconnected activity does not create live highlights.
+
+Judges use **Mark team interviewed**, with **Mark as not interviewed** for corrections. The **Universal interview tracker** in Judging shows saved completed/pending counts and teams for every group in the selected event/session, refreshing every 15 seconds while open. Version checks prevent a stale judge/advisor action from overwriting another action. Refresh saved interviews before editing if a judge has changed progress or rescheduled a team.

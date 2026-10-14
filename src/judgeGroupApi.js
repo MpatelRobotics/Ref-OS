@@ -7,3 +7,5 @@ export const disableJudgeGroupCode=(event,group)=>rpc('disable_judge_group_code'
 export const loginJudgeGroup=(event,code)=>rpc('login_judge_group',{p_event:event,p_code:code});
 export const loadJudgeGroupDashboard=event=>rpc('judge_group_dashboard',{p_event:event});
 export const logoutJudgeGroup=event=>rpc('logout_judge_group',{p_event:event});
+export const rescheduleJudgeInterview=args=>rpc('reschedule_judge_group_interview',args);
+export const markJudgeInterview=args=>rpc('mark_judge_group_interview',args);

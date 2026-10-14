@@ -2,12 +2,12 @@ import {validateInterviews} from './interviewSchedule.js';
 
 const minute=60000;
 const numeric=(a,b)=>a.localeCompare(b,undefined,{numeric:true});
-export function optimizeJudgeGroups({groupNames,panelPrefix='Judge panel',...options}){
+export function optimizeJudgeGroups({groupNames,panelPrefix=null,...options}){
  const names=groupNames.map(name=>name.trim());
  if(!names.length||names.length>10||names.some(n=>!n||n.length>100)||new Set(names.map(n=>n.toLowerCase())).size!==names.length)throw Error('Enter a unique name for each of 1–10 judge groups.');
  const scheduled=new Set((options.existing||[]).map(r=>r.team));const teams=[...new Set(options.teams)].filter(t=>!scheduled.has(t)).sort(numeric);
  if(!teams.length)throw Error('Select at least one unscheduled team.');
- const groups=names.map((name,i)=>({name,panel:names.length===1?panelPrefix:`${panelPrefix.trim()} ${i+1}`,teams:teams.filter((_,index)=>index%names.length===i)}));
+ const groups=names.map((name,i)=>({name,panel:panelPrefix?(names.length===1?panelPrefix:`${panelPrefix.trim()} ${i+1}`):name,teams:teams.filter((_,index)=>index%names.length===i)}));
  const entries=[],unplaced=[];let teamsWithTimes=0;
  for(const section of groups){if(!section.teams.length)continue;const result=optimizeInterviews({...options,teams:section.teams,existing:[...(options.existing||[]),...entries],panels:[section.panel],group:section.name});entries.push(...result.entries);unplaced.push(...result.unplaced);teamsWithTimes+=result.teamsWithTimes;section.unplaced=result.unplaced;}
  return {entries:entries.sort((a,b)=>Date.parse(a.start)-Date.parse(b.start)||numeric(a.team,b.team)),unplaced,teamsWithTimes,groups};
