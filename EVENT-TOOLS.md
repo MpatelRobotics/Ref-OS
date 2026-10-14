@@ -115,3 +115,5 @@ Judging uses four visible steps: set up groups and collect their conflict declar
 
 ### Managing judge groups
 Create groups using judges’ names (for example John, Sarah, Michael). Staff can enter exact conflicting team numbers and affiliation notes for each group in step 1; saving an empty team list declares no conflicts. Select group checkboxes to delete selected groups, or delete all groups and logins to start over. Deletion removes those groups’ interviews, memberships, conflict profiles and completion records across event sessions, revokes access, and discards the local interview draft after confirmation. Run `supabase/judge-group-management.sql` after the conflict migration to enable deletion. The optimizer starts with blank group names; use groups from setup.
+
+The interview optimizer spreads sister teams with the same numeric team-number prefix across judge groups, preserving group sizes and conflict exclusions. Existing interviews stay fixed. Conflicts and fixed assignments can prevent an even organization split.

@@ -8,7 +8,7 @@ export function optimizeJudgeGroups({groupNames,panelPrefix=null,conflicts={},..
  if(!names.length||names.length>10||names.some(n=>!n||n.length>100)||new Set(names.map(n=>n.toLowerCase())).size!==names.length)throw Error('Enter a unique name for each of 1–10 judge groups.');
  const scheduled=new Set((options.existing||[]).map(r=>r.team));const teams=[...new Set(options.teams)].filter(t=>!scheduled.has(t)).sort(numeric);
  if(!teams.length)throw Error('Select at least one unscheduled team.');
- const allocation=assignConflictFreeGroups(teams,names,conflicts);
+ const allocation=assignConflictFreeGroups(teams,names,conflicts,options.existing||[]);
  const groups=allocation.groups.map((g,i)=>({...g,panel:panelPrefix?(names.length===1?panelPrefix:`${panelPrefix.trim()} ${i+1}`):g.name}));
  const entries=[],unplaced=[];let teamsWithTimes=0;
  for(const section of groups){if(!section.teams.length)continue;const result=optimizeInterviews({...options,teams:section.teams,existing:[...(options.existing||[]),...entries],panels:[section.panel],group:section.name});entries.push(...result.entries);unplaced.push(...result.unplaced);teamsWithTimes+=result.teamsWithTimes;section.unplaced=result.unplaced;}
