@@ -9,3 +9,7 @@ export const loadJudgeGroupDashboard=event=>rpc('judge_group_dashboard',{p_event
 export const logoutJudgeGroup=event=>rpc('logout_judge_group',{p_event:event});
 export const rescheduleJudgeInterview=args=>rpc('reschedule_judge_group_interview',args);
 export const markJudgeInterview=args=>rpc('mark_judge_group_interview',args);
+export const listJudgeGroupConflicts=event=>rpc('list_judge_group_conflicts',{p_event:event});
+export const myJudgeGroupConflicts=event=>rpc('my_judge_group_conflicts',{p_event:event});
+export const saveJudgeGroupConflicts=args=>rpc('save_judge_group_conflicts',args);
+export const reassignJudgeTeam=args=>rpc('reassign_judge_team',args);

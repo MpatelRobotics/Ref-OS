@@ -101,3 +101,11 @@ Each assigned team has **Reschedule after match**: select that team's match, rev
 When fresh TM activity is available, portal matches use green **Playing now** and amber **Up next**. Upcoming is based on the whole match sequence for that field/session/division, not merely the next match involving this team. Stale or disconnected activity does not create live highlights.
 
 Judges use **Mark team interviewed**, with **Mark as not interviewed** for corrections. The **Universal interview tracker** in Judging shows saved completed/pending counts and teams for every group in the selected event/session, refreshing every 15 seconds while open. Version checks prevent a stale judge/advisor action from overwriting another action. Refresh saved interviews before editing if a judge has changed progress or rescheduled a team.
+
+## Conflict declarations and judge-group reassignment
+
+Run `supabase/judge-group-conflicts.sql` after judge-group-reschedule.sql. Create each group login before optimizing. Each group signs in, opens **Your group's conflicts & affiliations**, and lists exact conflicting/affiliated team numbers plus school/organization notes. Groups with no relevant teams explicitly declare none. Every selected group must have an enabled login and a submitted declaration before new optimizer assignments can be saved. Organization names alone do not automatically infer team relationships.
+
+The optimizer excludes declared teams, balancing eligible assignments where possible. It warns when an equal split is impossible or no group is eligible. Those teams are not assigned to a conflicting group. Existing assignments reported as conflicts later require advisor review; group interview actions are blocked for declared conflicts.
+
+Judge Advisors, Admins and Developers can move an assigned team using **Universal interview tracker → New judge group → Move team**. Targets must be enabled, declared and conflict-free. The confirmation explains that the old interview time and completion flag are cleared; the new group sees the team as pending and can reschedule it. Save/discard existing interview drafts before moving teams. Conflict declarations and assignment moves use server-side role checks and version checks.

@@ -16,6 +16,7 @@ export async function optimizerSchedulePDF(plan){
  line(`Before match: ${window.before?ref(window.before):window.known?'No later scheduled match':'Unknown - match times unavailable'}`);
  if(window.unknown)line('Some team match times are unavailable; this window may be incomplete.');if(window.overlapping.length)line('Match overlaps interview - review this slot.');line('');});
  }
+ if(plan.conflictUnassigned?.length)line(`No conflict-free group: ${plan.conflictUnassigned.join(', ')}`);
  line(`Teams not fitted: ${plan.unplaced.length?plan.unplaced.join(', '):'None'}`);line(`${plan.teamsWithTimes} selected teams have known match times. Match avoidance uses a ten-minute margin either side.`);
  return pdf.save();
 }
