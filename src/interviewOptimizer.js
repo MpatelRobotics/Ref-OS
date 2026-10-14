@@ -5,7 +5,7 @@ const minute=60000;
 const numeric=(a,b)=>a.localeCompare(b,undefined,{numeric:true});
 export function optimizeJudgeGroups({groupNames,panelPrefix=null,conflicts={},...options}){
  const names=groupNames.map(name=>name.trim());
- if(!names.length||names.length>10||names.some(n=>!n||n.length>100)||new Set(names.map(n=>n.toLowerCase())).size!==names.length)throw Error('Enter a unique name for each of 1–10 judge groups.');
+ if(!names.length||names.some(n=>!n||n.length>100)||new Set(names.map(n=>n.toLowerCase())).size!==names.length)throw Error('Enter a unique name for each judge group.');
  const scheduled=new Set((options.existing||[]).map(r=>r.team));const teams=[...new Set(options.teams)].filter(t=>!scheduled.has(t)).sort(numeric);
  if(!teams.length)throw Error('Select at least one unscheduled team.');
  const allocation=assignConflictFreeGroups(teams,names,conflicts,options.existing||[]);
@@ -22,7 +22,7 @@ export function optimizeInterviews({teams,existing=[],matches=[],start,end,minut
  if(!Number.isFinite(from)||!Number.isFinite(until)||until<=from||until-from>7*24*60*minute)throw Error('Choose a start and end within a seven-day interview window.');
  if(!Number.isInteger(gap)||gap<0||gap>60)throw Error('Interview buffers must be 0–60 minutes.');
  if(!Number.isFinite(padding)||padding<0||padding>120)throw Error('Choose a valid match margin.');
- const locations=[...new Set(panels.map(p=>p.trim()))];if(!locations.length||locations.length>10||locations.some(p=>!p||p.length>100)||new Set(locations.map(p=>p.toLowerCase())).size!==locations.length)throw Error('Choose 1–10 distinct panels/locations.');
+ const locations=[...new Set(panels.map(p=>p.trim()))];if(!locations.length||locations.some(p=>!p||p.length>100)||new Set(locations.map(p=>p.toLowerCase())).size!==locations.length)throw Error('Choose distinct panels/locations.');
  const scheduled=new Set(existing.map(r=>r.team));const pending=[...new Set(teams)].filter(t=>!scheduled.has(t)).sort(numeric);
  if(!pending.length)throw Error('Select at least one unscheduled team.');if(pending.length+existing.length>500)throw Error('Schedule up to 500 interviews.');
  const lunch=[Date.parse(lunchStart),Date.parse(lunchEnd)];

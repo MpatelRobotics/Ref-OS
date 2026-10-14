@@ -27,3 +27,5 @@ test('limited capacity reports unplaced teams and independent panels run concurr
 test('invalid windows, panels and duration reject instead of producing unsafe schedules',()=>{
  assert.throws(()=>optimizeInterviews({...base,end:time('08:00')}),/window/);assert.throws(()=>optimizeInterviews({...base,panels:['P1','p1']}),/distinct/);assert.throws(()=>optimizeInterviews({...base,minutes:0}),/length/);
 });
+
+test('optimizer accepts more than ten judge groups',()=>{const result=optimizeJudgeGroups({teams:Array.from({length:12},(_,i)=>String(i+1)+'A'),groupNames:Array.from({length:12},(_,i)=>'Group '+i),start:'2026-10-13T09:00:00Z',end:'2026-10-13T11:00:00Z',minutes:10,buffer:0});assert.equal(result.groups.length,12);assert.equal(result.entries.length,12);});
