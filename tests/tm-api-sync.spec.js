@@ -46,13 +46,12 @@ test('wrong event is blocked and connection errors have a recoverable message',a
   await page.evaluate(()=>window.fail=false);await page.getByRole('button',{name:'Connect to TM',exact:true}).click();await page.getByRole('button',{name:'Review TM data'}).click();
   await expect(page.getByRole('button',{name:'Start TM syncing'})).toBeEnabled();
 });
-test('setup download and controls fit mobile and key stays password masked',async({page})=>{
+test('browser setup only shows the connector download',async({page})=>{
   await mount(page, false);
   await expect(page.getByRole('link',{name:'Download Ref OS TM Connect for Windows'})).toHaveAttribute('href','https://github.com/MpatelRobotics/Ref-OS/releases/download/tm-connect/Ref-OS-TM-Connect.exe');
-  await expect(page.getByLabel('Event TM API key',{exact:true})).toHaveAttribute('type','password');
+  await expect(page.getByLabel('Event TM API key',{exact:true})).toHaveCount(0);await expect(page.getByLabel('TM server address',{exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Sync both TM divisions'})).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
-  await page.getByRole('button',{name:'Start TM syncing'}).scrollIntoViewIfNeeded();
-  await expect(page.getByRole('button',{name:'Start TM syncing'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Start TM syncing'})).toHaveCount(0);
 });
 test('live events publish Playing now and Stopped, and disconnect when sync stops',async({page})=>{
   await mount(page);await page.clock.install();await review(page);
