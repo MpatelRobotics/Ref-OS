@@ -41,6 +41,9 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
   const [name, setName] = useState(initial.name);
   const [shortName, setShortName] = useState(initial.shortName);
   const [logoUrl, setLogoUrl] = useState(initial.logoUrl);
+  const [uploadedLogo, setUploadedLogo] = useState(null);
+  const [readingLogo, setReadingLogo] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [accentText, setAccentText] = useState(initial.accent);
   const [fields, setFields] = useState(initial.fields);
   const [removeLegacyLogo, setRemoveLegacyLogo] = useState(false);
@@ -49,19 +52,52 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { setLogoBroken(false); }, [logoUrl]);
+  useEffect(() => { setLogoBroken(false); }, [logoUrl, uploadedLogo, removeLegacyLogo]);
 
   const accent = normalizeHexColor(accentText);
   const legacyLogo = brand?.logoSource === "legacy" && !removeLegacyLogo;
   const cleanLogoUrl = logoUrl.trim();
-  const previewLogo = isHttpUrl(cleanLogoUrl)
+  const previewLogo = uploadedLogo || (isHttpUrl(cleanLogoUrl)
     ? cleanLogoUrl
     : legacyLogo
       ? brand.logo
       : (brand?.logoSource === "saved" || brand?.logoSource === "legacy")
         ? (brand.highlander ? "/logo.svg" : "/refos-logo.svg")
-        : brand?.logo || "/refos-logo.svg";
+        : brand?.logo || "/refos-logo.svg");
   const previewShort = shortName.trim() || name.trim() || "Event";
+
+  const uploadLogo = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadError("");
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setUploadError("Choose a PNG, JPG, or WebP image."); return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError("Choose an image smaller than 10 MB."); return;
+    }
+    setReadingLogo(true);
+    const url = URL.createObjectURL(file);
+    try {
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      const scale = Math.min(1, 512 / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      setUploadedLogo(canvas.toDataURL("image/png"));
+      setLogoUrl("");
+      setRemoveLegacyLogo(false);
+    } catch {
+      setUploadError("This image could not be opened. Try another image.");
+    } finally {
+      URL.revokeObjectURL(url);
+      setReadingLogo(false);
+    }
+  };
 
   const validate = () => {
     const next = {};
@@ -82,6 +118,7 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
   };
 
   const save = async () => {
+    if (readingLogo || saving) return;
     const { next, cleanName, cleanShort, cleanedFields } = validate();
     setErrors(next);
     setSaveError("");
@@ -91,6 +128,7 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
       logoUrl: cleanLogoUrl !== initial.logoUrl,
       accent: accent !== normalizeHexColor(initial.accent),
       removeLegacyLogo,
+      uploadedLogo: uploadedLogo !== null,
     };
     const fieldsChanged = FIELD_KEYS.some((key) => cleanedFields[key] !== initial.fields[key]);
     const nameChanged = cleanName !== initial.name;
@@ -105,6 +143,7 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
           ...(identityChanged.shortName ? { shortName: cleanShort } : {}),
           ...(identityChanged.logoUrl ? { logoUrl: cleanLogoUrl } : {}),
           ...(identityChanged.accent ? { accent } : {}),
+          ...(uploadedLogo ? { logoData: uploadedLogo, logoUrl: "" } : {}),
           removeLegacyLogo,
         } : null,
         fieldCount: count !== initialCount ? count : null,
@@ -163,18 +202,29 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
             <div><label className="block"><span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Event timezone</span><select aria-label="Event timezone" value={timezone} onChange={e=>setTimezone(e.target.value)} className={`${inputClass} ${inputBorder(errors.timezone)}`}><option value="" disabled>Choose event timezone</option>{timezones.map(zone=><option key={zone} value={zone}>{zone.replaceAll('_',' ')}</option>)}</select></label><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Used for event clocks, scheduled match times and judging interviews. Applies across all divisions. Existing saved times keep the same instant.</p><button type="button" className="mt-2 min-h-[44px] rounded-lg border px-3" onClick={()=>setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)}>Use this device’s timezone</button><FieldError>{errors.timezone}</FieldError></div>
             <label className="block">
               <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Event logo URL</span>
-              <input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
+              <input value={logoUrl} disabled={readingLogo || saving} onChange={(e) => { setLogoUrl(e.target.value); setUploadedLogo(null); }} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
                 placeholder="https://example.org/event-logo.png" className={`${inputClass} ${inputBorder(errors.logoUrl)}`} />
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Link to a PNG, JPG, or SVG image. Leave blank to use {brand?.highlander ? "the Highlander Summit logo" : "the Ref OS logo"}.
+                Or link to a PNG, JPG, or SVG image. Leave blank to use {brand?.highlander ? "the Highlander Summit logo" : "the Ref OS logo"}.
               </p>
               {logoBroken && isHttpUrl(cleanLogoUrl) && <p className="mt-1 text-xs font-semibold text-amber-700 dark:text-amber-300">This image did not load. Check the address, or that the site allows the image to be shown elsewhere.</p>}
               <FieldError>{errors.logoUrl}</FieldError>
             </label>
-            {brand?.logoSource === "legacy" && (
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-200">
+                Upload event logo
+                <input type="file" accept="image/png,image/jpeg,image/webp" disabled={saving || readingLogo} onChange={uploadLogo}
+                  className="mt-2 block w-full text-sm file:mr-3 file:min-h-[44px] file:rounded-lg file:border file:border-slate-300 file:bg-slate-50 file:px-3 file:font-semibold file:text-slate-800" />
+              </label>
+              <p className="text-xs text-slate-500">PNG, JPG, or WebP, up to 10 MB. Preview above; saved for everyone at this event when you select Save Settings.</p>
+              <p role="status" className="text-sm">{readingLogo ? "Preparing logo…" : uploadedLogo ? "New logo ready to save." : ""}</p>
+              <FieldError>{uploadError}</FieldError>
+              {uploadedLogo && <button type="button" className="min-h-[44px] rounded-lg border px-3 text-sm" onClick={() => setUploadedLogo(null)}>Discard upload</button>}
+            </div>
+            {brand?.logoSource === "legacy" && !uploadedLogo && (
               <label className="flex items-start gap-2 rounded-xl border border-slate-200 dark:border-slate-700 p-3 text-sm text-slate-600 dark:text-slate-300">
                 <input type="checkbox" checked={removeLegacyLogo} onChange={(e) => setRemoveLegacyLogo(e.target.checked)} className="mt-0.5 w-4 h-4" />
-                <span>This event has a logo saved by the earlier event configurator. Check to remove it{cleanLogoUrl ? "" : " and use the default logo"}.</span>
+                <span>This event has an uploaded logo. Check to remove it{cleanLogoUrl ? "" : " and use the default logo"}.</span>
               </label>
             )}
             <div>
@@ -240,7 +290,7 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
           )}
           <div className="flex gap-2">
             <button onClick={onClose} disabled={saving} className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-semibold disabled:opacity-50">Cancel</button>
-            <button onClick={save} disabled={saving} className="flex-1 rounded-lg bg-[#0D0F32] text-white py-2.5 font-bold flex items-center justify-center gap-2 disabled:opacity-60">
+            <button onClick={save} disabled={saving || readingLogo} className="flex-1 rounded-lg bg-[#0D0F32] text-white py-2.5 font-bold flex items-center justify-center gap-2 disabled:opacity-60">
               <Save size={16} />{saving ? "Saving…" : "Save Settings"}
             </button>
           </div>
