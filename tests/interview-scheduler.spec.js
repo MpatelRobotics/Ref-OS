@@ -1,11 +1,9 @@
 import {test,expect} from '@playwright/test';
-test('scheduler is available inside the real Judging tab',async({page,isMobile})=>{
+test('admin cannot see the developer-only Judging tab',async({page,isMobile})=>{
  await page.route('https://example.supabase.co/**',r=>r.fulfill({contentType:'application/json',body:'[]'}));
  await page.route('**/src/interviewScheduleApi*',r=>r.fulfill({contentType:'text/javascript',body:'export const loadInterviewSchedule=async()=>({value:{duration:10,entries:[]},version:0});export const saveInterviewSchedule=async()=>({version:1});'}));
  await page.goto('/');await page.getByRole('button',{name:/Highlander Summit/}).first().click();await page.getByRole('button',{name:'Admin login',exact:true}).click();await page.getByPlaceholder('Admin password').fill('test-judge');await page.getByRole('button',{name:'Enter',exact:true}).click();await page.getByPlaceholder('e.g. Maharshi').fill('InterviewTester');await page.getByPlaceholder('Required for exports').nth(0).fill('Interview');await page.getByPlaceholder('Required for exports').nth(1).fill('Tester');await page.getByRole('button',{name:'Start logging',exact:true}).click();await page.getByRole('button',{name:'Close Quick Start'}).click();
- await page.getByRole('navigation',{name:isMobile?'Mobile navigation':'Main navigation',exact:true}).getByRole('button',{name:'Judging',exact:true}).click();
- await expect(page.getByRole('group',{name:'Experimental Interview Scheduler'})).toHaveCount(0);await expect(page.getByText('Interview Optimizer',{exact:true})).toBeVisible();
- await page.getByRole('navigation',{name:isMobile?'Mobile navigation':'Main navigation',exact:true}).getByRole('button',{name:'Nominations',exact:true}).click();await expect(page.getByText('Interview Optimizer',{exact:true})).toHaveCount(0);
+ const nav=page.getByRole('navigation',{name:isMobile?'Mobile navigation':'Main navigation',exact:true});await expect(nav.getByRole('button',{name:'Judging',exact:true})).toHaveCount(0);await nav.getByRole('button',{name:'Nominations',exact:true}).click();await expect(page.getByText('Interview Optimizer',{exact:true})).toHaveCount(0);
 
 });
 async function mount(page,fail=false){

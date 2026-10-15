@@ -1698,7 +1698,8 @@ const ConfigError = () => (
 /* ==================================================================== */
 function Tracker(props) {
   const eventId=props.initialEvent.id;
-  const [view, setView] = useState(props.role === "judge" ? "interviews" : props.role === "inspection" ? "robots" : "matches");
+  const [view, setView] = useState(props.role === "judge" ? "judging" : props.role === "inspection" ? "robots" : "matches");
+  useEffect(()=>{if(view==="interviews"&&!props.isDeveloper)setView(props.role==="judge"?"judging":"matches");},[view,props.isDeveloper,props.role]);
   const [divisions,setDivisions]=useState([]);
   const storageKey=`refosDivision:${eventId}:${props.league?.session?.id||''}`;
   const [selected,setSelected]=useState(()=>{try{return Number(localStorage.getItem(storageKey))||0;}catch{return 0;}});
@@ -4506,7 +4507,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])
           ] : isJudge ? [
             { k: "judging", label: "Nominations", Icon: Trophy },
-            ...((adminUnlocked || isJudge) ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
+            ...(isDeveloper ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
             { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch }
           ] : [
             { k: "matches", label: "Matches", Icon: ListOrdered },
@@ -4515,7 +4516,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             { k: "robots", label: "Robots", Icon: Camera },
             { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch },
             { k: "judging", label: "Nominations", Icon: Trophy },
-            ...((adminUnlocked || isJudge) ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
+            ...(isDeveloper ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
             ...(adminUnlocked ? [{ k: "rankings", label: "Rankings", Icon: BarChart3 }] : [])
           ];
           navItems.push({ k: "lost-found", label: "Lost & Found", Icon: Flag });
@@ -4560,7 +4561,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])
         ] : isJudge ? [
           { k: "judging", label: "Nominations", Icon: Trophy },
-            ...((adminUnlocked || isJudge) ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
+            ...(isDeveloper ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
           { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch }
         ] : [
           { k: "matches", label: "Matches", Icon: ListOrdered },
@@ -4586,7 +4587,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : [])
         ] : isJudge ? [
           { k: "judging", label: "Nominations", Icon: Trophy },
-            ...((adminUnlocked || isJudge) ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
+            ...(isDeveloper ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
           { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch }
         ] : [
           { k: "teams", label: "Teams", Icon: Users },
@@ -4595,7 +4596,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           { k: "robots", label: "Robots", Icon: Camera },
           { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch },
           { k: "judging", label: "Nominations", Icon: Trophy },
-            ...((adminUnlocked || isJudge) ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
+            ...(isDeveloper ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
           ...(adminUnlocked ? [{ k: "rankings", label: "Rankings", Icon: BarChart3 }] : [])
         ];
         return (
@@ -4783,7 +4784,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             onNominate={(award) => setNominating(award || "sportsmanship")} onDeleteNom={removeNomination}
             onExport={isEmcee ? undefined : () => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
           </>
-        ) : view === "interviews" && (adminUnlocked || isJudge) ? (
+        ) : view === "interviews" && isDeveloper ? (
           <JudgingInterviews division={divisionId} divisions={divisionCatalog} canManage={adminUnlocked&&!highlanderDemoLocked} canJudge={isJudge&&!highlanderDemoLocked} eventName={event?.name||'Event'} key={`${eventId}:${leagueSessionId || ""}`} eventId={eventId} sessionId={leagueSessionId || null} sessionName={league?.sessionName(leagueSessionId) || ""} teams={teams} matches={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone || 'UTC'} onSaveTimezone={adminUnlocked ? async zone => { const saved = await api.upsertEventSetting(eventId, 'event_timezone', {zone}); setEventSettings(prev=>({...prev,event_timezone:saved})); } : undefined}/>
         ) : view === "rulebook" ? (
           (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq" ? <IQRules /> : <RuleBook rules={rules} online={online} accent={brand.accent}
