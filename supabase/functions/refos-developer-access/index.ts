@@ -32,9 +32,10 @@ Deno.serve(async (request) => {
     const authorization = request.headers.get("Authorization");
     if (!authorization) return json({ ok: false, reason: "invalid" }, 401);
 
-    let body: { eventId?: unknown; credential?: unknown } = {};
+    let body: { eventId?: unknown; credential?: unknown; action?: unknown } = {};
     try { body = await request.json(); } catch { return json({ ok: false, reason: "invalid" }, 400); }
     const eventId = String(body.eventId ?? "").trim().toLowerCase();
+    if (body.action !== undefined && body.action !== "restore") return json({ ok: false, reason: "invalid" }, 400);
     const submitted = String(body.credential ?? "").trim().toUpperCase();
     if (!UUID_RE.test(eventId)) return json({ ok: false, reason: "invalid" }, 400);
 
@@ -64,6 +65,15 @@ Deno.serve(async (request) => {
 
     const secret = String(Deno.env.get("REFOS_SUPER_ADMIN_CODE") || "").trim().toUpperCase();
     const valid = CODE_RE.test(submitted) && CODE_RE.test(secret) && await sameSecret(submitted, secret);
+
+    // Restore is separate from login: verify either credential without granting membership.
+    if (body.action === "restore") {
+      const { data: result, error: restoreError } = valid
+        ? await serviceClient.rpc("restore_refos_event_as_developer", { p_event: eventId, p_user: userId })
+        : await userClient.rpc("restore_refos_event", { p_event: eventId, p_admin_credential: submitted });
+      if (restoreError) throw restoreError;
+      return json({ ok: result === "restored" || result === "active", result });
+    }
 
     if (!valid) {
       const { data: outcome, error: attemptError } = await serviceClient.rpc("refos_access_attempt", { p_event: eventId, p_user: userId, p_ok: false });

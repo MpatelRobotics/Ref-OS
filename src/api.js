@@ -527,12 +527,11 @@ export async function emergencyDeleteEvent(eventId, confirmName, overrideCode) {
 // Resolves to "restored", "active", "invalid", or "locked".
 export async function restoreEvent(eventId, adminCredential) {
   await ensureAnonymousSession();
-  const { data, error } = await supabase.rpc("restore_refos_event", {
-    p_event: eventId,
-    p_admin_credential: String(adminCredential || "").trim().toUpperCase(),
+  const { data, error } = await supabase.functions.invoke("refos-developer-access", {
+    body: { eventId, credential: String(adminCredential || "").trim().toUpperCase(), action: "restore" },
   });
-  if (error) throw error;
-  return String(data || "");
+  if (error) throw new Error("Could not verify restore access. Check the connection and try again.");
+  return String(data?.result || data?.reason || "invalid");
 }
 export async function getEvent(id) {
   if (E2E_MOCK) return { id, name: "Highlander Summit E2E", quals: 10, practice: 0, bracket: 16, finalsBestOf: 1, joinCode: "TEST" };

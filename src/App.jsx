@@ -1412,7 +1412,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
   };
   const restore = async (ev) => {
     const code = restoreCode.trim().toUpperCase();
-    if (!/^\d[A-Z]\d\d$/.test(code)) { setRestoreError("Enter this event's 4 character Admin access code."); return; }
+    if (!/^\d[A-Z]\d\d$/.test(code)) { setRestoreError("Enter the event’s Admin code or the Developer code."); return; }
     setRestoreBusy(true);
     setRestoreError("");
     try {
@@ -1426,7 +1426,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
       } else if (result === "locked") {
         setRestoreError("Too many incorrect codes. Try again in a few minutes.");
       } else {
-        setRestoreError("That is not this event's Admin access code.");
+        setRestoreError("That code was not accepted. Use the event’s Admin code or the Developer code.");
       }
     } catch (e) {
       setRestoreError(e?.message || "Could not restore the event.");
@@ -1498,7 +1498,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
       <div className="text-center mb-6">
         <img src="/refos-logo.svg" alt="Ref OS" className="h-20 mx-auto mb-3" />
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{view === "archived" ? "Archived events keep all of their data. An event Admin can restore one." : "Select the event this device is working at."}</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{view === "archived" ? "Archived events keep all of their data. Use the event’s Admin code or the Developer code to restore one." : "Select the event this device is working at."}</p>
       </div>
       {developerPage && !developerPageUnlocked ? <DeveloperPageLock events={events} onUnlock={method=>{setDeveloperPasskeySession(method==='passkey');setDeveloperPageUnlocked(true);}}/> : <>
       {developerPage && <>
@@ -1560,7 +1560,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
                     </>
                   ) : (
                     <div className="mt-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 p-3">
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Admin access code for this event</label>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Event Admin code or Developer code</label>
                       <input value={restoreCode} onChange={(e) => { setRestoreCode(e.target.value.toUpperCase()); setRestoreError(""); }} maxLength={4} placeholder="3S23"
                         autoCapitalize="characters" autoCorrect="off" spellCheck={false} disabled={restoreBusy}
                         onKeyDown={(e) => e.key === "Enter" && restore(ev)}
