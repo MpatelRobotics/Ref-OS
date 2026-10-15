@@ -2812,9 +2812,15 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   //   events.name, event_settings "event_branding", event_settings "field_names".
   // Only the parts the Admin changed are written. Teams, matches, rankings, violations,
   // alliances, nominations, and access credentials are never touched.
-  const saveEventSettings = async ({ name, branding, fieldNames: nextFieldNames, requiredRobotPhotos: nextPhotoRequirements, fieldCount: nextFieldCount }) => {
+  const saveEventSettings = async ({ timezone, name, branding, fieldNames: nextFieldNames, requiredRobotPhotos: nextPhotoRequirements, fieldCount: nextFieldCount }) => {
     if (!adminUnlocked) throw new Error("Only this event's Admin can change event settings.");
     try {
+      if (timezone) {
+        new Intl.DateTimeFormat('en-US',{timeZone:timezone}).format();
+        const savedTimezone=await eventApi.upsertEventSetting(eventId,'event_timezone',{zone:timezone},meName);
+        rememberSettingWrite(savedTimezone);
+        setEventSettings(cur=>({...cur,event_timezone:savedTimezone}));
+      }
       if (branding) {
         const { removeLegacyLogo, ...changes } = branding;
         const next = { ...(eventSettings?.event_branding?.value || {}), ...changes, updatedAt: Date.now() };
@@ -4428,7 +4434,6 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             <button aria-label="Settings" onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
               <div ref={menuRef} className="refos-menu-pop absolute right-0 mt-2 w-56 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
-                {adminUnlocked && !isHighlander && <button onClick={() => { setMenu(false); ruleImportRef.current?.click(); }} className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"><BookOpen size={16} /> Import event rules CSV</button>}
                 {isInspection ? (
                   <>
                     <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><ClipboardCheck size={12} /> Inspection</div>
@@ -5080,7 +5085,7 @@ onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!cu
       {showEventManagement && adminUnlocked && <EventManagementModal event={event} eventId={eventId} brand={brand} roleLabel={myRole} isProtected={eventProtected}
         onArchive={archiveCurrentEvent}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEventManagement(false)} />}
-      {showEventSettings && adminUnlocked && <EventSettingsModal fieldCount={configuredFieldCount} event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
+      {showEventSettings && adminUnlocked && <EventSettingsModal eventTimezone={eventSettings?.event_timezone?.value?.zone||''} fieldCount={configuredFieldCount} event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
         eventFormat={league || event?.format === "league" ? "league" : "tournament"}
         canConvertToLeague={!league && !isHighlander && event?.format !== "league"}
         onConvertToLeague={() => setShowConvertLeague(true)}

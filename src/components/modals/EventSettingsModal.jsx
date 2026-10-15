@@ -22,7 +22,9 @@ function FieldError({ children }) {
   return <p className="mt-1 text-xs font-semibold text-red-700 dark:text-red-300">{children}</p>;
 }
 
-export default function EventSettingsModal({ event, brand, fieldNames = {}, requiredRobotPhotos, onSave, onClose, eventFormat = "tournament", fieldCount, canConvertToLeague = false, onConvertToLeague }) {
+export default function EventSettingsModal({ event, brand, eventTimezone = "", fieldNames = {}, requiredRobotPhotos, onSave, onClose, eventFormat = "tournament", fieldCount, canConvertToLeague = false, onConvertToLeague }) {
+  const [timezone,setTimezone]=useState(eventTimezone);
+  const timezones=useMemo(()=>[...new Set(['UTC',eventTimezone,...(Intl.supportedValuesOf?.('timeZone')||['America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Europe/London','Asia/Kolkata','Australia/Sydney'])])].filter(Boolean).sort(),[eventTimezone]);
   const initialCount = fieldCount || (eventFormat === "league" ? 1 : 3);
   const [count,setCount] = useState(initialCount);
   const visibleFields = FIELD_KEYS.slice(0,count);
@@ -63,6 +65,7 @@ export default function EventSettingsModal({ event, brand, fieldNames = {}, requ
 
   const validate = () => {
     const next = {};
+    if(timezone)try{new Intl.DateTimeFormat('en-US',{timeZone:timezone}).format();}catch{next.timezone="Choose a valid event timezone.";}
     const cleanName = name.trim();
     const cleanShort = shortName.trim();
     if (!cleanName) next.name = "Enter the event name.";
@@ -92,10 +95,11 @@ export default function EventSettingsModal({ event, brand, fieldNames = {}, requ
     const fieldsChanged = FIELD_KEYS.some((key) => cleanedFields[key] !== initial.fields[key]);
     const nameChanged = cleanName !== initial.name;
     const photoRequirementsChanged = JSON.stringify(photoRequirements) !== JSON.stringify(initialPhotoRequirements);
-    if (count === initialCount && !nameChanged && !fieldsChanged && !photoRequirementsChanged && !Object.values(identityChanged).some(Boolean)) { onClose(); return; }
+    if (timezone===eventTimezone && count === initialCount && !nameChanged && !fieldsChanged && !photoRequirementsChanged && !Object.values(identityChanged).some(Boolean)) { onClose(); return; }
     setSaving(true);
     try {
       await onSave({
+        timezone: timezone!==eventTimezone?timezone:null,
         name: nameChanged ? cleanName : null,
         branding: Object.values(identityChanged).some(Boolean) ? {
           ...(identityChanged.shortName ? { shortName: cleanShort } : {}),
@@ -156,6 +160,7 @@ export default function EventSettingsModal({ event, brand, fieldNames = {}, requ
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Used where the full name is too long, such as the phone header.</p>
               <FieldError>{errors.shortName}</FieldError>
             </label>
+            <div><label className="block"><span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Event timezone</span><select aria-label="Event timezone" value={timezone} onChange={e=>setTimezone(e.target.value)} className={`${inputClass} ${inputBorder(errors.timezone)}`}><option value="" disabled>Choose event timezone</option>{timezones.map(zone=><option key={zone} value={zone}>{zone.replaceAll('_',' ')}</option>)}</select></label><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Used for event clocks, scheduled match times and judging interviews. Applies across all divisions. Existing saved times keep the same instant.</p><button type="button" className="mt-2 min-h-[44px] rounded-lg border px-3" onClick={()=>setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)}>Use this device’s timezone</button><FieldError>{errors.timezone}</FieldError></div>
             <label className="block">
               <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Event logo URL</span>
               <input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}
