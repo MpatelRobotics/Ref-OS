@@ -4734,10 +4734,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         );
       })()}
       <main id="workspace" tabIndex={-1} className="refos-workspace mx-auto px-4 pb-28 pt-4">
-        <button type="button" onClick={() => {
-          setGuideArticleId(({ "lost-found": "lost-found", teams: "teams", matches: "matches", rulebook: "rules", robots: isEmcee ? "emcee-start" : "photos", alliances: "alliances", judging: "judging", interviews: "judging", rankings: "rankings" })[view] || "navigation");
-          setShowUserGuide(true); setShowFeatures(true);
-        }} className="min-h-[44px] mb-3 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 inline-flex items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600"><BookOpen size={17} aria-hidden="true" />Help with this section</button>
+
         {league && !league.isActiveSession && (
           <div role="status" className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100 flex flex-wrap items-center gap-2">
             <span className="flex-1 min-w-[12rem]"><b>{league.session.name}</b> is {SESSION_STATUS_LABELS[league.session.status].toLowerCase()}, not the Active session. Anything recorded here belongs to {league.session.name}.</span>
