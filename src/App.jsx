@@ -88,6 +88,7 @@ import LostFoundBoard from "./components/LostFoundBoard.jsx";
 import JudgingInterviews from "./components/JudgingInterviews.jsx";
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
 import HelpRequestModal from "./components/modals/HelpRequestModal.jsx";
+import RULE_MANUAL_PAGES from "./manualRulePages.json";
 import manualQuickLinks from "./manualQuickLinks.json";
 import manualSearchIndex from "./manualSearchIndex.json";
 import { HIGHLANDER_EVENT_ID, getEventProfile, resolveEventBranding } from "./eventProfiles.js";
@@ -4077,7 +4078,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
 
       section("AWP analytics");
       line(`Overall alliance AWP success: ${awpMet}/${awpSides.length} (${awpRate}%)`);
-      for (const [label, key] of [["Pins","pinsMet"],["Goals","goalsMet"],["Off perimeter","perimeterMet"],["No auton violations","noViolationsMet"]]) {
+      for (const [label, key] of [["Pin Halves","pinsMet"],["Goals","goalsMet"],["Off perimeter","perimeterMet"],["No auton violations","noViolationsMet"]]) {
         const met = awpSides.filter((a) => a[key]).length;
         line(`${label}: ${met}/${awpSides.length} met (${awpSides.length ? Math.round(met/awpSides.length*100) : 0}%)`, 10, false, 10);
       }
@@ -6025,16 +6026,16 @@ function AwpAlliance({ color, th, state, onChange }) {
   return (
     <div className={`rounded-lg border p-3 space-y-2 ${isRed ? "border-red-200 dark:border-red-900 bg-red-50/40 dark:bg-red-950/20" : "border-blue-200 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/20"}`}>
       <div className={`text-xs font-bold uppercase tracking-wide ${isRed ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}>{color} alliance</div>
-      <AwpStep label="Pins Scored" sub={`Need ${th.pins}+`} val={pins} set={(n) => onChange({ pins: n })} />
-      <AwpStep label="Goals with 2+ Pins" sub={`Need ${th.goals}+`} val={goals} set={(n) => onChange({ goals: n })} />
+      <AwpStep label="Pin Halves Scored" sub={`Need ${th.pins}+`} val={pins} set={(n) => onChange({ pins: n })} />
+      <AwpStep label="Goals with 2+ Pin Halves" sub={`Need ${th.goals}+`} val={goals} set={(n) => onChange({ goals: n })} />
       <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"><input type="checkbox" checked={perim} onChange={(e) => onChange({ perim: e.target.checked })} className="w-4 h-4 accent-emerald-600" /> Robots off the Field Perimeter</label>
       <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200"><input type="checkbox" checked={noViol} onChange={(e) => onChange({ noViol: e.target.checked })} className="w-4 h-4 accent-emerald-600" /> No auton violations</label>
       <div className={`rounded-lg p-2.5 text-sm font-bold ${pass ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700"}`}>
         {pass ? "\u2713 AWP can be awarded" : "AWP not met yet"}
         {!pass && (
           <ul className="mt-1 font-normal text-xs space-y-0.5">
-            {!pinsOk && <li>• {th.pins}+ Pins (have {pins})</li>}
-            {!goalsOk && <li>• {th.goals}+ Goals with 2+ Pins (have {goals})</li>}
+            {!pinsOk && <li>• {th.pins}+ Pin Halves (have {pins})</li>}
+            {!goalsOk && <li>• {th.goals}+ Goals with 2+ Pin Halves (have {goals})</li>}
             {!perim && <li>• Both robots off the Field Perimeter</li>}
             {!noViol && <li>• No auton violations</li>}
           </ul>
@@ -7687,7 +7688,7 @@ function AWPAnalytics({ fieldLog = [] }) {
   const red = sides.filter((x) => x.side === "Red");
   const blue = sides.filter((x) => x.side === "Blue");
   const criteria = [
-    ["Pins", "pinsMet"],
+    ["Pin Halves", "pinsMet"],
     ["Goals", "goalsMet"],
     ["Off perimeter", "perimeterMet"],
     ["No auton violations", "noViolationsMet"],
@@ -7820,8 +7821,8 @@ function AWPHistory({ fieldLog = [], matches = {}, viols = [], canSeeFieldCompar
           </span>
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
-          <Criteria ok={data.pinsMet}>{data.pins} Pins {data.pinsNeed ? `(${data.pinsNeed}+ needed)` : ""}</Criteria>
-          <Criteria ok={data.goalsMet}>{data.goals} Goals with 2+ Pins {data.goalsNeed ? `(${data.goalsNeed}+ needed)` : ""}</Criteria>
+          <Criteria ok={data.pinsMet}>{data.pins} Pin Halves {data.pinsNeed ? `(${data.pinsNeed}+ needed)` : ""}</Criteria>
+          <Criteria ok={data.goalsMet}>{data.goals} Goals with 2+ Pin Halves {data.goalsNeed ? `(${data.goalsNeed}+ needed)` : ""}</Criteria>
           <Criteria ok={data.perimeterMet}>Robots off Field Perimeter</Criteria>
           <Criteria ok={data.noViolationsMet}>No auton violations</Criteria>
         </div>
@@ -8174,15 +8175,15 @@ function FeaturesGuide({ isHighlander = true }) {
 // Referee notes per rule (shown in a popup when a rule is tapped in the Rules tab).
 // Keyed by rule code. Fill these in as needed; rules without an entry show a default message.
 const RULE_NOTES = {
-  "SC8": "Autonomous Win Point. Signature Events (like this one) and other Worlds-qualifying events use the higher v2.0 bar: 7+ Pins Scored for your alliance, AND 3+ Goals that each hold 2+ of your alliance's Pins, AND neither of your robots touching the Field Perimeter when auton ends \u2014 with zero auton violations. (Standard events stay at 6 Pins / 2 Goals.)\nPins and Goals in Quadrants on the opposing side of the Autonomous Line don't count toward your total.\nAny auton violation, Major or Minor, voids the AWP.",
+  "SC8": "Autonomous Win Point (v2.1): standard events require 6+ Scored Pin Halves and 2+ Goals with at least 2 Scored Pin Halves each. Worlds-qualifying events require 7+ Pin Halves and 3+ qualifying Goals. Neither Robot may touch the Field Perimeter, and any autonomous Violation voids the AWP. Opposing-side Quadrants do not count.",
   "SG1": "Match won't start until every condition is met. If a robot can't get legal in time, it's removed from the field (R2d and GG2 then apply) \u2014 no DQ, but log a Minor and it can't play that match.",
   "SG2": "Incidental / insignificant in-match issues are Minor; escalate to Major only in extreme cases.\nTypical Minors: loose wires; broken zip ties or rubber bands; bent or broken parts not used for strategic gain.",
   "SG4": "Match-affecting impact is hard to judge, so most are Minor. Blatantly intentional or clearly match-affecting cases (especially in elims) can be escalated to Major at head-ref discretion.",
   "SG7": "Any violation (Major or Minor) awards the Autonomous Bonus to the opponents (see SG8b for the exception).\nIntentional / strategic / egregious cases \u2014 e.g., deliberately contacting an opposing robot while on foam on the opponents' side, or SG7e interactions \u2014 are Major and should be a DQ.\nDeliberate defensive auton (SG7a) may also be recorded as G1.",
   "SG8": "The Midfield and auton-line objects are shared, so robot-to-robot contact (incidental and intentional) is expected and should almost never be a violation \u2014 teams own their robots' actions and shouldn't claim GG14 on their own tippy robot.\nBut the Midfield isn't a free-for-all: head refs may still act on teams exploiting the rule, and reckless / unsafe play aimed at destruction, damage, tipping, entanglement, trapping, or forcing a penalty is still prohibited.",
-  "SG9": "Incidental / unintentional contact with a goal or its stacked objects is usually Minor.\nIntentional / strategic / egregious interactions \u2014 including adding or removing placed objects on the goal \u2014 are Major.\nRepeated Minors can escalate to Major, especially after prior warnings.",
-  "SG10": "v2.0 match-affecting math for Placed objects pulled out of a neutral Goal uses a fixed pin value: 10 pts per Pin for an interaction that removes 1\u20133 Pins, or a flat 50 pts total once an interaction removes 4+ Pins. If deducting that from the offender's final score would flip the result, it's Match Affecting (the value is never added to the real score). Refs just make a best-guess count \u2014 teams accept it.\nIntentional / strategic / egregious cases are Major.\nRepeated Minors can escalate to Major, especially after warnings.",
-  "SG11": "v2.0: match loads may only be introduced through your own alliance-colored Loaders, only during driver control, and only via the top or back (dropped or placed, nested is fine); they're removed only through the bottom. Momentary simultaneous contact between a match load, a drive-team member, and a robot is now allowed until it's released. The custom SG11 point math and repeat thresholds were removed \u2014 handle violations with standard Minor/Major judgment (excessive or unsafe actions can also invoke S1 / G1).",
+  "SG9": "Incidental, unintentional or inconsequential contact is typically Minor. Intentional, strategic or egregious interactions are Major, as is any addition or removal of Placed Scoring Objects on an opposing Alliance Goal. Repeated Minors can escalate after warnings. See v2.1 and its linked Q&A 3249 for removal from your own Alliance Goals.",
+  "SG10": "For each independent removal interaction from a neutral Goal, use 10 points per Pin for 1–3 Pins, or 50 points total for 4+ Pins. Separate Violations can stack and cumulatively become Match Affecting. Evaluate both Alliances simultaneously by hypothetically subtracting the attributed points; do not alter the recorded score. Referees use their best educated Pin count. Intentional, strategic or egregious Violations are Major; repeated Minors can escalate. See the v2.1 Significant Q&As on this rule.",
+  "SG11": "During Driver Control, Drive Team Members may introduce Match Loads through their Alliance-colored Loaders and raise/lower those Loaders. Introduce objects through the top or back; momentary contact with both a Robot and a person is allowed before release. After release, people may not touch the object again. Only Robots may remove loads, through the bottom opening. Keep bodies above the Loader plastic’s bottom edge; unsafe handling may invoke S1 or G1. VEX U uses VUG4.",
   "SG12": "Most are Minor; repeated Minors can escalate to Major, especially after warnings.\nv2.0: the Endgame restriction is now no Placing Scoring Objects on the Midfield Goal (the old vertical-expansion height cap in the Midfield was removed).\nA Midfield-Goal placement that changes the outcome in the offender's favor is Match Affecting.",
   "SG13": "Egregious cases are Major; repeated Minors can escalate to Major, especially after warnings.\n(Protects Load Zones from opponent interference during driver control; doesn't apply during auton. v2.0 also bars adding objects to, or removing them from, an opposing alliance's Loaders.)",
   "G1": "Any G1 can be treated as a Major, handled case-by-case. Teams at risk usually get a 'final warning,' though the head ref isn't required to give one.",
@@ -8199,25 +8200,9 @@ const RULE_NOTES = {
   "GG17": "No holding an opponent longer than a 3-count in driver control. Head refs count out loud; the count pauses/ends when the robots separate (~2 ft / one tile), when the held robot gets trapped or pinned by a different robot, or when an escape route opens. After a count ends you can't immediately re-hold the same robot \u2014 that resumes at a 5-count.\nWhen judging if a hold was match-affecting, weigh the full context: the first 3 seconds are legal, so only the extra time counts; how much extra time; how far/long they separated before returning; and what both robots were doing overall. Holding is inherently defensive, so GG15 may also apply on judgment calls.",
 };
 
-const RULE_MANUAL_PAGES = Object.fromEntries([
-  [24, ["SC1", "SC2"]], [25, ["SC3", "SC4"]], [26, ["SC5"]], [27, ["SC6", "SC7"]], [28, ["SC8"]],
-  [29, ["SG1"]], [30, ["SG2", "SG3", "SG4"]], [31, ["SG5", "SG6", "SG7"]], [33, ["SG8", "SG9"]],
-  [34, ["SG10", "SG11"]], [35, ["SG12"]], [36, ["SG13"]], [37, ["S1", "S2", "S3", "S4", "S5"]],
-  [38, ["G1", "G2", "G3"]], [39, ["G4", "G5"]], [40, ["GG1", "GG2"]], [41, ["GG3", "GG4"]],
-  [42, ["GG5", "GG6"]], [43, ["GG7", "GG8", "GG9"]], [44, ["GG10", "GG11", "GG12", "GG13"]],
-  [45, ["GG14", "GG15"]], [46, ["GG16", "GG17"]], [47, ["GG18"]], [49, ["RSC1", "RSC2", "RSC3"]],
-  [50, ["RSC4"]], [51, ["RSC5"]], [54, ["R1"]], [55, ["R2"]], [56, ["R3", "R4"]],
-  [57, ["R5", "R6"]], [58, ["R7", "R8", "R9"]], [59, ["R10", "R11", "R12"]],
-  [60, ["R13", "R14", "R15", "R16", "R17"]], [61, ["R18", "R19"]], [62, ["R20", "R21", "R22"]],
-  [63, ["R23", "R24"]], [64, ["R25"]], [65, ["R26", "R27", "R28"]], [68, ["T1"]],
-  [69, ["T2", "T3"]], [70, ["T4", "T5", "T6"]], [71, ["T7"]], [72, ["T8", "T9", "T10"]],
-  [73, ["T11", "T12", "T13"]], [74, ["T14", "T15", "T16"]], [75, ["T17"]], [76, ["T18"]],
-  [77, ["T19", "T20", "T21", "T22"]], [78, ["T23"]], [79, ["T24"]],
-].flatMap(([page, codes]) => codes.map((code) => [code, page])));
-
 // showGameManual: the bundled offline Game Manual viewer (unchanged). hasBundledManual still gates
 // the Highlander-specific referee notes only. qaUrl comes from officialResources.js.
-function RuleBook({ rules, hasBundledManual = false, showGameManual = true, qaUrl = "", online = true, accent = "" }) {
+export function RuleBook({ rules, hasBundledManual = false, showGameManual = true, qaUrl = "", online = true, accent = "" }) {
   const [query, setQuery] = useState("");
   const [manualQuery, setManualQuery] = useState("");
   const [selected, setSelected] = useState(null); // rule object shown in the notes popup
@@ -8267,7 +8252,7 @@ function RuleBook({ rules, hasBundledManual = false, showGameManual = true, qaUr
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#0D0F32] text-white dark:bg-slate-950"><BookOpen size={21} /></span>
             <span className="min-w-0 flex-1">
               <span className="block font-bold text-slate-900 dark:text-slate-100">Game Manual</span>
-              <span className="block text-xs text-slate-500 dark:text-slate-400">Override 2.0 is saved for offline event access</span>
+              <span className="block text-xs text-slate-500 dark:text-slate-400">Override 2.1 is saved for offline event access</span>
             </span>
             <ChevronRight size={20} className="shrink-0 text-slate-400" />
           </div>
@@ -8353,14 +8338,14 @@ function RuleBook({ rules, hasBundledManual = false, showGameManual = true, qaUr
           <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-900">
             <button onClick={() => setManualOpen(false)} className="refos-back-button shrink-0" aria-label="Back to Rules"><ChevronLeft size={21} /> Back</button>
             <div className="min-w-0 flex-1">
-              <div className="truncate font-bold text-slate-900 dark:text-white">Override 2.0 Game Manual</div>
+              <div className="truncate font-bold text-slate-900 dark:text-white">Override 2.1 Game Manual</div>
               <div className="text-[11px] text-slate-500 dark:text-slate-400">Available offline after the app updates</div>
             </div>
-            <a href={`/manuals/override-2.0.pdf#page=${manualPage}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:text-slate-100">Open separately</a>
+            <a href={`/manuals/override-2.1.pdf#page=${manualPage}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:text-slate-100">Open separately</a>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
             <button onClick={() => goToManualPage(3)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">Jump to Table of Contents</button>
-            <button onClick={() => goToManualPage(7)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">Jump to Quick Reference Guide</button>
+            <button onClick={() => goToManualPage(8)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">Jump to Quick Reference Guide</button>
             <span className="self-center text-xs text-slate-500 dark:text-slate-400">Page {manualPage}</span>
           </div>
           <div className="relative shrink-0 border-b border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
@@ -8391,7 +8376,7 @@ function RuleBook({ rules, hasBundledManual = false, showGameManual = true, qaUr
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto bg-slate-200 p-2 md:hidden dark:bg-slate-950">
             <div className="relative mx-auto max-w-3xl bg-white shadow-lg">
-              <img src={manualImage} alt={`Override 2.0 Game Manual page ${manualPage}`} className="block h-auto w-full" />
+              <img src={manualImage} alt={`Override 2.1 Game Manual page ${manualPage}`} className="block h-auto w-full" />
               {manualPageLinks.map((link, index) => (
                 <button
                   key={`${manualPage}-${index}`}
@@ -8406,10 +8391,10 @@ function RuleBook({ rules, hasBundledManual = false, showGameManual = true, qaUr
           </div>
           <div className="shrink-0 items-center justify-between gap-2 border-t border-slate-200 bg-white px-3 py-2 md:hidden dark:border-slate-800 dark:bg-slate-900 flex">
             <button type="button" onClick={() => goToManualPage(Math.max(1, manualPage - 1))} disabled={manualPage <= 1} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold disabled:opacity-40 dark:border-slate-700">Previous</button>
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Page {manualPage} of 129</span>
-            <button type="button" onClick={() => goToManualPage(Math.min(129, manualPage + 1))} disabled={manualPage >= 129} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold disabled:opacity-40 dark:border-slate-700">Next</button>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Page {manualPage} of 148</span>
+            <button type="button" onClick={() => goToManualPage(Math.min(148, manualPage + 1))} disabled={manualPage >= 148} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold disabled:opacity-40 dark:border-slate-700">Next</button>
           </div>
-          <iframe key={manualNavigation} src={`/manuals/override-2.0.pdf?navigation=${manualNavigation}#page=${manualPage}&view=FitH`} title={`Override 2.0 Game Manual page ${manualPage}`} className="hidden min-h-0 w-full flex-1 bg-white md:block" />
+          <iframe key={manualNavigation} src={`/manuals/override-2.1.pdf?navigation=${manualNavigation}#page=${manualPage}&view=FitH`} title={`Override 2.1 Game Manual page ${manualPage}`} className="hidden min-h-0 w-full flex-1 bg-white md:block" />
         </div>,
         document.body
       )}

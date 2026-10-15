@@ -230,7 +230,7 @@ Developer login also supports passkeys after server setup. See [Developer passke
 
 **Rules**
 - **V5RC / VEX U:** searchable event rule library, initially copied from the V5RC Override 2026–2027 default template. Each event's library is independent and can be imported from CSV. **VEX IQ:** the Rules tab shows the bundled Level Up quick-reference list instead; see [VEX IQ events](#vex-iq-events).
-- **Game Manual** for V5 events opens the bundled Override 2.0 manual. IQ events offer the bundled Level Up 2.0 manual with an in-app Back button. Both are available offline after the app's offline files finish downloading.
+- **Game Manual** for V5 events opens the bundled Override 2.1 manual (October 8, 2026; 148 pages). IQ events offer the bundled Level Up 2.0 manual with an in-app Back button. Both are available offline after the app's offline files finish downloading.
 - **Official Q&A** opens the official VEX Q&A for the season in a new browser tab. It needs an internet connection; offline, Ref OS says so instead of opening it. The link is set per season in `src/officialResources.js`, not in individual components. Ref OS only links to the Q&A; it does not copy or download it.
 
 **Coordination**

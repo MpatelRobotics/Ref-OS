@@ -15,7 +15,7 @@ export const OFFLINE_RULES = [
   },
   {
     "code": "SC3",
-    "desc": "Each Placed Pin can have zero, one, or two Scored halves",
+    "desc": "Scored Pin Half criteria",
     "category": "Scoring",
     "ord": 3
   },
@@ -27,7 +27,7 @@ export const OFFLINE_RULES = [
   },
   {
     "code": "SC5",
-    "desc": "Yellow Pin Ownership",
+    "desc": "Ownership of Yellow Pin Halves",
     "category": "Scoring",
     "ord": 5
   },
@@ -638,4 +638,4 @@ export const OFFLINE_RULES = [
     "ord": 106
   }
 ];
-export const OFFLINE_RULEBOOK_VERSION = "Override 2026-2027 / Ref-OS bundled rule index";
+export const OFFLINE_RULEBOOK_VERSION = "Override 2026-2027 v2.1 / Ref-OS bundled rule index";

@@ -7,9 +7,9 @@
 insert into public.rules (event_id, code, description, category, ord) values
   ('11111111-1111-4111-8111-111111111111', 'SC1', 'All scoring statuses are evaluated after the Match ends', 'Scoring', 1),
   ('11111111-1111-4111-8111-111111111111', 'SC2', 'Placed Scoring Object criteria', 'Scoring', 2),
-  ('11111111-1111-4111-8111-111111111111', 'SC3', 'Each Placed Pin can have zero, one, or two Scored halves', 'Scoring', 3),
+  ('11111111-1111-4111-8111-111111111111', 'SC3', 'Scored Pin Half criteria', 'Scoring', 3),
   ('11111111-1111-4111-8111-111111111111', 'SC4', 'A Toggle is considered set to a color when it meets all of the following criteria', 'Scoring', 4),
-  ('11111111-1111-4111-8111-111111111111', 'SC5', 'Yellow Pin Ownership', 'Scoring', 5),
+  ('11111111-1111-4111-8111-111111111111', 'SC5', 'Ownership of Yellow Pin Halves', 'Scoring', 5),
   ('11111111-1111-4111-8111-111111111111', 'SC6', 'Robot Midfield criteria', 'Scoring', 6),
   ('11111111-1111-4111-8111-111111111111', 'SC7', 'Autonomous Bonus criteria', 'Scoring', 7),
   ('11111111-1111-4111-8111-111111111111', 'SC8', 'Autonomous Win Point criteria', 'Scoring', 8),
