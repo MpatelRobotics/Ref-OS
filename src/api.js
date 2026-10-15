@@ -444,7 +444,8 @@ export async function listSelectableEvents() {
     // Phase 6: public branding only (short name, logo URL, accent). Empty when not configured.
     branding: {
       shortName: r.short_name || "",
-      logoUrl: r.logo_url || "",
+      logoUrl: /^data:image\//i.test(r.logo_url || "") ? "" : r.logo_url || "",
+      logoData: /^data:image\//i.test(r.logo_url || "") ? r.logo_url : "",
       accent: r.accent_color || "",
     },
   });
@@ -1131,7 +1132,7 @@ export async function getPublicEventBranding(eventId) {
   if (!row) return null;
   return {
     key: "event_branding",
-    value: { shortName: row.short_name || "", logoUrl: row.logo_url || "", accent: row.accent_color || "" },
+    value: { shortName: row.short_name || "", logoUrl: /^data:image\//i.test(row.logo_url || "") ? "" : row.logo_url || "", logoData: /^data:image\//i.test(row.logo_url || "") ? row.logo_url : "", accent: row.accent_color || "" },
     updatedBy: "",
     updatedAt: 0,
   };

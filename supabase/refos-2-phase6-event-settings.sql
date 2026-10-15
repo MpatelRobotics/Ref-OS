@@ -33,6 +33,9 @@ as $$
     case
       when b.value->>'logoUrl' ~* '^https?://[^[:space:]]+$' and length(b.value->>'logoUrl') <= 2000
         then b.value->>'logoUrl'
+      when b.value->>'logoData' ~ '^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$'
+        and length(b.value->>'logoData') <= 1500000
+        then b.value->>'logoData'
     end,
     case
       when b.value->>'accent' ~ '^#[0-9A-Fa-f]{6}$' then upper(b.value->>'accent')
