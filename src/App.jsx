@@ -1,3 +1,4 @@
+import RefereePortal from "./components/RefereePortal";
 import {parseManualScheduledTime,mergeManualMatchTimes,isTmTimesOnlyTable,parseTmTimesOnly} from './manualTmTimes';
 import ScheduledMatchTime from './components/ScheduledMatchTime';
 import { eliminationPairingKey, eliminationPairingLabel, eliminationResultLabel } from './tmReplayGrouping.js';
@@ -745,7 +746,7 @@ export default function App() {
   // saved refosActiveEventId. Only "Choose or configure an event" and "Lock This Device ->
   // Main Screen" clear the selection ("Lock This Device -> Event Main Page" keeps it). Access is never restored from these values: the server-side
   // event membership check below decides whether this device is still signed in.
-  const [activeEventId, setActiveEventId] = useState(()=>new URLSearchParams(window.location.search).get("open") === "universal-feedback" ? "" : readSavedEventId());
+  const [activeEventId, setActiveEventId] = useState(()=>new URLSearchParams(window.location.search).has("refPortal") || new URLSearchParams(window.location.search).get("open") === "universal-feedback" ? "" : readSavedEventId());
   const [eventChoices, setEventChoices] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventChoiceError, setEventChoiceError] = useState("");
@@ -1359,6 +1360,7 @@ const formatEventDate = (value) => {
 };
 
 const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, initialNotice = "" }) => {
+  const [refPortal,setRefPortal]=useState(()=>new URLSearchParams(window.location.search).has("refPortal"));
   const developerPage = new URLSearchParams(window.location.search).get('page') === 'developer' || new URLSearchParams(window.location.search).get('open') === 'universal-feedback';
   const [developerPageUnlocked, setDeveloperPageUnlocked] = useState(false);
   const lockDeveloperPage=useCallback(()=>{setDeveloperPageUnlocked(false);setDeveloperPasskeySession(false);setLiveActivityOpen(false);setUniversalFeedbackOpen(false);},[]);
@@ -1492,6 +1494,8 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
     }
   };
 
+  if(refPortal) return <RefereePortal onClose={()=>{setRefPortal(false);window.history.replaceState(null,"",window.location.pathname);onReload?.();}}/>;
+
   return (
   <div className="refos-safe-page min-h-screen bg-slate-100 dark:bg-slate-900 p-5 flex items-center justify-center">
     <div className="w-full max-w-xl">
@@ -1500,6 +1504,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{view === "archived" ? "Archived events keep all of their data. Use the event’s Admin code or the Developer code to restore one." : "Select the event this device is working at."}</p>
       </div>
+      {!developerPage && <button type="button" onClick={()=>setRefPortal(true)} className="mb-4 min-h-[44px] w-full rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white">Referee portal · Sign in or create account</button>}
       {developerPage && !developerPageUnlocked ? <DeveloperPageLock events={events} onUnlock={method=>{setDeveloperPasskeySession(method==='passkey');setDeveloperPageUnlocked(true);}}/> : <>
       {developerPage && <>
       <a href="/" className="inline-flex items-center min-h-[44px] mb-3 font-semibold text-slate-600 dark:text-slate-300">Back to main page</a>
