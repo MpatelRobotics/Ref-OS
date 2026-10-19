@@ -6,7 +6,7 @@ export async function loadRefereeProfile(userId){
  if(profile.error)throw profile.error;if(plans.error)throw plans.error;
  return {profile:profile.data,plans:plans.data||[]};
 }
-export async function saveRefereeProfile(userId,profile){const {error}=await supabase.from('referee_profiles').upsert({...normalizeRefereeLocation(profile),map_name:profile.map_visible?(profile.map_name||profile.full_name||'').trim().slice(0,60):(profile.map_name||''),user_id:userId});if(error){if(/map_visible|map_name|schema cache/i.test(error.message||''))throw Error('Map sharing is not set up in the database yet. Ask the developer to run referee-community.sql in Supabase, then try again.');throw error;}}
+export async function saveRefereeProfile(userId,profile){const {error}=await supabase.from('referee_profiles').upsert({...normalizeRefereeLocation(profile),map_name:profile.map_visible?(profile.map_name||profile.full_name||'').trim().slice(0,60):(profile.map_name||''),user_id:userId});if(error){if(/programs|languages/i.test(error.message||''))throw Error('Profile options are not set up yet. Ask the developer to run referee-profile-calendar.sql in Supabase.');if(/map_visible|map_name|schema cache/i.test(error.message||''))throw Error('Map sharing is not set up in the database yet. Ask the developer to run referee-community.sql in Supabase, then try again.');throw error;}}
 export async function saveEventPlan(userId,eventId,attendance){
  const result=attendance?await supabase.from('referee_event_plans').upsert({user_id:userId,event_id:eventId,attendance}):await supabase.from('referee_event_plans').delete().eq('user_id',userId).eq('event_id',eventId);
  if(result.error)throw result.error;
@@ -18,9 +18,9 @@ export async function claimRefereePasscode(eventId,code=null){
  const {data,error}=await supabase.rpc('claim_referee_passcode',{p_event:eventId,p_code:code});if(error)throw error;
  if(data!=='ok')throw Error(data==='locked'?'Too many attempts. Try again in five minutes.':data==='archived'?'This event is archived or unavailable.':'Passcode not accepted. Select this event as attended or going in your referee account.');
 }
-export async function refereeEventCatalog(){const {data,error}=await supabase.rpc('list_referee_event_catalog');if(error)throw error;return data||[];}
+export async function refereeEventCatalog(){const [catalog,dates]=await Promise.all([supabase.rpc('list_referee_event_catalog'),supabase.rpc('list_referee_event_dates')]);if(catalog.error)throw catalog.error;if(dates.error)throw Error('Event dates are not set up yet. Ask the developer to run referee-profile-calendar.sql.');return (catalog.data||[]).map(event=>({...event,...(dates.data||[]).find(row=>row.event_id===event.event_id)}));}
 export async function externalEventPlans(userId){const {data,error}=await supabase.from('referee_external_events').select('*').eq('user_id',userId);if(error)throw error;return data||[];}
-export async function saveExternalEvent(userId,event,attendance){const result=attendance?await supabase.from('referee_external_events').upsert({user_id:userId,code:event.code,name:event.name,location:event.location||'',start_date:event.start||event.start_date||'',attendance}):await supabase.from('referee_external_events').delete().eq('user_id',userId).eq('code',event.code);if(result.error)throw result.error;}
+export async function saveExternalEvent(userId,event,attendance){const result=attendance?await supabase.from('referee_external_events').upsert({user_id:userId,code:event.code,name:event.name,location:event.location||'',start_date:event.start||event.start_date||'',end_date:event.end||event.end_date||'',attendance}):await supabase.from('referee_external_events').delete().eq('user_id',userId).eq('code',event.code);if(result.error)throw result.error;}
 export async function openExternalEvent(code){const {data,error}=await supabase.rpc('open_referee_external_event',{p_code:code});if(error)throw error;return data;}
 
 export async function listRefereeMap(){const {data,error}=await supabase.rpc('list_referee_map');if(error)throw error;return data||[];}

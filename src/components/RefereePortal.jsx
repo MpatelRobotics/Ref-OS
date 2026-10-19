@@ -1,3 +1,4 @@
+import RefereeNextEvent from "./RefereeNextEvent";
 import RefereeProfileForm from "./RefereeProfileForm";
 import RefereeCommunityMap from "./RefereeCommunityMap";
 import RefereePortalFeedback from "./RefereePortalFeedback";
@@ -6,8 +7,8 @@ import RefereeEventSearch from "./RefereeEventSearch";
 import React,{useEffect,useState} from 'react';
 import {supabase} from '../supabaseClient';
 import * as api from '../api';
-import {accountUser,loadRefereeProfile,saveRefereeProfile,saveEventPlan,hasRefereePasscode,externalEventPlans,refereeEventCatalog,claimRefereePasscode} from '../refereePortalApi';
-const empty={full_name:'',country:'',region:'',city:'',phone:'',contact_email:'',discord:'',map_visible:true,map_name:''};
+import {accountUser,loadRefereeProfile,saveRefereeProfile,saveEventPlan,hasRefereePasscode,externalEventPlans,refereeEventCatalog,claimRefereePasscode,openExternalEvent} from '../refereePortalApi';
+const empty={full_name:'',country:'',region:'',city:'',phone:'',contact_email:'',discord:'',map_visible:true,map_name:'',programs:[],languages:[]};
 const field='mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white';
 const button='min-h-[44px] rounded-xl border border-slate-300 px-4 py-2 font-semibold disabled:opacity-50';
 export default function RefereePortal({onClose,eventId,onUnlock,onOpenEvent}){
@@ -24,6 +25,7 @@ export default function RefereePortal({onClose,eventId,onUnlock,onOpenEvent}){
   setPassword('');await load();
  });}
  function openEvent(id){if(onOpenEvent){onOpenEvent(id);return;}const url=new URL(window.location.href);url.searchParams.delete('refPortal');url.searchParams.set('event',id);window.location.assign(url.toString());}
+ async function openUpcomingEvent(event){if(event.id){await openSelectedEvent(event.id);return;}await run(async()=>{const id=await openExternalEvent(event.code);openEvent(id);});}
  async function openSelectedEvent(id){await run(async()=>{await claimRefereePasscode(id);openEvent(id);});}
  async function enterEvent(){await run(async()=>{
   let check=await api.verifyEventSession(eventId);
@@ -45,6 +47,7 @@ export default function RefereePortal({onClose,eventId,onUnlock,onOpenEvent}){
  <div className="mt-3 flex flex-wrap gap-2">{[['login','Sign in'],['signup','Create account'],['reset','Forgot password?']].filter(([key])=>key!==mode).map(([key,label])=><button key={key} disabled={busy} className={button} onClick={()=>{setMode(key);setError('');setNotice('');}}>{label}</button>)}</div>
  </section>:<>
  <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"><p className="mb-3 font-semibold">Welcome{profile.full_name?`, ${profile.full_name}`:''}</p><label className="block text-sm font-semibold">Portal section<select aria-label="Portal section" className={field} value={section} onChange={e=>setSection(e.target.value)}><option value="profile">My profile &amp; passcode</option><option value="events">My events &amp; event search</option><option value="community">USA referee map</option></select></label></div>
+ <RefereeNextEvent events={events} plans={plans} external={external} busy={busy} onOpen={openUpcomingEvent}/>
  {recovery&&<form className="space-y-3 rounded-2xl bg-white p-5 dark:bg-slate-800" onSubmit={e=>{e.preventDefault();run(async()=>{const {error}=await supabase.auth.updateUser({password});if(error)throw error;setPassword('');setRecovery(false);setNotice('Password updated.');});}}><h2 className="text-lg font-bold">Set a new password</h2><label className="block">New password<input type="password" autoComplete="new-password" className={field} required minLength={8} value={password} onChange={e=>setPassword(e.target.value)}/></label><button className={button} disabled={busy}>Update password</button></form>}
  {section==='profile'&&<>
  <RefereeProfileForm profile={profile} setProfile={setProfile} busy={busy} email={user.email} onSave={()=>run(async()=>{await saveRefereeProfile(user.id,profile);setMapRefresh(n=>n+1);setNotice('Profile saved.');})}/>

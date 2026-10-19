@@ -1,11 +1,21 @@
+import {readFile} from 'node:fs/promises';
 import {test,expect} from '@playwright/test';
 test('referee can save a profile and mark event plans on mobile',async({page})=>{
  await page.route('**/src/refereePortalApi*',r=>r.fulfill({contentType:'text/javascript',body:`export async function listRefereeMap(){return [{display_name:'Alex',state:'New Jersey'},{display_name:'Jordan',state:'California'}]};export async function sendPortalFeedback(id,type,message){window.sentPortalFeedback={id,type,message}};export async function hasRefereePasscode(){return false};export async function externalEventPlans(){return []};export async function refereeEventCatalog(){return []};export async function claimRefereePasscode(id){window.claimedEvent=id};export async function setRefereePasscode(code){window.passcodeSaved=Boolean(code)};export async function saveExternalEvent(id,event,attendance){window.savedExternal={code:event.code,attendance}};export async function openExternalEvent(code){window.openedExternal=code;return 'external-id'};export async function accountUser(){return {id:'account',email:'alex@example.org'}};export async function loadRefereeProfile(){return {profile:{full_name:'Alex Smith'},plans:[]}};export async function saveRefereeProfile(id,value){window.savedProfile=value};export async function saveEventPlan(id,event,attendance){window.savedPlan={event,attendance}};`}));
  await page.route('**/src/api*',r=>r.fulfill({contentType:'text/javascript',body:`export async function listSelectableEvents(){return [{id:'event',name:'Example tournament'}]};export async function searchVexEvents(filters){window.searchFilters=filters;return {events:[{code:'VE-V5-27-65868',name:'State tournament',start:'2027-02-01',city:'Trenton'}],nextPage:null}};export async function lookupVexEvent(code){window.lookupCode=code;return {code,name:'State tournament',location:'New Jersey',start:'2027-02-01',teams:[]}};`}));
  await page.route('**/referee-test',r=>r.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module">import '/src/index.css';import '/@vite/client';import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(t)=>t;window.__vite_plugin_react_preamble_installed__=true;const React=(await import('/node_modules/.vite/deps/react.js')).default,DOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default,View=(await import('/src/components/RefereePortal.jsx')).default;DOM.createRoot(document.getElementById('root')).render(React.createElement(View,{onClose:()=>{},onOpenEvent:id=>window.openedEvent=id}));</script>`}));
- await page.setViewportSize({width:390,height:844});await page.goto('/referee-test');
+ await page.clock.setFixedTime(new Date('2026-10-19T12:00:00Z'));await page.setViewportSize({width:390,height:844});await page.goto('/referee-test');
  await page.getByLabel('Country',{exact:true}).selectOption('United States');await page.getByLabel('State / district',{exact:true}).selectOption('New Jersey');await page.getByText('Contact details (optional)',{exact:true}).click();await page.getByLabel('Phone',{exact:true}).fill('555-0100');await page.getByLabel(/^Show me on the referee map/).check();await page.getByLabel('Map display name',{exact:true}).fill('Alex');
+ await page.getByLabel('V5RC',{exact:true}).check();
+ await page.getByLabel('VIQRC',{exact:true}).check();
+ await page.getByLabel('Add language',{exact:true}).selectOption('English');
+ await page.getByRole('button',{name:'Add language',exact:true}).click();
+ await page.getByLabel('Add language',{exact:true}).selectOption('other');
+ await page.getByLabel('Other language',{exact:true}).fill('Swahili');
+ await page.getByRole('button',{name:'Add language',exact:true}).click();
  await page.getByRole('button',{name:'Save profile',exact:true}).click();
+ expect(await page.evaluate(()=>window.savedProfile.programs)).toEqual(['V5RC','VIQRC']);
+ expect(await page.evaluate(()=>window.savedProfile.languages)).toEqual(['English','Swahili']);
  await expect.poll(()=>page.evaluate(()=>window.savedProfile?.country)).toBe('United States');
  await page.getByText('Personal referee passcode · Not set',{exact:true}).click();
  await page.getByLabel('New referee passcode',{exact:true}).fill('Myref12345');
@@ -25,7 +35,14 @@ test('referee can save a profile and mark event plans on mobile',async({page})=>
  await page.getByRole('button',{name:'Use selected event',exact:true}).click();
  await page.getByLabel(/^My attendance/).selectOption('going');
  await expect.poll(()=>page.evaluate(()=>window.savedExternal?.code)).toBe('VE-V5-27-65868');
- await page.getByRole('button',{name:'Open event',exact:true}).first().click();
+ await expect(page.getByRole('region',{name:'My next event'})).toContainText('State tournament');
+ const downloadWait=page.waitForEvent('download');
+ await page.getByRole('button',{name:'Export upcoming events',exact:true}).click();
+ const download=await downloadWait;
+ expect(download.suggestedFilename()).toBe('Ref-OS-Upcoming-Events.ics');
+ const calendar=await readFile(await download.path(),'utf8');
+ expect(calendar).toContain('DTSTART;VALUE=DATE:20270201');
+ await page.getByRole('button',{name:'Open next event',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>window.openedEvent)).toBe('external-id');
  await page.getByLabel('Portal section',{exact:true}).selectOption('community');
  await expect(page.getByRole('heading',{name:'Referees across the USA'})).toBeVisible();

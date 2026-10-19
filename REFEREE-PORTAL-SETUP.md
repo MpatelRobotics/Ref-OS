@@ -29,3 +29,11 @@ Run `supabase/referee-community.sql` after the portal and Universal Feedback mig
 Map sharing defaults to on for new profiles after referee-map-default-on.sql is applied. Existing saved preferences are preserved. A referee selects the United States and a supported state and saves; the map display name defaults to their profile name and can be edited. The sharing checkbox can be turned off at any time. Only map display name and state are returned by the authenticated community RPC. Phone, email, city, user ID, and full profile are not exposed. Turning sharing off removes the profile from subsequent map reads. Map geometry comes from us-atlas 3.0.1 using US Census boundaries; its ISC license is kept in src/data/us-atlas-LICENSE.txt.
 
 The Send feedback button is available to signed-in portal accounts without an event membership. Messages are private to the Developer's Universal Feedback inbox and include account name/email for follow-up. Submission retries are idempotent; accounts are limited to ten messages per hour. The standard Developer status controls apply to portal feedback. This sends in-app feedback, not an email or Discord message.
+
+## Programs, languages and calendars
+
+Run `supabase/referee-profile-calendar.sql` after the earlier portal migrations. Programs worked supports V5RC, VIQRC, and VURC. Languages spoken supports multiple selections plus a custom language; both fields stay private with the rest of the profile.
+
+My next event appears near the top of the signed-in portal in every section. It uses dated events marked going, excludes archived/past events, includes ongoing multi-day events, and merges matching Ref OS and VEX-code entries. Events without dates remain listed under My events and cannot be exported until a VEX date is available. Older saved VEX entries may need to be looked up again to save their end date.
+
+Export upcoming events downloads Ref-OS-Upcoming-Events.ics for import into a personal calendar. Entries are all-day because no referee shift times have been supplied. Multi-day entries use exclusive calendar end dates; exported dates do not shift through device timezones. The file is a snapshot rather than a live calendar subscription.
