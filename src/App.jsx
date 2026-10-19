@@ -1,3 +1,4 @@
+import {accountUser} from "./refereePortalApi";
 import RefereePortal from "./components/RefereePortal";
 import {parseManualScheduledTime,mergeManualMatchTimes,isTmTimesOnlyTable,parseTmTimesOnly} from './manualTmTimes';
 import ScheduledMatchTime from './components/ScheduledMatchTime';
@@ -1749,6 +1750,22 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   useEffect(() => { venueSync.setDeviceLabel(meName); }, [meName]);
   // Lock This Device asks where to go first (Main Screen / Event Main Page / Cancel).
   const [showLockChoice, setShowLockChoice] = useState(false);
+  const [canReturnToRefereePortal, setCanReturnToRefereePortal] = useState(false);
+  useEffect(() => {
+    if (!showLockChoice) return;
+    let live = true;
+    setCanReturnToRefereePortal(false);
+    accountUser().then(user => { if (live) setCanReturnToRefereePortal(!!user); }).catch(() => {});
+    return () => { live = false; };
+  }, [showLockChoice]);
+  const returnToRefereePortal = async () => {
+    await onLockToEventLogin();
+    localStorage.removeItem("refosActiveEventId");
+    const url = new URL(window.location.href);
+    url.search = "?refPortal=1";
+    url.hash = "";
+    window.location.assign(url.toString());
+  };
   const [lockBusy, setLockBusy] = useState(false);
   const runLock = async (action) => {
     setLockBusy(true);
@@ -5028,6 +5045,7 @@ onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!cu
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importSkillsFile(f); }} />
       {showSyncStatus && adminUnlocked && <SyncStatusModal eventId={eventId} eventName={event?.name} onClose={() => setShowSyncStatus(false)} />}
       {showLockChoice && <LockDeviceModal eventName={event?.name} busy={lockBusy}
+        onRefereePortal={canReturnToRefereePortal ? () => runLock(returnToRefereePortal) : undefined}
         onMainScreen={() => runLock(onLock)}
         onEventMainPage={() => runLock(onLockToEventLogin)}
         onCancel={() => { if (!lockBusy) setShowLockChoice(false); }} />}
