@@ -1859,7 +1859,7 @@ export async function listUniversalFeedback() {
     rows.push(...(data || []));
     if (!data || data.length < 500) break;
   }
-  return Array.from(new Map(rows.map(row => [row.id, row])).values()).map(row => ({ ...mapFieldLog(row), kind: "feedback", eventId: row.event_id, eventName: row.event_name, sessionName: row.session_name, status: row.status }));
+  return Array.from(new Map(rows.map(row => [row.id, row])).values()).map(row => ({ ...mapFieldLog(row), kind: "feedback", eventId: row.event_id || "referee-portal", eventName: row.event_name, sessionName: row.session_name, status: row.status }));
 }
 export async function setUniversalFeedbackStatus(_eventId, feedbackId, status) {
   const { error } = await supabase.rpc('set_universal_feedback_status', { p_feedback: feedbackId, p_status: status });

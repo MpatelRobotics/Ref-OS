@@ -21,3 +21,11 @@ Accounts can create or replace an 8–16 character letters-and-numbers passcode.
 The event login screen has Use personal referee passcode, usable without first signing into the portal on that device. A signed-in account may only use its own personal passcode. An account can also open its own selected events from the portal without typing the passcode again. Existing roles on that same account are preserved; passcode use on another device grants only Referee access.
 
 No event Admin code is required to open a selected event. If a looked-up VEX event does not yet exist in Ref OS, Open event creates a workspace with no Admin credential and Referee membership only. Repeated opens reuse the exact VEX code, and existing archived workspaces are never reopened or duplicated. A Developer can later configure Admin access. This implements self-service Referee access based on self-reported attendance/plans. New workspaces still require roster and schedule import through the normal event tools.
+
+## Community map and portal feedback
+
+Run `supabase/referee-community.sql` after the portal and Universal Feedback migrations. The portal section dropdown separates Profile, Events, and the USA community map. Country and US state selection use dropdowns; contact details and passcode settings are collapsible. Event search supports state/date or event-code modes and saved-event attendance filters.
+
+Map sharing defaults to off for every profile, including existing users. A referee must select the United States and a supported state, choose a map display name, enable sharing, and save. Only map display name and state are returned by the authenticated community RPC. Phone, email, city, user ID, and full profile are not exposed. Turning sharing off removes the profile from subsequent map reads. Map geometry comes from us-atlas 3.0.1 using US Census boundaries; its ISC license is kept in src/data/us-atlas-LICENSE.txt.
+
+The Send feedback button is available to signed-in portal accounts without an event membership. Messages are private to the Developer's Universal Feedback inbox and include account name/email for follow-up. Submission retries are idempotent; accounts are limited to ten messages per hour. The standard Developer status controls apply to portal feedback. This sends in-app feedback, not an email or Discord message.

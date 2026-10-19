@@ -1,19 +1,21 @@
 import {test,expect} from '@playwright/test';
 test('referee can save a profile and mark event plans on mobile',async({page})=>{
- await page.route('**/src/refereePortalApi*',r=>r.fulfill({contentType:'text/javascript',body:`export async function hasRefereePasscode(){return false};export async function externalEventPlans(){return []};export async function refereeEventCatalog(){return []};export async function claimRefereePasscode(id){window.claimedEvent=id};export async function setRefereePasscode(code){window.passcodeSaved=Boolean(code)};export async function saveExternalEvent(id,event,attendance){window.savedExternal={code:event.code,attendance}};export async function openExternalEvent(code){window.openedExternal=code;return 'external-id'};export async function accountUser(){return {id:'account',email:'alex@example.org'}};export async function loadRefereeProfile(){return {profile:{full_name:'Alex Smith'},plans:[]}};export async function saveRefereeProfile(id,value){window.savedProfile=value};export async function saveEventPlan(id,event,attendance){window.savedPlan={event,attendance}};`}));
+ await page.route('**/src/refereePortalApi*',r=>r.fulfill({contentType:'text/javascript',body:`export async function listRefereeMap(){return [{display_name:'Alex',state:'New Jersey'},{display_name:'Jordan',state:'California'}]};export async function sendPortalFeedback(id,type,message){window.sentPortalFeedback={id,type,message}};export async function hasRefereePasscode(){return false};export async function externalEventPlans(){return []};export async function refereeEventCatalog(){return []};export async function claimRefereePasscode(id){window.claimedEvent=id};export async function setRefereePasscode(code){window.passcodeSaved=Boolean(code)};export async function saveExternalEvent(id,event,attendance){window.savedExternal={code:event.code,attendance}};export async function openExternalEvent(code){window.openedExternal=code;return 'external-id'};export async function accountUser(){return {id:'account',email:'alex@example.org'}};export async function loadRefereeProfile(){return {profile:{full_name:'Alex Smith'},plans:[]}};export async function saveRefereeProfile(id,value){window.savedProfile=value};export async function saveEventPlan(id,event,attendance){window.savedPlan={event,attendance}};`}));
  await page.route('**/src/api*',r=>r.fulfill({contentType:'text/javascript',body:`export async function listSelectableEvents(){return [{id:'event',name:'Example tournament'}]};export async function searchVexEvents(filters){window.searchFilters=filters;return {events:[{code:'VE-V5-27-65868',name:'State tournament',start:'2027-02-01',city:'Trenton'}],nextPage:null}};export async function lookupVexEvent(code){window.lookupCode=code;return {code,name:'State tournament',location:'New Jersey',start:'2027-02-01',teams:[]}};`}));
  await page.route('**/referee-test',r=>r.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module">import '/src/index.css';import '/@vite/client';import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(t)=>t;window.__vite_plugin_react_preamble_installed__=true;const React=(await import('/node_modules/.vite/deps/react.js')).default,DOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default,View=(await import('/src/components/RefereePortal.jsx')).default;DOM.createRoot(document.getElementById('root')).render(React.createElement(View,{onClose:()=>{},onOpenEvent:id=>window.openedEvent=id}));</script>`}));
  await page.setViewportSize({width:390,height:844});await page.goto('/referee-test');
- await page.getByLabel('Country',{exact:true}).fill('United States');await page.getByLabel('Phone',{exact:true}).fill('555-0100');
+ await page.getByLabel('Country',{exact:true}).selectOption('United States');await page.getByLabel('State / district',{exact:true}).selectOption('New Jersey');await page.getByText('Contact details (optional)',{exact:true}).click();await page.getByLabel('Phone',{exact:true}).fill('555-0100');await page.getByLabel(/^Show me on the referee map/).check();await page.getByLabel('Map display name',{exact:true}).fill('Alex');
  await page.getByRole('button',{name:'Save profile',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>window.savedProfile?.country)).toBe('United States');
- await page.getByLabel('Attendance for Example tournament').selectOption('going');
- await expect.poll(()=>page.evaluate(()=>window.savedPlan?.attendance)).toBe('going');
- await expect(page.getByRole('heading',{name:'Events I’m going to'}).locator('..')).toContainText('Example tournament');
+ await page.getByText('Personal referee passcode · Not set',{exact:true}).click();
  await page.getByLabel('New referee passcode',{exact:true}).fill('Myref12345');
  await page.getByLabel('Confirm referee passcode',{exact:true}).fill('Myref12345');
  await page.getByRole('button',{name:'Save referee passcode',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>window.passcodeSaved)).toBe(true);
+ await page.getByLabel('Portal section',{exact:true}).selectOption('events');
+ await page.getByLabel('Attendance for Example tournament').selectOption('going');
+ await expect.poll(()=>page.evaluate(()=>window.savedPlan?.attendance)).toBe('going');
+ await expect(page.getByRole('heading',{name:'Events I’m going to'}).locator('..')).toContainText('Example tournament');
  await page.getByRole('button',{name:'Open event',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>window.openedEvent)).toBe('event');
  await page.getByLabel('State or territory').selectOption('New Jersey');
@@ -25,11 +27,25 @@ test('referee can save a profile and mark event plans on mobile',async({page})=>
  await expect.poll(()=>page.evaluate(()=>window.savedExternal?.code)).toBe('VE-V5-27-65868');
  await page.getByRole('button',{name:'Open event',exact:true}).first().click();
  await expect.poll(()=>page.evaluate(()=>window.openedEvent)).toBe('external-id');
+ await page.getByLabel('Portal section',{exact:true}).selectOption('community');
+ await expect(page.getByRole('heading',{name:'Referees across the USA'})).toBeVisible();
+ await page.getByLabel('View referees by state').selectOption('New Jersey');
+ await expect(page.getByText('Alex',{exact:true})).toBeVisible();
+ await expect(page.getByText('Jordan',{exact:true})).toHaveCount(0);
+ await page.setViewportSize({width:1000,height:900});
+ await page.getByRole('group',{name:/USA referee map/}).screenshot({path:'test-results/referee-map.png'});
+ await page.setViewportSize({width:390,height:844});
+ await page.getByRole('button',{name:'Send feedback',exact:true}).click();
+ await page.getByLabel('Feedback type').selectOption('suggestion');
+ await page.getByLabel('Your message').fill('Please add more event filters.');
+ await page.getByRole('button',{name:'Send to developer',exact:true}).click();
+ await expect(page.getByRole('status')).toContainText('message was sent');
+ await expect.poll(()=>page.evaluate(()=>window.sentPortalFeedback?.type)).toBe('suggestion');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });
 
 test('new referee accounts show email confirmation before profile access',async({page})=>{
- await page.route('**/src/refereePortalApi*',r=>r.fulfill({contentType:'text/javascript',body:`export async function hasRefereePasscode(){return false};export async function externalEventPlans(){return []};export async function refereeEventCatalog(){return []};export async function claimRefereePasscode(id){window.claimedEvent=id};export async function setRefereePasscode(code){window.passcodeSaved=Boolean(code)};export async function saveExternalEvent(id,event,attendance){window.savedExternal={code:event.code,attendance}};export async function openExternalEvent(code){window.openedExternal=code;return 'external-id'};export async function accountUser(){return null};export async function loadRefereeProfile(){};export async function saveRefereeProfile(){};export async function saveEventPlan(){};`}));
+ await page.route('**/src/refereePortalApi*',r=>r.fulfill({contentType:'text/javascript',body:`export async function listRefereeMap(){return [{display_name:'Alex',state:'New Jersey'},{display_name:'Jordan',state:'California'}]};export async function sendPortalFeedback(id,type,message){window.sentPortalFeedback={id,type,message}};export async function hasRefereePasscode(){return false};export async function externalEventPlans(){return []};export async function refereeEventCatalog(){return []};export async function claimRefereePasscode(id){window.claimedEvent=id};export async function setRefereePasscode(code){window.passcodeSaved=Boolean(code)};export async function saveExternalEvent(id,event,attendance){window.savedExternal={code:event.code,attendance}};export async function openExternalEvent(code){window.openedExternal=code;return 'external-id'};export async function accountUser(){return null};export async function loadRefereeProfile(){};export async function saveRefereeProfile(){};export async function saveEventPlan(){};`}));
  await page.route('**/src/supabaseClient*',r=>r.fulfill({contentType:'text/javascript',body:`export const supabase={auth:{signUp:async values=>{window.signupEmail=values.email;return {data:{session:null},error:null}}}};`}));
  await page.route('**/src/api*',r=>r.fulfill({contentType:'text/javascript',body:`export async function listSelectableEvents(){return []};`}));
  await page.route('**/referee-auth-test',r=>r.fulfill({contentType:'text/html',body:`<div id="root"></div><script type="module">import '/@vite/client';import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(t)=>t;window.__vite_plugin_react_preamble_installed__=true;const React=(await import('/node_modules/.vite/deps/react.js')).default,DOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default,View=(await import('/src/components/RefereePortal.jsx')).default;DOM.createRoot(document.getElementById('root')).render(React.createElement(View,{onClose:()=>{},onOpenEvent:id=>window.openedEvent=id}));</script>`}));

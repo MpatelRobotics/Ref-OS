@@ -1,0 +1,20 @@
+import React,{useEffect,useState} from 'react';
+import states from '../data/usStatePaths.json';
+import {US_STATES} from '../refereeLocations';
+import {listRefereeMap} from '../refereePortalApi';
+export default function RefereeCommunityMap({refresh=0}){
+ const [rows,setRows]=useState([]),[selected,setSelected]=useState(''),[loading,setLoading]=useState(true),[error,setError]=useState(''),[retry,setRetry]=useState(0);
+ useEffect(()=>{let live=true;setLoading(true);setError('');listRefereeMap().then(data=>{if(live)setRows(data);}).catch(()=>{if(live)setError('Could not load the referee map. Check your connection and that referee-community.sql has been installed.');}).finally(()=>{if(live)setLoading(false);});return()=>{live=false;};},[refresh,retry]);
+ const counts=Object.fromEntries(US_STATES.map(state=>[state,rows.filter(row=>row.state===state).length]));
+ return <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800"><div><h2 className="text-xl font-bold">Referees across the USA</h2><p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Meet the community by home state. Only referees who choose to share appear here. Locations are self-reported.</p></div>
+ {loading?<p role="status">Loading community…</p>:error?<div role="alert"><p>{error}</p><button className="mt-2 min-h-[44px] rounded-lg border px-3" onClick={()=>setRetry(n=>n+1)}>Try again</button></div>:<>
+ <p className="text-sm font-semibold">{rows.length} sharing referees · {Object.values(counts).filter(Boolean).length} states / districts</p>
+ <div className="rounded-xl border border-slate-200 bg-slate-50 p-2 dark:border-slate-600 dark:bg-slate-900"><svg viewBox="0 0 975 610" className="h-auto w-full" role="group" aria-label="USA referee map. Select a state to view sharing referees.">
+ {states.map(state=><path key={state.id} d={state.path} role="button" tabIndex={0} aria-label={`${state.name}: ${counts[state.name]||0} referees`} aria-pressed={selected===state.name} onClick={()=>setSelected(state.name)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setSelected(state.name);}}} fill={selected===state.name?'#312e81':counts[state.name]?'#818cf8':'#cbd5e1'} stroke={selected===state.name?'#0f172a':'#ffffff'} strokeWidth={selected===state.name?2.5:1} className="cursor-pointer hover:opacity-75 focus:outline focus:outline-2 focus:outline-indigo-700"><title>{state.name}: {counts[state.name]||0} sharing referees</title></path>)}
+ </svg></div>
+ <div className="flex flex-wrap gap-4 text-sm"><span className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-indigo-400"/>Sharing referees</span><span className="flex items-center gap-2"><span className="h-3 w-3 rounded bg-slate-300"/>No sharing referees</span></div>
+ <label className="block font-semibold">View referees by state<select className="mt-1 min-h-[44px] w-full rounded-xl border bg-white px-3 text-slate-900 dark:bg-slate-900 dark:text-white" value={selected} onChange={e=>setSelected(e.target.value)}><option value="">All states</option>{US_STATES.map(state=><option key={state}>{state}</option>)}</select></label>
+ <div aria-live="polite"><h3 className="font-semibold">{selected||'All sharing referees'}</h3>{rows.filter(row=>!selected||row.state===selected).length?<ul className="mt-3 grid max-h-80 gap-2 overflow-y-auto sm:grid-cols-2">{rows.filter(row=>!selected||row.state===selected).map((row,i)=><li key={row.state+row.display_name+i} className="rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-600"><p className="font-semibold">{row.display_name}</p><p className="text-sm text-slate-500 dark:text-slate-300">{row.state}</p></li>)}</ul>:<p className="mt-2 text-sm text-slate-500">No referees have chosen to share {selected?'in this state':'on the map'} yet. You can opt in under My profile.</p>}</div>
+ </>}
+ <p className="text-xs text-slate-500 dark:text-slate-400">State boundaries: U.S. Census Bureau via us-atlas (ISC). Contact details, cities, and precise locations are never shown on this map.</p></section>;
+}
