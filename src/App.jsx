@@ -1494,7 +1494,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
     }
   };
 
-  if(refPortal) return <RefereePortal onClose={()=>{setRefPortal(false);window.history.replaceState(null,"",window.location.pathname);onReload?.();}}/>;
+  if(refPortal) return <RefereePortal onOpenEvent={id=>{setRefPortal(false);onReload?.();onChoose(id);}} onClose={()=>{setRefPortal(false);window.history.replaceState(null,"",window.location.pathname);onReload?.();}}/>;
 
   return (
   <div className="refos-safe-page min-h-screen bg-slate-100 dark:bg-slate-900 p-5 flex items-center justify-center">

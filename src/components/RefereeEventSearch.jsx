@@ -1,0 +1,17 @@
+import React,{useState} from 'react';
+import VexEventFinder from './VexEventFinder';
+import * as api from '../api';
+import {saveExternalEvent,openExternalEvent,claimRefereePasscode} from '../refereePortalApi';
+const button='min-h-[44px] rounded-lg border px-3 py-2 font-semibold disabled:opacity-50';
+export default function RefereeEventSearch({user,external,setExternal,run,busy,onOpen}){
+ const [code,setCode]=useState(''),[result,setResult]=useState(null),[lookupBusy,setLookupBusy]=useState(false),[error,setError]=useState('');
+ async function lookup(value){setLookupBusy(true);setError('');setResult(null);try{setResult(await api.lookupVexEvent(value));}catch(e){setError(e.message);}finally{setLookupBusy(false);}}
+ async function open(event){await run(async()=>{const id=event.id||await openExternalEvent(event.code);if(event.id)await claimRefereePasscode(id);onOpen(id);});}
+ return <section className="space-y-4 rounded-2xl bg-white p-5 dark:bg-slate-800"><h2 className="text-lg font-bold">Find VEX events</h2><p className="text-sm">Search by state and date, or enter an RE- / VE- event code. Mark your attendance, then open the event. No event Admin code is required.</p>
+ <label className="block">VEX event code<input className="mt-1 w-full rounded-lg border bg-transparent px-3 py-3" value={code} onChange={e=>setCode(e.target.value)} placeholder="RE-V5RC-26-4270 or VE-V5-27-65868"/></label><button className={button} disabled={busy||lookupBusy||!code.trim()} onClick={()=>lookup(code)}>Look up event</button>
+ <VexEventFinder onSearch={api.searchVexEvents} onSelect={lookup} disabled={busy||lookupBusy}/>
+ {lookupBusy&&<p role="status">Looking up event…</p>}{error&&<p role="alert" className="text-red-600">{error}</p>}
+ {result&&<div className="space-y-2 rounded-xl border p-3"><h3 className="font-bold">{result.name}</h3><p>{result.code} · {result.start?.slice(0,10)}</p><p>{result.location}</p><label className="block">My attendance<select className="mt-1 w-full rounded-lg border bg-white p-3 text-slate-900" disabled={busy} value={external.find(p=>p.code===result.code)?.attendance||''} onChange={e=>{const attendance=e.target.value;run(async()=>{await saveExternalEvent(user.id,result,attendance);setExternal(old=>[...old.filter(p=>p.code!==result.code),...(attendance?[{...result,attendance}]:[])]);});}}><option value="">Not selected</option><option value="attended">I attended</option><option value="going">I’m going</option></select></label></div>}
+ {external.map(event=><div key={event.code} className="space-y-2 rounded-xl border p-3"><h3 className="font-semibold">{event.name}</h3><p className="text-sm">{event.code} · {event.attendance==='going'?'Going':'Attended'} · {event.location}</p><div className="flex flex-wrap gap-2"><button className={button} disabled={busy} onClick={()=>open(event)}>Open event</button><button className={button} disabled={busy} onClick={()=>run(async()=>{const attendance=event.attendance==='going'?'attended':'going';await saveExternalEvent(user.id,event,attendance);setExternal(old=>old.map(p=>p.code===event.code?{...p,attendance}:p));})}>Mark {event.attendance==='going'?'attended':'going'}</button><button className={button} disabled={busy} onClick={()=>run(async()=>{await saveExternalEvent(user.id,event,'');setExternal(old=>old.filter(p=>p.code!==event.code));})}>Remove</button></div></div>)}
+ </section>;
+}

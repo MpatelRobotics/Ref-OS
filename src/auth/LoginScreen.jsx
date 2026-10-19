@@ -130,6 +130,7 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
         </div>
 
         <button type="button" onClick={()=>setRefPortal(true)} className="mb-4 min-h-[44px] w-full rounded-xl border border-slate-300 px-4 py-3 font-semibold">Sign in with referee account</button>
+        <button type="button" onClick={()=>{setMode("personal");setUseDifferentCode(true);setPw("");setErr("");}} className="mb-4 min-h-[44px] w-full rounded-xl border px-4 py-3 font-semibold">Use personal referee passcode</button>
         {notice && !showRemembered && (
           <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 text-center">{notice}</p>
         )}
@@ -216,12 +217,12 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
           </>
         ) : (
           <>
-            <p className="text-sm text-slate-600 mb-4 text-center">Enter the admin password.</p>
-            <input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} placeholder="Admin password" autoFocus
+            <p className="text-sm text-slate-600 mb-4 text-center">{mode==="personal"?"Enter your personal referee passcode for an event marked attended or going.":"Enter the admin password."}</p>
+            <input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} aria-label={mode==="personal"?"Personal referee passcode":"Admin password"} placeholder={mode==="personal"?"Personal referee passcode":"Admin password"} autoFocus
               onKeyDown={(e) => e.key === "Enter" && submit()}
               className={`w-full px-3 py-3 rounded-lg bg-white border border-slate-300 text-[#11172F] placeholder-slate-400 focus:outline-none focus:ring-2 ${highlander ? "focus:ring-[#D7212B]" : "focus:ring-blue-500"}`} />
             {err && <p className="text-sm text-red-400 mt-2 text-center">{err}</p>}
-            <button onClick={submit} disabled={!pw} style={pw ? { backgroundColor: accent } : undefined}
+            <button onClick={submit} disabled={!pw||checkingCode} style={pw ? { backgroundColor: accent } : undefined}
               className="w-full mt-3 py-3 rounded-lg font-semibold text-white hover:brightness-95 disabled:bg-slate-200 disabled:text-slate-400">Enter</button>
             <button onClick={() => { setMode("code"); setPw(""); setErr(""); }}
               className="w-full mt-3 py-3 rounded-lg font-semibold border border-slate-300 bg-white text-[#11172F] hover:bg-slate-50">

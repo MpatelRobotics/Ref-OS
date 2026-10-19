@@ -7,6 +7,17 @@
 
 Accounts use Supabase Auth email/password sessions. Profiles and event plans use owner-only RLS and exclude anonymous sessions. Profile contact email is separate from the sign-in email. No contact directory or public profile is exposed.
 
-Event attendance is self-reported, not an official assignment. Selecting an event never creates an event membership. Enter the event's crew access code on the first visit; subsequent visits reuse membership after server verification. Existing event code, role, archive, and revocation rules still apply. Signing out of the account leaves the saved profile and event plans intact.
+Event attendance is self-reported, not an official assignment. After installing the personal-passcode migration below, selecting attended or going makes that event eligible for personal Referee access. Open event creates or verifies Referee membership without requiring an event Admin code. Existing event code login remains available. Signing out of the account leaves the saved profile and event plans intact.
 
 Password reset links return to the referee portal with a new-password form. Email verification links return to the account portal. Mobile users can complete email verification/reset in their browser and then sign into the installed app using the same account.
+
+
+## Personal passcodes and event search
+
+Run `supabase/referee-portal-passcodes.sql` after the original portal migration, lifecycle, Developer access, and security migrations. This adds private passcodes, external VEX event plans, public event-code/location lookup, and scoped Referee claims. No new Edge Function is needed: state/date/code search reuses the deployed `vex-event-lookup` function and its VEX_EVENTS_API_TOKEN.
+
+Accounts can create or replace an 8–16 character letters-and-numbers passcode. It is case insensitive, hashed with pgcrypto, never returned to the browser, and grants Referee access only to events that account selected as attended or going. Wrong attempts use the shared per-device/event lockout and persist on failure. Disabling/replacing a passcode prevents future claims with the old code; it does not sign out existing event sessions.
+
+The event login screen has Use personal referee passcode, usable without first signing into the portal on that device. A signed-in account may only use its own personal passcode. An account can also open its own selected events from the portal without typing the passcode again. Existing roles on that same account are preserved; passcode use on another device grants only Referee access.
+
+No event Admin code is required to open a selected event. If a looked-up VEX event does not yet exist in Ref OS, Open event creates a workspace with no Admin credential and Referee membership only. Repeated opens reuse the exact VEX code, and existing archived workspaces are never reopened or duplicated. A Developer can later configure Admin access. This implements self-service Referee access based on self-reported attendance/plans. New workspaces still require roster and schedule import through the normal event tools.

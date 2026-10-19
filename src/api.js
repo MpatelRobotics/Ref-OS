@@ -111,6 +111,14 @@ export async function claimEventAccess(eventId, credential) {
     throw new Error("Invalid event credential");
   }
   await ensureAnonymousSession();
+  if (String(credential || "").trim().length >= 8) {
+    const {data:outcome,error:passcodeError}=await supabase.rpc("claim_referee_passcode",{p_event:eventId,p_code:String(credential).trim()});
+    if(passcodeError)throw passcodeError;
+    if(outcome!=="ok")throw new Error(outcome==="locked"?"Too many attempts. Try again in five minutes.":outcome==="archived"?"This event is archived or unavailable.":"Personal passcode not accepted. Select this event as attended or going in your account.");
+    const access=await getMyEventAccessChecked(eventId);
+    if(!access)throw new Error("Event access could not be confirmed.");
+    return {role:access.role==="admin"?"ref":access.role,serverRole:access.role,isAdmin:access.role==="admin",developer:access.developer===true};
+  }
   const { data, error } = await supabase.rpc("claim_event_access", {
     p_event: eventId,
     p_credential: String(credential || ""),
