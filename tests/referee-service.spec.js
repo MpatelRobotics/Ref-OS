@@ -1,0 +1,9 @@
+import {test,expect} from '@playwright/test';
+import {readFile} from 'node:fs/promises';
+test('annual service summary downloads deduplicated volunteer days',async({page})=>{
+ await page.route('**/service-test',r=>r.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module">import '/src/index.css';import '/@vite/client';import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(t)=>t;window.__vite_plugin_react_preamble_installed__=true;const React=(await import('/node_modules/.vite/deps/react.js')).default,DOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default,View=(await import('/src/components/RefereeServiceSummary.jsx')).default;DOM.createRoot(document.getElementById('root')).render(React.createElement(View,{name:'Alex Smith',events:[{id:'one',name:'Fall Tournament',code:'RE-V5RC-26-1234',start_date:'2026-09-01',end_date:'2026-09-02'},{id:'two',name:'Second Event',start_date:'2026-09-02',end_date:'2026-09-03'}],plans:[{event_id:'one',attendance:'attended'},{event_id:'two',attendance:'attended'}],external:[]}));</script>`}));
+ await page.clock.setFixedTime(new Date('2026-10-19T12:00:00Z'));await page.setViewportSize({width:390,height:844});await page.goto('/service-test');
+ await expect(page.getByText('2026: 3 volunteer days · 2 events')).toBeVisible();
+ const waiting=page.waitForEvent('download');await page.getByRole('button',{name:'Download annual summary'}).click();const download=await waiting;
+ expect(download.suggestedFilename()).toBe('Ref-OS-Service-2026.csv');const csv=await readFile(await download.path(),'utf8');expect(csv).toContain('"Unique volunteer days","3"');expect(csv).toContain('Fall Tournament');expect(csv).toContain('Alex Smith');
+});

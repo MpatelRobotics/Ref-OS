@@ -32,6 +32,11 @@ export async function submitFeedbackScreenshots({eventId,id,note,by,sessionId=nu
  } catch {throw Error('Your message was saved, but a screenshot could not be attached. Keep this window open and press Send Feedback again to retry without duplicating the message.');}
 }
 export async function loadFeedbackScreenshots(feedbackId) {
+ // Portal feedback uses a separate private bucket and the same Developer viewer.
+ const portal=await supabase.from('referee_feedback_attachments').select('slot,path').eq('feedback_id',feedbackId).order('slot');
+ if(portal.error&&!['42P01','PGRST205'].includes(portal.error.code))throw Error('Could not load portal screenshots. Check your access and connection.');
+ if(portal.data?.length)return Promise.all(portal.data.map(async row=>{const {data,error}=await supabase.storage.from('referee-feedback-screenshots').createSignedUrl(row.path,600);if(error)throw error;return {slot:row.slot,url:data.signedUrl};}));
+
  const {data,error}=await supabase.from('feedback_attachments').select('slot,path').eq('feedback_id',feedbackId).order('slot');
  if(error)throw Error('Could not load screenshots. Check your connection and screenshot setup.');
  return await Promise.all((data || []).map(async row=>{

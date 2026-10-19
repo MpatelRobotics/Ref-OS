@@ -42,13 +42,15 @@ export async function lookupEvent(code, token, fetcher = fetch) {
     const location = event.location || {};
     return { code, name: text(event.name), start: text(event.start), end: text(event.end),
       location: ['venue','address_1','address_2','city','region','postcode','country'].map(key => text(location[key])).filter(Boolean).join(', '),
-      program: text(event.program?.name), eventType: eventType(event.event_type),
+      program: text(event.program?.name), eventType: eventType(event.event_type), eventCategory:/signature/i.test([typeName(event.level),typeName(event.event_type),event.name].join(' '))?'signature':eventType(event.event_type),
       teams: [...teams.values()].sort((a,b) => a.number.localeCompare(b.number,'en',{numeric:true})) };
   } finally { clearTimeout(timer); }
 }
 
 const normalized = value => String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z]/g,'');
 export async function searchEvents(filters, token, fetcher = fetch) {
+  const programFilter=String(filters.program||'all'),typeFilter=String(filters.eventType||'all');
+  if(!['all','V5RC','VIQRC','VURC'].includes(programFilter)||!['all','tournament','league','signature'].includes(typeFilter))throw new Error('Choose a supported program and event type.');
   const country = String(filters.country || '').toUpperCase();
   const state = String(filters.state || '').trim();
   const page = Number(filters.page || 1);
@@ -80,9 +82,13 @@ export async function searchEvents(filters, token, fetcher = fetch) {
       for(const event of body.data) {
         const locations=[event.location,...(Array.isArray(event.locations)?event.locations:[])].filter(Boolean);
         if(!locations.some(location=>accepted.has(normalized(locationValue(location.country))) && stateAliases.has(normalized(locationValue(location.region)))))continue;
-        if(typeName(event.event_type) && !eventType(event.event_type))continue;
+        if(typeName(event.event_type) && !eventType(event.event_type) && !/signature/i.test(typeName(event.event_type)))continue;
         if(!text(event.name)||!text(event.sku))continue;
-        events.push({code:text(event.sku),name:text(event.name),start:text(event.start),city:text(event.location?.city),eventType:eventType(event.event_type)});
+        const programValue=[text(event.program?.name),text(event.sku)].join(' ').toUpperCase();
+        const program=/VIQ|IQRC|IQC|VEX IQ/.test(programValue)?'VIQRC':/VURC|VEX U|VEXU|(?:RE|VE)-U(?:-|RC)/.test(programValue)?'VURC':/V5|VRC/.test(programValue)?'V5RC':'';
+        const category=/signature/i.test([typeName(event.level),typeName(event.event_type),event.name].join(' '))?'signature':eventType(event.event_type);
+        if(programFilter!=='all'&&program!==programFilter||typeFilter!=='all'&&category!==typeFilter)continue;
+        events.push({code:text(event.sku),name:text(event.name),start:text(event.start),city:text(event.location?.city),program,eventType:eventType(event.event_type),eventCategory:category});
       }
       if(current===last){nextPage=null;break;}
       nextPage=current+1;

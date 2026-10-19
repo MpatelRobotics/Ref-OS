@@ -1,0 +1,3 @@
+export function refereeProgram(event){const value=[event.program,event.code].filter(Boolean).join(' ').toUpperCase();if(/VIQ|IQRC|IQC|VEX IQ/.test(value))return 'VIQRC';if(/VURC|VEX U|VEXU|(?:RE|VE)-U(?:-|RC)/.test(value))return 'VURC';if(/V5|VRC/.test(value))return 'V5RC';return '';}
+export function refereeEventType(event){const value=[event.eventCategory,event.event_type,event.eventType,event.format,event.name].filter(Boolean).join(' ').toLowerCase();if(/signature/.test(value))return 'signature';if(/league/.test(value))return 'league';if(/tournament/.test(value))return 'tournament';return '';}
+export function matchesRefereeFilters(event,program='all',type='all'){return (program==='all'||refereeProgram(event)===program)&&(type==='all'||refereeEventType(event)===type);}

@@ -41,3 +41,14 @@ test('new event type labels, VE codes and state abbreviations are included',asyn
  ]}),{status:200}));
  expect(result.events.map(e=>e.code)).toEqual(['RE-V5RC-26-4246','VE-V5-27-65868']);
 });
+
+
+test('program and signature filters select the right events across RE and VE codes',async()=>{
+ const result=await searchEvents({...filters,program:'V5RC',eventType:'signature'},'fixture-token',async()=>new Response(JSON.stringify({meta:{last_page:1},data:[
+  {sku:'VE-V5-27-12345',name:'Signature Event',start:'2026-10-20',event_type:'Tournament',program:{name:'V5RC'},location:{country:'US',region:'New York'}},
+  {sku:'RE-VIQRC-26-1234',name:'IQ League',start:'2026-10-20',event_type:'League',program:{name:'VIQRC'},location:{country:'US',region:'New York'}},
+  {sku:'RE-V5RC-26-4321',name:'Other Tournament',start:'2026-10-20',event_type:'Tournament',program:{name:'V5RC'},location:{country:'US',region:'New York'}}
+ ]}),{status:200}));
+ expect(result.events.map(e=>e.code)).toEqual(['VE-V5-27-12345']);
+ expect(result.events[0].program).toBe('V5RC');expect(result.events[0].eventCategory).toBe('signature');
+});

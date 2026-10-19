@@ -1,9 +1,11 @@
+import RefereeProfilePhoto from "./RefereeProfilePhoto";
 import React,{useRef,useState} from 'react';
 import {US_STATES,isUSA,normalizeUSState} from '../refereeLocations';
 const names=new Intl.DisplayNames(['en'],{type:'region'});
 const countries=[...new Set(Array.from({length:676},(_,i)=>String.fromCharCode(65+Math.floor(i/26),65+i%26)).map(code=>names.of(code)).filter(name=>name&&!/^[A-Z]{2}$/.test(name)))].sort();
 const field='mt-1 min-h-[44px] w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white';
-export default function RefereeProfileForm({profile,setProfile,busy,onSave,email}){
+export default function RefereeProfileForm({profile,setProfile,busy,onSave,email,userId}){
+ const [photoBusy,setPhotoBusy]=useState(false);
  const usa=isUSA(profile.country);
  const [language,setLanguage]=useState(''),[otherLanguage,setOtherLanguage]=useState('');
  const languages=Array.isArray(profile.languages)?profile.languages:[];
@@ -12,11 +14,12 @@ export default function RefereeProfileForm({profile,setProfile,busy,onSave,email
  const region=usa?normalizeUSState(profile.region):profile.region;
  const [locationError,setLocationError]=useState('');
  const countryInput=useRef(null),stateInput=useRef(null);
- const submit=e=>{e.preventDefault();if(profile.map_visible&&(!usa||!US_STATES.includes(region))){setLocationError('Choose United States and your home state above, then save your map preference.');(!usa?countryInput:stateInput).current?.focus();return;}setLocationError('');onSave();};
+ const submit=e=>{e.preventDefault();if(busy||photoBusy)return;if(profile.map_visible&&(!usa||!US_STATES.includes(region))){setLocationError('Choose United States and your home state above, then save your map preference.');(!usa?countryInput:stateInput).current?.focus();return;}setLocationError('');onSave();};
  const change=(key,value)=>{setLocationError('');setProfile(old=>({...old,[key]:value,...(key==='country'&&!isUSA(value)?{map_visible:false}:{} )}));};
  return <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800"><div><h2 className="text-xl font-bold">My profile</h2><p className="mt-1 text-sm text-slate-500 dark:text-slate-300">Signed in as {email}. Your contact information stays private.</p></div>
  <form className="space-y-5" onSubmit={submit}>
  <label className="block font-semibold">Full name<input required maxLength={100} autoComplete="name" className={field} value={profile.full_name} onChange={e=>change('full_name',e.target.value)}/></label>
+ <RefereeProfilePhoto userId={userId} path={profile.photo_path||''} onChange={path=>change('photo_path',path)} onBusy={setPhotoBusy}/>
  <fieldset className="space-y-3"><legend className="mb-2 font-semibold">Where are you from?</legend><div className="grid gap-4 sm:grid-cols-2"><label className="block">Country<select ref={countryInput} aria-label="Country" className={field} value={usa?'United States':profile.country} onChange={e=>change('country',e.target.value)}><option value="">Choose country</option>{profile.country&&!usa&&!countries.includes(profile.country)&&<option>{profile.country}</option>}{countries.map(country=><option key={country}>{country}</option>)}</select></label>
  <label className="block">{usa?'State / district':'State / province / region'}{usa?<select ref={stateInput} aria-label="State / district" className={field} value={region} onChange={e=>change('region',e.target.value)}><option value="">Choose state</option>{profile.region&&!US_STATES.includes(region)&&<option>{profile.region}</option>}{US_STATES.map(state=><option key={state}>{state}</option>)}</select>:<input className={field} autoComplete="address-level1" maxLength={100} value={region} onChange={e=>change('region',e.target.value)}/>}</label></div><label className="block">City <span className="text-sm text-slate-500">(optional)</span><input className={field} autoComplete="address-level2" maxLength={100} value={profile.city} onChange={e=>change('city',e.target.value)}/></label></fieldset>
  <fieldset className="space-y-3"><legend className="mb-2 font-semibold">Programs worked</legend><p className="text-sm text-slate-500">Select every program you have refereed.</p><div className="flex flex-wrap gap-3">{['V5RC','VIQRC','VURC'].map(program=><label key={program} className="flex min-h-[44px] items-center gap-2 rounded-xl border px-3"><input type="checkbox" disabled={busy} checked={programs.includes(program)} onChange={e=>change('programs',e.target.checked?[...programs,program]:programs.filter(item=>item!==program))}/>{program}</label>)}</div></fieldset>
@@ -26,8 +29,8 @@ export default function RefereeProfileForm({profile,setProfile,busy,onSave,email
  {profile.map_visible&&<label className="block">Map display name<input required maxLength={60} className={field} value={profile.map_name||profile.full_name||''} onChange={e=>change('map_name',e.target.value)} placeholder="How you want to appear on the map"/></label>}
  <p id="map-sharing-help" className="text-xs text-slate-500 dark:text-slate-400">Changes take effect after saving. Sharing is on by default for new profiles. Uncheck and save to leave the map. We do not show your city, email, phone, or exact location.</p>
  {locationError&&<p role="alert" className="text-sm font-semibold text-red-700 dark:text-red-300">{locationError}</p>}
- <button type="submit" disabled={busy} className="min-h-[44px] rounded-xl border border-indigo-400 px-4 py-2 font-semibold disabled:opacity-50">{busy?'Saving…':'Save map preference'}</button>
+ <button type="submit" disabled={busy||photoBusy} className="min-h-[44px] rounded-xl border border-indigo-400 px-4 py-2 font-semibold disabled:opacity-50">{busy?'Saving…':'Save map preference'}</button>
  </fieldset>
- <button disabled={busy} className="min-h-[44px] rounded-xl bg-indigo-700 px-5 py-3 font-semibold text-white disabled:opacity-50">{busy?'Saving…':'Save profile'}</button>
+ <button disabled={busy||photoBusy} className="min-h-[44px] rounded-xl bg-indigo-700 px-5 py-3 font-semibold text-white disabled:opacity-50">{busy?'Saving…':'Save profile'}</button>
  </form></section>;
 }

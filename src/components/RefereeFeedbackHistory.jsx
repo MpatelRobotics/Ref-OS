@@ -1,0 +1,9 @@
+import React,{useEffect,useState} from 'react';
+import {listMyPortalFeedback,portalFeedbackScreenshots} from '../refereePortalApi';
+import FeedbackAttachments from './FeedbackAttachments';
+const labels={new:'New',in_progress:'In progress',resolved:'Resolved'};
+export default function RefereeFeedbackHistory(){
+ const [rows,setRows]=useState([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[refresh,setRefresh]=useState(0);
+ useEffect(()=>{let live=true;setLoading(true);setError('');listMyPortalFeedback().then(data=>{if(live)setRows(data||[]);}).catch(e=>{if(live)setError(e.message);}).finally(()=>{if(live)setLoading(false);});return()=>{live=false;};},[refresh]);
+ return <section className="space-y-4 rounded-2xl border bg-white p-5 dark:bg-slate-800"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold">My feedback</h2><button disabled={loading} className="min-h-[44px] rounded-lg border px-3 disabled:opacity-50" onClick={()=>setRefresh(value=>value+1)}>Refresh feedback status</button></div><p className="text-sm text-slate-500">Your portal submissions and their current Developer review status.</p>{loading?<p role="status">Loading feedback…</p>:error?<p role="alert" className="text-red-600">{error}</p>:!rows.length?<p>You haven’t sent portal feedback yet. Use Send feedback above to report an issue or suggest an improvement.</p>:rows.map(row=><article key={row.id} className="space-y-2 rounded-xl border p-3"><p className="font-semibold">{labels[row.status]||'New'} <span className="font-normal text-slate-500">· {new Date(row.created_at).toLocaleDateString()}</span></p><p className="whitespace-pre-wrap break-words">{row.note}</p><FeedbackAttachments feedbackId={row.id} loadScreenshots={portalFeedbackScreenshots}/></article>)}</section>;
+}
