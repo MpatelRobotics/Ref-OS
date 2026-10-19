@@ -1,3 +1,4 @@
+import { nominationsThroughSession } from "./league/nominationCarryover.js";
 import { supabase } from "./supabaseClient";
 import { OFFLINE_RULES } from "./offlineRules";
 import { putCachedBlob, deletePaths as deleteCachedPhotos } from "./photoCache";
@@ -35,8 +36,9 @@ export const uid = () =>
    EVENT-SCOPED (league-wide): teams, rules, access codes, event members and volunteer profiles,
    event settings (except the snapshot keys below), watch notes, ref roster, branding.
    SESSION-SCOPED: matches, violations, field log (except the league-wide kinds below), field
-   reset checks, alliances, nominations, finalists, attendance, robot inspection photos, and the
-   imported rankings / skills / qualification-record snapshots. */
+   reset checks, alliances, finalists, attendance, robot inspection photos, and the
+   imported rankings / skills / qualification-record snapshots. Nominations retain their original
+   session and are visible cumulatively through the selected league session. */
 export const LEAGUE_SESSION_SETTING_KEYS = new Set(["skills_rankings", "qualification_records", "judging_rank_order", "rank_snapshot", "tm_field_activity", "tm_check_in", "tm_match_times", "tm_team_divisions"]);
 export const LEAGUE_EVENT_SCOPED_FIELD_LOG_KINDS = new Set(["role_code_update", "role_code_request", "volunteer_contact", "sync_probe", "sync_ack", "system_test"]);
 let leagueContext = { eventId: "", sessionId: "", legacySessionId: "" };
@@ -1332,12 +1334,18 @@ export const decodeAttribution = (value) => {
 const encodeAttribution = (nickname, fullName) => JSON.stringify({ v: 1, n: String(nickname || "").trim(), f: String(fullName || nickname || "").trim() });
 const mapNom = (r) => {
   const attribution = decodeAttribution(r.nominated_by);
-  return { id: r.id, award: r.award, team: r.team, match: r.match_info || null, reason: r.reason || "", criteria: r.criteria || [], whereWhen: r.where_when || "", by: attribution.nickname, byFullName: attribution.fullName, byRole: r.nominated_role || "", createdAt: new Date(r.created_at).getTime() };
+  return { id: r.id, sessionId: r.session_id || null, award: r.award, team: r.team, match: r.match_info || null, reason: r.reason || "", criteria: r.criteria || [], whereWhen: r.where_when || "", by: attribution.nickname, byFullName: attribution.fullName, byRole: r.nominated_role || "", createdAt: new Date(r.created_at).getTime() };
 };
 export async function listNominations(eventId) {
   if (E2E_MOCK) return [];
-  const { data } = await inSession(supabase.from("nominations").select("*").eq("event_id", eventId), eventId).order("created_at", { ascending: false });
-  return (data || []).map(mapNom);
+  const sessionId = leagueSessionFor(eventId);
+  const legacySessionId = leagueLegacySessionFor(eventId);
+  const [result, sessions] = await Promise.all([
+    supabase.from("nominations").select("*").eq("event_id", eventId).order("created_at", { ascending: false }),
+    sessionId ? listLeagueSessions(eventId) : Promise.resolve([]),
+  ]);
+  if (result.error) throw result.error;
+  return nominationsThroughSession((result.data || []).map(mapNom), sessions, sessionId, legacySessionId);
 }
 export async function addNomination(eventId, n) {
   const id = (self.crypto && self.crypto.randomUUID && self.crypto.randomUUID()) || Math.random().toString(36).slice(2);
@@ -1349,7 +1357,8 @@ export async function addNomination(eventId, n) {
   return mapNom(data);
 }
 export async function deleteNomination(id) {
-  await supabase.from("nominations").delete().eq("id", id);
+  const { error } = await supabase.from("nominations").delete().eq("id", id);
+  if (error) throw error;
 }
 export async function clearJudging(eventId) {
   const { error: nomError } = await inSession(supabase.from("nominations").delete().eq("event_id", eventId), eventId);

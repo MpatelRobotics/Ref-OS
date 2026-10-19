@@ -3895,7 +3895,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       }
       if (sel.teams) { await api.clearTeams(eventId); setTeams([]); }
       if (sel.schedule) { await api.clearMatches(eventId); setMatches({}); await api.clearRankings(eventId); await api.deleteEventSetting(eventId, "qualification_records"); setEventSettings((cur) => { const next = { ...cur }; delete next.qualification_records; return next; }); setTeams((cur) => cur.map((t) => ({ ...t, rank: null }))); }
-      if (sel.judging) { await api.clearJudging(eventId); await api.deleteEventSetting(eventId, "judging_rank_order"); setNoms([]); setFinalists(new Set()); setEventSettings((cur) => { const next = { ...cur }; delete next.judging_rank_order; return next; }); }
+      if (sel.judging) { await api.clearJudging(eventId); await api.deleteEventSetting(eventId, "judging_rank_order"); setNoms(await api.listNominations(eventId)); setFinalists(new Set()); setEventSettings((cur) => { const next = { ...cur }; delete next.judging_rank_order; return next; }); }
       if (sel.alliances) { await api.clearAlliances(eventId); setAlliances({}); setAlliancesLoaded(true); }
       if (sel.watchlist) { await api.clearWatchNotes(eventId); setWatchNotes([]); }
       if (sel.quadrants) { await api.clearFieldResetChecks(eventId); setFieldResetChecks([]); }
@@ -7100,6 +7100,7 @@ const AWARDS = [
 const G_RULE = /^G[1-5]$/i;
 
 function JudgingView({ noms, viols, teamName, finalists, rankOrder = {}, canReorder = false, onMoveRank, onToggleFinalist, onNominate, onDeleteNom, onExport, emcee }) {
+  const league = useContext(LeagueUiContext);
   const [award, setAward] = useState("sportsmanship");
   const [openTeam, setOpenTeam] = useState(null);
 
@@ -7124,6 +7125,7 @@ function JudgingView({ noms, viols, teamName, finalists, rankOrder = {}, canReor
 
   return (
     <>
+      {league && <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">Nominations carry over from earlier league sessions. Showing nominations through {league.session.name}.</p>}
       {onExport && noms.length > 0 && (
         <div className="flex justify-end mb-2">
           <button onClick={onExport} className="inline-flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg px-3 py-1.5"><Download size={15} /> Export nominations</button>
@@ -7181,6 +7183,7 @@ function JudgingView({ noms, viols, teamName, finalists, rankOrder = {}, canReor
                     {row.noms.sort((a, b) => b.createdAt - a.createdAt).map((n) => (
                       <div key={n.id} className="px-4 py-2.5 text-sm">
                         <div className="flex items-center gap-2 text-xs text-slate-400">
+                          {league && <span className="font-semibold">{league.sessionName(n.sessionId || league.legacySessionId) || "Earlier league nomination"}</span>}
                           {fmtMatch(n.match) && <span className="font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{fmtMatch(n.match)}</span>}
                           {n.by && <span className="flex items-center gap-1"><UserCircle2 size={12} /> {n.by}</span>}
                           {n.byRole && <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md border ${roleChip(n.byRole)}`}>{n.byRole}</span>}
