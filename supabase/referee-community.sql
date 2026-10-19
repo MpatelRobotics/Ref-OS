@@ -1,5 +1,5 @@
 -- Run after referee-portal.sql and universal-feedback.sql.
-alter table public.referee_profiles add column if not exists map_visible boolean not null default false;
+alter table public.referee_profiles add column if not exists map_visible boolean not null default true;
 alter table public.referee_profiles add column if not exists map_name text not null default '' check(length(map_name)<=60);
 create or replace function public.list_referee_map()
 returns table(display_name text,state text) language plpgsql stable security definer set search_path=public as $$

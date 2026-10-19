@@ -1,3 +1,4 @@
+import {normalizeRefereeLocation} from './refereeLocations';
 import {supabase} from './supabaseClient';
 export async function accountUser(){const {data,error}=await supabase.auth.getUser();if(error && error.name!=='AuthSessionMissingError')throw error;return data?.user && !data.user.is_anonymous?data.user:null;}
 export async function loadRefereeProfile(userId){
@@ -5,7 +6,7 @@ export async function loadRefereeProfile(userId){
  if(profile.error)throw profile.error;if(plans.error)throw plans.error;
  return {profile:profile.data,plans:plans.data||[]};
 }
-export async function saveRefereeProfile(userId,profile){const {error}=await supabase.from('referee_profiles').upsert({...profile,user_id:userId});if(error)throw error;}
+export async function saveRefereeProfile(userId,profile){const {error}=await supabase.from('referee_profiles').upsert({...normalizeRefereeLocation(profile),map_name:profile.map_visible?(profile.map_name||profile.full_name||'').trim().slice(0,60):(profile.map_name||''),user_id:userId});if(error){if(/map_visible|map_name|schema cache/i.test(error.message||''))throw Error('Map sharing is not set up in the database yet. Ask the developer to run referee-community.sql in Supabase, then try again.');throw error;}}
 export async function saveEventPlan(userId,eventId,attendance){
  const result=attendance?await supabase.from('referee_event_plans').upsert({user_id:userId,event_id:eventId,attendance}):await supabase.from('referee_event_plans').delete().eq('user_id',userId).eq('event_id',eventId);
  if(result.error)throw result.error;

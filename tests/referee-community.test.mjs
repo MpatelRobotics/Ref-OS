@@ -17,7 +17,7 @@ test('community exposes opt-in state and name only; portal feedback reaches only
  const a='22222222-2222-4222-8222-222222222222',b='33333333-3333-4333-8333-333333333333',id='44444444-4444-4444-8444-444444444444';
  await db.query('insert into auth.users values ($1),($2)',[a,b]);
  await db.query("select set_config('test.uid',$1,false),set_config('test.anon','false',false)",[a]);await db.exec('set role authenticated');
- await db.query("insert into referee_profiles(user_id,full_name,country,region,city,phone,map_name) values ($1,'Alex Smith','United States','New Jersey','Private city','Private phone','Alex')",[a]);
+ await db.query("insert into referee_profiles(user_id,full_name,country,region,city,phone,map_name,map_visible) values ($1,'Alex Smith','United States','New Jersey','Private city','Private phone','Alex',false)",[a]);
  assert.deepEqual((await db.query('select * from list_referee_map()')).rows,[]);
  await db.query('update referee_profiles set map_visible=true where user_id=$1',[a]);
  await db.query("select set_config('test.uid',$1,false)",[b]);

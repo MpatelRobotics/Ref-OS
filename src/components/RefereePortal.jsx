@@ -7,7 +7,7 @@ import React,{useEffect,useState} from 'react';
 import {supabase} from '../supabaseClient';
 import * as api from '../api';
 import {accountUser,loadRefereeProfile,saveRefereeProfile,saveEventPlan,hasRefereePasscode,externalEventPlans,refereeEventCatalog,claimRefereePasscode} from '../refereePortalApi';
-const empty={full_name:'',country:'',region:'',city:'',phone:'',contact_email:'',discord:'',map_visible:false,map_name:''};
+const empty={full_name:'',country:'',region:'',city:'',phone:'',contact_email:'',discord:'',map_visible:true,map_name:''};
 const field='mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-slate-900 dark:border-slate-600 dark:bg-slate-900 dark:text-white';
 const button='min-h-[44px] rounded-xl border border-slate-300 px-4 py-2 font-semibold disabled:opacity-50';
 export default function RefereePortal({onClose,eventId,onUnlock,onOpenEvent}){

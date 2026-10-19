@@ -1,0 +1,23 @@
+import {test,expect} from '@playwright/test';
+test('map opt-in accepts old state abbreviations and guides missing location',async({page})=>{
+ await page.route('**/map-opt-in-test',r=>r.fulfill({contentType:'text/html',body:`<div id="root"></div><script type="module">import '/@vite/client';import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(t)=>t;window.__vite_plugin_react_preamble_installed__=true;const React=(await import('/node_modules/.vite/deps/react.js')).default,DOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default,View=(await import('/src/components/RefereeProfileForm.jsx')).default,{normalizeRefereeLocation}=await import('/src/refereeLocations.js');function Harness({initial}){const [profile,setProfile]=React.useState(initial);return React.createElement(View,{profile,setProfile,onSave:()=>window.saved=normalizeRefereeLocation(profile),email:'ref@example.org'});}const root=DOM.createRoot(document.getElementById('root'));window.start=(location)=>root.render(React.createElement(Harness,{key:Math.random(),initial:{full_name:'Alex Smith',country:'',region:'',city:'',phone:'',contact_email:'',discord:'',map_visible:false,map_name:'',...location}}));window.start({country:'U.S.',region:'NJ'});</script>`}));
+ await page.goto('/map-opt-in-test');
+ await expect(page.getByLabel('State / district',{exact:true})).toHaveValue('New Jersey');
+ await page.getByLabel(/^Show me on the referee map/).check();
+ await expect(page.getByLabel('Map display name',{exact:true})).toHaveValue('Alex Smith');
+ await page.getByRole('button',{name:'Save map preference',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>window.saved?.map_visible)).toBe(true);
+ expect(await page.evaluate(()=>window.saved.region)).toBe('New Jersey');
+ await page.getByLabel(/^Show me on the referee map/).uncheck();
+ await page.getByRole('button',{name:'Save map preference',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>window.saved?.map_visible)).toBe(false);
+ await page.evaluate(()=>{window.saved=null;window.start({});});
+ await page.getByLabel(/^Show me on the referee map/).check();
+ await page.getByRole('button',{name:'Save map preference',exact:true}).click();
+ await expect(page.getByRole('alert')).toContainText('Choose United States');
+ expect(await page.evaluate(()=>window.saved)).toBe(null);
+ await page.getByLabel('Country',{exact:true}).selectOption('United States');
+ await page.getByLabel('State / district',{exact:true}).selectOption('California');
+ await page.getByRole('button',{name:'Save map preference',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>window.saved?.region)).toBe('California');
+});
