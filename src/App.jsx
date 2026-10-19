@@ -4960,13 +4960,16 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       )}
       {showClear && <ClearModal leagueSessionName={league?.session?.name || ""} protectedKeys={highlanderDemoLocked ? ["violations", "teams", "schedule", "alliances"] : []} counts={{ violations: viols.length, robotPhotos: teams.reduce((total, team) => total + (team.photoKeys || []).length + (team._pendingRobotPhotos || []).length, 0), teams: teams.length, schedule: Object.keys(matches).length, replays: fieldLog.filter((e) => e.kind === "replay").length, judging: noms.length, alliances: Object.values(alliances).filter((a) => (a || []).filter(Boolean).length).length, watchlist: watchNotes.length, quadrantChecks: fieldResetChecks.length }} onClear={clearSelected} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowClear(false)} />}
       {showOnline && (
-        <div className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center" onClick={() => setShowOnline(false)}>
-          <div className="bg-white dark:bg-slate-800 w-full max-h-[100dvh] sm:max-w-md sm:max-h-[90vh] sm:rounded-2xl rounded-t-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div role="dialog" aria-modal="true" aria-labelledby="volunteer-status-title" className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center" style={{ paddingTop: "env(safe-area-inset-top)" }} onClick={() => setShowOnline(false)}>
+          <div className="bg-white dark:bg-slate-800 w-full max-h-[calc(100dvh-env(safe-area-inset-top))] sm:max-w-md sm:max-h-[90vh] sm:rounded-2xl rounded-t-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-4 py-3 flex items-center justify-between border-b border-slate-200 dark:border-slate-700 shrink-0 bg-white dark:bg-slate-800">
-              <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Users size={18} /> Key Volunteer Status</h2>
-              <button onClick={() => setShowOnline(false)} className="text-slate-400"><X size={22} /></button>
+              <h2 id="volunteer-status-title" className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Users size={18} /> Key Volunteer Status</h2>
+              <button type="button" aria-label="Close volunteer status" onClick={() => setShowOnline(false)} className="min-h-[44px] min-w-[44px] grid place-items-center rounded-lg text-slate-600 dark:text-slate-300"><X size={22} /></button>
             </div>
-            <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}><OnlineList isDeveloper={isDeveloper} fieldCount={configuredFieldCount} presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} eventMembers={eventMembers} onSetAdmin={adminUnlocked ? setVolunteerAdmin : undefined} assignments={volunteerAssignments} onSetAssignment={adminUnlocked ? setVolunteerAssignment : undefined} fieldNames={fieldNames} /></div>
+            <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y"><OnlineList isDeveloper={isDeveloper} fieldCount={configuredFieldCount} presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} eventMembers={eventMembers} onSetAdmin={adminUnlocked ? setVolunteerAdmin : undefined} assignments={volunteerAssignments} onSetAssignment={adminUnlocked ? setVolunteerAssignment : undefined} fieldNames={fieldNames} /></div>
+            <div className="shrink-0 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+              <button type="button" onClick={() => setShowOnline(false)} className="w-full min-h-[44px] rounded-xl bg-[#0D0F32] px-4 py-3 font-semibold text-white">Close</button>
+            </div>
           </div>
         </div>
       )}
