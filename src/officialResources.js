@@ -1,3 +1,5 @@
+export const OFFICIAL_MANUALS_URL = "https://manuals.vex.com/";
+
 // Official VEX resources per game season, keyed by the same ruleset key the default rules
 // template uses (refos_rulesets.key, recorded on each new event as event_settings.rules_template).
 // Next season: add a new entry and point DEFAULT_RULESET_KEY at it. No component hardcodes a URL.

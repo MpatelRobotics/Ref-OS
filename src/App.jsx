@@ -1,3 +1,4 @@
+import OfficialManualsLink from "./components/OfficialManualsLink";
 import LeagueRobotAttendance from "./components/LeagueRobotAttendance";
 import {accountUser} from "./refereePortalApi";
 import RefereePortal from "./components/RefereePortal";
@@ -8268,6 +8269,7 @@ export function RuleBook({ rules, hasBundledManual = false, showGameManual = tru
   }
   return (
     <>
+      {showGameManual&&<div className="mb-3"><OfficialManualsLink/></div>}
       {(showGameManual || qaUrl) && <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
         {showGameManual && <button onClick={() => openManualAt(1)} className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
           <div className="flex items-center gap-3">
