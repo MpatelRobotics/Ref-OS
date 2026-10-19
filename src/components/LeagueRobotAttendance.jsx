@@ -1,0 +1,18 @@
+import React,{useEffect,useRef,useState} from 'react';
+import * as api from '../api';
+export default function LeagueRobotAttendance({eventId,sessionId,sessionName,team,meName,canEdit=false}){
+ const [record,setRecord]=useState(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[retry,setRetry]=useState(0);
+ const saving=useRef(false),version=useRef(0);
+ useEffect(()=>{
+  let live=true;
+  async function refresh(){if(saving.current)return;const ticket=++version.current;setLoading(true);setError('');try{const rows=await api.listLeagueAttendance(eventId,sessionId);if(live&&ticket===version.current)setRecord(rows.find(row=>row.team===team)||null);}catch(e){if(live&&ticket===version.current)setError(e.message||'Could not load attendance. Check your connection and try again.');}finally{if(live&&ticket===version.current)setLoading(false);}}
+  refresh();
+  const off=api.subscribeEvent(eventId,payload=>{if(payload.leagueAttendance)refresh();});
+  const visible=()=>{if(!document.hidden)refresh();};document.addEventListener('visibilitychange',visible);
+  return()=>{live=false;version.current++;off?.();document.removeEventListener('visibilitychange',visible);};
+ },[eventId,sessionId,team,retry]);
+ async function mark(status){if(saving.current||loading||!canEdit)return;saving.current=true;version.current++;setBusy(true);setError('');setNotice('');try{const saved=await api.setLeagueAttendance(eventId,sessionId,team,status,meName);setRecord(saved||null);setNotice(status?`${team} marked ${status} for ${sessionName}.`:`Attendance cleared for ${team} in ${sessionName}.`);}catch(e){setError(e.message||'Attendance was not saved. Check your connection and try again.');}finally{saving.current=false;setBusy(false);}}
+ return <section aria-label="League session attendance" className="mb-4 space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold">{sessionName} attendance</h3><span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-800 dark:bg-slate-700 dark:text-white">{loading?'Loading…':record?.status==='present'?'Present':record?.status==='absent'?'Absent':'Not recorded'}</span></div><p className="text-sm text-slate-500 dark:text-slate-400">Attendance for team {team} in this league session only. Robot photos and TM check-in are separate.</p>
+ {canEdit?<div className="flex flex-wrap gap-2">{[['present','Present'],['absent','Absent'],[null,'Clear attendance']].map(([status,label])=><button key={label} type="button" disabled={busy||loading||(!status&&!record)} aria-pressed={status?record?.status===status:undefined} onClick={()=>mark(status)} className={`min-h-[44px] rounded-lg border px-4 py-2 font-semibold disabled:opacity-50 ${status&&record?.status===status?'border-indigo-700 bg-indigo-700 text-white':'border-slate-300 dark:border-slate-600'}`}>{label}</button>)}</div>:<p className="text-sm text-slate-500">Referees, inspectors, and event admins can update attendance.</p>}
+ {record?.by&&<p className="text-xs text-slate-500">Recorded by {record.by}</p>}{busy&&<p role="status" className="text-sm">Saving attendance…</p>}{notice&&<p role="status" className="text-sm text-emerald-700 dark:text-emerald-300">{notice}</p>}{error&&<div role="alert" className="space-y-2 text-sm text-red-700 dark:text-red-300"><p>{error}</p><button type="button" disabled={busy} className="min-h-[44px] rounded-lg border px-3" onClick={()=>setRetry(value=>value+1)}>Refresh attendance</button></div>}</section>;
+}

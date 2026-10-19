@@ -128,8 +128,8 @@ drop policy if exists "refs write league attendance" on public.league_session_at
 create policy "members read league attendance" on public.league_session_attendance for select
   using (public.has_event_role(event_id, array['ref','judge','emcee','inspection','admin']));
 create policy "refs write league attendance" on public.league_session_attendance for all
-  using (public.has_event_role(event_id, array['ref','admin']))
-  with check (public.has_event_role(event_id, array['ref','admin']));
+  using (public.has_event_role(event_id, array['ref','inspection','admin']))
+  with check (public.has_event_role(event_id, array['ref','inspection','admin']));
 
 -- ---------------------------------------------------------------------------
 -- 4. session_id on session-scoped tables

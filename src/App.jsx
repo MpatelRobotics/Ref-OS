@@ -1,3 +1,4 @@
+import LeagueRobotAttendance from "./components/LeagueRobotAttendance";
 import {accountUser} from "./refereePortalApi";
 import RefereePortal from "./components/RefereePortal";
 import {parseManualScheduledTime,mergeManualMatchTimes,isTmTimesOnlyTable,parseTmTimesOnly} from './manualTmTimes';
@@ -4795,7 +4796,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={highlanderDemoLocked ? undefined : (n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} emcee={isEmcee} />
         ) : openRobot ? (
-          <RobotDetail requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} canTakePhotos={!isEmcee} canDeletePhotos={!isInspection && !isEmcee} />
+          <RobotDetail meName={meName} canEditAttendance={!isJudge&&!isEmcee&&!highlanderDemoLocked} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} canTakePhotos={!isEmcee} canDeletePhotos={!isInspection && !isEmcee} />
         ) : view === "lost-found" ? (
           <LostFoundBoard embedded key={eventId} eventId={eventId} eventName={event?.name || "Current event"} meName={meName} canManage={adminUnlocked}/>
         ) : view === "matches" ? (
@@ -6975,7 +6976,7 @@ function LeagueEarlierRobotPhotos({ team, league, onOpenPhoto }) {
   );
 }
 
-function RobotDetail({ requiredRobotPhotos, isIQ = false, team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, canTakePhotos = true, canDeletePhotos = true }) {
+function RobotDetail({ meName, canEditAttendance = false, requiredRobotPhotos, isIQ = false, team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, canTakePhotos = true, canDeletePhotos = true }) {
   const league = useContext(LeagueUiContext);
   const [busy, setBusy] = useState(false);
   const [captureAngle, setCaptureAngle] = useState("");
@@ -7046,6 +7047,7 @@ function RobotDetail({ requiredRobotPhotos, isIQ = false, team, onAddPhoto, onRe
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{requiredCount ? "Required views are configured by the event Admin. Photo completion does not certify inspection." : "All views are optional for this event."}</p>
         {canTakePhotos && <button type="button" onClick={beginSequence} disabled={busy} className="mt-3 w-full rounded-lg bg-[#D7212B] px-3 py-3 text-base font-bold text-white disabled:bg-slate-400"><Camera size={18} className="inline mr-1.5"/>Take pictures in order</button>}
       </div>
+      {league&&<LeagueRobotAttendance key={`${league.session.id}:${team.number}`} eventId={league.eventId} sessionId={league.session.id} sessionName={league.session.name} team={team.number} meName={meName} canEdit={canEditAttendance}/>}
       {canTakePhotos && <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; add(file); }} />}
       {canTakePhotos && sequenceIndex >= 0 && createPortal(
         <div className="fixed inset-0 z-[160] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4" onClick={() => { if (!busy) { setSequenceIndex(-1); setCaptureAngle(""); } }}>
