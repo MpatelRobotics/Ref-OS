@@ -4793,7 +4793,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={isIQ ? undefined : teamRecords[openTeam]}
             onLog={highlanderDemoLocked ? undefined : () => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked && !highlanderDemoLocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : openMatch ? (
-          isIQ ? <IQMatchDetail key={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} canEdit={adminUnlocked && !highlanderDemoLocked} onSaveScore={saveIQScore} onLogTeam={!isEmcee && !isJudge ? number => { const m=matches[openMatch]; setLogFor(number); setLogMatch({phase:m.phase,num:m.num}); } : null} onAddField={!isEmcee && !isJudge ? addFieldLog : null} /> : <MatchDetail tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} onNav={setOpenMatch} fieldNames={fieldNames}
+          isIQ ? <IQMatchDetail key={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} canEdit={adminUnlocked && !highlanderDemoLocked} onSaveScore={saveIQScore} onLogTeam={!isEmcee && !isJudge ? number => { const m=matches[openMatch]; setLogFor(number); setLogMatch({phase:m.phase,num:m.num}); } : null} onAddField={!isEmcee && !isJudge ? addFieldLog : null} /> : <MatchDetail tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
             fieldLog={fieldLog} fieldResetChecks={fieldResetChecks} onVerifyFieldReset={verifyFieldResetQuadrant} onResetFieldReset={resetFieldResetMatch}
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={highlanderDemoLocked ? undefined : (n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} emcee={isEmcee} />
@@ -6129,6 +6129,7 @@ function AwpChecker({ onSave }) {
 const REPLAY_REASONS = ["Field fault", "Scoring or timer issue", "Match started incorrectly", "Safety interruption", "External interference", "Other"];
 
 function MatchDetail({ tmTimes=[], eventTimezone='UTC', tmActivity, match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, canManageViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
+  const league = useContext(LeagueUiContext);
   const [toOpen, setToOpen] = useState(false);
   const [toAlliance, setToAlliance] = useState("red");
   const [toTeam, setToTeam] = useState("");
@@ -6208,7 +6209,7 @@ function MatchDetail({ tmTimes=[], eventTimezone='UTC', tmActivity, match, match
   const idx = ids.indexOf(m.id);
   const prev = idx > 0 ? ids[idx - 1] : null;
   const next = idx >= 0 && idx < ids.length - 1 ? ids[idx + 1] : null;
-  const mv = viols.filter((v) => v.match && v.match.phase === m.phase && String(v.match.num) === String(m.num)).sort((a, b) => b.createdAt - a.createdAt);
+  const mv = viols.filter((v) => (!league || (v.sessionId || league.legacySessionId) === league.session.id) && v.match && v.match.phase === m.phase && String(v.match.num) === String(m.num)).sort((a, b) => b.createdAt - a.createdAt);
   const stat = {};
   for (const v of viols) {
     const t = v.team;
@@ -6239,9 +6240,17 @@ function MatchDetail({ tmTimes=[], eventTimezone='UTC', tmActivity, match, match
                     <span key={ty} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-semibold border ${TYPES[ty].badge}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${TYPES[ty].dot}`} />{s[ty]}
                     </span>) : null)}
-                  {Object.entries(s.codes).sort((a, b) => b[1] - a[1]).map(([c, n2]) => (
+                  {!league && Object.entries(s.codes).sort((a, b) => b[1] - a[1]).map(([c, n2]) => (
                     <span key={c} className="font-mono text-[11px] text-slate-500 dark:text-slate-400">{fmtRule(c)}{n2 > 1 ? <span className="text-slate-400">×{n2}</span> : null}</span>
                   ))}
+                  {league && <div className="w-full space-y-1">
+                    {viols.filter(v => v.team === n).map(v => <div key={v.id} className="flex flex-wrap gap-x-2 text-xs text-slate-600 dark:text-slate-300">
+                      <span className="font-semibold">{league.sessionName(v.sessionId || league.legacySessionId) || "Earlier league session"}</span>
+                      {fmtMatch(v.match) && <span>{fmtMatch(v.match)}</span>}
+                      <span>{TYPES[v.type]?.label}</span>
+                      <span className="font-mono">{splitRuleCodes(v.code).map(fmtRule).join(", ")}</span>
+                    </div>)}
+                  </div>}
                 </div>
               )}
             </button>
