@@ -1,3 +1,4 @@
+import { REFEREE_PORTAL_ENABLED } from "./featureAvailability.js";
 import OfficialManualsLink from "./components/OfficialManualsLink";
 import LeagueRobotAttendance from "./components/LeagueRobotAttendance";
 import {accountUser} from "./refereePortalApi";
@@ -1363,7 +1364,7 @@ const formatEventDate = (value) => {
 };
 
 const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, initialNotice = "" }) => {
-  const [refPortal,setRefPortal]=useState(()=>new URLSearchParams(window.location.search).has("refPortal"));
+  const [refPortal,setRefPortal]=useState(()=>REFEREE_PORTAL_ENABLED && new URLSearchParams(window.location.search).has("refPortal"));
   const developerPage = new URLSearchParams(window.location.search).get('page') === 'developer' || new URLSearchParams(window.location.search).get('open') === 'universal-feedback';
   const [developerPageUnlocked, setDeveloperPageUnlocked] = useState(false);
   const lockDeveloperPage=useCallback(()=>{setDeveloperPageUnlocked(false);setDeveloperPasskeySession(false);setLiveActivityOpen(false);setUniversalFeedbackOpen(false);},[]);
@@ -1497,7 +1498,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
     }
   };
 
-  if(refPortal) return <RefereePortal onOpenEvent={id=>{setRefPortal(false);onReload?.();onChoose(id);}} onClose={()=>{setRefPortal(false);window.history.replaceState(null,"",window.location.pathname);onReload?.();}}/>;
+  if(REFEREE_PORTAL_ENABLED && refPortal) return <RefereePortal onOpenEvent={id=>{setRefPortal(false);onReload?.();onChoose(id);}} onClose={()=>{setRefPortal(false);window.history.replaceState(null,"",window.location.pathname);onReload?.();}}/>;
 
   return (
   <div className="refos-safe-page min-h-screen bg-slate-100 dark:bg-slate-900 p-5 flex items-center justify-center">
@@ -1507,7 +1508,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{view === "archived" ? "Archived events keep all of their data. Use the event’s Admin code or the Developer code to restore one." : "Select the event this device is working at."}</p>
       </div>
-      {!developerPage && <button type="button" onClick={()=>setRefPortal(true)} className="mb-4 min-h-[44px] w-full rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white">Referee portal · Sign in or create account</button>}
+      {REFEREE_PORTAL_ENABLED && !developerPage && <button type="button" onClick={()=>setRefPortal(true)} className="mb-4 min-h-[44px] w-full rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white">Referee portal · Sign in or create account</button>}
       {developerPage && !developerPageUnlocked ? <DeveloperPageLock events={events} onUnlock={method=>{setDeveloperPasskeySession(method==='passkey');setDeveloperPageUnlocked(true);}}/> : <>
       {developerPage && <>
       <a href="/" className="inline-flex items-center min-h-[44px] mb-3 font-semibold text-slate-600 dark:text-slate-300">Back to main page</a>
@@ -5050,7 +5051,7 @@ onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!cu
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; importSkillsFile(f); }} />
       {showSyncStatus && adminUnlocked && <SyncStatusModal eventId={eventId} eventName={event?.name} onClose={() => setShowSyncStatus(false)} />}
       {showLockChoice && <LockDeviceModal eventName={event?.name} busy={lockBusy}
-        onRefereePortal={canReturnToRefereePortal ? () => runLock(returnToRefereePortal) : undefined}
+        onRefereePortal={REFEREE_PORTAL_ENABLED && canReturnToRefereePortal ? () => runLock(returnToRefereePortal) : undefined}
         onMainScreen={() => runLock(onLock)}
         onEventMainPage={() => runLock(onLockToEventLogin)}
         onCancel={() => { if (!lockBusy) setShowLockChoice(false); }} />}

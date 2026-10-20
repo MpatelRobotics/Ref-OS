@@ -1,3 +1,4 @@
+import { REFEREE_PORTAL_ENABLED, JUDGE_GROUP_LOGIN_ENABLED } from "../featureAvailability.js";
 import RefereePortal from "../components/RefereePortal";
 import JudgeGroupPortal from '../components/JudgeGroupPortal';
 import React, { useEffect, useState } from "react";
@@ -115,8 +116,8 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
     await finishServerLogin(clean);
   };
 
-  if(groupPortal)return <JudgeGroupPortal eventId={eventId} eventName={eventName} onClose={()=>setGroupPortal(false)}/>;
-  if(refPortal) return <RefereePortal eventId={eventId} onUnlock={onUnlock} onClose={()=>setRefPortal(false)}/>;
+  if(JUDGE_GROUP_LOGIN_ENABLED && groupPortal)return <JudgeGroupPortal eventId={eventId} eventName={eventName} onClose={()=>setGroupPortal(false)}/>;
+  if(REFEREE_PORTAL_ENABLED && refPortal) return <RefereePortal eventId={eventId} onUnlock={onUnlock} onClose={()=>setRefPortal(false)}/>;
   return (
     <div className="refos-safe-login min-h-screen bg-[#F4F6FA] text-[#11172F] grid place-items-center p-6 font-sans">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white px-6 py-7 sm:px-8 shadow-[0_24px_70px_rgba(15,23,42,0.12)] overflow-hidden relative">
@@ -129,8 +130,8 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
           <span className="mt-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-700">Official Release</span>
         </div>
 
-        <button type="button" onClick={()=>setRefPortal(true)} className="mb-4 min-h-[44px] w-full rounded-xl border border-slate-300 px-4 py-3 font-semibold">Sign in with referee account</button>
-        <button type="button" onClick={()=>{setMode("personal");setUseDifferentCode(true);setPw("");setErr("");}} className="mb-4 min-h-[44px] w-full rounded-xl border px-4 py-3 font-semibold">Use personal referee passcode</button>
+        {REFEREE_PORTAL_ENABLED && <button type="button" onClick={()=>setRefPortal(true)} className="mb-4 min-h-[44px] w-full rounded-xl border border-slate-300 px-4 py-3 font-semibold">Sign in with referee account</button>}
+        {REFEREE_PORTAL_ENABLED && <button type="button" onClick={()=>{setMode("personal");setUseDifferentCode(true);setPw("");setErr("");}} className="mb-4 min-h-[44px] w-full rounded-xl border px-4 py-3 font-semibold">Use personal referee passcode</button>}
         {notice && !showRemembered && (
           <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 text-center">{notice}</p>
         )}
@@ -230,7 +231,7 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
             </button>
           </>
         )}
-        <button type="button" onClick={()=>setGroupPortal(true)} className="w-full mt-4 min-h-[44px] rounded-lg border px-4 py-3 font-semibold">Judge-group login</button>
+        {JUDGE_GROUP_LOGIN_ENABLED && <button type="button" onClick={()=>setGroupPortal(true)} className="w-full mt-4 min-h-[44px] rounded-lg border px-4 py-3 font-semibold">Judge-group login</button>}
         <button type="button" onClick={signInDeveloperPasskey} disabled={checkingCode||unlocking} className="w-full mt-4 min-h-[44px] rounded-lg border border-slate-300 px-4 py-3 font-semibold text-[#11172F] disabled:opacity-50">Sign in as Developer with passkey</button>
         <button onClick={onChooseEvent} className="w-full mt-5 rounded-lg border border-slate-300 px-4 py-2.5 font-semibold text-[#11172F]">Choose or configure an event</button>
         {canEmergencyDelete && (
