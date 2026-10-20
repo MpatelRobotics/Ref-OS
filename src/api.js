@@ -1,4 +1,4 @@
-import { nominationsThroughSession } from "./league/nominationCarryover.js";
+import { nominationsThroughSession, recordsThroughSession } from "./league/nominationCarryover.js";
 import { supabase } from "./supabaseClient";
 import { OFFLINE_RULES } from "./offlineRules";
 import { putCachedBlob, deletePaths as deleteCachedPhotos } from "./photoCache";
@@ -1399,12 +1399,15 @@ const mapViol = (r) => {
 };
 export async function listViolations(eventId) {
   if (E2E_MOCK) return e2eState.violations.map((v) => ({ ...v }));
-  if (isVenueMode()) return venueListViolations(eventId);
-  const { data } = await inSession(supabase.from("violations").select("*").eq("event_id", eventId), eventId).order("created_at", { ascending: false });
-  return (data || []).map(mapViol);
+  const sessionId = leagueSessionFor(eventId);
+  const legacySessionId = leagueLegacySessionFor(eventId);
+  const [rows, sessions] = await Promise.all([
+    listLeagueViolations(eventId),
+    sessionId ? listLeagueSessions(eventId) : Promise.resolve([]),
+  ]);
+  return recordsThroughSession(rows, sessions, sessionId, legacySessionId);
 }
-// League team history: every session's violations (each carries sessionId). History only; the
-// current session's own list (listViolations) is what drives escalation and match views.
+// Full league history; listViolations limits this to the selected and earlier sessions.
 export async function listLeagueViolations(eventId, team = "") {
   if (E2E_MOCK) return [];
   const number = String(team || "").trim().toUpperCase();
@@ -1412,7 +1415,11 @@ export async function listLeagueViolations(eventId, team = "") {
   if (number) query = query.eq("team", number);
   const cloud = isVenueMode()
     ? await cloudRowsOrSnapshot(eventId, `violation-league-${number || "all"}`, () => query.order("created_at", { ascending: false }))
-    : ((await query.order("created_at", { ascending: false })).data || []);
+    : await (async () => {
+      const { data, error } = await query.order("created_at", { ascending: false });
+      if (error) throw error;
+      return data || [];
+    })();
   const byId = new Map(cloud.map((r) => [r.id, { ...mapViol(r), _source: "cloud" }]));
   if (isVenueMode()) {
     const local = await venue.list(eventId, "violation");

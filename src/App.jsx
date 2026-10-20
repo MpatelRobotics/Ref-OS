@@ -2705,7 +2705,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     if (highlanderDemoLocked) throw new Error("Highlander Summit violations are read only for the demo.");
     const cleanMatch = form.match && form.match.phase && form.match.phase !== "none" ? { phase: form.match.phase, num: (form.match.num || "").trim() } : null;
     const row = {
-      id: orig.id, event_id: eventId, team: form.team, type: form.type,
+      id: orig.id, event_id: eventId, session_id: orig.sessionId || null, team: form.team, type: form.type,
       code: normNum(form.code).replace(/[<>]/g, ""), rule_desc: (form.desc || "").trim(),
       notes: (form.notes || "").trim(), match_info: cleanMatch, logged_by: JSON.stringify({ v: 1, n: orig.by || meName || "", f: orig.byFullName || meFullName || meName || "" }), logged_by_user: orig.byUserId,
     };
@@ -3875,7 +3875,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const clearSelected = async (sel) => {
     if (highlanderDemoLocked && (sel.violations || sel.teams || sel.schedule || sel.alliances)) { explainDemoLock(); return; }
     try {
-      if (sel.violations) { await api.clearViolations(eventId); setViols([]); }
+      if (sel.violations) { await api.clearViolations(eventId); setViols(await api.listViolations(eventId)); }
       if (sel.robotPhotos || sel.teams) {
         const pending = (await outbox.loadQueue(eventId)).filter((op) => op.kind === "robot_photo");
         for (const op of pending) await outbox.cancelOp(eventId, op.id);
@@ -4115,7 +4115,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         const fm = matchList.filter((m) => m.field === field);
         const ids = new Set(fm.map((m) => m.id));
         const refs = new Set(fm.map((m) => m.phase === "qual" ? `Q${m.num}` : fmtMatch({phase:m.phase,num:m.num})));
-        const vc = viols.filter((v) => v.match && v.match.num != null && refs.has(v.match.phase === "qual" ? `Q${v.match.num}` : fmtMatch(v.match))).length;
+        const vc = viols.filter((v) => (!league || (v.sessionId || league.legacySessionId) === leagueSessionId) && v.match && v.match.num != null && refs.has(v.match.phase === "qual" ? `Q${v.match.num}` : fmtMatch(v.match))).length;
         const rp = fieldLog.filter((e) => e.kind === "replay" && ((e.matchId && ids.has(e.matchId)) || (e.matchRef && refs.has(e.matchRef)))).length;
         const ff = fieldLog.filter((e) => e.kind === "field_fault" && ((e.matchId && ids.has(e.matchId)) || (e.matchRef && refs.has(e.matchRef)))).length;
         line(`${fieldDisplayName(field, fieldNames)}: ${fm.length} matches, ${vc} violations, ${rp} replays, ${ff} field faults`);
@@ -4793,7 +4793,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={isIQ ? undefined : teamRecords[openTeam]}
             onLog={highlanderDemoLocked ? undefined : () => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked && !highlanderDemoLocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : openMatch ? (
-          isIQ ? <IQMatchDetail key={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols} fieldLog={fieldLog} canEdit={adminUnlocked && !highlanderDemoLocked} onSaveScore={saveIQScore} onLogTeam={!isEmcee && !isJudge ? number => { const m=matches[openMatch]; setLogFor(number); setLogMatch({phase:m.phase,num:m.num}); } : null} onAddField={!isEmcee && !isJudge ? addFieldLog : null} /> : <MatchDetail tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
+          isIQ ? <IQMatchDetail key={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} canEdit={adminUnlocked && !highlanderDemoLocked} onSaveScore={saveIQScore} onLogTeam={!isEmcee && !isJudge ? number => { const m=matches[openMatch]; setLogFor(number); setLogMatch({phase:m.phase,num:m.num}); } : null} onAddField={!isEmcee && !isJudge ? addFieldLog : null} /> : <MatchDetail tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} onNav={setOpenMatch} fieldNames={fieldNames}
             fieldLog={fieldLog} fieldResetChecks={fieldResetChecks} onVerifyFieldReset={verifyFieldResetQuadrant} onResetFieldReset={resetFieldResetMatch}
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={highlanderDemoLocked ? undefined : (n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} emcee={isEmcee} />
@@ -4802,7 +4802,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         ) : view === "lost-found" ? (
           <LostFoundBoard embedded key={eventId} eventId={eventId} eventName={event?.name || "Current event"} meName={meName} canManage={adminUnlocked}/>
         ) : view === "matches" ? (
-          isIQ ? <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} parseCSV={parseCSV} /> : <MatchList tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
+          isIQ ? <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} parseCSV={parseCSV} /> : <MatchList tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
           <><RobotCheckIn teams={teams} checkIn={eventSettings?.tm_check_in?.value} onOpen={setOpenRobot} /><RobotList followups={operationRows.filter(r=>r.kind==='inspection-followup'&&r.payload.status==='open'&&(r.session_id||null)===(leagueSessionId||null)&&(r.division_id===0||r.division_id===divisionId))} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} /></>
         ) : view === "judging" ? (
@@ -5458,7 +5458,7 @@ function ViolationCard({ v, onDelete, onOpenPhoto, onEdit, showTeam, canManage =
   const T = TYPES[v.type];
   // League events: every violation shows the session it belongs to.
   const league = useContext(LeagueUiContext);
-  const sessionLabel = league ? (league.sessionName(v.sessionId) || (v.sessionId ? "" : league.session.name)) : "";
+  const sessionLabel = league ? (league.sessionName(v.sessionId || league.legacySessionId) || "Earlier league session") : "";
   const canEdit = onEdit && canManage && !v._pending;
   return (
     <li className={`rounded-xl border p-3 ${T.soft}`}>
@@ -7761,6 +7761,7 @@ function AWPAnalytics({ fieldLog = [] }) {
 }
 
 function FieldComparison({ matches = {}, viols = [], fieldLog = [], fieldNames = DEFAULT_FIELD_NAMES }) {
+  const league = useContext(LeagueUiContext);
   const all = Object.values(matches);
   const fields = [...new Set(all.map((m) => m.field).filter(Boolean))].sort();
   if (!fields.length) return null;
@@ -7773,6 +7774,7 @@ function FieldComparison({ matches = {}, viols = [], fieldLog = [], fieldNames =
           const ids = new Set(fm.map((m) => m.id));
           const refs = new Set(fm.map((m) => m.phase === "qual" ? `Q${m.num}` : fmtMatch({ phase: m.phase, num: m.num })));
           const violations = viols.filter((v) => {
+            if (league && (v.sessionId || league.legacySessionId) !== league.session.id) return false;
             if (!v.match || v.match.num == null) return false;
             const ref = v.match.phase === "qual" ? `Q${v.match.num}` : fmtMatch(v.match);
             return refs.has(ref);

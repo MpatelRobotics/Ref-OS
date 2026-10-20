@@ -1,5 +1,5 @@
-// Keep original nomination IDs and session attribution; never copy carried records.
-export function nominationsThroughSession(nominations, sessions, sessionId, legacySessionId = null) {
+// Keep original record IDs and session attribution; never copy carried records.
+export function recordsThroughSession(nominations, sessions, sessionId, legacySessionId = null) {
   if (!sessionId) return nominations;
   const ordered = [...sessions].sort((a, b) => (a.order - b.order)
     || String(a.date || "").localeCompare(String(b.date || ""))
@@ -8,3 +8,5 @@ export function nominationsThroughSession(nominations, sessions, sessionId, lega
   const visible = new Set(index < 0 ? [sessionId] : ordered.slice(0, index + 1).map(s => s.id));
   return nominations.filter(n => visible.has(n.sessionId || legacySessionId));
 }
+
+export const nominationsThroughSession = recordsThroughSession;
