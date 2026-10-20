@@ -1,7 +1,7 @@
 import { REFEREE_PORTAL_ENABLED, JUDGE_GROUP_LOGIN_ENABLED } from "../featureAvailability.js";
 import RefereePortal from "../components/RefereePortal";
 import JudgeGroupPortal from '../components/JudgeGroupPortal';
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as api from "../api";
 import { APP_VERSION } from "../appVersion";
 import { resolveEventBranding } from "../eventProfiles.js";
@@ -67,7 +67,10 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
     return result;
   };
 
+  const loginInFlight = useRef(false);
   const finishServerLogin = async (credential) => {
+    if (loginInFlight.current) return;
+    loginInFlight.current = true;
     setCheckingCode(true);
     setErr("");
     try {
@@ -78,6 +81,7 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
       setCode("");
       setErr(e?.message?.includes("Invalid event credential") ? "Incorrect event credential." : (e.message || "Could not sign in."));
     } finally {
+      loginInFlight.current = false;
       setCheckingCode(false);
     }
   };
@@ -91,14 +95,12 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
     if (checkingCode) return;
     const key = String(value || "").toUpperCase();
     setErr("");
-    setCode((cur) => {
-      if (cur.length >= 4) return cur;
-      const position = cur.length;
-      const expectsLetter = position === 1;
-      if (expectsLetter && !"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").includes(key)) return cur;
-      if (!expectsLetter && !/^\d$/.test(key)) return cur;
-      return cur + key;
-    });
+    if (code.length >= 4) return;
+    const expectsLetter = code.length === 1;
+    if (expectsLetter ? !/^[A-Z]$/.test(key) : !/^\d$/.test(key)) return;
+    const next = code + key;
+    setCode(next);
+    if (next.length === 4) finishServerLogin(next);
   };
 
 
