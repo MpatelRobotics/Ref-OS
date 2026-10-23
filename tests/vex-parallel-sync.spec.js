@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-test('Sync everything starts all categories with one division and polls every 15 seconds',async({page})=>{
+test('Sync everything starts all categories with one division and polls every 3 seconds',async({page})=>{
  await page.clock.install();
  await page.route('**/all-sync-test',r=>r.fulfill({contentType:'text/html',body:`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
  import '/@vite/client';import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;
@@ -13,12 +13,12 @@ test('Sync everything starts all categories with one division and polls every 15
  await page.getByRole('button',{name:'Start all syncs'}).click();await expect(page.getByRole('dialog')).toHaveCount(0);
  expect(await page.evaluate(()=>window.applied)).toEqual(['rankings','skills','scores']);
  expect(await page.evaluate(()=>window.requests.slice(1).map(r=>r.division))).toEqual([2,null,2]);
- await page.clock.fastForward(15000);await expect.poll(()=>page.evaluate(()=>window.applied?.length || 0)).toBe(6);
+ await page.clock.fastForward(3000);await expect.poll(()=>page.evaluate(()=>window.applied?.length || 0)).toBe(6);
  await expect(page.getByLabel('VEX scores sync status')).toContainText('scores updated');
  await expect(page.getByLabel('VEX scores sync status').locator('details p')).toBeHidden();
  await page.getByLabel('VEX scores sync status').getByText('Details',{exact:true}).click();
  await expect(page.getByLabel('VEX scores sync status').locator('details p')).toBeVisible();
- await page.evaluate(()=>{window.failSkills=true;});await page.clock.fastForward(15000);
+ await page.evaluate(()=>{window.failSkills=true;});await page.clock.fastForward(3000);
  await expect.poll(()=>page.evaluate(()=>window.applied?.length || 0)).toBe(8);
  await expect(page.getByLabel('VEX Skills sync status')).toContainText('Skills unavailable');
  await expect(page.getByLabel('VEX sync status',{exact:true})).toContainText('sync active');
@@ -26,7 +26,7 @@ test('Sync everything starts all categories with one division and polls every 15
  await page.evaluate(()=>window.showSyncStatus(false));
  await expect(page.getByLabel('VEX scores sync status')).toHaveCount(0);
  const before=await page.evaluate(()=>window.applied?.length || 0);
- await page.clock.fastForward(15000);
+ await page.clock.fastForward(3000);
  await expect.poll(()=>page.evaluate(()=>window.applied?.length || 0)).toBe(before+2);
 });
 test('all three syncs stay active and stopping Skills preserves rankings and scores',async({page})=>{
@@ -35,8 +35,8 @@ test('all three syncs stay active and stopping Skills preserves rankings and sco
  await page.goto('/parallel-sync-test');
  for(const kind of ['rankings','skills','scores']){await page.getByRole('button',{name:'Open '+kind,exact:true}).click();await expect(page.getByRole('button',{name:'Start syncing',exact:true})).toBeVisible();await page.getByRole('button',{name:'Start syncing',exact:true}).click();}
  await expect(page.getByLabel('VEX sync status', {exact:true})).toContainText('sync active');await expect(page.getByLabel('VEX Skills sync status')).toContainText('sync active');await expect(page.getByLabel('VEX scores sync status')).toContainText('sync active');
- await page.clock.fastForward(15000);await expect.poll(()=>page.evaluate(()=>window.applied?.length || 0)).toBe(6);expect(await page.evaluate(()=>window.maxFlight)).toBe(1);
- await page.getByLabel('VEX Skills sync status').getByRole('button',{name:'Stop sync',exact:true}).click();const before=await page.evaluate(()=>window.applied?.length || 0);await page.clock.fastForward(15000);await expect.poll(()=>page.evaluate(()=>window.applied?.length || 0)).toBe(before+2);await expect(page.getByLabel('VEX sync status',{exact:true})).toContainText('sync active');await expect(page.getByLabel('VEX scores sync status')).toContainText('sync active');
+ await page.clock.fastForward(3000);await expect.poll(()=>page.evaluate(()=>window.applied?.length || 0)).toBe(6);expect(await page.evaluate(()=>window.maxFlight)).toBe(1);
+ await page.getByLabel('VEX Skills sync status').getByRole('button',{name:'Stop sync',exact:true}).click();const before=await page.evaluate(()=>window.applied?.length || 0);await page.clock.fastForward(3000);await expect.poll(()=>page.evaluate(()=>window.applied?.length || 0)).toBe(before+2);await expect(page.getByLabel('VEX sync status',{exact:true})).toContainText('sync active');await expect(page.getByLabel('VEX scores sync status')).toContainText('sync active');
 });
 
 test('opening an event automatically starts saved-division sync without TM or a dialog',async({page})=>{
@@ -53,6 +53,6 @@ test('opening an event automatically starts saved-division sync without TM or a 
  await expect(page.getByRole('button',{name:'Sync everything',exact:true})).toHaveCount(0);
  expect(await page.evaluate(()=>window.requests.slice(1).map(r=>r.division))).toEqual([1,2,null,1,2]);
  await page.evaluate(()=>window.showSyncStatus(false));
- await page.clock.fastForward(15000);
+ await page.clock.fastForward(3000);
  await expect.poll(()=>page.evaluate(()=>window.applied?.length || 0)).toBe(10);
 });
