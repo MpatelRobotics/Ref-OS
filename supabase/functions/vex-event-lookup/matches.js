@@ -13,10 +13,21 @@ export async function fetchVexStandings(code, division, token, fetcher=fetch, ki
   if(kind!=='skills'&&!divisions.some(d=>d.id===Number(division)))throw new Error('VEX division is not available for this event.');
   const rows=[];
   for(let page=1;page<=20;page++){const result=await get(kind==='skills'?`events/${found[0].id}/skills`:`events/${found[0].id}/divisions/${Number(division)}/${kind==='scores'?'matches':kind}`,{page,per_page:250});const last=Number(result.meta?.last_page);if(!Array.isArray(result.data)||!Number.isInteger(last)||last<page||last>20)throw new Error('VEX standings pagination is incomplete. No standings were imported.');rows.push(...result.data);if(page===last)break;}
+  let teams;
+  if(kind==='scores'){
+   const roster=[];
+   for(let page=1;page<=20;page++){
+    const result=await get(`events/${found[0].id}/teams`,{page,per_page:250});
+    const last=Number(result.meta?.last_page);
+    if(!Array.isArray(result.data)||!Number.isInteger(last)||last<page||last>20)throw Error('VEX roster pagination is incomplete. No roster was imported.');
+    roster.push(...result.data);if(page===last)break;
+   }
+   teams=mapVexTeams(roster);
+  }
   const warnings=[];
   const scores=kind==='scores'?mapVexScores(rows):[];
   const notScored=kind==='scores'?rows.filter(row=>!vexMatchIsScored(row)).length:0;
-  return {code,divisions,kind,warnings,upstreamRows:rows.length,rankings:kind==='rankings'?mapVexRankings(rows):[],skills:kind==='skills'?mapVexSkills(rows):[],scores,scoreSummary:kind==='scores'?{received:rows.length,notScored,unsupported:rows.length-notScored-scores.length}:undefined,scoreDiagnostics:kind==='scores'?describeVexScores(rows,scores):undefined,checkedAt:new Date().toISOString()};
+  return {code,divisions,kind,warnings,teams,upstreamRows:rows.length,rankings:kind==='rankings'?mapVexRankings(rows):[],skills:kind==='skills'?mapVexSkills(rows):[],scores,matches:kind==='scores'?mapVexScores(rows,false):[],scoreSummary:kind==='scores'?{received:rows.length,notScored,unsupported:rows.length-notScored-scores.length}:undefined,scoreDiagnostics:kind==='scores'?describeVexScores(rows,scores):undefined,checkedAt:new Date().toISOString()};
  }finally{clearTimeout(timer);}
 }
 
@@ -62,10 +73,10 @@ export function describeVexScores(rows,scores){
  }));
  return {message,samples};
 }
-export function mapVexScores(rows){
+export function mapVexScores(rows, scoredOnly=true){
  const result=[];
  for(const row of rows){
-  if(!vexMatchIsScored(row))continue;
+  if(scoredOnly&&!vexMatchIsScored(row))continue;
   const phase={1:'practice',2:'qual',3:'qf',4:'sf',5:'final',6:'r16'}[row.round];
   if(!phase)continue;
   // The app represents non-final elimination pairings as a single match.
@@ -75,8 +86,17 @@ export function mapVexScores(rows){
   const red=row.alliances?.find(a=>a.color==='red'),blue=row.alliances?.find(a=>a.color==='blue');
   const teams=a=>(a?.teams||[]).map(t=>String(t.team?.name||'').trim().toUpperCase());
   const r=teams(red),b=teams(blue);
-  if(!Number.isInteger(num)||num<1||!red||!blue||!Number.isInteger(red.score)||red.score<0||!Number.isInteger(blue.score)||blue.score<0||r.length!==2||b.length!==2||new Set([...r,...b]).size!==4||![...r,...b].every(n=>/^[A-Z0-9-]+$/.test(n)))continue;
-  result.push({phase,num,red:r,blue:b,redScore:red.score,blueScore:blue.score});
+  if(!Number.isInteger(num)||num<1||!red||!blue||scoredOnly&&(!Number.isInteger(red.score)||red.score<0||!Number.isInteger(blue.score)||blue.score<0)||r.length!==2||b.length!==2||new Set([...r,...b]).size!==4||![...r,...b].every(n=>/^[A-Z0-9-]+$/.test(n)))continue;
+  result.push({phase,num,red:r,blue:b,...(scoredOnly?{redScore:red.score,blueScore:blue.score}:{})});
  }
  return result;
+}
+
+export function mapVexTeams(rows){
+ const seen=new Set();
+ return rows.map(row=>{
+  const number=String(row.number||'').trim().toUpperCase();
+  if(!/^[A-Z0-9-]+$/.test(number)||seen.has(number))throw Error('VEX returned invalid or duplicate roster teams. No roster was imported.');
+  seen.add(number);return {number,name:String(row.team_name||'').trim()};
+ });
 }

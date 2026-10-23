@@ -1,3 +1,5 @@
+import { partitionScheduledTeams } from "./scheduledTeams.js";
+import UnscheduledTeams from "./components/UnscheduledTeams.jsx";
 import { REFEREE_PORTAL_ENABLED } from "./featureAvailability.js";
 import OfficialManualsLink from "./components/OfficialManualsLink";
 import LeagueRobotAttendance from "./components/LeagueRobotAttendance";
@@ -7,7 +9,7 @@ import {parseManualScheduledTime,mergeManualMatchTimes,isTmTimesOnlyTable,parseT
 import ScheduledMatchTime from './components/ScheduledMatchTime';
 import { eliminationPairingKey, eliminationPairingLabel, eliminationResultLabel } from './tmReplayGrouping.js';
 import { tmPairingNumber, tmGameNumber, tmMatchOrder } from './tmMatchIdentity.js';
-import {planScoreUpdates} from "./vexScoreSync.js";
+import {planScoreUpdates,planMissingVexMatches,planVexRosterUpdates} from "./vexScoreSync.js";
 import {parseViolationRuleNotes,validViolationRuleDetails,formatViolationRuleNotes} from "./violationRuleNotes.js";
 import DeveloperLiveActivity from "./components/DeveloperLiveActivity.jsx";
 import useLiveActivity from "./useLiveActivity.js";
@@ -3627,12 +3629,32 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     if (!adminUnlocked || highlanderDemoLocked || isVenueMode()) throw new Error("Cloud administrator access is required.");
     const targetApi = data.division && data.divisions?.length>1 ? createDivisionApi(eventApi,eventId,Number(data.division)) : api;
     if (kind === "scores") {
+      let rosterUpdated=0;
+      if(Array.isArray(data.teams)&&data.teams.length){
+        const existing=await api.listTeams(eventId);
+        const changes=planVexRosterUpdates(existing,data.teams);
+        if(changes.length){await api.bulkUpsertTeams(eventId,changes);rosterUpdated=changes.length;setTeams(await api.listTeams(eventId));}
+      }
       if(targetApi.claimMatchingSchedule)await targetApi.claimMatchingSchedule(data.scores||[]);
-      const fresh=await targetApi.listMatches(eventId);
+      let fresh=await targetApi.listMatches(eventId, {strict:true});
+      const missing=planMissingVexMatches(fresh,data.matches||data.scores||[]);
+      const numbers=[...new Set(missing.flatMap(m=>[...m.red,...m.blue]))];
+      if(numbers.length){const known=await api.listTeams(eventId);const absent=numbers.filter(number=>!known.some(t=>t.number===number));if(absent.length)await api.bulkUpsertTeams(eventId,absent.map(number=>({number,name:""})));}
+      let added=0;
+      for(const row of missing)if(await targetApi.insertTmMatch(eventId,row))added++;
+      if(missing.length)fresh=await targetApi.listMatches(eventId,{strict:true});
       const plan=planScoreUpdates(fresh,data.scores||[]);
       let updated=0;for(const row of plan.updates)updated+=await targetApi.updateExistingVexScore(eventId,row);
-      if(!data.division || Number(data.division)===divisionId || !divisionId)await reloadMatches();
-      return {message:`${updated} existing matches updated · ${plan.skipped + plan.updates.length-updated} unmatched or changed matches skipped.`};
+      const isCurrentDivision=!data.division || Number(data.division)===divisionId || !divisionId;
+      if ((data.matches||data.scores||[]).length && fresh.length) {
+        const prior=await targetApi.getEventSetting(eventId,"vex_schedule_team_filter");
+        if(!prior?.value?.enabled){
+          const saved=await targetApi.upsertEventSetting(eventId,"vex_schedule_team_filter",{enabled:true,source:"VEX sync"},meName);
+          if(isCurrentDivision)setEventSettings(prev=>({...prev,vex_schedule_team_filter:saved}));
+        }
+      }
+      if(isCurrentDivision){await reloadMatches();if(numbers.length)setTeams(await api.listTeams(eventId));}
+      return {message:`${rosterUpdated} teams added or updated · ${added} matches added · ${updated} match scores updated · ${plan.skipped + plan.updates.length-updated} unmatched or changed matches skipped.`};
     }
     if (!["rankings","skills"].includes(kind)) throw new Error("Unsupported VEX sync category.");
     const rows = data[kind] || [];
@@ -4372,7 +4394,8 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
 
   if (!ready) return <FullPage>Loading event…</FullPage>;
 
-  const filteredTeams = teams
+  const scheduleTeams = partitionScheduledTeams(teams, matches, eventSettings?.vex_schedule_team_filter?.value?.enabled === true);
+  const filteredTeams = scheduleTeams.scheduled
     .filter((t) => { const q = query.trim().toLowerCase(); return !q || t.number.toLowerCase().includes(q) || (t.name || "").toLowerCase().includes(q); })
     .sort((a, b) => (countsByTeam[b.number]?.total || 0) - (countsByTeam[a.number]?.total || 0)
       || a.number.localeCompare(b.number, undefined, { numeric: true }));
@@ -4804,7 +4827,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         ) : view === "matches" ? (
           isIQ ? <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} parseCSV={parseCSV} /> : <MatchList tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
-          <><RobotCheckIn teams={teams} checkIn={eventSettings?.tm_check_in?.value} onOpen={setOpenRobot} /><RobotList followups={operationRows.filter(r=>r.kind==='inspection-followup'&&r.payload.status==='open'&&(r.session_id||null)===(leagueSessionId||null)&&(r.division_id===0||r.division_id===divisionId))} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenRobot} /></>
+          <><RobotCheckIn teams={scheduleTeams.scheduled} checkIn={eventSettings?.tm_check_in?.value} onOpen={setOpenRobot} /><RobotList followups={operationRows.filter(r=>r.kind==='inspection-followup'&&r.payload.status==='open'&&(r.session_id||null)===(leagueSessionId||null)&&(r.division_id===0||r.division_id===divisionId))} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={scheduleTeams.scheduled} query={query} setQuery={setQuery} onOpen={setOpenRobot} /><UnscheduledTeams teams={scheduleTeams.unscheduled} query={query} onOpen={setOpenRobot} robots /></>
         ) : view === "judging" ? (
           <>
           <JudgingView noms={noms} viols={viols} teamName={teamNameMap} finalists={finalists} rankOrder={eventSettings?.judging_rank_order?.value || {}} canReorder={adminUnlocked} onMoveRank={moveJudgingRank} emcee={isEmcee}
@@ -4895,6 +4918,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             )}
           </>
         )}
+        {view === "teams" && !openTeam && !openMatch && !openRobot && <UnscheduledTeams teams={scheduleTeams.unscheduled} query={query} onOpen={setOpenTeam} />}
         <div ref={workspaceFooterRef} className="flex flex-col items-center gap-2 mt-10 pb-2">
           <img src={isHighlander ? "/logo.svg" : "/refos-logo.svg"} alt={isHighlander ? "Highlander Summit" : "Ref OS"} className="h-10 w-10 object-contain opacity-90" />
           <p className="text-center text-xs text-slate-400">

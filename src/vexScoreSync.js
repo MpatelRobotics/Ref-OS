@@ -11,3 +11,20 @@ export function planScoreUpdates(matches,scores){
  }
  return {updates,skipped};
 }
+
+// Insert only unambiguous, complete schedules. Existing assignments are never replaced.
+export function planMissingVexMatches(matches, rows) {
+ const existing = new Set(Object.values(matches).map(m => `${m.phase}:${m.num}`));
+ const counts = new Map();
+ for (const row of rows) counts.set(`${row.phase}:${row.num}`, (counts.get(`${row.phase}:${row.num}`) || 0) + 1);
+ return rows.filter(row => !existing.has(`${row.phase}:${row.num}`) && counts.get(`${row.phase}:${row.num}`) === 1
+  && ['practice','qual','r16','qf','sf','final'].includes(row.phase) && Number.isInteger(row.num) && row.num > 0
+  && Array.isArray(row.red) && Array.isArray(row.blue) && row.red.length === 2 && row.blue.length === 2
+  && new Set([...row.red,...row.blue]).size === 4 && [...row.red,...row.blue].every(n => /^[A-Z0-9-]+$/.test(n)));
+}
+
+export function planVexRosterUpdates(existing, roster){
+ const known=new Map(existing.map(t=>[t.number,t]));
+ return roster.filter(t=>!known.has(t.number)||(t.name&&t.name!==known.get(t.number).name))
+  .map(t=>({number:t.number,name:t.name||known.get(t.number)?.name||''}));
+}

@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mapVexScores,fetchVexStandings,describeVexScores} from '../supabase/functions/vex-event-lookup/matches.js';
-import {planScoreUpdates} from '../src/vexScoreSync.js';
+import {mapVexScores,fetchVexStandings,describeVexScores,mapVexTeams} from '../supabase/functions/vex-event-lookup/matches.js';
+import {planScoreUpdates,planMissingVexMatches,planVexRosterUpdates} from '../src/vexScoreSync.js';
 const row={round:2,matchnum:3,instance:1,scored:true,alliances:[{color:'red',score:10,teams:[{team:{name:'2A'}},{team:{name:'3B'}}]},{color:'blue',score:0,teams:[{team:{name:'4C'}},{team:{name:'5D'}}]}]};
 test('scored results map with zero scores, unsupported rounds and unscored placeholders skip',()=>{const scores=mapVexScores([row,{...row,scored:false,alliances:row.alliances.map(a=>({...a,score:0}))},{...row,round:9}]);assert.equal(scores.length,1);assert.deepEqual(scores[0],{phase:'qual',num:3,red:['2A','3B'],blue:['4C','5D'],redScore:10,blueScore:0});});
 test('only existing matching matches update, no creation, reversed teams and duplicates skip',()=>{const score=mapVexScores([row])[0];const matches={'3':{...score,red:['3B','2A'],redScore:null,blueScore:null}};assert.equal(planScoreUpdates(matches,[score]).updates.length,1);assert.equal(planScoreUpdates({},[score]).updates.length,0);assert.equal(planScoreUpdates(matches,[score,score]).updates.length,0);assert.equal(planScoreUpdates(matches,[{...score,red:score.blue,blue:score.red}]).updates.length,0);assert.equal(planScoreUpdates({'3':score},[score]).updates.length,0);});
 test('multi-game non-final series cannot collapse to one existing pairing score',()=>{assert.equal(mapVexScores([{...row,round:3,matchnum:1},{...row,round:3,matchnum:2}]).length,0);});
-test('scores-only fetches division matches without returning schedule imports',async()=>{let n=0;const urls=[];const fetcher=async url=>{urls.push(String(url));n++;return new Response(JSON.stringify(n===1?{data:[{id:1,sku:'VE-V5-27-6588'}]}:n===2?{divisions:[{id:1,name:'Main'}]}:{data:[row],meta:{last_page:1}}));};const result=await fetchVexStandings('VE-V5-27-6588',1,'fixture-token',fetcher,'scores');assert.equal(result.scores.length,1);assert.ok(urls[2].includes('/divisions/1/matches?'));assert.equal(result.matches,undefined);});
+test('score sync fetches both published schedule and completed scores',async()=>{let n=0;const urls=[];const fetcher=async url=>{urls.push(String(url));n++;if(String(url).includes('/teams?'))return new Response(JSON.stringify({data:[{number:'2A',team_name:'Example team'}],meta:{last_page:1}}));return new Response(JSON.stringify(n===1?{data:[{id:1,sku:'VE-V5-27-6588'}]}:n===2?{divisions:[{id:1,name:'Main'}]}:{data:[row],meta:{last_page:1}}));};const result=await fetchVexStandings('VE-V5-27-6588',1,'fixture-token',fetcher,'scores');assert.equal(result.scores.length,1);assert.ok(urls[2].includes('/divisions/1/matches?'));assert.deepEqual(result.matches,mapVexScores([row],false));});
 
 test('VEX scored timestamps accept published scores including valid zero scores',()=>{
  const timestamp='2026-10-07T01:33:00+00:00';
@@ -26,7 +26,7 @@ test('published scores without completion metadata import but placeholders and m
  assert.equal(mapVexScores([{...q1,scored:null},{...q1,scored:''}]).length,2);
  assert.equal(mapVexScores([placeholder,{...q1,alliances:q1.alliances.map(a=>({...a,score:'133'}))}]).length,0);
  let n=0;
- const fetcher=async()=>new Response(JSON.stringify(++n===1?{data:[{id:1,sku:'VE-V5-26-65633'}]}:n===2?{divisions:[{id:1,name:'Main'}]}:{data:[q1,q2,placeholder],meta:{last_page:1}}));
+ const fetcher=async url=>String(url).includes('/teams?')?new Response(JSON.stringify({data:[],meta:{last_page:1}})):new Response(JSON.stringify(++n===1?{data:[{id:1,sku:'VE-V5-26-65633'}]}:n===2?{divisions:[{id:1,name:'Main'}]}:{data:[q1,q2,placeholder],meta:{last_page:1}}));
  const result=await fetchVexStandings('VE-V5-26-65633',1,'fixture-token',fetcher,'scores');
  assert.equal(result.scores.length,2);
  assert.deepEqual(result.scoreSummary,{received:3,notScored:1,unsupported:0});
@@ -37,7 +37,7 @@ test('VEX false completion flag with actual published scores yields three ready 
  const pairs=[[133,0],[24,74],[21,88],...Array.from({length:9},()=>[0,0])];
  const rows=pairs.map(([red,blue],i)=>({...row,matchnum:i+1,scored:false,alliances:row.alliances.map(a=>({...a,score:a.color==='red'?red:blue}))}));
  let n=0;
- const fetcher=async()=>new Response(JSON.stringify(++n===1?{data:[{id:1,sku:'VE-V5-26-65633'}]}:n===2?{divisions:[{id:1,name:'Main'}]}:{data:rows,meta:{last_page:1}}));
+ const fetcher=async url=>String(url).includes('/teams?')?new Response(JSON.stringify({data:[],meta:{last_page:1}})):new Response(JSON.stringify(++n===1?{data:[{id:1,sku:'VE-V5-26-65633'}]}:n===2?{divisions:[{id:1,name:'Main'}]}:{data:rows,meta:{last_page:1}}));
  const result=await fetchVexStandings('VE-V5-26-65633',1,'fixture-token',fetcher,'scores');
  assert.deepEqual(result.scores.map(m=>[m.num,m.redScore,m.blueScore]),[[1,133,0],[2,24,74],[3,21,88]]);
  assert.deepEqual(result.scoreSummary,{received:12,notScored:9,unsupported:0});
@@ -58,4 +58,25 @@ test('diagnostics distinguish API placeholders from rejected published scores wi
  assert.equal(rejected.samples[0].redScore,10);
  assert.match(describeVexScores([],[]).message,/no matches/);
  assert.match(describeVexScores([row],mapVexScores([row])).message,/ready to match/);
+});
+
+test('unplayed schedule imports without placeholder scores; repeated checks skip existing and ambiguous matches',()=>{
+ const unplayed={...row,scored:false,alliances:row.alliances.map(a=>({...a,score:0}))};
+ const schedule=mapVexScores([unplayed],false);
+ assert.equal(schedule.length,1);assert.equal(schedule[0].redScore,undefined);
+ assert.deepEqual(mapVexScores([unplayed]),[]);
+ assert.equal(planMissingVexMatches({},schedule).length,1);
+ assert.deepEqual(planMissingVexMatches({'3':schedule[0]},schedule),[]);
+ assert.deepEqual(planMissingVexMatches({},[...schedule,...schedule]),[]);
+ assert.deepEqual(planMissingVexMatches({'3':{...schedule[0],red:['OTHER','TEAM']}},schedule),[]);
+});
+
+test('roster includes teams without matches and preserves saved names when upstream name is blank',()=>{
+ const roster=mapVexTeams([{number:' 1a ',team_name:'First'},{number:'2B',team_name:''}]);
+ assert.deepEqual(roster,[{number:'1A',name:'First'},{number:'2B',name:''}]);
+ const existing=[{number:'1A',name:'Old',photoKeys:['photo']},{number:'2B',name:'Saved'}];
+ assert.deepEqual(planVexRosterUpdates(existing,roster),[{number:'1A',name:'First'}]);
+ assert.equal(existing[0].photoKeys[0],'photo');
+ assert.deepEqual(planVexRosterUpdates([],roster),roster);
+ assert.throws(()=>mapVexTeams([{number:'1A'},{number:'1A'}]),/duplicate/);
 });
