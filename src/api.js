@@ -39,7 +39,7 @@ export const uid = () =>
    reset checks, alliances, finalists, attendance, robot inspection photos, and the
    imported rankings / skills / qualification-record snapshots. Nominations retain their original
    session and are visible cumulatively through the selected league session. */
-export const LEAGUE_SESSION_SETTING_KEYS = new Set(["skills_rankings", "qualification_records", "judging_rank_order", "rank_snapshot", "tm_field_activity", "tm_check_in", "tm_match_times", "tm_team_divisions"]);
+export const LEAGUE_SESSION_SETTING_KEYS = new Set(["vex_schedule_team_filter", "skills_rankings", "qualification_records", "judging_rank_order", "rank_snapshot", "tm_field_activity", "tm_check_in", "tm_match_times", "tm_team_divisions"]);
 export const LEAGUE_EVENT_SCOPED_FIELD_LOG_KINDS = new Set(["role_code_update", "role_code_request", "volunteer_contact", "sync_probe", "sync_ack", "system_test"]);
 let leagueContext = { eventId: "", sessionId: "", legacySessionId: "" };
 // legacySessionId: for a League converted from a Tournament, the session that owns the
