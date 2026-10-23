@@ -15,6 +15,12 @@ test('real desktop opens securely, reaches its native connector, and hides while
     const invalid = await page.evaluate(async () => { try { await window.refosTmDesktop.openWebsite('http://unsafe.example'); return false; } catch { return true; } });
     assert.equal(invalid, true);
     if (!process.env.REFOS_PACKAGED_EXE) await page.screenshot({ path: resolve('desktop/build/launcher-preview.png') });
+    await page.route('https://blocked.example.test/**', route => route.abort('connectionrefused'));
+    await page.getByLabel('Ref OS website address').fill('https://blocked.example.test');
+    await page.getByRole('button', { name: 'Open Ref OS' }).click();
+    await page.waitForURL('**/launcher.html');
+    await page.waitForFunction(() => document.querySelector('#status')?.textContent.includes('ERR_CONNECTION_REFUSED'));
+    assert.match(await page.locator('#status').innerText(), /school IT/);
     await page.route('https://refos.example.test/**', route => route.fulfill({ contentType: 'text/html', body: '<h1>Ref OS test event</h1>' }));
     await page.getByLabel('Ref OS website address').fill('https://refos.example.test');
     await page.getByRole('button', { name: 'Open Ref OS' }).click();

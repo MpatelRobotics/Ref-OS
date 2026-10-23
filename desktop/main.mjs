@@ -1,3 +1,4 @@
+import { connectionFailure } from './networkErrors.mjs';
 import { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog } from 'electron';
 import { randomBytes } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -8,6 +9,7 @@ import { join } from 'node:path';
 import { createConnector } from '../tm-bridge/connector.mjs';
 
 const local = name => fileURLToPath(new URL(name, import.meta.url));
+let lastConnectionError = '';
 let win, tray, server, origin = '', pairingCode = '', port, syncing = false, quitting = false;
 const testMode = process.env.REFOS_DESKTOP_TEST === '1';
 if (testMode) app.setPath('userData', mkdtempSync(join(tmpdir(), 'refos-tm-test-')));
@@ -21,15 +23,33 @@ async function stopConnector() {
 }
 ipcMain.handle('tm:open', async (event, entered) => {
   if (event.sender !== win?.webContents || event.senderFrame !== win.webContents.mainFrame || event.senderFrame.url !== new URL('launcher.html', import.meta.url).href) throw Error('Setup is unavailable.');
-  const url = new URL(entered);
+  let url;
+  try { url = new URL(entered); } catch { throw Error('Enter the HTTPS address of your Ref OS website.'); }
   if (url.protocol !== 'https:' || url.username || url.password) throw Error('Enter the HTTPS address of your Ref OS website.');
   await stopConnector();
-  origin = url.origin; pairingCode = randomBytes(32).toString('hex');
-  server = createConnector({ origin, pairingCode });
-  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
-  port = server.address().port;
-  await writeFile(`${app.getPath('userData')}/website.json`, JSON.stringify({ website: url.href }));
-  try { await win.loadURL(url.href); } catch { origin = ''; await stopConnector(); await win.loadFile(local('launcher.html')); throw Error('Could not open Ref OS. Check the website address and internet connection.'); }
+  lastConnectionError = '';
+  let stage = 'website';
+  try {
+    // Re-read managed Windows proxy/PAC settings after changing networks.
+    await win.webContents.session.forceReloadProxyConfig();
+    stage = 'local';
+    origin = url.origin; pairingCode = randomBytes(32).toString('hex');
+    server = createConnector({ origin, pairingCode });
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+    port = server.address().port;
+    await writeFile(`${app.getPath('userData')}/website.json`, JSON.stringify({ website: url.href }));
+    stage = 'website';
+    await win.loadURL(url.href);
+  } catch (error) {
+    lastConnectionError = connectionFailure(error, stage);
+    origin = ''; await stopConnector();
+    await win.loadFile(local('launcher.html'));
+    throw Error(lastConnectionError);
+  }
+});
+ipcMain.handle('tm:connection-error', async event => {
+  if (event.sender !== win?.webContents || event.senderFrame !== win.webContents.mainFrame || event.senderFrame.url !== new URL('launcher.html', import.meta.url).href) return '';
+  return lastConnectionError;
 });
 ipcMain.handle('tm:website', async event => {
   if (event.sender !== win?.webContents || event.senderFrame.url !== new URL('launcher.html', import.meta.url).href) return '';
