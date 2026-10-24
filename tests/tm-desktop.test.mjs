@@ -15,15 +15,31 @@ test('real desktop opens securely, reaches its native connector, and hides while
     const invalid = await page.evaluate(async () => { try { await window.refosTmDesktop.openWebsite('http://unsafe.example'); return false; } catch { return true; } });
     assert.equal(invalid, true);
     if (!process.env.REFOS_PACKAGED_EXE) await page.screenshot({ path: resolve('desktop/build/launcher-preview.png') });
+    const launcherUrl=page.url();
+    await page.route('https://www.ref-os.fyi/**', route => route.fulfill({contentType:'text/html',body:'<h1>Automatic Ref OS launch</h1>'}));
+    await desktop.evaluate(async ({BrowserWindow}) => {
+      const win=BrowserWindow.getAllWindows()[0];
+      const url=new URL(win.webContents.getURL());url.search='?autoOpen=1';
+      await win.loadURL(url.href);
+    });
+    await page.waitForURL('https://www.ref-os.fyi/');
+    assert.equal(await page.locator('h1').innerText(),'Automatic Ref OS launch');
+    await desktop.evaluate(async ({BrowserWindow},url) => {
+      await BrowserWindow.getAllWindows()[0].loadURL(url);
+    },launcherUrl);
     await page.route('https://blocked.example.test/**', route => route.abort('connectionrefused'));
     await page.getByLabel('Ref OS website address').fill('https://blocked.example.test');
-    await page.getByRole('button', { name: 'Open Ref OS' }).click();
+    await page.getByRole('button', { name: 'Open Ref OS', exact:true }).click();
     await page.waitForURL('**/launcher.html');
     await page.waitForFunction(() => document.querySelector('#status')?.textContent.includes('ERR_CONNECTION_REFUSED'));
     assert.match(await page.locator('#status').innerText(), /school IT/);
+    assert.equal(await page.getByRole('button',{name:'Retry connection',exact:true}).isVisible(),true);
+    assert.equal(await page.getByRole('button',{name:'Open Windows proxy settings',exact:true}).isVisible(),true);
+    assert.ok(await page.locator('#fix-steps li').count()>=2);
+    if (!process.env.REFOS_PACKAGED_EXE) await page.screenshot({path:resolve('desktop/build/network-help-preview.png'),fullPage:true});
     await page.route('https://refos.example.test/**', route => route.fulfill({ contentType: 'text/html', body: '<h1>Ref OS test event</h1>' }));
     await page.getByLabel('Ref OS website address').fill('https://refos.example.test');
-    await page.getByRole('button', { name: 'Open Ref OS' }).click();
+    await page.getByRole('button', { name: 'Open Ref OS', exact:true }).click();
     await page.waitForURL('https://refos.example.test/');
     assert.equal(await page.evaluate(() => typeof window.refosTmDesktop.request), 'function');
     const error = await page.evaluate(async () => { try { await window.refosTmDesktop.request('snapshot', {}); } catch (error) { return error.message; } });

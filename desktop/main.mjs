@@ -1,5 +1,5 @@
-import { connectionFailure } from './networkErrors.mjs';
-import { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog } from 'electron';
+import { connectionFailure, connectionDetails } from './networkErrors.mjs';
+import { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog, shell, clipboard } from 'electron';
 import { randomBytes } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +9,8 @@ import { join } from 'node:path';
 import { createConnector } from '../tm-bridge/connector.mjs';
 
 const local = name => fileURLToPath(new URL(name, import.meta.url));
-let lastConnectionError = '';
+const isLauncher = value => { const url = new URL(value); url.search = ''; url.hash = ''; return url.href === new URL('launcher.html', import.meta.url).href; };
+let lastConnectionError = '', lastConnectionHelp = null;
 let win, tray, server, origin = '', pairingCode = '', port, syncing = false, quitting = false;
 const testMode = process.env.REFOS_DESKTOP_TEST === '1';
 if (testMode) app.setPath('userData', mkdtempSync(join(tmpdir(), 'refos-tm-test-')));
@@ -22,12 +23,12 @@ async function stopConnector() {
   if (server) { const old = server; server = null; await new Promise(resolve => { old.close(resolve); old.closeAllConnections(); }); }
 }
 ipcMain.handle('tm:open', async (event, entered) => {
-  if (event.sender !== win?.webContents || event.senderFrame !== win.webContents.mainFrame || event.senderFrame.url !== new URL('launcher.html', import.meta.url).href) throw Error('Setup is unavailable.');
+  if (event.sender !== win?.webContents || event.senderFrame !== win.webContents.mainFrame || !isLauncher(event.senderFrame.url)) throw Error('Setup is unavailable.');
   let url;
   try { url = new URL(entered); } catch { throw Error('Enter the HTTPS address of your Ref OS website.'); }
   if (url.protocol !== 'https:' || url.username || url.password) throw Error('Enter the HTTPS address of your Ref OS website.');
   await stopConnector();
-  lastConnectionError = '';
+  lastConnectionError = ''; lastConnectionHelp = null;
   let stage = 'website';
   try {
     // Re-read managed Windows proxy/PAC settings after changing networks.
@@ -41,6 +42,7 @@ ipcMain.handle('tm:open', async (event, entered) => {
     stage = 'website';
     await win.loadURL(url.href);
   } catch (error) {
+    lastConnectionHelp = connectionDetails(error, stage);
     lastConnectionError = connectionFailure(error, stage);
     origin = ''; await stopConnector();
     await win.loadFile(local('launcher.html'));
@@ -48,11 +50,21 @@ ipcMain.handle('tm:open', async (event, entered) => {
   }
 });
 ipcMain.handle('tm:connection-error', async event => {
-  if (event.sender !== win?.webContents || event.senderFrame !== win.webContents.mainFrame || event.senderFrame.url !== new URL('launcher.html', import.meta.url).href) return '';
-  return lastConnectionError;
+  if (event.sender !== win?.webContents || event.senderFrame !== win.webContents.mainFrame || !isLauncher(event.senderFrame.url)) return '';
+  return lastConnectionHelp;
+});
+ipcMain.handle('tm:network-help', async (event, action, entered) => {
+  if (event.sender !== win?.webContents || event.senderFrame !== win.webContents.mainFrame || !isLauncher(event.senderFrame.url)) throw Error('Setup is unavailable.');
+  if(action==='browser'){
+    const url=new URL(entered);
+    if(url.protocol!=='https:'||url.username||url.password)throw Error('Enter an HTTPS website address first.');
+    await shell.openExternal(url.href);
+  }else if(action==='proxy' && process.platform==='win32')await shell.openExternal('ms-settings:network-proxy');
+  else if(action==='copy')clipboard.writeText(`Ref OS TM Connect ${app.getVersion()}\n${lastConnectionError || 'No connection error recorded.'}`);
+  else throw Error('Unknown troubleshooting action.');
 });
 ipcMain.handle('tm:website', async event => {
-  if (event.sender !== win?.webContents || event.senderFrame.url !== new URL('launcher.html', import.meta.url).href) return '';
+  if (event.sender !== win?.webContents || !isLauncher(event.senderFrame.url)) return '';
   try { return JSON.parse(await readFile(`${app.getPath('userData')}/website.json`, 'utf8')).website; } catch { return ''; }
 });
 ipcMain.handle('tm:request', async (event, route, body) => {
@@ -93,7 +105,7 @@ else {
     ]));
     tray.on('double-click', () => win.show());
     win.on('close', event => { if (!quitting && syncing) { event.preventDefault(); win.hide(); } });
-    await win.loadFile(local('launcher.html'));
+    await win.loadFile(local('launcher.html'), { query: testMode ? {} : { autoOpen: '1' } });
   });
   app.on('window-all-closed', () => app.quit());
   app.on('before-quit', () => { quitting = true; server?.close(); server?.closeAllConnections(); tray?.destroy(); });
