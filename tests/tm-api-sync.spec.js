@@ -156,7 +156,8 @@ test('Chrome extension enables browser TM forms and live field sync without the 
  await page.route(/\/src\/tmExtension\.js(?:\?.*)?$/,route=>route.fulfill({contentType:'application/javascript',body:'export const isTmExtension=()=>true;'}));
  await mount(page,false);await review(page);
  await expect(page.getByText('Chrome TM extension connected · live field updates supported.')).toBeVisible();
- await expect(page.getByRole('link',{name:'Download Ref OS TM Connect for Windows'})).toHaveCount(0);
+ await expect(page.getByRole('link',{name:'Download Ref OS TM Connect for Windows'})).toBeVisible();
+ await expect(page.getByRole('link',{name:'Download Chrome TM extension'})).toBeVisible();
  await page.getByRole('button',{name:'Start TM syncing'}).click();
  await expect.poll(()=>page.evaluate(()=>window.applies.length)).toBe(1);
  expect(await page.evaluate(()=>window.lastFetchSettings.liveFields)).toBe(true);
