@@ -1,3 +1,4 @@
+import { groupEventsByState } from './eventStateGroups.js';
 import { partitionScheduledTeams } from "./scheduledTeams.js";
 import UnscheduledTeams from "./components/UnscheduledTeams.jsx";
 import { REFEREE_PORTAL_ENABLED } from "./featureAvailability.js";
@@ -1400,17 +1401,9 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
   const [archivedNotice, setArchivedNotice] = useState("");
   const activeEvents = events.filter((ev) => !ev.archivedAt && !deletedIds.has(ev.id));
   const selectorEvents = developerPage ? events.filter(ev => !deletedIds.has(ev.id)) : activeEvents;
-  const njEventIds = new Set([
-    "11111111-1111-4111-8111-111111111111",
-    "dd6da58d-bbb2-49e9-ad76-8141ac32edb5",
-    "0fc62358-dadb-4a12-9eb1-3bd3a6775a54",
-    "4f6d3058-f6b9-4c6e-a4e4-0c75af5b5619",
-    "5526ae63-37cd-46f5-989a-8ee28789cf8b",
-  ]);
-  const selectorGroups = [
-    {name:"",events:selectorEvents.filter(ev=>!njEventIds.has(ev.id))},
-    {name:"NJ Events",events:selectorEvents.filter(ev=>njEventIds.has(ev.id))},
-  ];
+  const selectorGroups = groupEventsByState(selectorEvents);
+  const [expandedStates,setExpandedStates]=useState({});
+  const allStatesExpanded=selectorGroups.filter(group=>group.name).every(group=>expandedStates[group.name]);
 
   const archivedEvents = events.filter((ev) => ev.archivedAt && !deletedIds.has(ev.id))
     .sort((a, b) => new Date(b.archivedAt).getTime() - new Date(a.archivedAt).getTime());
@@ -1611,6 +1604,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
         {!loading && !error && selectorEvents.length === 0 && (
           <p className="text-center text-slate-500 py-8">No active Ref OS events are available.</p>
         )}
+        {!loading && !error && selectorGroups.some(group=>group.name) && <button type="button" className="min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700" onClick={()=>setExpandedStates(Object.fromEntries(selectorGroups.filter(group=>group.name).map(group=>[group.name,!allStatesExpanded])))}>{allStatesExpanded ? "Collapse all" : "Expand all"}</button>}
         {!loading && !error && selectorGroups.filter(group=>group.events.length).map(group=>{
           const cards=group.events.map((ev) => {
           const profile = resolveEventBranding(ev.id, ev, ev.branding);
@@ -1633,8 +1627,8 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
             </button>
           );
         });
-          return group.name ? <details key={group.name} className="rounded-xl border border-slate-200 dark:border-slate-700">
-            <summary className="min-h-[48px] cursor-pointer rounded-xl px-4 py-3 font-semibold text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600">NJ Events ({group.events.length})</summary>
+          return group.name ? <details key={group.name} open={!!expandedStates[group.name]} onToggle={event=>{const open=event.currentTarget.open;setExpandedStates(previous=>previous[group.name]===open?previous:{...previous,[group.name]:open});}} className="rounded-xl border border-slate-200 dark:border-slate-700">
+            <summary className="min-h-[48px] cursor-pointer rounded-xl px-4 py-3 font-semibold text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600">{group.name} ({group.events.length})</summary>
             <div className="space-y-3 p-3 pt-0">{cards}</div>
           </details> : <React.Fragment key="main-events">{cards}</React.Fragment>;
         })}

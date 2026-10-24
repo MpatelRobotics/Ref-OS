@@ -464,9 +464,11 @@ export async function listSelectableEvents() {
   });
   // Phase 7: archive status and creation date, merged onto every event (active and archived).
   const withLifecycle = async (choices) => {
-    const [lifecycle, formats] = await Promise.all([listEventLifecycle(), listEventFormats()]);
+    const [lifecycle, formats, locations] = await Promise.all([listEventLifecycle(), listEventFormats(), supabase.rpc("list_refos_event_locations").then(r=>r.error?[]:r.data||[]).catch(()=>[])]);
     return choices.map((choice) => ({
       ...choice,
+      location: locations.find(row=>row.event_id===choice.id)?.location || "",
+      state: locations.find(row=>row.event_id===choice.id)?.state || "",
       archivedAt: lifecycle?.get(choice.id)?.archivedAt || null,
       createdAt: lifecycle?.get(choice.id)?.createdAt || null,
       format: formats?.get(choice.id)?.format || "tournament",
