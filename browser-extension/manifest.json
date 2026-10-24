@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Ref OS TM Connect",
+  "version": "1.0.0",
+  "minimum_chrome_version": "116",
+  "description": "Connect Ref OS to your chosen local Tournament Manager server, including live fields.",
+  "permissions": [
+    "storage",
+    "declarativeNetRequestWithHostAccess",
+    "offscreen"
+  ],
+  "host_permissions": [
+    "https://gcibsphjcllspzesqqsw.supabase.co/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*",
+    "ws://*/*",
+    "wss://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "icons": {
+    "128": "icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.ref-os.fyi/*",
+        "https://ref-os.fyi/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src http: https: ws: wss:"
+  }
+}

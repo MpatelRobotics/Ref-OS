@@ -1,3 +1,4 @@
+import { isTmExtension, extensionTmRequest } from "./tmExtension.js";
 import { nominationsThroughSession, recordsThroughSession } from "./league/nominationCarryover.js";
 import { supabase } from "./supabaseClient";
 import { OFFLINE_RULES } from "./offlineRules";
@@ -12,12 +13,14 @@ export async function getTmSnapshot(eventId, settings) {
   if (error || !data.session?.access_token) throw Error('Sign in before connecting TM.');
   if (isTmMobile()) return mobileTmRequest('snapshot', { ...settings, address: normalizeTmAddress(settings.address), eventId, authorization: `Bearer ${data.session.access_token}`, anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY });
   if (window.refosTmDesktop) return window.refosTmDesktop.request('snapshot', { ...settings, address: normalizeTmAddress(settings.address), eventId, authorization: `Bearer ${data.session.access_token}`, anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY });
-  throw Error('Open Ref OS TM Connect for Windows to connect Tournament Manager.');
+  if (isTmExtension()) return extensionTmRequest('snapshot', { ...settings, address: normalizeTmAddress(settings.address), eventId, authorization: `Bearer ${data.session.access_token}`, anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY });
+  throw Error('Install the Ref OS TM extension or open Ref OS TM Connect to connect Tournament Manager.');
 }
 export async function getTmFieldActivity(connectionId, pairingCode, disconnect = false) {
   if (isTmMobile()) return mobileTmRequest(disconnect ? 'disconnect' : 'activity', { connectionId });
   if (window.refosTmDesktop) return window.refosTmDesktop.request(disconnect ? 'disconnect' : 'activity', { connectionId });
-  throw Error('Open Ref OS TM Connect for Windows to read live field activity.');
+  if (isTmExtension()) return extensionTmRequest(disconnect ? 'disconnect' : 'activity', { connectionId });
+  throw Error('Connect the TM extension or desktop app to read live field activity.');
 }
 
 const E2E_MOCK = import.meta.env.VITE_E2E_MOCK === "1";

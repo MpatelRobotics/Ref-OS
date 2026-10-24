@@ -12,6 +12,7 @@
     "test:e2e": "playwright test",
     "security:access-sql": "node scripts/generate-access-security-sql.mjs > supabase/access-passwords-generated.sql",
     "push:vapid-keys": "node scripts/generate-vapid-keys.mjs",
+    "build:tm-extension": "node scripts/build-tm-extension.mjs",
     "build:tm-desktop": "node scripts/build-tm-desktop.mjs",
     "mobile:sync": "node scripts/sync-mobile.mjs --android",
     "mobile:android": "cap open android"

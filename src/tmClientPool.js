@@ -10,7 +10,7 @@ export function createTmClientPool(createClient, {http,sockets,cloudUrl}) {
   };
   return createClient({http,sockets:scoped,cloudUrl});
  };
- return async(route,body)=>{
+ const request=async(route,body)=>{
   const channel=route==='snapshot'?(body.channelId||'default'):connections.get(body.connectionId)||'default';
   if(!/^[a-zA-Z0-9_-]{1,80}$/.test(channel))throw Error('Invalid TM connection.');
   if(!clients.has(channel)){if(clients.size>=3)throw Error('Too many TM connections. Reopen the app.');clients.set(channel,make(channel));}
@@ -19,4 +19,6 @@ export function createTmClientPool(createClient, {http,sockets,cloudUrl}) {
   if(route==='disconnect'){for(const [id,value] of connections)if(value===channel)connections.delete(id);}
   return route==='snapshot'?{...result,multiServer:true}:result;
  };
+ request.closeAll=async()=>{await Promise.all([...clients.values()].map(client=>client.close()));clients.clear();connections.clear();};
+ return request;
 }
