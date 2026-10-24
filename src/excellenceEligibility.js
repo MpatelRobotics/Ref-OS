@@ -22,7 +22,7 @@ export function excellenceEligibility(teams,skills,review={}){
   const quals=rankBy(t=>Number(t.rank)>0?-Number(t.rank):null);
   for(const team of roster){
    const r={qualification:quals.get(team.number),skills:total.get(team.number),autonomous:auto.get(team.number)};
-   const hasQualifications=roster.every(t=>Number(t.rank)>0);
+   const hasQualifications=Number(team.rank)>0;
    const hasSkills=skills.length>0;
    const performance=allAssigned&&hasQualifications&&hasSkills&&r.qualification<=cutoff&&r.skills<=cutoff&&r.autonomous<=cutoff&&Number(scores.get(team.number)?.programming)>0;
    const checks=review.teams?.[team.number]||{};

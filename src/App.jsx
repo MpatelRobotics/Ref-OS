@@ -4843,7 +4843,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           <><RobotCheckIn teams={scheduleTeams.scheduled} checkIn={eventSettings?.tm_check_in?.value} onOpen={setOpenRobot} /><RobotList followups={operationRows.filter(r=>r.kind==='inspection-followup'&&r.payload.status==='open'&&(r.session_id||null)===(leagueSessionId||null)&&(r.division_id===0||r.division_id===divisionId))} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={scheduleTeams.scheduled} query={query} setQuery={setQuery} onOpen={setOpenRobot} /><UnscheduledTeams teams={scheduleTeams.unscheduled} query={query} onOpen={setOpenRobot} robots /></>
         ) : view === "judging" ? (
           <>
-          <ExcellenceEligibility teams={teams} skills={eventSettings?.skills_rankings?.value?.rows||[]} review={eventSettings?.excellence_review?.value||{}} onSave={adminUnlocked&&!highlanderDemoLocked ? async value=>{const saved=await api.upsertEventSetting(eventId,"excellence_review",value,meName);setEventSettings(previous=>({...previous,excellence_review:saved}));}:undefined}/>
+          <ExcellenceEligibility teams={teams} skills={eventSettings?.skills_rankings?.value?.rows||[]}/>
           <JudgingView noms={noms} viols={viols} teamName={teamNameMap} finalists={finalists} rankOrder={eventSettings?.judging_rank_order?.value || {}} canReorder={adminUnlocked} onMoveRank={moveJudgingRank} emcee={isEmcee}
             onToggleFinalist={(award, team) => (isJudge ? toggleFinalist(award, team) : requireAdmin(() => toggleFinalist(award, team)))}
             onNominate={(award) => setNominating(award || "sportsmanship")} onDeleteNom={removeNomination}
