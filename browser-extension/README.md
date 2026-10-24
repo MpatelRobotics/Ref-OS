@@ -11,7 +11,7 @@ This extension connects the official Ref OS website to a local Tournament Manage
 6. Open or reload `https://www.ref-os.fyi`, select your event, and sign in with event administrator access.
 7. Open **Tournament Manager Sync Center → Connect Tournament Manager**. The page should say **Chrome TM extension connected**.
 8. In TM, enable **Tools → Options → Web Publishing → Local TM API**. Copy the event API key.
-9. Enter the same TM address and the event key in Ref OS. Connect, select your TM division/session, review the data, and start syncing. Use **Sync both TM divisions** for two divisions on that server.
+9. Enter the TM address and event API key in the extension and click **Save TM connection**. Open TM Sync Center in Ref OS; both fields fill in automatically. Connect, select your TM division/session, review the data, and start syncing. Use **Sync both TM divisions** for two divisions on that server.
 10. Keep the Ref OS tab open. Closing it or leaving the website disconnects the live stream. Browser tab suspension can pause synchronization. Match timers use TM start/stop events; this extension does not control TM or start matches.
 
 ## Troubleshooting
@@ -26,7 +26,7 @@ This extension connects the official Ref OS website to a local Tournament Manage
 - Website access is limited to the official `ref-os.fyi` and `www.ref-os.fyi` pages. No browsing history is read.
 - TM host access is optional and requested only after you choose its address. Read-only TM API paths are allowed; arbitrary URLs and write requests are rejected.
 - Authentication is checked by Ref OS Cloud before each snapshot. The cloud endpoint is pinned to this Ref OS deployment.
-- Only the TM address is saved locally. Account tokens and TM API keys are used in memory and are not written to extension storage or diagnostic logs.
+- The TM address is saved locally. The TM API key is kept in extension session storage until Chrome closes and is shared only with the official Ref OS page to fill in the connection form. It is not saved to disk or diagnostic logs. Account tokens stay in memory.
 - Live WebSocket headers are attached with temporary, exact-URL, extension-initiator-only session rules. Each rule is removed after its handshake, including on failure.
 - Removing or changing server access closes existing connections. Idle connections expire. No TLS certificate bypass is included.
 

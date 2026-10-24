@@ -66,6 +66,7 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
  (async()=>{
   await init;
   if(!sender.tab||sender.frameId!==0||!websiteAllowed(sender.url))throw Error('Open the official Ref OS website to use this extension.');
+  if(message.route==='credentials'){const {address}=await chrome.storage.local.get('address');const {tmCredentials}=await chrome.storage.session.get('tmCredentials');return {address:address||'',apiKey:tmCredentials?.address===address?tmCredentials.apiKey:''};}
   if(message.route==='ping')return {available:true,version:'1.0.0',liveFields:true};
   const {address}=await chrome.storage.local.get('address');validateRequest(message.route,message.body,address);
   if(message.route==='snapshot')await addressAllowed(address);

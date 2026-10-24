@@ -33,6 +33,10 @@ test('Chrome extension reads signed TM data and real live WebSocket events, then
   const page=await context.newPage();await page.goto('https://www.ref-os.fyi/');
   const request=(route,body={})=>page.evaluate(({route,body})=>new Promise((resolve,reject)=>{const id=crypto.randomUUID();const timer=setTimeout(()=>reject(Error('Extension reply timeout')),15000);const listener=event=>{if(event.data?.source==='refos-tm-extension'&&event.data.id===id){clearTimeout(timer);window.removeEventListener('message',listener);event.data.ok?resolve(event.data.data):reject(Error(event.data.error));}};window.addEventListener('message',listener);window.postMessage({source:'refos-tm-page',id,route,body},location.origin);}),{route,body});
   assert.equal((await request('ping')).liveFields,true);
+  await worker.evaluate(async address=>chrome.storage.session.set({tmCredentials:{address,apiKey:'test-key'}}),address);
+  assert.deepEqual(await request('credentials'),{address,apiKey:'test-key'});
+  await worker.evaluate(()=>chrome.storage.session.remove('tmCredentials'));
+  assert.deepEqual(await request('credentials'),{address,apiKey:''});
   const result=await request('snapshot',{address,apiKey:'test-key',authorization:'Bearer account-token',anonKey:'public-key',eventId:'event-one',division:1,liveFields:true});
   assert.equal(result.teams[0].number,'1A');assert.ok(result.connectionId);assert.equal(result.fieldError,'');
   let activity;for(let i=0;i<20;i++){activity=await request('activity',{connectionId:result.connectionId});if(activity.fieldSets[0]?.fields[0]?.status==='playing')break;await new Promise(r=>setTimeout(r,50));}
