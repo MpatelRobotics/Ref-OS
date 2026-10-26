@@ -26,9 +26,19 @@ export function excellenceEligibility(teams,skills,review={}){
    const hasSkills=skills.length>0;
    const performance=allAssigned&&hasQualifications&&hasSkills&&r.qualification<=cutoff&&r.skills<=cutoff&&r.autonomous<=cutoff&&Number(scores.get(team.number)?.programming)>0;
    const checks=review.teams?.[team.number]||{};
-   results.push({team,group,cutoff,ranks:r,performance,eligible:performance&&currentFinal&&EXCELLENCE_CHECKS.every(([key])=>checks[key]===true),checks,pending:!allAssigned||!hasQualifications||!hasSkills});
+   results.push({team,group,cutoff,ranks:r,skillsReady:hasSkills,autonomousScore:Number(scores.get(team.number)?.programming)||0,performance,eligible:performance&&currentFinal&&EXCELLENCE_CHECKS.every(([key])=>checks[key]===true),checks,pending:!allAssigned||!hasQualifications||!hasSkills});
   }
  }
  for(const team of unique.filter(t=>review.splitLevels&&!review.levels?.[t.number]))results.push({team,group:'unassigned',pending:true,performance:false,eligible:false,checks:review.teams?.[team.number]||{},ranks:{}});
  return results.sort((a,b)=>Number(b.eligible)-Number(a.eligible)||Number(b.performance)-Number(a.performance)||a.team.number.localeCompare(b.team.number,undefined,{numeric:true}));
+}
+
+export function excellenceCutoffs(row){
+ return [['qualification','Qualification'],['skills','Overall Skills'],['autonomous','Autonomous Coding']].map(([key,label])=>{
+  const rank=row.ranks[key],known=Number(rank)>0&&(key==='qualification'||row.skillsReady);
+  const places=known?Math.max(0,rank-row.cutoff):null;
+  const zero=key==='autonomous'&&row.skillsReady&&!(row.autonomousScore>0);
+  const met=known&&places===0&&!zero;
+  return {key,label,rank:known?rank:null,places,met,status:!known?'Waiting for ranking data':zero?(places>0?'Needs a score above zero and to move up '+places+' '+(places===1?'place':'places'):'Needs an Autonomous Coding score above zero'):places>0?'Move up '+places+' '+(places===1?'place':'places'):'Meets cutoff'};
+ });
 }

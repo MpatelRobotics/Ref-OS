@@ -7438,6 +7438,8 @@ function Rankings({ viols, teamName }) {
   if (ranked.length === 0) return <Empty title="No violations yet" sub="Team rankings appear once violations are logged." />;
   return (
     <>
+      <ExcellenceEligibility teams={teams} skills={skills}/>
+
       <p className="text-xs text-slate-400 mb-3">{ranked.length} team{ranked.length !== 1 ? "s" : ""} with violations, most to least (Majors weighted highest).</p>
       <ul className="space-y-2">
         {ranked.map((r, i) => (

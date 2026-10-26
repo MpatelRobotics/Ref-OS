@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {excellenceEligibility,excellenceSnapshot,EXCELLENCE_CHECKS} from '../src/excellenceEligibility.js';
+import {excellenceEligibility,excellenceSnapshot,EXCELLENCE_CHECKS,excellenceCutoffs} from '../src/excellenceEligibility.js';
 const teams=Array.from({length:10},(_,i)=>({number:String(i+1)+'A',rank:i+1}));
 const skills=teams.map((t,i)=>({number:t.number,total:100-i,programming:50-i}));
 test('evaluates entire roster without nominations, requires all eight criteria and final data',()=>{
@@ -27,4 +27,14 @@ test('teams without skills runs remain in denominator and ties share autonomous 
  const rows=excellenceEligibility(teams,skills.slice(0,2).map(s=>({...s,programming:5})));
  assert.equal(rows.length,10);assert.equal(rows.find(r=>r.team.number==='2A').ranks.autonomous,1);
  assert.equal(rows.find(r=>r.team.number==='10A').performance,false);
+});
+
+test('cutoff indicators show gaps, zero scores and missing data',()=>{
+ const row=excellenceEligibility(teams,skills).find(r=>r.team.number==='6A');
+ assert.deepEqual(excellenceCutoffs(row).map(c=>c.places),[2,2,2]);
+ assert.ok(excellenceCutoffs(row).every(c=>c.status==='Move up 2 places'));
+ const zero=excellenceEligibility(teams,skills.map(s=>({...s,programming:0})))[0];
+ assert.match(excellenceCutoffs(zero)[2].status,/score above zero/);
+ assert.equal(excellenceCutoffs(excellenceEligibility(teams,[])[0])[1].status,'Waiting for ranking data');
+ assert.ok(excellenceCutoffs(excellenceEligibility(teams,skills)[0]).every(c=>c.met));
 });

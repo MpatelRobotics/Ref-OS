@@ -1,7 +1,7 @@
 import React,{useState} from 'react';
-import {excellenceEligibility} from '../excellenceEligibility.js';
+import {excellenceEligibility,excellenceCutoffs} from '../excellenceEligibility.js';
 export default function ExcellenceEligibility({teams=[],skills=[]}){
- const [filter,setFilter]=useState('candidates');
+ const [filter,setFilter]=useState('all');
  const rows=excellenceEligibility(teams,skills);
  const candidates=rows.filter(r=>r.performance);
  return <details className="mb-4 rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
@@ -11,7 +11,8 @@ export default function ExcellenceEligibility({teams=[],skills=[]}){
  <label className="block font-medium">Show teams<select className="mt-1 min-h-[44px] w-full rounded-lg border bg-white p-2 text-slate-900 dark:bg-slate-900 dark:text-white" value={filter} onChange={e=>setFilter(e.target.value)}><option value="candidates">Meet all three ranking criteria ({candidates.length})</option><option value="all">All teams ({rows.length})</option></select></label>
  {!rows.length?<p>No teams loaded. Import the event roster first.</p>:filter==='candidates'&&!candidates.length?<p>No teams currently meet all three ranking criteria.</p>:null}
  {(filter==='all'?rows:candidates).map(row=><div key={row.team.number} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700"><p><b>{row.team.number}</b> {row.team.name} · {row.pending?'Waiting for this team’s ranking data':row.performance?'Meets top 40% criteria':'Outside top 40% criteria'}</p>
- <p className="mt-2 text-sm">Qualification #{row.ranks.qualification||'—'} · Skills #{row.ranks.skills||'—'} · Autonomous Coding #{row.ranks.autonomous||'—'} · Cutoff #{row.cutoff||'—'}</p>
+ <p className="mt-2 text-sm font-medium">Top 40% cutoff: #{row.cutoff||'—'} · {excellenceCutoffs(row).filter(item=>item.met).length} of 3 criteria met</p>
+ <ul className="mt-3 grid gap-2 sm:grid-cols-3">{excellenceCutoffs(row).map(item=><li key={item.key} className={`rounded-lg border p-3 text-sm ${item.met?'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-100':'border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100'}`}><p className="font-semibold">{item.met?'✓ ':''}{item.label}{item.rank?' #'+item.rank:''}</p><p className="mt-1">{item.status}</p></li>)}</ul>
  </div>)}
  </div></details>;
 }
