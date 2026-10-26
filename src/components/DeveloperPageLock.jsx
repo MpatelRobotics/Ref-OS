@@ -17,6 +17,7 @@ export default function DeveloperPageLock({ events, onUnlock }) {
     catch { setCode(''); setError('Developer access could not be verified. Check your code and connection.'); }
     finally { setBusy(false); }
   }}>
+    <a href="/" className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"><span aria-hidden="true">←</span> Back to events</a>
     <h2 className="font-bold text-lg">Developer sign-in</h2>
     <label className="block text-sm font-semibold">Developer code<input type="password" autoComplete="off" value={code} onChange={e => setCode(e.target.value)} className="mt-1 w-full min-h-[44px] rounded-lg border bg-transparent p-2" /></label>
     {error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>}
