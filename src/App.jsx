@@ -4434,7 +4434,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
               </div>
             </div>
           )}
-          <div className="flex-1 min-w-0">
+          <div className="refos-header-event flex-1 min-w-0">
             <div className="flex items-start gap-1.5 flex-wrap">
               <h1 className="font-bold tracking-tight leading-tight text-[15px] sm:text-base line-clamp-1 sm:line-clamp-2">
                 {brand.hasSavedShortName

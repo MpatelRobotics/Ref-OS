@@ -311,3 +311,14 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 }
 
 @media (min-width:1100px) { body:has(.refos-desktop-nav) .refos-event-tm-sync { margin-left:216px; } }
+
+
+/* Give iPhone status bars breathing room and keep the event title out of the controls row. */
+@media (max-width:639px) {
+  .refos-header { padding-top:calc(var(--refos-safe-top) + 8px); }
+  .refos-header-inner { flex-wrap:wrap; align-items:center; row-gap:8px; }
+  .refos-header-event { flex:0 0 100%; order:-1; }
+  .refos-header-event h1 { display:block; overflow:visible; white-space:normal; -webkit-line-clamp:unset; overflow-wrap:anywhere; }
+  .refos-header-event > button { min-height:24px; }
+  .refos-header-brand,.refos-header-inner > .refos-back-button { margin-right:auto; }
+}
