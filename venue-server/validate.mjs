@@ -70,21 +70,27 @@ function cleanData(kind, data) {
   if (!data || typeof data !== "object" || Array.isArray(data)) return { error: "data must be an object" };
   if (JSON.stringify(data).length > schema.maxBytes) return { error: "data too large" };
   const out = {};
-  for (const [key, value] of Object.entries(data)) {
-    const check = schema.fields[key];
+  const keys = Object.keys(data);
+  for (let i = 0; i < keys.length; i++) {
+    var key = keys[i], value = data[key];
+    var check = schema.fields[key];
     if (!check) return { error: `field not allowed: ${key.slice(0, 40)}` };
-    const cleaned = check(value);
+    var cleaned = check(value);
     if (cleaned === undefined) return { error: `invalid field: ${key}` };
     if (cleaned !== null) out[key] = cleaned;
   }
-  for (const key of schema.required) if (out[key] == null) return { error: `missing field: ${key}` };
+  for (let i = 0; i < schema.required.length; i++) {
+    var requiredKey = schema.required[i];
+    if (out[requiredKey] == null) return { error: `missing field: ${requiredKey}` };
+  }
   if (kind === "field_log" && CLOUD_ONLY_FIELD_LOG_KINDS.has(out.kind)) return { error: "access-code entries are not stored on the venue server" };
   return { data: out };
 }
 
 export function validateChange(change) {
   if (!change || typeof change !== "object") return { error: "change must be an object" };
-  const { changeId, kind, recordId, op, data, baseVersion, clientTs } = change;
+  const changeId = change.changeId, kind = change.kind, recordId = change.recordId,
+    op = change.op, data = change.data, baseVersion = change.baseVersion, clientTs = change.clientTs;
   if (!isDeviceId(changeId)) return { error: "invalid changeId" };
   if (!SCHEMAS[kind]) return { error: "unsupported kind" };
   if (!isDeviceId(recordId)) return { error: "invalid recordId" };

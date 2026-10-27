@@ -330,4 +330,10 @@ Open Ref-OS-Venue-Server.exe on the host computer and click Start Server. Node.j
 
 Data stays in the Windows app user-data folder, separate from the executable. Existing command-line server data is not moved automatically: export a backup before changing hosts.
 
-Build the web app, then run npm run build:venue-desktop. The venue-desktop-release GitHub workflow publishes the Windows download and requires repository secrets VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. The executable is currently unsigned; school IT may need to approve it.
+Build the web app, then run npm run build:venue-desktop. The venue-desktop-release GitHub workflow publishes the Windows download and uses repository variables (or secrets) VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. The executable is currently unsigned; school IT may need to approve it.
+
+## Android host app
+
+The Android Venue Server is a separate app (com.refos.venue), so it can be installed alongside TM Connect. It uses native SQLite and a foreground connected-device service with a visible Stop Server notification. Android 8 or later is required. Keep the device powered and connected to venue Wi-Fi. The service is not automatically restarted after force-stop or reboot. Records stay in app-private storage across server restarts; uninstalling deletes them. Export before uninstalling. Cloud reconciliation is still manual.
+
+Build the web app, run npm run prepare:venue-android, then from android run gradlew :venue:assembleDebug :venue:testDebugUnitTest. The Android release workflow uses the existing Android keystore secrets for installable APK updates; no paid Windows signing service is required.

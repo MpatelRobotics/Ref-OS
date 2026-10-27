@@ -18,7 +18,8 @@
     "mobile:android": "cap open android",
     "build:venue-download": "node scripts/build-venue-download.mjs",
     "postbuild": "npm run build:venue-download",
-    "build:venue-desktop": "node scripts/build-venue-desktop.mjs"
+    "build:venue-desktop": "node scripts/build-venue-desktop.mjs",
+    "prepare:venue-android": "node scripts/prepare-venue-android.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

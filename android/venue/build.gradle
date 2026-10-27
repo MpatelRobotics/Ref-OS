@@ -1,0 +1,26 @@
+apply plugin: 'com.android.application'
+android {
+    namespace 'com.refos.venue'
+    compileSdk 36
+    defaultConfig { applicationId 'com.refos.venue'; minSdk 26; targetSdk 36; versionCode Integer.parseInt(System.getenv('REFOS_ANDROID_VERSION_CODE') ?: '1'); versionName '2.0.0' }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    testOptions { unitTests.includeAndroidResources = true }
+    signingConfigs {
+        release {
+            if (System.getenv('ANDROID_KEYSTORE_PATH')) {
+                storeFile file(System.getenv('ANDROID_KEYSTORE_PATH'))
+                storeType 'PKCS12'
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes { release { signingConfig signingConfigs.release; minifyEnabled false } }
+}
+dependencies {
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
+    implementation 'org.mozilla:rhino:1.8.0'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
+}
