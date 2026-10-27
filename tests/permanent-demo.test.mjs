@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {PGlite} from '@electric-sql/pglite';
-import {DEMO_EVENTS,isDemoEvent} from '../src/demoEvents.js';
+import {DEMO_EVENTS,isDemoEvent,RETIRED_IQ_DEMO_ID} from '../src/demoEvents.js';
 test('VTOW grants demo-only admin and demos cannot be destroyed or change program',async()=>{
  const db=new PGlite();
  await db.exec(`
@@ -12,17 +12,17 @@ test('VTOW grants demo-only admin and demos cannot be destroyed or change progra
  create table events(id uuid primary key,name text,event_format text default 'tournament',archived_at timestamptz);
  create table event_settings(event_id uuid,key text,value jsonb,primary key(event_id,key));
  create table event_members(event_id uuid,user_id uuid,role text,developer boolean,primary key(event_id,user_id));
- create table event_access_credentials(event_id uuid,credential_name text);
- insert into events(id,name) values ('${DEMO_EVENTS.v5}','V5 Demo'),('${DEMO_EVENTS.iq}','IQ Demo'),('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Real Event');
+ create table event_access_credentials(event_id uuid,credential_name text,enabled boolean);
+ insert into events(id,name) values ('${DEMO_EVENTS.v5}','V5 Demo'),('${RETIRED_IQ_DEMO_ID}','IQ Demo'),('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','Real Event');
  insert into event_settings values('${DEMO_EVENTS.v5}','competition_program','{"program":"v5"}');
  `);
  await db.exec(readFileSync(new URL('../supabase/refos-permanent-demos.sql',import.meta.url),'utf8'));
  assert.equal((await db.query('select * from claim_refos_demo_access($1,$2)',[DEMO_EVENTS.v5,'VTOW'])).rows[0].is_admin,true);
- assert.equal((await db.query('select * from claim_refos_demo_access($1,$2)',[DEMO_EVENTS.iq,'vtow'])).rows[0].role,'admin');
+ await assert.rejects(db.query('select * from claim_refos_demo_access($1,$2)',[RETIRED_IQ_DEMO_ID,'VTOW']));
  await assert.rejects(db.query('select * from claim_refos_demo_access($1,$2)',['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','VTOW']));
  await assert.rejects(db.query('select * from claim_refos_demo_access($1,$2)',[DEMO_EVENTS.v5,'NOPE']));
  await assert.rejects(db.query('delete from events where id=$1',[DEMO_EVENTS.v5]));
- await assert.rejects(db.query('update events set archived_at=now() where id=$1',[DEMO_EVENTS.iq]));
+ await assert.rejects(db.query('update events set archived_at=now() where id=$1',[DEMO_EVENTS.v5]));
  await assert.rejects(db.query("update event_settings set value='{}' where event_id=$1 and key='competition_program'",[DEMO_EVENTS.v5]));
  await db.query("update events set name='Renamed real event' where id=$1",['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb']);
  assert.equal(isDemoEvent('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),false);

@@ -1,8 +1,18 @@
 -- Run once in the Supabase SQL Editor. Rerunnable; preserves visitor changes.
 begin;
+-- Retire the former IQ demo while preserving its records.
+drop trigger if exists guard_refos_permanent_demo on public.events;
+drop trigger if exists guard_refos_permanent_demo on public.event_settings;
+drop trigger if exists guard_refos_permanent_demo on public.event_access_credentials;
+select set_config('refos.lifecycle_change','on',true);
+update public.events set archived_at=coalesce(archived_at,now()) where id='80286e06-0548-43be-9c0f-372b54e58ece';
+update public.event_settings set value='{"protected":false}'::jsonb where event_id='80286e06-0548-43be-9c0f-372b54e58ece' and key='system_protection';
+update public.event_access_credentials set enabled=false where event_id='80286e06-0548-43be-9c0f-372b54e58ece';
+delete from public.event_members where event_id='80286e06-0548-43be-9c0f-372b54e58ece';
+
 insert into public.event_settings(event_id,key,value)
 select id,'system_protection','{"protected":true}'::jsonb from public.events
-where id in ('5296a93c-792b-4ba1-9da2-b7df52d20d88','80286e06-0548-43be-9c0f-372b54e58ece')
+where id in ('5296a93c-792b-4ba1-9da2-b7df52d20d88')
 on conflict(event_id,key) do update set value=excluded.value;
 create or replace function public.claim_refos_demo_access(p_event uuid,p_code text)
 returns table(role text,is_admin boolean)
@@ -10,7 +20,7 @@ language plpgsql security definer set search_path=public
 as $$
 begin
  if auth.uid() is null then raise exception 'Sign in before opening the demo';end if;
- if p_event not in ('5296a93c-792b-4ba1-9da2-b7df52d20d88'::uuid,'80286e06-0548-43be-9c0f-372b54e58ece'::uuid)
+ if p_event not in ('5296a93c-792b-4ba1-9da2-b7df52d20d88'::uuid)
  or upper(trim(coalesce(p_code,'')))<>'VTOW'
  or not exists(select 1 from public.events where id=p_event and archived_at is null)
  then raise exception 'Invalid demo event or code';end if;
@@ -28,7 +38,7 @@ returns trigger language plpgsql set search_path=public as $$
 declare target uuid;
 begin
  if TG_TABLE_NAME='events' then target=old.id;else target=old.event_id;end if;
- if target not in ('5296a93c-792b-4ba1-9da2-b7df52d20d88'::uuid,'80286e06-0548-43be-9c0f-372b54e58ece'::uuid) then
+ if target not in ('5296a93c-792b-4ba1-9da2-b7df52d20d88'::uuid) then
   if TG_OP='DELETE' then return old;else return new;end if;
  end if;
  if TG_TABLE_NAME='events' then

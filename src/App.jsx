@@ -1,5 +1,5 @@
 import DemoLauncher from './components/DemoLauncher.jsx';
-import { isDemoEvent, DEMO_IDENTITY } from './demoEvents.js';
+import { isDemoEvent, DEMO_IDENTITY, RETIRED_IQ_DEMO_ID } from './demoEvents.js';
 import ExcellenceEligibility from './components/ExcellenceEligibility.jsx';
 import { groupEventsByState } from './eventStateGroups.js';
 import { partitionScheduledTeams } from "./scheduledTeams.js";
@@ -1402,7 +1402,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deletedIds, setDeletedIds] = useState(() => new Set());
   const [archivedNotice, setArchivedNotice] = useState("");
-  const activeEvents = events.filter((ev) => !ev.archivedAt && !deletedIds.has(ev.id) && !isDemoEvent(ev.id));
+  const activeEvents = events.filter((ev) => !ev.archivedAt && !deletedIds.has(ev.id) && !isDemoEvent(ev.id) && ev.id !== RETIRED_IQ_DEMO_ID);
   const selectorEvents = developerPage ? events.filter(ev => !deletedIds.has(ev.id)) : activeEvents;
   const selectorGroups = groupEventsByState(selectorEvents);
   const [expandedStates,setExpandedStates]=useState({});
