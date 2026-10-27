@@ -23,3 +23,6 @@ mobile/tm-sockets/.build/
 
 # Generated Chrome extension folder (ZIP is published with the site)
 browser-extension/build/
+
+# Venue hosting download is generated after each production build
+public/Ref-OS-Venue-Server.zip

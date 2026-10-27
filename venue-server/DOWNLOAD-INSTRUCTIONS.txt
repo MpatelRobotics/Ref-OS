@@ -1,0 +1,16 @@
+REF OS LOCAL VENUE SERVER - START HERE
+
+1. Install Node.js version 22.13 or newer from https://nodejs.org if it is not already installed.
+2. Right-click the downloaded ZIP and choose Extract All. Keep the whole extracted folder together.
+3. Open the venue-server folder. Double-click start-venue-server.cmd.
+4. Keep that server window open. The browser opens a setup page with addresses for other devices.
+5. Join the same Wi-Fi on each device, enter one of those addresses, and sign in while internet is available.
+6. Test a sample entry on two devices before relying on offline sharing.
+
+Local sharing covers violations, field logs, roster and presence. Other features and initial sign-in still use the cloud. Export Venue Data before switching to Cloud.
+
+Updates: stop the server, replace dist and server source files from the new download, and keep venue-server/data. That folder contains your local event records. Do not delete it.
+
+If the host already has a server running on port 8080, use its existing setup page instead of starting a second copy.
+
+Help: refos.app@gmail.com

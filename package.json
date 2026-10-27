@@ -15,7 +15,9 @@
     "build:tm-extension": "node scripts/build-tm-extension.mjs",
     "build:tm-desktop": "node scripts/build-tm-desktop.mjs",
     "mobile:sync": "node scripts/sync-mobile.mjs --android",
-    "mobile:android": "cap open android"
+    "mobile:android": "cap open android",
+    "build:venue-download": "node scripts/build-venue-download.mjs",
+    "postbuild": "npm run build:venue-download"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
