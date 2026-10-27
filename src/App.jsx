@@ -6064,14 +6064,14 @@ function MatchList({ tmTimes=[], eventTimezone='UTC', tmActivity, matches, teamN
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-14 shrink-0">{rowLabel(m)}</span>
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
                   <span className="text-red-700 dark:text-red-300 font-semibold">{m.red.join("  ")}</span>
-                  <span className="text-slate-300 dark:text-slate-400 font-sans">vs</span>
+                  <span className="text-slate-500 dark:text-slate-400 font-sans">vs</span>
                   <span className="text-blue-700 dark:text-blue-300 font-semibold">{m.blue.join("  ")}</span>
                 </div>
                 <ScheduledMatchTime match={m} times={tmTimes} zone={eventTimezone}/>
                 {liveHighlights[m.id] && <span className={`text-xs font-semibold shrink-0 ${liveHighlights[m.id] === 'current' ? 'text-emerald-800 dark:text-emerald-200' : 'text-amber-800 dark:text-amber-200'}`}>{liveHighlights[m.id] === 'current' ? 'Playing now' : 'Up next'}</span>}
-                {m.field && <span className="text-[11px] text-slate-400 shrink-0">{fieldDisplayName(m.field, fieldNames)}</span>}
+                {m.field && <span className="text-[11px] text-slate-600 dark:text-slate-300 shrink-0">{fieldDisplayName(m.field, fieldNames)}</span>}
                 {m.redScore != null && m.blueScore != null && (
-                  <span aria-label={`Score: red ${m.redScore}, blue ${m.blueScore}`} className="font-mono text-sm font-bold shrink-0"><span className="text-slate-500 mr-1">Score</span><span className={m.winner === "red" ? "text-red-700 dark:text-red-300" : "text-slate-400"}>{m.redScore}</span><span className="text-slate-300">-</span><span className={m.winner === "blue" ? "text-blue-700 dark:text-blue-300" : "text-slate-400"}>{m.blueScore}</span></span>
+                  <span aria-label={`Score: red ${m.redScore}, blue ${m.blueScore}`} className="font-mono text-sm font-bold shrink-0"><span className="text-slate-500 mr-1">Score</span><span className="text-red-700 dark:text-red-300">{m.redScore}</span><span className="text-slate-500 dark:text-slate-400"> – </span><span className="text-blue-700 dark:text-blue-300">{m.blueScore}</span></span>
                 )}
                 {eliminationPairingKey(m) && eliminationResultLabel(m) && <span className="text-xs font-semibold text-amber-800 dark:text-amber-200">{eliminationResultLabel(m)}</span>}
                 {(m.redScore == null || m.blueScore == null) && <span className="text-xs text-slate-500 shrink-0">Awaiting score</span>}
