@@ -150,7 +150,21 @@ export default function SyncStatusModal({ eventId, eventName = "", onClose }) {
             </div>
           </fieldset>
 
-          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950/30"><h3 className="font-bold">Connect devices at your venue</h3><a href="/Ref-OS-Venue-Server.zip" download className="mt-3 flex min-h-[48px] items-center justify-center rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white hover:bg-indigo-800">Download Venue Server for Windows</a><p className="mt-2">Install Node.js 22.13 or newer from <a className="underline" href="https://nodejs.org" target="_blank" rel="noopener noreferrer">nodejs.org</a> if needed. Download the ZIP above, right-click it, and choose <b>Extract All</b>.</p><ol className="mt-2 list-decimal space-y-2 pl-5"><li>On the host computer, open the folder you just extracted in <b>File Explorer</b>. Open the <b>venue-server</b> folder, then double-click the file <b>start-venue-server.cmd</b>. This filename is an instruction, not a button on this page. Keep the server window open; the browser will show setup instructions.</li><li>Connect every device to the same Wi-Fi. Open a listed venue address on each device, then sign in to the event while internet is available.</li><li>Before relying on offline mode, confirm the venue status is connected and test a sample violation on two devices.</li></ol><p className="mt-2">The local server shares violations, field logs, roster and presence. First-time sign-in and other event features still use the cloud. Venue records are not automatically copied to the cloud; export a backup before switching modes.</p></div>
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950/30"><h3 className="font-bold">Set up local sharing</h3>
+            <a href="/Ref-OS-Venue-Server.zip" download className="mt-3 flex min-h-[48px] items-center justify-center rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white hover:bg-indigo-800">Download Venue Server for Windows</a>
+            <ol className="mt-3 list-decimal space-y-3 pl-5">
+              <li><b>Download and unzip.</b> Click the button above. Right-click the downloaded ZIP and choose <b>Extract All</b>.</li>
+              <li><b>Start the server.</b> In the extracted folder, open <b>venue-server</b> and double-click <b>start-venue-server.cmd</b>. Leave its window open.</li>
+              <li><b>Connect your devices.</b> Join the same Wi-Fi. On each device, type an address from the setup page into the browser and sign in.</li>
+              <li><b>Check sharing.</b> Add a sample violation and confirm it appears on a second device.</li>
+            </ol>
+            <details className="mt-3"><summary className="min-h-[44px] cursor-pointer py-2 font-semibold">First-time setup &amp; offline details</summary><div className="space-y-2 pt-1">
+              <p>If the launcher asks for Node.js, install version 22.13 or newer from <a className="underline" href="https://nodejs.org" target="_blank" rel="noopener noreferrer">nodejs.org</a>, then open the launcher again.</p>
+              <p>Sign in on each device while internet is available. Keep the host computer awake.</p>
+              <p>Local sharing covers violations, field logs, roster and presence. Other features still use the cloud.</p>
+              <p>Venue records do not upload to the cloud automatically. Export Venue Data before switching back to Cloud.</p>
+            </div></details>
+          </div>
           <div>
             <label htmlFor="venue-url" className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Server URL</label>
             <div className="mt-1 flex gap-2">
