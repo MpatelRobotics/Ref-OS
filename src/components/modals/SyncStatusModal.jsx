@@ -155,7 +155,7 @@ export default function SyncStatusModal({ eventId, eventName = "", onClose }) {
             <ol className="mt-3 list-decimal space-y-3 pl-5">
               <li><b>Download and unzip.</b> Click the button above. Right-click the downloaded ZIP and choose <b>Extract All</b>.</li>
               <li><b>Start the server.</b> In the extracted folder, open <b>venue-server</b> and double-click <b>start-venue-server.cmd</b>. Leave its window open.</li>
-              <li><b>Connect your devices.</b> Join the same Wi-Fi. On each device, type an address from the setup page into the browser and sign in.</li>
+              <li><b>Connect each device.</b> Join the same Wi-Fi as the host computer. In this menu on each device, enter the host computer’s full address in <b>Server URL</b> below, then tap <b>Open Ref OS at the venue address</b> and sign in.</li>
               <li><b>Check sharing.</b> Add a sample violation and confirm it appears on a second device.</li>
             </ol>
             <details className="mt-3"><summary className="min-h-[44px] cursor-pointer py-2 font-semibold">First-time setup &amp; offline details</summary><div className="space-y-2 pt-1">
@@ -173,7 +173,7 @@ export default function SyncStatusModal({ eventId, eventName = "", onClose }) {
                 className="min-w-0 flex-1 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               {venue && <button type="button" onClick={saveUrl} className="px-3 rounded-lg border border-slate-300 dark:border-slate-600 font-semibold">Save</button>}
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Host name or IP address and port, e.g. http://refos.local:8080 or http://192.168.1.50:8080. If .local names do not work on this network, use the IP address.</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">On every device, enter the same address shown on the host computer’s setup page, including http:// and the port (for example, http://192.168.1.50:8080). Use the host computer’s IP address, not this device’s IP. Then tap Open Ref OS at the venue address below. If already using Local Venue Server, tap Save after changing this address.</p>
             {urlError && <p className="text-xs text-red-600 mt-1">{urlError}</p>}
             {!normalizeServerUrl(urlInput).error && <a className="mt-2 inline-flex min-h-[44px] items-center rounded-lg border border-blue-400 px-3 font-semibold" href={normalizeServerUrl(urlInput).url+"/?event="+encodeURIComponent(eventId)} target="_blank" rel="noopener noreferrer">Open Ref OS at the venue address</a>}
             <p className="mt-2 text-xs text-slate-500">If connection fails: keep the host awake, check the IP address and port, allow Node.js through the host firewall on your private event network, and ask venue IT whether Wi-Fi device isolation blocks devices from reaching each other. A guest network may separate devices.</p>
