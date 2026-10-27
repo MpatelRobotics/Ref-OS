@@ -1,3 +1,4 @@
+import { isDemoEvent } from '../demoEvents.js';
 import { REFEREE_PORTAL_ENABLED, JUDGE_GROUP_LOGIN_ENABLED } from "../featureAvailability.js";
 import RefereePortal from "../components/RefereePortal";
 import JudgeGroupPortal from '../components/JudgeGroupPortal';
@@ -21,7 +22,7 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
   const showShortName = profile.hasSavedShortName && profile.shortName.toLowerCase() !== profile.name.toLowerCase();
   const [refPortal,setRefPortal]=useState(false);
   const [groupPortal,setGroupPortal]=useState(false);
-  const [mode, setMode] = useState("code");
+  const [mode, setMode] = useState(isDemoEvent(eventId)?"password":"code");
   const [pw, setPw] = useState("");
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
@@ -85,6 +86,16 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
       setCheckingCode(false);
     }
   };
+
+  const demoEntryAttempted=useRef(false);
+  useEffect(()=>{
+    if(!isDemoEvent(eventId)||demoEntryAttempted.current)return;
+    let entry;try{entry=JSON.parse(sessionStorage.getItem('refosDemoEntry')||'null');}catch{}
+    if(entry?.eventId!==eventId)return;
+    demoEntryAttempted.current=true;
+    sessionStorage.removeItem('refosDemoEntry');
+    void finishServerLogin(entry.code);
+  },[eventId]);
 
   const submit = () => {
     if (!pw) return;

@@ -1,3 +1,5 @@
+import DemoLauncher from './components/DemoLauncher.jsx';
+import { isDemoEvent } from './demoEvents.js';
 import ExcellenceEligibility from './components/ExcellenceEligibility.jsx';
 import { groupEventsByState } from './eventStateGroups.js';
 import { partitionScheduledTeams } from "./scheduledTeams.js";
@@ -1400,7 +1402,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deletedIds, setDeletedIds] = useState(() => new Set());
   const [archivedNotice, setArchivedNotice] = useState("");
-  const activeEvents = events.filter((ev) => !ev.archivedAt && !deletedIds.has(ev.id));
+  const activeEvents = events.filter((ev) => !ev.archivedAt && !deletedIds.has(ev.id) && !isDemoEvent(ev.id));
   const selectorEvents = developerPage ? events.filter(ev => !deletedIds.has(ev.id)) : activeEvents;
   const selectorGroups = groupEventsByState(selectorEvents);
   const [expandedStates,setExpandedStates]=useState({});
@@ -1525,6 +1527,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
       {universalFeedbackOpen ? <UniversalFeedback isDeveloper events={events} onClose={()=>setUniversalFeedbackOpen(false)}/> : <button type="button" onClick={()=>setUniversalFeedbackOpen(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 bg-white dark:bg-slate-800 p-3 font-semibold">Universal Feedback · Developer only</button>}
       </>}
       {!universalFeedbackOpen && <>
+      {!developerPage && view === "active" && <DemoLauncher onChoose={onChoose}/>}
       {notice && view === "active" && (
         <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">{notice}</div>
       )}
@@ -4802,6 +4805,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             {league.activeSession && <button type="button" onClick={league.switchToActive} className="rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-bold text-white">Go to {league.activeSession.name}</button>}
           </div>
         )}
+        {isDemoEvent(eventId) && <div role="status" className="mb-4 rounded-xl border border-indigo-300 bg-indigo-50 p-3 text-sm text-indigo-950 dark:border-indigo-700 dark:bg-indigo-950 dark:text-indigo-100"><b>DEMO · {isIQ?"VEX IQ Level Up":"V5 Override"}</b> · Fictional teams and sample data. Shared playground: changes are visible to other visitors. Use sample information only.</div>}
         {highlanderDemoLocked && <div role="status" className="mb-4 rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-900 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-100">Highlander Summit demo archive: matches, alliances, and violations are read only.</div>}
         {highlanderDemoLocked && !isInspection && !isEmcee && <HighlanderPractice key={eventId} by={meName || "Demo Ref"}
           renderForm={({onSave,onClose}) => <LogModal requiredRobotPhotos={requiredRobotPhotos} practice teams={teams} viols={[]} presetTeam={openTeam || null} knownRules={knownRules} me={{name:meName || "Demo Ref"}} event={event} matches={matches} presetMatch={openMatch && matches[openMatch] ? {phase:matches[openMatch].phase,num:String(matches[openMatch].num)} : null} rules={rules} onOpenPhoto={setLightbox} fieldNames={fieldNames} onSetName={()=>{}} onSave={onSave} onClose={onClose} />}
