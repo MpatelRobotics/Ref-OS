@@ -17,7 +17,8 @@
     "mobile:sync": "node scripts/sync-mobile.mjs --android",
     "mobile:android": "cap open android",
     "build:venue-download": "node scripts/build-venue-download.mjs",
-    "postbuild": "npm run build:venue-download"
+    "postbuild": "npm run build:venue-download",
+    "build:venue-desktop": "node scripts/build-venue-desktop.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

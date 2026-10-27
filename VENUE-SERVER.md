@@ -324,3 +324,10 @@ All endpoints are under `/api/v1`. Event endpoints require `Authorization: Beare
 - Keep the server computer awake. Firewall rules must permit the server port, and venue Wi-Fi must permit devices to communicate.
 - Changing from the public HTTPS website to a local HTTP address starts a different browser storage origin. Sign in and prepare that local address before losing internet.
 - The server stores data under venue-server/data unless configured otherwise. Keep that folder when updating. Export Venue Data before switching to Cloud; automatic venue-to-cloud reconciliation is still not included.
+## Windows app
+
+Open Ref-OS-Venue-Server.exe on the host computer and click Start Server. Node.js is included. Keep the app open and use Copy Address to share its address with devices on the same Wi-Fi.
+
+Data stays in the Windows app user-data folder, separate from the executable. Existing command-line server data is not moved automatically: export a backup before changing hosts.
+
+Build the web app, then run npm run build:venue-desktop. The venue-desktop-release GitHub workflow publishes the Windows download and requires repository secrets VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. The executable is currently unsigned; school IT may need to approve it.

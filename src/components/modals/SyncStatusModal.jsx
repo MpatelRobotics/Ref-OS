@@ -151,15 +151,15 @@ export default function SyncStatusModal({ eventId, eventName = "", onClose }) {
           </fieldset>
 
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950/30"><h3 className="font-bold">Set up local sharing</h3>
-            <a href="/Ref-OS-Venue-Server.zip" download className="mt-3 flex min-h-[48px] items-center justify-center rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white hover:bg-indigo-800">Download Venue Server for Windows</a>
+            <a href="https://github.com/MpatelRobotics/Ref-OS/releases/download/venue-server/Ref-OS-Venue-Server.exe" download className="mt-3 flex min-h-[48px] items-center justify-center rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white hover:bg-indigo-800">Download Venue Server for Windows</a>
             <ol className="mt-3 list-decimal space-y-3 pl-5">
-              <li><b>Download and unzip.</b> Click the button above. Right-click the downloaded ZIP and choose <b>Extract All</b>.</li>
-              <li><b>Start the server.</b> In the extracted folder, open <b>venue-server</b> and double-click <b>start-venue-server.cmd</b>. Leave its window open.</li>
+              <li><b>Download the app.</b> Click the button above on the Windows computer that will host your event.</li>
+              <li><b>Start sharing.</b> Open <b>Ref-OS-Venue-Server.exe</b> and click <b>Start Server</b>. Keep the app open. No command window or Node.js installation is needed.</li>
               <li><b>Connect each device.</b> Join the same Wi-Fi as the host computer. In this menu on each device, enter the host computer’s full address in <b>Server URL</b> below, then tap <b>Open Ref OS at the venue address</b> and sign in.</li>
               <li><b>Check sharing.</b> Add a sample violation and confirm it appears on a second device.</li>
             </ol>
             <details className="mt-3"><summary className="min-h-[44px] cursor-pointer py-2 font-semibold">First-time setup &amp; offline details</summary><div className="space-y-2 pt-1">
-              <p>If the launcher asks for Node.js, install version 22.13 or newer from <a className="underline" href="https://nodejs.org" target="_blank" rel="noopener noreferrer">nodejs.org</a>, then open the launcher again.</p>
+              <p>The Windows app includes everything needed to run the server. <a className="underline" href="/Ref-OS-Venue-Server.zip" download>Advanced: download the command-line ZIP instead</a> (requires Node.js 22.13 or newer).</p>
               <p>Sign in on each device while internet is available. Keep the host computer awake.</p>
               <p>Local sharing covers violations, field logs, roster and presence. Other features still use the cloud.</p>
               <p>Venue records do not upload to the cloud automatically. Export Venue Data before switching back to Cloud.</p>
@@ -173,7 +173,7 @@ export default function SyncStatusModal({ eventId, eventName = "", onClose }) {
                 className="min-w-0 flex-1 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
               {venue && <button type="button" onClick={saveUrl} className="px-3 rounded-lg border border-slate-300 dark:border-slate-600 font-semibold">Save</button>}
             </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">On every device, enter the same address shown on the host computer’s setup page, including http:// and the port (for example, http://192.168.1.50:8080). Use the host computer’s IP address, not this device’s IP. Then tap Open Ref OS at the venue address below. If already using Local Venue Server, tap Save after changing this address.</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">On every device, enter the same address shown on the host computer’s Venue Server app, including http:// and the port (for example, http://192.168.1.50:8080). Use the host computer’s IP address, not this device’s IP. Then tap Open Ref OS at the venue address below. If already using Local Venue Server, tap Save after changing this address.</p>
             {urlError && <p className="text-xs text-red-600 mt-1">{urlError}</p>}
             {!normalizeServerUrl(urlInput).error && <a className="mt-2 inline-flex min-h-[44px] items-center rounded-lg border border-blue-400 px-3 font-semibold" href={normalizeServerUrl(urlInput).url+"/?event="+encodeURIComponent(eventId)} target="_blank" rel="noopener noreferrer">Open Ref OS at the venue address</a>}
             <p className="mt-2 text-xs text-slate-500">If connection fails: keep the host awake, check the IP address and port, allow Node.js through the host firewall on your private event network, and ask venue IT whether Wi-Fi device isolation blocks devices from reaching each other. A guest network may separate devices.</p>

@@ -26,3 +26,7 @@ browser-extension/build/
 
 # Venue hosting download is generated after each production build
 public/Ref-OS-Venue-Server.zip
+
+venue-desktop/build/
+venue-desktop/release/
+public/Ref-OS-Venue-Server.exe

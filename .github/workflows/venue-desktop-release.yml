@@ -1,0 +1,41 @@
+name: Build Venue Server Windows download
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['venue-desktop/**', 'venue-server/**', 'src/**', 'public/**', 'scripts/build-venue-desktop.mjs', 'package.json', 'package-lock.json', '.github/workflows/venue-desktop-release.yml']
+permissions:
+  contents: write
+concurrency:
+  group: venue-desktop-release
+  cancel-in-progress: false
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Check app configuration
+        shell: pwsh
+        run: |
+          if (!$env:VITE_SUPABASE_URL -or !$env:VITE_SUPABASE_ANON_KEY) { throw 'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY repository secrets before building the venue app.' }
+      - run: npm run build
+      - run: node scripts/build-venue-desktop.mjs --prepare
+      - run: node --test tests/venue-desktop.test.mjs tests/venue-reliability.test.mjs
+      - run: npm run build:venue-desktop
+      - name: Publish Windows download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release view venue-server *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create venue-server --title 'Ref OS Venue Server for Windows' --notes 'Open the app and click Start Server. No separate Node.js installation required.' }
+          gh release upload venue-server venue-desktop/release/Ref-OS-Venue-Server.exe --clobber
