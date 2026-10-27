@@ -1,10 +1,11 @@
+import {uuid} from './uuid.js';
 let available=false;
 const pending=new Map();
 export const isTmExtension=()=>available;
 export function extensionTmRequest(route,body={}){
  if(typeof window==='undefined')return Promise.reject(Error('TM extension is unavailable.'));
  return new Promise((resolve,reject)=>{
-  const id=crypto.randomUUID();
+  const id=uuid();
   const timer=setTimeout(()=>{pending.delete(id);reject(Error('TM extension did not respond. Open the extension, check its server access, then reload Ref OS.'));},route==='ping'?2000:60000);
   pending.set(id,{resolve,reject,timer});
   window.postMessage({source:'refos-tm-page',id,route,body},window.location.origin);

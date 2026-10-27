@@ -1,3 +1,4 @@
+import {uuid} from './uuid.js';
 export function localInterviewTime(iso,zone='UTC') {
  const date=new Date(iso);if(!Number.isFinite(date.getTime()))return '';
  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date).map(p=>[p.type,p.value]));
@@ -37,7 +38,7 @@ export function addInterviewSlots(existing,teams,start,minutes,panel,buffer=0,gr
  const scheduled=new Set(existing.map(entry=>entry.team));
  const selected=[...new Set(teams)].filter(team=>!scheduled.has(team)).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
  if(!selected.length)throw Error('Select at least one unscheduled team.');
- const next=[...existing,...selected.map((team,index)=>({id:crypto.randomUUID(),team,start:new Date(date.getTime()+index*(length+Number(buffer))*60000).toISOString(),minutes:length,panel:panel.trim(),buffer:Number(buffer),group,status:'scheduled'}))];
+ const next=[...existing,...selected.map((team,index)=>({id:uuid(),team,start:new Date(date.getTime()+index*(length+Number(buffer))*60000).toISOString(),minutes:length,panel:panel.trim(),buffer:Number(buffer),group,status:'scheduled'}))];
  const issue=validateInterviews(next,length);if(issue)throw Error(issue);
  return next;
 }

@@ -1,3 +1,4 @@
+import {uuid} from '../uuid.js';
 import React, {useEffect,useMemo,useRef,useState} from 'react';
 import {listLostFound,saveLostFound,setLostFoundReturned,prepareItemPhoto,lostFoundPhoto} from '../lostFound';
 import {PHOTO_FAILURES,photoFailureReason} from '../photoFailures';
@@ -15,12 +16,12 @@ export default function LostFoundBoard({eventId,eventName,meName,canManage,onClo
   const [items,setItems]=useState([]),[error,setError]=useState(''),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false);
   const [description,setDescription]=useState(''),[location,setLocation]=useState(''),[photo,setPhoto]=useState(null),[processing,setProcessing]=useState(false),[attempted,setAttempted]=useState(false);
   const [query,setQuery]=useState(''),[filter,setFilter]=useState('available');
-  const id=useRef(crypto.randomUUID()); const flight=useRef(false);
+  const id=useRef(uuid()); const flight=useRef(false);
   const refresh=async()=>{try{const rows=await service.listLostFound(eventId);setItems(rows);setError('');}catch(e){setError(e.message);}finally{setLoading(false);}};
   useEffect(()=>{let live=true;const load=async()=>{try{const rows=await service.listLostFound(eventId);if(live){setItems(rows);setError('');}}catch(e){if(live)setError(e.message);}finally{if(live)setLoading(false);}};load();const timer=setInterval(()=>{if(document.visibilityState==='visible')load();},30000);return()=>{live=false;clearInterval(timer);};},[eventId,service]);
   const shown=useMemo(()=>items.filter(item=>(filter==='all'||item.returned===(filter==='returned'))&&`${item.description} ${item.pickup_location}`.toLowerCase().includes(query.toLowerCase())),[items,filter,query]);
   const pick=async e=>{const file=e.target.files?.[0];e.target.value='';if(!file||flight.current||processing)return;setProcessing(true);setError('');try{setPhoto(await service.prepareItemPhoto(file));}catch(e){setError(e.message);}finally{setProcessing(false);}};
-  const submit=async e=>{e.preventDefault();if(flight.current||processing)return;flight.current=true;setBusy(true);setAttempted(true);setError('');try{await service.saveLostFound({eventId,id:id.current,description,location,by:meName,photo});setDescription('');setLocation('');setPhoto(null);setAttempted(false);id.current=crypto.randomUUID();await refresh();}catch(e){setError(e.message);}finally{flight.current=false;setBusy(false);}};
+  const submit=async e=>{e.preventDefault();if(flight.current||processing)return;flight.current=true;setBusy(true);setAttempted(true);setError('');try{await service.saveLostFound({eventId,id:id.current,description,location,by:meName,photo});setDescription('');setLocation('');setPhoto(null);setAttempted(false);id.current=uuid();await refresh();}catch(e){setError(e.message);}finally{flight.current=false;setBusy(false);}};
   const toggle=async item=>{if(flight.current)return;flight.current=true;setBusy(true);try{await service.setLostFoundReturned(item.id,!item.returned);await refresh();}catch(e){setError(e.message);}finally{flight.current=false;setBusy(false);}};
   return <div className={embedded ? "text-slate-900 dark:text-slate-100" : "fixed inset-0 z-50 flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100"}>
     <header className="shrink-0 flex items-center gap-3 border-b bg-white p-3 dark:bg-slate-800">{!embedded&&<button type="button" onClick={onClose} className="refos-back-button">Back</button>}<h2 className="font-bold">Lost &amp; Found · {eventName}</h2></header>

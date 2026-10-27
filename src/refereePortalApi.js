@@ -1,3 +1,4 @@
+import {uuid} from './uuid.js';
 import {normalizeRefereeLocation} from './refereeLocations';
 import {supabase} from './supabaseClient';
 export async function accountUser(){const {data,error}=await supabase.auth.getUser();if(error && error.name!=='AuthSessionMissingError')throw error;return data?.user && !data.user.is_anonymous?data.user:null;}
@@ -44,7 +45,7 @@ export async function uploadProfilePhoto(userId,file){
  const {compressRobotPhoto}=await import('./photoCompression');
  if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw Error('Choose a PNG, JPG or WebP photo.');
  const prepared=await compressRobotPhoto(file);const blob=await (await fetch(prepared.dataUrl)).blob();
- const path=`${userId}/${crypto.randomUUID()}.${prepared.mime==='image/webp'?'webp':'jpg'}`;
+ const path=`${userId}/${uuid()}.${prepared.mime==='image/webp'?'webp':'jpg'}`;
  const {error}=await supabase.storage.from('referee-profile-photos').upload(path,blob,{contentType:prepared.mime,upsert:false});if(error)throw error;return path;
 }
 export async function sendPortalFeedbackScreenshots(id,type,message,screenshots=[]){

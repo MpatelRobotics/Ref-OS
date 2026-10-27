@@ -1,7 +1,8 @@
+import {uuid} from '../uuid.js';
 import React,{useState} from 'react';
 export function practiceRows(form,by='Demo Ref') {
  const groups=form.ruleGroups?.length?form.ruleGroups:[{type:form.type,code:form.code,desc:form.desc}];
- return groups.map(group=>({id:crypto.randomUUID(),team:String(form.team||form.newNumber||'').trim().toUpperCase(),type:group.type||'minor',code:String(group.code||'').replace(/[<>]/g,''),desc:String(group.desc||''),notes:form.notes||'',match:form.match?.phase&&form.match.phase!=='none'?form.match:null,by,createdAt:Date.now(),photoKeys:[],_localPhotos:form.photos||[],practice:true}));
+ return groups.map(group=>({id:uuid(),team:String(form.team||form.newNumber||'').trim().toUpperCase(),type:group.type||'minor',code:String(group.code||'').replace(/[<>]/g,''),desc:String(group.desc||''),notes:form.notes||'',match:form.match?.phase&&form.match.phase!=='none'?form.match:null,by,createdAt:Date.now(),photoKeys:[],_localPhotos:form.photos||[],practice:true}));
 }
 // Intentionally has no API, outbox, storage or persistence imports. These entries exist only here.
 export default function HighlanderPractice({renderForm,renderEntry,by}) {

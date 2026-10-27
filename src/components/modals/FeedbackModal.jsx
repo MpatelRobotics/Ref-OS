@@ -1,3 +1,4 @@
+import {uuid} from '../../uuid.js';
 import React, { useMemo, useRef, useState } from "react";
 import { Bug, CheckCircle2, Lightbulb, MessageSquare, Send, X } from "lucide-react";
 import { APP_VERSION } from "../../appVersion";
@@ -18,7 +19,7 @@ export default function FeedbackModal({ meName, myRole, onSubmit, onClose, prepa
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [attempted, setAttempted] = useState(false);
-  const submissionId = useRef(crypto.randomUUID());
+  const submissionId = useRef(uuid());
   const inFlight = useRef(false);
   const pickScreenshots = async (e) => {
     const files = Array.from(e.target.files || []); e.target.value = '';

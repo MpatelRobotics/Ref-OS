@@ -1,3 +1,4 @@
+import {uuid} from './uuid.js';
 import {validateInterviews} from './interviewSchedule.js';
 import {assignConflictFreeGroups} from './judgeConflicts.js';
 
@@ -34,7 +35,7 @@ export function optimizeInterviews({teams,existing=[],matches=[],start,end,minut
  const earliest=(team,panel)=>{const duration=(lengths.get(team)+gap)*minute;const blocks=[...(lunchMode==='avoid'?[lunch]:[]),...teamBlocks.get(team),...[...existing,...proposed].filter(r=>r.panel.trim().toLowerCase()===panel.toLowerCase()).map(r=>[Date.parse(r.start),Date.parse(r.start)+(Number(r.minutes)+Number(r.buffer||0))*minute])].sort((a,b)=>a[0]-b[0]);let time=from;for(const [a,b]of blocks){if(time+duration<=a)break;if(time<b&&a<time+duration)time=b;}return time+duration<=until?time:null;};
  while(pending.length){let best=null;for(const team of pending)for(const panel of locations){const time=earliest(team,panel);if(time===null)continue;const deadline=Math.min(...teamBlocks.get(team).filter(([a])=>a>=time+(lengths.get(team)+gap)*minute).map(([a])=>a));const candidate={team,panel,time,deadline};if(!best||time<best.time||time===best.time&&(deadline<best.deadline||deadline===best.deadline&&numeric(team,best.team)<0))best=candidate;}
   if(!best){unplaced.push(...pending);break;}
-  proposed.push({id:crypto.randomUUID(),team:best.team,panel:best.panel,start:new Date(best.time).toISOString(),minutes:lengths.get(best.team),buffer:gap,group,status:'scheduled'});pending.splice(pending.indexOf(best.team),1);
+  proposed.push({id:uuid(),team:best.team,panel:best.panel,start:new Date(best.time).toISOString(),minutes:lengths.get(best.team),buffer:gap,group,status:'scheduled'});pending.splice(pending.indexOf(best.team),1);
  }
  return {entries:proposed,unplaced,ignored:teams.filter(t=>scheduled.has(t)),teamsWithTimes:teams.filter(t=>(teamBlocks.get(t)||[]).length).length};
 }
