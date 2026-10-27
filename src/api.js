@@ -1,3 +1,4 @@
+import { createSettingsReadCache } from './settingsReadCache.js';
 import { isDemoEvent } from './demoEvents.js';
 import { isTmExtension, extensionTmRequest } from "./tmExtension.js";
 import { nominationsThroughSession, recordsThroughSession } from "./league/nominationCarryover.js";
@@ -1120,10 +1121,17 @@ export async function deleteMatch(eventId, phase, num) {
 
 /* ================= event settings (shared configuration) ================= */
 const mapEventSetting = (r) => ({ key: r.key, value: r.value, updatedBy: r.updated_by || "", updatedAt: r.updated_at ? new Date(r.updated_at).getTime() : 0 });
+const settingsReadCache=createSettingsReadCache({
+ metadata:async eventId=>{const {data,error}=await supabase.from("event_settings").select("key,updated_at").eq("event_id",eventId);if(error)throw error;return data||[];},
+ values:async(eventId,keys)=>{let query=supabase.from("event_settings").select("key,value,updated_by,updated_at").eq("event_id",eventId);if(keys)query=query.in("key",keys);const {data,error}=await query;if(error)throw error;return data||[];},
+});
 export async function listEventSettings(eventId) {
   if (E2E_MOCK) return {};
-  const { data, error } = await supabase.from("event_settings").select("*").eq("event_id", eventId);
-  if (error) throw error;
+  const {data:authData,error:authError}=await supabase.auth.getSession();
+  if(authError)throw authError;
+  const userId=authData?.session?.user?.id;
+  if(!userId)throw new Error("Sign in before loading event settings.");
+  const data=await settingsReadCache.read(userId,eventId);
   const sessionId = leagueSessionFor(eventId);
   if (!sessionId) return Object.fromEntries((data || []).map((r) => [r.key, mapEventSetting(r)]));
   // League: snapshot keys are stored per session as "<key>@<session id>". This session's value is

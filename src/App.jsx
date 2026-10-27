@@ -1733,7 +1733,7 @@ function Tracker(props) {
   const [selected,setSelected]=useState(()=>{try{return Number(localStorage.getItem(storageKey))||0;}catch{return 0;}});
   useEffect(()=>{
     let active=true;
-    const load=async()=>{try{const settings=await eventApi.listEventSettings(eventId);const rows=settings.vex_divisions?.value?.divisions||[];if(active)setDivisions(rows);}catch{}};
+    const load=async()=>{if(document.hidden)return;try{const setting=await eventApi.getEventSetting(eventId,'vex_divisions');const rows=setting?.value?.divisions||[];if(active)setDivisions(rows);}catch{}};
     load();const timer=setInterval(load,15000);return()=>{active=false;clearInterval(timer);};
   },[eventId]);
   const divisionId=divisions.length>1?(divisions.some(d=>d.id===selected)?selected:divisions[0].id):0;
@@ -2247,13 +2247,16 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   useEffect(() => {
     if (!showShare && !hasPendingRoleCodeRequests) return undefined;
     let live = true;
+    let pending=false;
     const syncCodes = async () => {
+      if(document.hidden||pending)return;
+      pending=true;
       try {
         const [settings, entries] = await Promise.all([api.listEventSettings(eventId), api.listFieldLog(eventId)]);
         if (!live) return;
         applyServerSettings(settings);
         setFieldLog(entries);
-      } catch {}
+      } catch {} finally {pending=false;}
     };
     syncCodes();
     const interval = setInterval(syncCodes, 3000);
@@ -2590,10 +2593,23 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       setReady(true);
       doFlush();
     })();
+    const changedTables=new Set();
+    let changeTimer=null;
+    const flushChanges=()=>{
+      changeTimer=null;
+      if(document.hidden)return;
+      const tables=new Set(changedTables);changedTables.clear();
+      if(tables.has("event_settings")&&!isInspection)api.listEventSettings(eventId).then(applyServerSettings).catch(()=>{});
+      if(tables.has("matches")&&!isInspection)api.listMatches(eventId).then(list=>setMatches(Object.fromEntries(list.map(match=>[match.id,match])))).catch(()=>{});
+      if((isInspection&&tables.has("event_settings"))||[...tables].some(table=>table!=="event_settings"&&table!=="matches"))refresh().catch(()=>{});
+    };
     const unsub = api.subscribeEvent(eventId, (payload) => {
       if (payload?.leagueSessions) leagueReloadRef.current?.();
-      refresh();
+      changedTables.add(payload?.table||"all");
+      if(changeTimer===null)changeTimer=setTimeout(flushChanges,300);
     });
+    const onVisible=()=>{if(!document.hidden){changedTables.clear();refresh().catch(()=>{});if(!isInspection)api.listMatches(eventId).then(list=>setMatches(Object.fromEntries(list.map(match=>[match.id,match])))).catch(()=>{});}};
+    document.addEventListener("visibilitychange",onVisible);
     const onFocus = () => { refresh(); doFlush(); };
     const goOnline = () => { setOnline(true); setCloudReachable(null); refresh().catch(() => {}); doFlush(); };
     const goOffline = () => { setOnline(false); setCloudReachable(false); };
@@ -2608,7 +2624,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     let refreshingDesktop = false;
     let disposed = false;
     const desktopRefresh = desktop ? setInterval(async () => {
-      if (!navigator.onLine || refreshingDesktop) return;
+      if (!navigator.onLine || document.hidden || refreshingDesktop) return;
       refreshingDesktop = true;
       try {
         await Promise.allSettled([
@@ -2620,7 +2636,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       } finally { refreshingDesktop = false; }
     }, 5 * 60 * 1000) : null;
     return () => {
-      unsub(); window.removeEventListener("focus", onFocus);
+      unsub(); if(changeTimer!==null)clearTimeout(changeTimer);document.removeEventListener("visibilitychange",onVisible);window.removeEventListener("focus", onFocus);
       window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline);
       disposed = true;
       clearInterval(iv);
