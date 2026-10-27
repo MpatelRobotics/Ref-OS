@@ -1,5 +1,5 @@
 import DemoLauncher from './components/DemoLauncher.jsx';
-import { isDemoEvent } from './demoEvents.js';
+import { isDemoEvent, DEMO_IDENTITY } from './demoEvents.js';
 import ExcellenceEligibility from './components/ExcellenceEligibility.jsx';
 import { groupEventsByState } from './eventStateGroups.js';
 import { partitionScheduledTeams } from "./scheduledTeams.js";
@@ -824,7 +824,7 @@ export default function App() {
   const [mePhone, setMePhone] = useState(() => readIdentity(activeEventId).phone || "");
   // A Developer sign-in always uses the fixed developer identity and never reads or overwrites
   // the volunteer profile saved on this device.
-  const who = developer ? DEVELOPER_IDENTITY : { nickname: meName, fullName: meFullName, phone: mePhone };
+  const who = isDemoEvent(activeEventId) ? DEMO_IDENTITY : developer ? DEVELOPER_IDENTITY : { nickname: meName, fullName: meFullName, phone: mePhone };
   const [event, setEvent] = useState(null);
   const [loadErr, setLoadErr] = useState(false);
 
@@ -1207,7 +1207,7 @@ export default function App() {
       await chooseAnotherEvent();
     }} />;
   if (!identityChecked) return <FullPage>Checking volunteer profile…</FullPage>;
-  if (!developer && (!meName || !meFullName)) return <NameScreen onIdentity={saveIdentity} />;
+  if (!isDemoEvent(activeEventId) && !developer && (!meName || !meFullName)) return <NameScreen onIdentity={saveIdentity} />;
   if (loadErr) return (
     <FullPage>
       <div className="max-w-sm">

@@ -3,3 +3,5 @@ export const DEMO_EVENTS = {
   "iq": "80286e06-0548-43be-9c0f-372b54e58ece"
 };
 export const isDemoEvent=id=>Object.values(DEMO_EVENTS).includes(id);
+
+export const DEMO_IDENTITY = Object.freeze({nickname:'Demo Ref',fullName:'Demo Visitor',phone:''});
