@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {PGlite} from '@electric-sql/pglite';
 import {DEMO_EVENTS,isDemoEvent,RETIRED_IQ_DEMO_ID} from '../src/demoEvents.js';
-test('VTOW grants demo-only admin and demos cannot be destroyed or change program',async()=>{
+test('DEMOV5 grants demo-only admin and demos cannot be destroyed or change program',async()=>{
  const db=new PGlite();
  await db.exec(`
  create schema auth;
@@ -17,9 +17,9 @@ test('VTOW grants demo-only admin and demos cannot be destroyed or change progra
  insert into event_settings values('${DEMO_EVENTS.v5}','competition_program','{"program":"v5"}');
  `);
  await db.exec(readFileSync(new URL('../supabase/refos-permanent-demos.sql',import.meta.url),'utf8'));
- assert.equal((await db.query('select * from claim_refos_demo_access($1,$2)',[DEMO_EVENTS.v5,'VTOW'])).rows[0].is_admin,true);
- await assert.rejects(db.query('select * from claim_refos_demo_access($1,$2)',[RETIRED_IQ_DEMO_ID,'VTOW']));
- await assert.rejects(db.query('select * from claim_refos_demo_access($1,$2)',['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','VTOW']));
+ assert.equal((await db.query('select * from claim_refos_demo_access($1,$2)',[DEMO_EVENTS.v5,'DEMOV5'])).rows[0].is_admin,true);
+ await assert.rejects(db.query('select * from claim_refos_demo_access($1,$2)',[RETIRED_IQ_DEMO_ID,'DEMOV5']));
+ await assert.rejects(db.query('select * from claim_refos_demo_access($1,$2)',['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','DEMOV5']));
  await assert.rejects(db.query('select * from claim_refos_demo_access($1,$2)',[DEMO_EVENTS.v5,'NOPE']));
  await assert.rejects(db.query('delete from events where id=$1',[DEMO_EVENTS.v5]));
  await assert.rejects(db.query('update events set archived_at=now() where id=$1',[DEMO_EVENTS.v5]));

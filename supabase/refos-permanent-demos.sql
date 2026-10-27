@@ -21,7 +21,7 @@ as $$
 begin
  if auth.uid() is null then raise exception 'Sign in before opening the demo';end if;
  if p_event not in ('5296a93c-792b-4ba1-9da2-b7df52d20d88'::uuid)
- or upper(trim(coalesce(p_code,'')))<>'VTOW'
+ or upper(trim(coalesce(p_code,'')))<>'DEMOV5'
  or not exists(select 1 from public.events where id=p_event and archived_at is null)
  then raise exception 'Invalid demo event or code';end if;
  insert into public.event_members(event_id,user_id,role,developer)

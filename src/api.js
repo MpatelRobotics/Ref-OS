@@ -118,7 +118,7 @@ export async function claimEventAccess(eventId, credential) {
     throw new Error("Invalid event credential");
   }
   await ensureAnonymousSession();
-  if(isDemoEvent(eventId)&&String(credential||"").trim().toUpperCase()==="VTOW"){
+  if(isDemoEvent(eventId)&&String(credential||"").trim().toUpperCase()==="DEMOV5"){
     const {data,error}=await supabase.rpc("claim_refos_demo_access",{p_event:eventId,p_code:String(credential).trim().toUpperCase()});
     if(error)throw new Error(/claim_refos_demo_access/.test(error.message||"")?"Demo login setup is not installed yet. Ask the developer to run supabase/refos-permanent-demos.sql.":error.message);
     const row=Array.isArray(data)?data[0]:data;
