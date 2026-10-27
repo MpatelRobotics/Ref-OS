@@ -1,3 +1,4 @@
+import {settleVenueBatch,venueRetryDelay} from './venueReliability.js';
 // Ref OS Local Venue Server sync (Phase 1).
 //
 // Holds, per event, on THIS device (IndexedDB "refos-venue"):
@@ -212,22 +213,12 @@ async function push(st, key) {
     const batch = st.pending.slice(0, PUSH_BATCH);
     const { json, latencyMs } = await request(`/api/v1/events/${st.eventId}/changes`, { method: "POST", key, body: { changes: batch } });
     setStatus(st, { latencyMs });
-    const results = new Map((json?.results || []).map((r) => [r.changeId, r]));
-    const accepted = new Set();
-    const newlyRejected = [];
-    for (const change of batch) {
-      const result = results.get(change.changeId);
-      if (!result) continue; // keep and retry
-      if (result.status === "invalid") newlyRejected.push({ change, error: result.error || "invalid", at: Date.now() });
-      accepted.add(change.changeId);
-    }
-    if (!accepted.size) throw new Error("Venue server did not accept any queued change.");
-    st.pending = st.pending.filter((c) => !accepted.has(c.changeId));
-    await savePending(st);
-    if (newlyRejected.length) {
-      st.rejected = [...newlyRejected, ...st.rejected].slice(0, 500);
-      await saveRejected(st);
-    }
+    await settleVenueBatch({
+      batch,results:json?.results,
+      pull:()=>pull(st,key),
+      preserveRejected:async rows=>{st.rejected=[...rows,...st.rejected];await saveRejected(st);},
+      removeAccepted:async accepted=>{const remaining=st.pending.filter(c=>!accepted.has(c.changeId));await kvSet("pending:"+st.eventId,remaining);st.pending=remaining;},
+    });
   }
 }
 
@@ -261,16 +252,17 @@ async function syncOnce(st) {
       await ensurePaired(st, key);
       await push(st, key);
       const changed = await pull(st, key);
-      setStatus(st, { state: "idle", connected: true, lastSuccessAt: Date.now(), lastError: "" });
+      setStatus(st, { state: "idle", failures:0, connected: true, lastSuccessAt: Date.now(), lastError: "" });
       if (changed) notify(st);
       return true;
     } catch (error) {
+      setStatus(st,{failures:(st.status.failures||0)+1});
       if (error.keyUnavailable) setStatus(st, { state: "error", keyAvailable: false, lastError: error.message });
       else if (error.venueUnreachable) setStatus(st, { state: "offline", connected: false, lastError: error.message });
       else {
         setStatus(st, { state: "error", connected: error.status ? true : st.status.connected, lastError: error.message, paired: error.status === 401 || error.status === 409 ? false : st.status.paired });
         // 409: the server is paired with a different key for this event (the key was rotated).
-        if (error.status === 409) refreshVenueKey(st);
+        if (error.status === 409 || error.status === 401) await refreshVenueKey(st);
       }
       return false;
     } finally {
@@ -286,7 +278,7 @@ function schedule(st, delay) {
   if (!st.running) return;
   st.timer = setTimeout(async () => {
     const ok = await syncOnce(st);
-    schedule(st, ok ? POLL_MS : BACKOFF_MS);
+    schedule(st, ok ? POLL_MS : venueRetryDelay(st.status.failures||1));
   }, delay);
 }
 
@@ -396,7 +388,7 @@ export async function syncNow(eventId = activeEventId) {
   if (!eventId) return false;
   const st = await activate(eventId);
   const ok = await syncOnce(st);
-  if (st.running) schedule(st, ok ? POLL_MS : BACKOFF_MS);
+  if (st.running) schedule(st, ok ? POLL_MS : venueRetryDelay(st.status.failures||1));
   return ok;
 }
 
@@ -455,3 +447,10 @@ export async function localVenueSummary(eventId = activeEventId) {
 }
 
 export const _test = { events, request, VenueUnreachableError, view };
+
+if(typeof window!=='undefined'){
+ const reconnect=()=>{if(!isVenueMode())return;const st=events.get(activeEventId);if(st?.running)schedule(st,0);};
+ window.addEventListener('online',reconnect);
+ window.addEventListener('focus',reconnect);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)reconnect();});
+}

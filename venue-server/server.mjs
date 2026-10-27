@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import {venueSetupPage} from './setup-page.mjs';
+import {spawn} from 'node:child_process';
 // Ref OS Venue Server — Phase 1.
 //
 // Lets Ref OS devices on the same venue network share live event operations data (violations,
@@ -164,6 +166,10 @@ export function createVenueServer(config = readConfig()) {
     if (isApi && cors === null) return send(res, 403, { error: "Origin not allowed" });
     if (req.method === "OPTIONS") { res.writeHead(204, cors); return res.end(); }
     if (!isApi) {
+      if(path==="/setup"&&(req.method==="GET"||req.method==="HEAD")){
+        const html=venueSetupPage({addresses:lanAddresses(),port:server.address()?.port||config.port,webReady:!!config.webRoot});
+        res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","Content-Security-Policy":"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"});res.end(req.method==="HEAD"?undefined:html);return;
+      }
       if (req.method !== "GET" && req.method !== "HEAD") return send(res, 405, { error: "Method not allowed" });
       return serveStatic(req, res, path);
     }
@@ -297,7 +303,17 @@ if (isMain) {
     process.exit(0);
   }
   const { server } = createVenueServer(config);
+  server.on("error",error=>{
+    console.error(error.code==="EADDRINUSE"?"That port is already being used. Close the other venue server, or set PORT to a different number and try again.":error.code==="EACCES"?"The server cannot use that address or port. Choose another port above 1024.":"The venue server could not start: "+error.message);
+    process.exitCode=1;
+  });
   server.listen(config.port, config.host, () => {
+    const setupUrl="http://localhost:"+config.port+"/setup";
+    console.log("Setup and connection help: "+setupUrl);
+    if(args.includes("--open")&&process.platform==="win32"){
+      const browser=spawn("cmd",["/c","start","",setupUrl],{windowsHide:true,stdio:"ignore"});
+      browser.on("error",()=>console.log("Open "+setupUrl+" in your browser."));
+    }
     console.log(`Ref OS Venue Server ${SERVER_VERSION} (API v${API_VERSION}) listening on ${config.host}:${config.port}`);
     console.log(`Data: ${join(config.dataDir, "refos-venue.sqlite")}`);
     console.log(config.webRoot ? `Serving Ref OS app from ${config.webRoot}` : "No Ref OS build found (run npm run build in the Ref OS folder to serve the app from this server).");

@@ -312,3 +312,15 @@ All endpoints are under `/api/v1`. Event endpoints require `Authorization: Beare
 | GET | `/api/v1/events/<id>/status` | Record counts, latest sequence number, and number of known devices |
 
 **Conflicts:** each record has a version number. If two devices edit the same record from the same starting version, the later change wins and is marked `applied_conflict` in the change log. An edit that arrives after the record was deleted does not bring it back.
+
+
+## Setup and recovery improvements
+- On Windows, double-click venue-server/start-venue-server.cmd. The browser opens /setup with local connection addresses and troubleshooting steps.
+- Open one of the listed IP addresses on phones and tablets on the same network. Do not enter localhost on another device.
+- Sign in to each event once while internet is available. Confirm the Venue badge is connected, then test a sample entry on two devices before relying on offline sharing.
+- Local changes remain queued until the server's updated records have also been downloaded and saved. Retry uses the same change ID, so an interrupted connection does not create a second copy.
+- Changes rejected because their record was deleted are retained in the recovery export.
+- The app retries on focus, Wi-Fi reconnection, and return from the background. Repeated failures back off to 30 seconds.
+- Keep the server computer awake. Firewall rules must permit the server port, and venue Wi-Fi must permit devices to communicate.
+- Changing from the public HTTPS website to a local HTTP address starts a different browser storage origin. Sign in and prepare that local address before losing internet.
+- The server stores data under venue-server/data unless configured otherwise. Keep that folder when updating. Export Venue Data before switching to Cloud; automatic venue-to-cloud reconciliation is still not included.

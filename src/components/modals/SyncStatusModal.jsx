@@ -45,6 +45,10 @@ export default function SyncStatusModal({ eventId, eventName = "", onClose }) {
     if (mode === "venue") {
       const url = applyUrl();
       if (!url) return;
+      if(mixedContentProblem(url)){setUrlError("Open the venue address in a new tab first, then sign in there. This secure website cannot connect directly to an unsecured local server.");return;}
+      setBusy("test");
+      const result=await venueSync.testConnection(url);setTest(result);setBusy("");
+      if(!result.ok){setUrlError(result.error);return;}
       try { sessionStorage.setItem("refosOpenSyncStatus", "1"); } catch {}
       setCfg(setSyncConfig({ mode: "venue", serverUrl: url, source: "user" }));
       return;
@@ -63,6 +67,7 @@ export default function SyncStatusModal({ eventId, eventName = "", onClose }) {
   const saveUrl = () => {
     const url = applyUrl();
     if (!url || url === cfg.serverUrl) return;
+    if(status.pending){setUrlError("There are changes waiting for the current server. Sync or export them before changing the server address.");return;}
     setTest(null);
     setCfg(setSyncConfig({ serverUrl: url, source: "user" }));
     setNotice("Server address saved.");
@@ -135,7 +140,7 @@ export default function SyncStatusModal({ eventId, eventName = "", onClose }) {
                 { mode: "cloud", title: "Cloud", detail: "Supabase (default)", Icon: Cloud },
                 { mode: "venue", title: "Local Venue Server", detail: "Venue network", Icon: Server },
               ].map(({ mode, title, detail, Icon }) => (
-                <button key={mode} type="button" role="radio" aria-checked={cfg.mode === mode} onClick={() => chooseMode(mode)}
+                <button key={mode} type="button" role="radio" aria-checked={cfg.mode === mode} disabled={!!busy} onClick={() => chooseMode(mode)}
                   className={`rounded-xl border p-3 text-left flex items-center gap-3 ${cfg.mode === mode ? "border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-950/30" : "border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-700"}`}>
                   <span className={`h-5 w-5 rounded-full border-2 grid place-items-center shrink-0 ${cfg.mode === mode ? "border-blue-600" : "border-slate-300 dark:border-slate-500"}`}>{cfg.mode === mode && <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />}</span>
                   <Icon size={18} className="shrink-0 text-slate-500" />
@@ -145,6 +150,7 @@ export default function SyncStatusModal({ eventId, eventName = "", onClose }) {
             </div>
           </fieldset>
 
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950/30"><h3 className="font-bold">Connect devices at your venue</h3><ol className="mt-2 list-decimal space-y-2 pl-5"><li>On the host computer, double-click <b>start-venue-server.cmd</b>. Its setup page lists the addresses other devices can use.</li><li>Connect every device to the same Wi-Fi. Open a listed venue address on each device, then sign in to the event while internet is available.</li><li>Before relying on offline mode, confirm the venue status is connected and test a sample violation on two devices.</li></ol><p className="mt-2">The local server shares violations, field logs, roster and presence. First-time sign-in and other event features still use the cloud. Venue records are not automatically copied to the cloud; export a backup before switching modes.</p></div>
           <div>
             <label htmlFor="venue-url" className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Server URL</label>
             <div className="mt-1 flex gap-2">
@@ -155,6 +161,8 @@ export default function SyncStatusModal({ eventId, eventName = "", onClose }) {
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Host name or IP address and port, e.g. http://refos.local:8080 or http://192.168.1.50:8080. If .local names do not work on this network, use the IP address.</p>
             {urlError && <p className="text-xs text-red-600 mt-1">{urlError}</p>}
+            {!normalizeServerUrl(urlInput).error && <a className="mt-2 inline-flex min-h-[44px] items-center rounded-lg border border-blue-400 px-3 font-semibold" href={normalizeServerUrl(urlInput).url+"/?event="+encodeURIComponent(eventId)} target="_blank" rel="noopener noreferrer">Open Ref OS at the venue address</a>}
+            <p className="mt-2 text-xs text-slate-500">If connection fails: keep the host awake, check the IP address and port, allow Node.js through the host firewall on your private event network, and ask venue IT whether Wi-Fi device isolation blocks devices from reaching each other. A guest network may separate devices.</p>
             {mixed && (
               <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200 flex gap-2">
                 <AlertTriangle size={14} className="shrink-0 mt-0.5" />
