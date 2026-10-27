@@ -25,7 +25,7 @@ Deno.serve(async request => {
   const {data:user,error:userError}=await client.auth.getUser();if(userError||!user.user)throw Error();userId=user.user.id;
   const body=await request.json();if(JSON.stringify(body).length>20000)throw Error();
   const action=body.action;
-  if(['manage-list','manage-rename','manage-revoke','manage-logout'].includes(action)){
+  if(['manage-list','manage-rename','manage-revoke','manage-logout','manage-logout-all'].includes(action)){
    const {data:access,error:accessError}=await service.from('event_members').select('event_id').eq('user_id',userId).eq('role','admin').eq('developer',true).limit(1);
    if(accessError||!access?.length)return reply({error:'Developer access required.',reason:'access'},403);
    stage='management';
@@ -35,6 +35,11 @@ Deno.serve(async request => {
    }
    if(action==='manage-revoke'){
     const {data,error}=await service.from('developer_passkeys').delete().eq('id',body.id).eq('secret_version',secretVersion).eq('rp_id',rpID).select('id');if(error||data?.length!==1)throw Error();return reply({ok:true});
+   }
+   if(action==='manage-logout-all'){
+    if(body.confirmation!=='SIGN VOLUNTEERS OUT')return reply({error:'Confirmation required.'},400);
+    const {data,error}=await service.rpc('revoke_all_refos_device_access',{p_actor:userId});
+    if(error)throw error;return reply({ok:true,...data});
    }
    if(action==='manage-logout'){
     if(typeof body.userId!=='string'||! /^[0-9a-f-]{36}$/i.test(body.userId))throw Error();
