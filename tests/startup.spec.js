@@ -146,7 +146,8 @@ test("generated volunteer QR is produced locally as a data URL", async ({ page }
   await loginAdmin(page);
   await page.getByRole("button", { name: "Settings" }).click();
   await page.getByRole("button", { name: "Event Command Center" }).click();
-  await page.getByRole("button", { name: "Volunteer Access Codes" }).click();
+  await page.getByRole("button", { name: /^Volunteer Access / }).click();
+  await page.getByRole("button", { name: /^Manage access codes/ }).click();
 
   await page.getByRole("button", { name: "Generate code", exact: true }).first().click();
   await expect(page.getByText("Share this code")).toBeVisible();

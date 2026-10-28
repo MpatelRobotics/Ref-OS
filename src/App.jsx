@@ -82,7 +82,6 @@ import ClearModal from "./components/modals/ClearModal.jsx";
 import AddTeamModal from "./components/modals/AddTeamModal.jsx";
 import AnnouncementModal from "./components/modals/AnnouncementModal.jsx";
 import CountdownSetupModal from "./components/modals/CountdownSetupModal.jsx";
-import FieldNameConfiguratorModal from "./components/modals/FieldNameConfiguratorModal.jsx";
 import EventSettingsModal from "./components/modals/EventSettingsModal.jsx";
 import EventManagementModal from "./components/modals/EventManagementModal.jsx";
 import DeleteEventModal from "./components/modals/DeleteEventModal.jsx";
@@ -1987,11 +1986,11 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   });
   const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [showCountdownSetup, setShowCountdownSetup] = useState(false);
-  const [showFieldNameConfigurator, setShowFieldNameConfigurator] = useState(false);
   const [showEventSettings, setShowEventSettings] = useState(false);
   const [showEventManagement, setShowEventManagement] = useState(false);
   const [showOfflineTest, setShowOfflineTest] = useState(false);
   const [showCommandCenter, setShowCommandCenter] = useState(false);
+  const [commandCenterGroup,setCommandCenterGroup]=useState('');
   const [commandCenterChildOpen, setCommandCenterChildOpen] = useState(false);
   const [showContactDirectory, setShowContactDirectory] = useState(false);
   const [showPreEventTest, setShowPreEventTest] = useState(false);
@@ -2025,7 +2024,6 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
 
   const returnToCommandCenter = () => {
     setShowCountdownSetup(false);
-    setShowFieldNameConfigurator(false);
     setShowEventSettings(false);
     setShowEventManagement(false);
     setShowOfflineTest(false);
@@ -2836,19 +2834,6 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     } catch (e) {
       if (outbox.isOffline(e)) { alert("You're offline — reconnect to update the contact directory."); return; }
       alert("Could not save contact directory: " + (e.message || e));
-    }
-  };
-  const saveFieldNames = async (names) => {
-    try {
-      const saved = await api.upsertEventSetting(eventId, "field_names", names, meName);
-      rememberSettingWrite(saved);
-      setEventSettings((cur) => ({ ...cur, field_names: saved }));
-      if (commandCenterChildOpen) returnToCommandCenter();
-      else setShowFieldNameConfigurator(false);
-      return saved;
-    } catch (error) {
-      if (outbox.isOffline(error)) throw new Error("Reconnect before changing field names.");
-      throw error;
     }
   };
   // Phase 6: Event Settings. Writes ONLY this event's row (eventId) in:
@@ -5174,11 +5159,8 @@ onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!cu
             onEventFormatChanged?.({ ...event, format: "league" });
           }} />
       )}
-      {showFieldNameConfigurator && adminUnlocked && <FieldNameConfiguratorModal current={fieldNames}
-        onSave={saveFieldNames}
-        onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowFieldNameConfigurator(false)} />}
       {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowOfflineTest(false)} />}
-      {showCommandCenter && adminUnlocked && <CommandCenter extraTools={<><EventArchiveTools eventId={eventId} eventName={event?.name||'Event'} divisions={divisionCatalog} isLeague={Boolean(league)}/><OfflineEventTools eventId={eventId} sessionId={leagueSessionId} division={divisionId} teams={teams} matches={matches} failed={failedSyncItems} onRetry={retryFailedSync}/></>} matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
+      {showCommandCenter && adminUnlocked && <CommandCenter group={commandCenterGroup} onGroupChange={setCommandCenterGroup} extraTools={<EventArchiveTools eventId={eventId} eventName={event?.name||'Event'} divisions={divisionCatalog} isLeague={Boolean(league)}/>} readinessTools={<OfflineEventTools eventId={eventId} sessionId={leagueSessionId} division={divisionId} teams={teams} matches={matches} failed={failedSyncItems} onRetry={retryFailedSync}/>} matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
         eventMembers={eventMembers} meName={meName} onSetAdmin={setVolunteerAdmin}
         alertStats={alertStats} alertStatsLoading={alertStatsLoading} onRefreshAlertStats={loadAlertStats} onResetAlertStats={resetAlertStats}
         alertDeliveryLabel={notificationDeliveryLabel}
@@ -5193,7 +5175,6 @@ onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!cu
         onClearAnnouncements={clearAnnouncementsForAll}
         onContactDirectory={() => openCommandCenterTool(() => setShowContactDirectory(true))}
         onRoleCodes={() => openCommandCenterTool(() => setShowRoleCodeManager(true))}
-        onFieldNames={() => openCommandCenterTool(() => setShowFieldNameConfigurator(true))}
         brand={brand}
         onEventSettings={() => openCommandCenterTool(() => setShowEventSettings(true))}
         onEventManagement={() => openCommandCenterTool(() => setShowEventManagement(true))}
