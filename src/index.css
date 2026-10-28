@@ -140,13 +140,13 @@ button:active:not(:disabled) {
   }
 }
 
-/* Ref-OS workspace system: navy structure, neutral surfaces, semantic status. */
-:root { --ref-bg:#f3f5f8; --ref-surface:#fff; --ref-text:#17243a; --ref-muted:#526176; --ref-border:#d9e1eb; --ref-accent:#1d4ed8; --ref-navy:#0a3773; --ref-nav-border:#31598b; }
-.dark { --ref-bg:#101827; --ref-surface:#1a2638; --ref-text:#eef3fb; --ref-muted:#afbdd0; --ref-border:#3d4d64; --ref-accent:#93c5fd; }
+/* Quiet workspace: neutral navigation, clear type, semantic status colors. */
+:root { --ref-bg:#f8fafc; --ref-surface:#fff; --ref-text:#17243a; --ref-muted:#526176; --ref-border:#e2e8f0; --ref-accent:#1d4ed8; --ref-navy:#0a3773; --ref-nav-border:#e2e8f0; --ref-nav:#f8fafc; --ref-active:#eaf0f8; }
+.dark { --ref-bg:#101827; --ref-surface:#1a2638; --ref-text:#eef3fb; --ref-muted:#afbdd0; --ref-border:#3d4d64; --ref-accent:#93c5fd; --ref-nav:#141e2d; --ref-active:#24354b; --ref-nav-border:#2b394d; }
 body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 .refos-shell { background:var(--ref-bg); color:var(--ref-text); }
-.refos-header { background:var(--ref-navy); border-bottom:1px solid var(--ref-nav-border); box-shadow:0 2px 8px #0f172a12; }
-.refos-header-inner { max-width:1120px; min-height:88px; }
+.refos-header { background:var(--ref-surface); color:var(--ref-text); border-bottom:1px solid var(--ref-border); box-shadow:none; }
+.refos-header-inner { max-width:1120px; min-height:64px; }
 .refos-header button { min-height:32px; }
 .refos-back-button { display:inline-flex; align-items:center; gap:5px; flex-shrink:0; border:0; border-radius:6px; background:transparent; padding:6px 8px 6px 2px; color:var(--ref-muted); font-size:14px; line-height:1; font-weight:700; white-space:nowrap; box-shadow:none; }
 .refos-back-button:hover { background:color-mix(in srgb,var(--ref-text) 7%,transparent); color:var(--ref-text); }
@@ -160,49 +160,50 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 .refos-description { color:var(--ref-muted); font-size:14px; line-height:1.6; margin-top:10px; max-width:560px; }
 .refos-role { border:1px solid var(--ref-border); border-radius:8px; padding:7px 12px; background:var(--ref-surface); color:var(--ref-muted); font-size:12px; font-weight:650; white-space:nowrap; }
 .refos-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-bottom:28px; }
-.refos-stats>div { background:var(--ref-surface); border:1px solid var(--ref-border); border-radius:14px; padding:20px; }
+.refos-stats>div { background:transparent; border:0; border-left:1px solid var(--ref-border); border-radius:0; padding:12px 20px; }
 .refos-stats dt { color:var(--ref-muted); font-size:12px; font-weight:650; }
 .refos-stats dd { font-size:30px; font-weight:750; margin-top:8px; font-variant-numeric:tabular-nums; }
 .refos-stats dd span { font-size:12px; font-weight:500; color:var(--ref-muted); }
 .refos-desktop-nav { max-width:1056px; margin:auto; gap:6px; padding:0 16px; }
 .refos-desktop-nav button { min-height:48px; }
-.refos-desktop-nav button[aria-current='page'] { border-color:#60a5fa; background:#ffffff12; }
+.refos-desktop-nav button { color:var(--ref-muted); }
+.refos-desktop-nav button[aria-current='page'] { border-color:var(--ref-accent); background:var(--ref-active); color:var(--ref-text); }
 .refos-team-list>li>button { min-height:80px; border-color:var(--ref-border); border-radius:14px; padding:20px; flex-wrap:wrap; gap:12px; background:var(--ref-surface); }
 .refos-team-list>li>button:hover { border-color:var(--ref-accent); box-shadow:0 3px 12px #0f172a0a; }
 .refos-team-list .text-slate-300 { color:var(--ref-muted); }
 .refos-workspace input:not([type=checkbox]):not([type=radio]),.refos-workspace select { min-height:46px; }
 .refos-shell main button { min-height:44px; }
 .refos-shell :is(button,input,select,textarea):focus-visible { outline:3px solid var(--ref-accent); outline-offset:3px; }
-.refos-header :is(button,a):focus-visible { outline-color:#93c5fd; }
+.refos-header :is(button,a):focus-visible { outline-color:var(--ref-accent); }
 .refos-skip { position:fixed; left:16px; top:-100px; z-index:200; background:white; color:#17243a; padding:12px 20px; border-radius:8px; }
 .refos-skip:focus { top:16px; }
 #workspace { scroll-margin-top:180px; }
 @media(min-width:1100px) {
- .refos-shell { padding-left:216px; }
- .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav { position:fixed; left:0; top:0; bottom:0; width:216px; flex-direction:column; padding:118px 12px 20px; background:var(--ref-navy); border-right:1px solid var(--ref-nav-border); gap:4px; box-shadow:8px 0 28px rgb(13 15 50 / .18); overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#aebbd2 transparent; }
+ .refos-shell { padding-left:176px; }
+ .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav { position:fixed; left:0; top:0; bottom:0; width:176px; flex-direction:column; padding:108px 10px 20px; background:var(--ref-nav); border-right:1px solid var(--ref-nav-border); gap:4px; box-shadow:none; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#aebbd2 transparent; }
  .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar { width:7px; }
  .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar-track { background:transparent; }
- .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar-thumb { background:#aebbd2; border-radius:999px; border:2px solid var(--ref-navy); }
+ .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar-thumb { background:#aebbd2; border-radius:999px; border:2px solid var(--ref-nav); }
  .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav::-webkit-scrollbar-thumb:hover { background:#d7e0ee; }
- .refos-desktop-nav::before { content:'REF-OS'; position:absolute; top:26px; left:20px; font-size:24px; line-height:1; font-weight:800; letter-spacing:.04em; color:#fff; }
- .refos-sidebar-subtitle { position:absolute; top:55px; left:20px; font-size:10px; line-height:1.2; font-weight:600; letter-spacing:.025em; color:#d7e3f1; white-space:nowrap; }
- .refos-sidebar-section-label { position:absolute; top:89px; left:20px; font-size:10px; line-height:1.2; letter-spacing:.16em; text-transform:uppercase; color:#cbd7e8; font-weight:750; }
- .refos-desktop-nav button { width:100%; min-height:44px; border:0; border-radius:8px; padding:8px 10px; gap:9px; text-align:left; color:#e0e9f4; font-weight:650; }
+ .refos-desktop-nav::before { content:'REF-OS'; position:absolute; top:26px; left:20px; font-size:19px; line-height:1; font-weight:750; letter-spacing:.02em; color:var(--ref-text); }
+ .refos-sidebar-subtitle { position:absolute; top:51px; left:20px; font-size:9px; line-height:1.2; font-weight:600; letter-spacing:.025em; color:var(--ref-muted); white-space:nowrap; }
+ .refos-sidebar-section-label { position:absolute; top:82px; left:20px; font-size:10px; line-height:1.2; letter-spacing:.16em; text-transform:uppercase; color:var(--ref-muted); font-weight:750; }
+ .refos-desktop-nav button { width:100%; min-height:44px; border:0; border-radius:8px; padding:8px 10px; gap:8px; text-align:left; color:var(--ref-muted); font-size:13px; font-weight:550; }
  .refos-desktop-nav button svg { width:17px; height:17px; }
- .refos-desktop-nav button[aria-current='page'] { color:white; background:#D7212B; box-shadow:inset 3px 0 #ffffff,0 5px 14px rgb(13 15 50 / .18); }
- .refos-desktop-nav button:not([aria-current='page']):hover { color:white; background:#ffffff18; }
- .refos-desktop-utilities { display:flex; flex-direction:column; gap:4px; margin-top:14px; padding-top:40px; border-top:1px solid #ffffff12; position:relative; }
+ .refos-desktop-nav button[aria-current='page'] { color:var(--ref-text); background:var(--ref-active); box-shadow:none; }
+ .refos-desktop-nav button:not([aria-current='page']):hover { color:var(--ref-text); background:var(--ref-active); }
+ .refos-desktop-utilities { display:flex; flex-direction:column; gap:4px; margin-top:14px; padding-top:40px; border-top:1px solid var(--ref-border); position:relative; }
  .refos-sidebar-tools-label { top:15px; left:10px; }
- .refos-desktop-nav .refos-sidebar-tool { min-height:40px; padding:9px 13px; color:#d5e2f0; font-size:12px; }
- .refos-sidebar-footer { position:static; margin:18px 10px 0; padding:14px 0 2px; border-top:1px solid #ffffff2b; display:flex; flex-direction:column; gap:4px; color:#c1d1e3; font-size:10px; flex-shrink:0; }
- .refos-sidebar-footer span:first-child { color:#f4f8fc; font-size:11px; font-weight:700; }
- .refos-header { background:var(--ref-navy); border-bottom-color:var(--ref-nav-border); box-shadow:0 1px 0 rgb(13 15 50 / .34); }
- .refos-header .text-slate-400 { color:#dce7f3; }
- .refos-header .text-slate-300 { color:#eef5fb; }
- .refos-header-inner { max-width:1440px; min-height:72px; padding-left:36px; padding-right:36px; }
+ .refos-desktop-nav .refos-sidebar-tool { display:flex; align-items:center; gap:8px; min-height:44px; padding:9px 10px; color:var(--ref-muted); font-size:12px; }
+ .refos-sidebar-footer { position:static; margin:18px 10px 0; padding:14px 0 2px; border-top:1px solid var(--ref-border); display:flex; flex-direction:column; gap:4px; color:var(--ref-muted); font-size:10px; flex-shrink:0; }
+ .refos-sidebar-footer span:first-child { color:var(--ref-text); font-size:11px; font-weight:700; }
+ .refos-header { border-bottom-color:var(--ref-border); }
+ .refos-header .text-slate-400 { color:var(--ref-muted); }
+ .refos-header .text-slate-300 { color:var(--ref-muted); }
+ .refos-header-inner { max-width:1440px; min-height:64px; padding-left:28px; padding-right:28px; }
  .refos-header-brand { display:none; }
  .refos-shell:not(:has(.refos-desktop-nav)) { padding-left:0; }
- .refos-workspace { max-width:1440px; padding:38px 36px 112px; }
+ .refos-workspace { max-width:1440px; padding:28px 28px 112px; }
  .refos-desktop-strip { max-width:1440px; padding-left:36px; padding-right:36px; }
  .refos-page-heading { align-items:center; margin-bottom:24px; padding-bottom:22px; border-bottom:1px solid var(--ref-border); }
  .refos-page-heading h2 { font-size:2rem; }
@@ -237,16 +238,17 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 
 .refos-workspace { animation:refosPageEnter 240ms cubic-bezier(.2,.8,.2,1) both; }
 .refos-page-heading h2 { letter-spacing:-.025em; }
-.refos-stats>div { border-radius:10px; box-shadow:0 1px 2px rgb(15 23 42 / .035); transition:transform 180ms ease,border-color 180ms ease,box-shadow 180ms ease; }
-.refos-stats>div:hover { transform:translateY(-2px); box-shadow:0 6px 16px rgb(15 23 42 / .07); }
+.refos-stats>div { box-shadow:none; }
+.refos-stats>div:first-child { border-left:0; padding-left:0; }
+.refos-stats>div:hover { transform:none; box-shadow:none; }
 .refos-team-list>li { animation:refosListEnter 220ms ease-out both; }
 .refos-team-list>li:nth-child(2){animation-delay:25ms}.refos-team-list>li:nth-child(3){animation-delay:50ms}.refos-team-list>li:nth-child(4){animation-delay:75ms}.refos-team-list>li:nth-child(5){animation-delay:100ms}.refos-team-list>li:nth-child(n+6){animation-delay:125ms}
 .refos-team-list>li>button { border-radius:9px; box-shadow:none; transition:transform 150ms ease,border-color 150ms ease,background-color 150ms ease,box-shadow 150ms ease; }
 .refos-team-list>li>button:hover { transform:translateX(3px); box-shadow:0 2px 8px rgb(15 23 42 / .06); }
 .refos-team-list>li>button:active { transform:translateX(1px) scale(.995); }
 .refos-desktop-nav button { transition:background-color 150ms ease,color 150ms ease,transform 150ms ease; }
-.refos-desktop-nav button:hover { transform:translateX(2px); }
-.refos-desktop-nav button[aria-current='page'] { box-shadow:inset 3px 0 #93c5fd; }
+.refos-desktop-nav button:hover { transform:none; }
+.refos-desktop-nav button[aria-current='page'] { box-shadow:none; }
 .refos-role { border-radius:6px; }
 .refos-shell main :is(.rounded-2xl,.rounded-xl) { transition:border-color 170ms ease,box-shadow 170ms ease,transform 170ms ease; }
 .refos-shell main button:hover:not(:disabled) { filter:brightness(.985); }
@@ -264,11 +266,11 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 }
 
 /* 1.2 UX pass: faster navigation, thumb-friendly mobile controls, clearer context */
-.refos-mobile-context { display:flex; align-items:center; gap:7px; padding:0 16px 10px; color:#cbd5e1; font-size:12px; font-weight:650; }
-.refos-mobile-bottom { position:fixed; left:0; right:0; bottom:0; z-index:48; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); min-height:66px; padding:5px 6px calc(5px + env(safe-area-inset-bottom)); background:rgb(15 29 51 / .98); border-top:1px solid #33425b; box-shadow:0 -8px 24px rgb(15 23 42 / .14); backdrop-filter:blur(14px); }
-.refos-mobile-bottom button { min-width:0; min-height:54px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border-radius:8px; color:#94a3b8; font-size:10px; font-weight:650; }
-.refos-mobile-bottom button[aria-current='page'] { color:white; background:#ffffff10; }
-.refos-mobile-bottom button[aria-current='page'] svg { color:#93c5fd; transform:translateY(-1px); }
+.refos-mobile-context { display:flex; align-items:center; gap:7px; padding:0 16px 10px; color:var(--ref-muted); font-size:12px; font-weight:650; }
+.refos-mobile-bottom { position:fixed; left:0; right:0; bottom:0; z-index:48; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); min-height:66px; padding:5px 6px calc(5px + env(safe-area-inset-bottom)); background:var(--ref-surface); border-top:1px solid var(--ref-border); box-shadow:none; backdrop-filter:blur(14px); }
+.refos-mobile-bottom button { min-width:0; min-height:54px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border-radius:8px; color:var(--ref-muted); font-size:11px; font-weight:650; }
+.refos-mobile-bottom button[aria-current='page'] { color:var(--ref-text); background:var(--ref-active); }
+.refos-mobile-bottom button[aria-current='page'] svg { color:var(--ref-accent); transform:none; }
 .refos-mobile-bottom button:active { transform:scale(.94); }
 .refos-mobile-sheet { animation:refosSheetUp 210ms cubic-bezier(.2,.8,.2,1) both; padding-bottom:env(safe-area-inset-bottom); }
 .refos-mobile-sheet-backdrop { animation:refosBackdropIn 160ms ease-out both; }
@@ -310,7 +312,7 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
   .refos-bracket-label { grid-column:1 / -1; }
 }
 
-@media (min-width:1100px) { body:has(.refos-desktop-nav) .refos-event-tm-sync { margin-left:216px; } }
+@media (min-width:1100px) { body:has(.refos-desktop-nav) .refos-event-tm-sync { margin-left:176px; } }
 
 
 /* Give iPhone status bars breathing room and keep the event title out of the controls row. */
@@ -322,3 +324,20 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
   .refos-header-event > button { min-height:24px; }
   .refos-header-brand,.refos-header-inner > .refos-back-button { margin-right:auto; }
 }
+
+
+/* Soft chrome and shared row treatment, scoped to the event workspace. */
+.refos-header .refos-back-button-on-dark { color:var(--ref-text); }
+.refos-header .refos-back-button-on-dark:hover { background:var(--ref-active); }
+.refos-header :is(.text-slate-200,.text-slate-300,.text-slate-400) { color:var(--ref-muted); }
+.refos-header .refos-user-chip { background:var(--ref-active); }
+.refos-header button:hover { background-color:var(--ref-active); }
+.refos-header .refos-user-chip > span:first-child,
+.refos-online-cluster .hidden > span { background:var(--ref-active); color:var(--ref-text); --tw-ring-color:var(--ref-border); }
+.refos-online-cluster > span { background:var(--ref-active); color:var(--ref-text); border-color:var(--ref-border); }
+.refos-header-event > button { font-size:11px; }
+.refos-workspace :is(.refos-team-list,.refos-match-list) { display:flex; flex-direction:column; gap:0; border-top:1px solid var(--ref-border); }
+.refos-workspace :is(.refos-team-list,.refos-match-list)>li { margin:0; animation:none; }
+.refos-workspace :is(.refos-team-list,.refos-match-list)>li>button { min-height:64px; border:0; border-bottom:1px solid var(--ref-border); border-radius:0; padding:14px 12px; box-shadow:none; background:transparent; }
+.refos-workspace :is(.refos-team-list,.refos-match-list)>li>button:hover { transform:none; box-shadow:none; background:var(--ref-surface); }
+.refos-workspace .refos-match-list>li>button:has(.text-emerald-800) { background:color-mix(in srgb,var(--ref-surface) 90%,#22c55e); }

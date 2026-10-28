@@ -6,7 +6,7 @@ const source=readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8');
 const list=source.slice(source.indexOf('function MatchList('),source.indexOf('function AwpStep('));
 const detail=source.slice(source.indexOf('function MatchDetail('),source.indexOf('\nfunction ',source.indexOf('function MatchDetail(')+10));
 const stubs=[...new Set([...list.matchAll(/<([A-Z][A-Za-z0-9]*)/g),...detail.matchAll(/<([A-Z][A-Za-z0-9]*)/g)].map(m=>m[1]))].filter(name=>!['React','Empty'].includes(name)).map(name=>'const '+name+'=()=>null;').join('\n');
-const compiled=transformSync(`import React from '/node_modules/.vite/deps/react.js';import {iqTeams} from '/src/iq/iqWorkflows.js';const {useState,useEffect,useContext}=React;const LeagueUiContext=React.createContext(null),DEFAULT_FIELD_NAMES={},ORDER=[],TYPES={};const tmMatchHighlights=()=>({}),tmMatchOrder=(a,b)=>a.num-b.num,eliminationPairingKey=()=>null,eliminationResultLabel=()=>'',fieldDisplayName=f=>f,fmtMatch=m=>m.phase==='final'?'F'+m.num:m.phase==='practice'?'P'+m.num:'Q'+m.num,splitRuleCodes=()=>[],fmtRule=c=>c,fmtTime=()=>'';const Empty=({title})=><p>{title}</p>;${stubs}
+const compiled=transformSync(`import React from '/node_modules/.vite/deps/react.js';import {iqTeams,iqStartingPosition} from '/src/iq/iqWorkflows.js';const {useState,useEffect,useContext}=React;const LeagueUiContext=React.createContext(null),DEFAULT_FIELD_NAMES={},ORDER=[],TYPES={};const tmMatchHighlights=()=>({}),tmMatchOrder=(a,b)=>a.num-b.num,eliminationPairingKey=()=>null,eliminationResultLabel=()=>'',fieldDisplayName=f=>f,fmtMatch=m=>m.phase==='final'?'F'+m.num:m.phase==='practice'?'P'+m.num:'Q'+m.num,splitRuleCodes=()=>[],fmtRule=c=>c,fmtTime=()=>'';const Empty=({title})=><p>{title}</p>;${stubs}
 ${list}
 ${detail}
 export {MatchList,MatchDetail};`,{loader:'jsx',format:'esm'}).code;
@@ -18,6 +18,8 @@ async function mount(page,mode='detail',iq=true){
 test('shared detail adapts IQ partners and score while removing scoring aid and V5 operations',async({page})=>{
  await page.setViewportSize({width:390,height:844});await mount(page);
  await expect(page.getByText('Teamwork partners',{exact:true})).toBeVisible();
+ await expect(page.getByText('Team 1 · Blue Pyramid Goal side',{exact:true})).toHaveCSS('color','rgb(29, 78, 216)');
+ await expect(page.getByText('Team 2 · Red Pyramid Goal side',{exact:true})).toHaveCSS('color','rgb(185, 28, 28)');
  await expect(page.getByText('Shared score: 42',{exact:true})).toBeVisible();
  for(const text of ['Level Up scoring aid','Referee quick checks','Red alliance','Blue alliance'])await expect(page.getByText(text,{exact:true})).toHaveCount(0);
  for(const text of ['AWP check','Timeout','Save shared score'])await expect(page.getByRole('button',{name:text,exact:true})).toHaveCount(0);

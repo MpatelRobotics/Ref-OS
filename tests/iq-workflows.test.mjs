@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {iqScore,iqFinalPairs,parseIQMatches} from '../src/iq/iqWorkflows.js';
+import {iqScore,iqFinalPairs,parseIQMatches,iqStartingPosition} from '../src/iq/iqWorkflows.js';
 const csv=text=>text.trim().split(/\r?\n/).map(line=>line.split(','));
 test('Level Up scoring counts each bag at one level, validates quantities and preserves zero',()=>{
  assert.equal(iqScore({floor:1,l1:2,l2:3,l3:4,l4:5}),153);
@@ -44,4 +44,11 @@ test('actual IQ TM export imports 24 numeric partner matches without turning uns
 });
 test('IQ TM extra slots cannot hide a third partner',()=>{
  assert.throws(()=>parseIQMatches('Round,MatchNum,Red1,Blue1,Red3\n2,1,7,9,18','tm.csv',csv),/one or two/);
+});
+
+test('IQ starting-side colors follow partner order instead of the TM red/blue header names',()=>{
+ const text=readFileSync(new URL('./fixtures/iq-tm-matches.csv',import.meta.url),'utf8');
+ const match=parseIQMatches(text,'IQMatches.csv',csv)[0];
+ assert.deepEqual(match.red,['7','9']);
+ assert.equal(iqStartingPosition(0).color,'blue');assert.equal(iqStartingPosition(1).color,'red');
 });

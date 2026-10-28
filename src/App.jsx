@@ -20,7 +20,7 @@ import DeveloperLiveActivity from "./components/DeveloperLiveActivity.jsx";
 import useLiveActivity from "./useLiveActivity.js";
 import EventLocalClock from "./components/EventLocalClock.jsx";
 import IQMatches, {IQInspectionChecklist} from './iq/IQWorkflows.jsx';
-import {parseIQMatches, iqTeams} from './iq/iqWorkflows.js';
+import {parseIQMatches, iqTeams, iqStartingPosition} from './iq/iqWorkflows.js';
 import IQ_RULES from './iqLevelUpRules.json';
 import HighlanderPractice from "./components/HighlanderPractice.jsx";
 import IQRules from "./components/IQRules.jsx";
@@ -4402,7 +4402,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   return (
     <div className="refos-shell min-h-screen font-sans antialiased">
       <a className="refos-skip" href="#workspace">Skip to workspace</a>
-      <header className="refos-header sticky top-0 z-20 text-white" style={brand.accentSource === "saved" ? { borderBottom: `3px solid ${brand.accent}` } : undefined}>
+      <header className="refos-header sticky top-0 z-20">
         <div className="refos-header-inner mx-auto px-4 py-3 flex items-center gap-3">
           {(openTeam || openMatch || openRobot) ? (
             <button onClick={() => { setOpenTeam(null); setOpenMatch(null); setOpenRobot(null); }} aria-label={`Back to ${openTeam ? "Teams" : openRobot ? "Robots" : "Matches"}`} className="refos-back-button refos-back-button-on-dark">
@@ -4413,8 +4413,8 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
               <EventLogo src={brand.logo} fallback={brand.highlander ? "/logo.svg" : "/refos-logo.svg"} alt={brand.shortName} className="h-9 w-9 object-contain" />
               <div className="leading-tight hidden sm:block">
                 <div className="flex items-center gap-1.5">
-                  <div className="font-bold text-[13px] text-white">Ref-OS</div>
-                  <span className="rounded-full border border-red-300/50 bg-red-400/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-red-100">Official Release</span>
+                  <div className="font-bold text-[13px] text-slate-900 dark:text-slate-100">Ref-OS</div>
+                  <span className="rounded-full border border-slate-200 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">Official Release</span>
                 </div>
                 <div className="text-[9px] text-slate-400">Referee Operating System</div>
               </div>
@@ -4431,11 +4431,11 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
                 onClick={() => adminUnlocked && setShowDiagnosticReport(true)}
                 title={adminUnlocked ? "Open Admin Diagnostics" : connectionHealth.label}
                 className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${
-                  connectionHealth.tone === "green" ? "text-emerald-300 bg-emerald-900/40" :
-                  connectionHealth.tone === "blue" ? "text-sky-300 bg-sky-900/40" :
-                  connectionHealth.tone === "red" ? "text-red-300 bg-red-900/40" :
-                  connectionHealth.tone === "amber" ? "text-amber-300 bg-amber-900/40" :
-                  "text-slate-300 bg-slate-700/60"
+                  connectionHealth.tone === "green" ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-900/40" :
+                  connectionHealth.tone === "blue" ? "text-sky-700 bg-sky-50 dark:text-sky-300 dark:bg-sky-900/40" :
+                  connectionHealth.tone === "red" ? "text-red-700 bg-red-50 dark:text-red-300 dark:bg-red-900/40" :
+                  connectionHealth.tone === "amber" ? "text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-900/40" :
+                  "text-slate-600 bg-slate-100 dark:text-slate-300 dark:bg-slate-700/60"
                 } ${adminUnlocked ? "hover:ring-1 hover:ring-white/30" : "cursor-default"}`}
               >
                 {connectionHealth.icon === "cloud" ? <Cloud size={10} /> : connectionHealth.icon === "sync" ? <RefreshCw size={10} className={syncing ? "animate-spin" : ""} /> : <CloudOff size={10} />}
@@ -4451,7 +4451,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
                 <button
                   onClick={() => adminUnlocked && setShowSyncStatus(true)}
                   title={venueStatus.connected === false ? "Venue server disconnected — changes are saved on this device and will sync when it returns" : `Local Venue Server${venueStatus.pending ? ` · ${venueStatus.pending} pending` : ""}`}
-                  className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${venueStatus.connected === false || venueStatus.state === "error" ? "text-red-200 bg-red-700/70" : venueStatus.connected ? "text-emerald-300 bg-emerald-900/40" : "text-slate-300 bg-slate-700/60"} ${adminUnlocked ? "hover:ring-1 hover:ring-white/30" : "cursor-default"}`}>
+                  className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full shrink-0 mt-0.5 ${venueStatus.connected === false || venueStatus.state === "error" ? "text-red-700 bg-red-50 dark:text-red-200 dark:bg-red-900/40" : venueStatus.connected ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-900/40" : "text-slate-600 bg-slate-100 dark:text-slate-300 dark:bg-slate-700/60"} ${adminUnlocked ? "hover:ring-1 hover:ring-white/30" : "cursor-default"}`}>
                   <Server size={10} />
                   <span>{venueStatus.connected === false ? "Venue offline" : venueStatus.state === "error" ? "Venue error" : "Venue"}{venueStatus.pending ? ` · ${venueStatus.pending}` : ""}</span>
                 </button>
@@ -4459,7 +4459,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             </div>
             {league && (
               <button type="button" onClick={() => league.openOverview(adminUnlocked)} title="League Overview"
-                className="mt-0.5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-white/15 hover:bg-white/25 px-2 py-0.5 text-[12px] font-bold text-white">
+                className="mt-0.5 inline-flex max-w-full items-center gap-1.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 px-2 py-0.5 text-[12px] font-semibold text-slate-700 dark:text-slate-200">
                 <CalendarDays size={12} className="shrink-0" />
                 <span className="truncate">{league.session.name}</span>
                 {!league.isActiveSession && <span className="shrink-0 rounded bg-amber-400/90 px-1 text-[9px] font-bold uppercase text-slate-900">{SESSION_STATUS_LABELS[league.session.status]}</span>}
@@ -5974,6 +5974,7 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
   const rowLabel = (m) => (m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`));
   return (
     <>
+      {isIQ&&<p className="mb-3 text-xs text-slate-600 dark:text-slate-300">Starting positions: <span className="text-blue-700 dark:text-blue-300">Team 1 · blue goal side</span> · <span className="text-red-700 dark:text-red-300">Team 2 · red goal side</span></p>}
       {currentMatches.map(current => <button key={current.id} type="button" onClick={() => onOpen(current.id)} className="min-h-[44px] px-3 py-2 mb-3 mr-2 rounded-lg border border-emerald-500 bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 text-sm font-semibold">Jump to current match · {current.phase === 'qual' ? `Q${current.num}` : (fmtMatch({ phase: current.phase, num: current.num }) || current.label)}</button>)}
       {!emcee && replaySet.size > 0 && (
         <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3">
@@ -6017,14 +6018,14 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
       {filtered.length === 0 ? (
         <Empty title={tab === "elim" ? "No elimination matches" : "No matches"} sub={tab === "elim" ? (canAdd ? "Add an elimination match, or import the bracket from Tournament Manager." : "Elimination matches will appear here once loaded.") : "Try a different match number or team."} />
       ) : (
-        <ul className="space-y-2">
+        <ul className="refos-match-list space-y-2">
           {filtered.map((m,index) => (
             <li key={m.id}>
               {tab === "elim" && eliminationPairingKey(m)!==eliminationPairingKey(filtered[index-1]||{}) && <h3 className="pt-3 pb-2 font-semibold">{eliminationPairingLabel(m)} · Games</h3>}
               <button onClick={() => onOpen(m.id)} className={`w-full text-left rounded-xl border px-4 py-3 flex flex-wrap sm:flex-nowrap items-center gap-3 hover:shadow-sm transition ${liveHighlights[m.id] === 'current' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 dark:border-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'bg-amber-50 dark:bg-amber-950 border-amber-500 dark:border-amber-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}>
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-14 shrink-0">{rowLabel(m)}</span>
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
-                  <span className={isIQ?"text-slate-800 dark:text-slate-100 font-semibold":"text-red-700 dark:text-red-300 font-semibold"}>{isIQ?iqTeams(m).join(" + "):m.red.join("  ")}</span>
+                  <span className={isIQ?"text-slate-800 dark:text-slate-100 font-semibold":"text-red-700 dark:text-red-300 font-semibold"}>{isIQ?iqTeams(m).map((number,index)=><React.Fragment key={number}>{index>0&&<span className="text-slate-500"> + </span>}<span title={iqStartingPosition(index).label} className={index===0?"text-blue-700 dark:text-blue-300":"text-red-700 dark:text-red-300"}>{number}</span></React.Fragment>):m.red.join("  ")}</span>
                   {!isIQ && <span className="text-slate-500 dark:text-slate-400 font-sans">vs</span>}
                   {!isIQ && <span className="text-blue-700 dark:text-blue-300 font-semibold">{m.blue.join("  ")}</span>}
                 </div>
@@ -6244,16 +6245,17 @@ function MatchDetail({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, 
     <div className={`rounded-xl border p-3 ${isIQ ? "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700" : color === "red" ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800" : "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"}`}>
       <p className={`text-xs font-bold uppercase tracking-wide mb-2 ${isIQ ? "text-slate-600 dark:text-slate-300" : color === "red" ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}>{label}</p>
       <div className="space-y-2">
-        {teams.map((n) => {
+        {teams.map((n,index) => {
           const s = stat[n];
           return (
             <button key={n} onClick={emcee || !onLogTeam ? undefined : () => onLogTeam(n)} className={`w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2.5 text-left ${emcee ? "cursor-default" : "hover:border-slate-300 dark:border-slate-600"}`}>
               <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{n}</span>
+                <span className={`font-mono font-bold ${isIQ?(index===0?"text-blue-700 dark:text-blue-300":"text-red-700 dark:text-red-300"):"text-slate-900 dark:text-slate-100"}`}>{n}</span>
                 {teamRank[n] != null && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-200 dark:border-indigo-800 text-[11px] font-bold shrink-0">Rank {teamRank[n]}</span>}
                 {teamName[n] && <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{teamName[n]}</span>}
                 {!emcee && onLogTeam && <span className="ml-auto text-xs font-semibold text-[#D7212B] flex items-center gap-1 shrink-0"><Plus size={14} /> Log</span>}
               </div>
+              {isIQ&&<p className={`mt-1 text-xs font-medium ${index===0?"text-blue-700 dark:text-blue-300":"text-red-700 dark:text-red-300"}`}>{iqStartingPosition(index).label}</p>}
               {!emcee && s && s.total > 0 && (
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <span className="text-[11px] text-slate-400">Prior:</span>
