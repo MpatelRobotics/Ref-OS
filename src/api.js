@@ -596,9 +596,10 @@ export async function restoreEvent(eventId, adminCredential) {
   if (error) throw new Error("Could not verify restore access. Check the connection and try again.");
   return String(data?.result || data?.reason || "invalid");
 }
-export async function getEvent(id) {
+export async function getEvent(id,{strict=false}={}) {
   if (E2E_MOCK) return { id, name: "Highlander Summit E2E", quals: 10, practice: 0, bracket: 16, finalsBestOf: 1, joinCode: "TEST" };
-  const { data } = await supabase.from("events").select("*").eq("id", id).maybeSingle();
+  const { data,error } = await supabase.from("events").select("*").eq("id", id).maybeSingle();
+  if(strict&&error)throw error;
   return mapEvent(data);
 }
 export async function createVexEvent(name, adminCredential, format = "tournament") {

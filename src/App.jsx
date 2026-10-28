@@ -868,10 +868,12 @@ export default function App() {
           ? rows
           : [highlander, ...rows];
         setEventChoices(choices);
-        // Cached photos for events that no longer exist (deleted elsewhere) are removed from this device.
-        if (rows.length) photoCache.pruneMissingEvents(choices.map((ev) => ev.id));
-        // A restored event ID that no longer exists returns to Choose VEX Event.
+        // Public discovery deliberately excludes private test events. It is neither
+        // an event-existence check nor a safe list for pruning cached event photos.
         if (activeEventId && !choices.some((ev) => ev.id === activeEventId)) {
+          const selected=await api.getEvent(activeEventId,{strict:true});
+          if(!live)return;
+          if(selected)return; // Keep it selected without adding it to the public directory.
           localStorage.removeItem("refosActiveEventId");
           try {
             const url = new URL(window.location.href);
