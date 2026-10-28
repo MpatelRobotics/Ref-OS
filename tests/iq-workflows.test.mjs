@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {iqScore,iqFinalPairs,parseIQMatches} from '../src/iq/iqWorkflows.js';
@@ -27,4 +28,20 @@ test('IQ importer rejects four opposing teams, duplicate identities and invalid 
 test('IQ JSON and unscored rows never supply a score that clears saved results',()=>{
  const rows=parseIQMatches(JSON.stringify([{phase:'qual',num:1,teams:['1A','2B'],score:0},{phase:'final',num:1,red:['3A','4A'],blue:[],redScore:20,scored:false}]),'test.json',csv);
  assert.equal(rows[0].redScore,0);assert.equal(rows[1].redScore,undefined);
+});
+
+test('actual IQ TM export imports 24 numeric partner matches without turning unscored zeros into results',()=>{
+ const text=readFileSync(new URL('./fixtures/iq-tm-matches.csv',import.meta.url),'utf8');
+ const rows=parseIQMatches(text,'IQMatches.csv',csv);
+ assert.equal(rows.length,24);
+ assert.deepEqual(rows[0],{phase:'qual',num:1,red:['7','9'],blue:[],field:'Main Field',label:''});
+ assert.deepEqual(rows.at(-1).red,['6','15']);
+ assert.ok(rows.every(m=>m.phase==='qual'&&m.red.length===2&&m.blue.length===0&&!Object.hasOwn(m,'redScore')));
+ assert.equal(new Set(rows.flatMap(m=>m.red)).size,24);
+ const scored=parseIQMatches(text.replace('0,0,,,False,None','42,0,,,True,None'),'IQMatches.csv',csv);
+ assert.equal(scored[0].redScore,42);
+ assert.equal(scored[1].redScore,undefined);
+});
+test('IQ TM extra slots cannot hide a third partner',()=>{
+ assert.throws(()=>parseIQMatches('Round,MatchNum,Red1,Blue1,Red3\n2,1,7,9,18','tm.csv',csv),/one or two/);
 });

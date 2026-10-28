@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {fileURLToPath} from 'node:url';
 const preamble=`import '/@vite/client';import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;`;
 async function mount(page,body){await page.route('**/iq-workflow-test',r=>r.fulfill({contentType:'text/html',body:`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">${preamble}const React=(await import('/node_modules/.vite/deps/react.js')).default;const ReactDOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default;const IQ=await import('/src/iq/IQWorkflows.jsx');await import('/src/index.css');${body}</script></body></html>`}));await page.goto('/iq-workflow-test');}
 test('shared scoring, IQ referee checks and read-only role',async({page})=>{
@@ -81,4 +82,14 @@ test('Inspection program cache is specific to its event and survives a failed re
  await mount(page,`window.api=await import('/src/api');window.ready=true;`);await page.waitForFunction(()=>window.ready);
  const result=await page.evaluate(async()=>{const initial=await window.api.getEventCompetitionProgram('one');window.failed=true;const offline=await window.api.getEventCompetitionProgram('one');let isolated=false;try{await window.api.getEventCompetitionProgram('two');}catch{isolated=true;}return {initial,offline,isolated,calls:window.calls};});
  expect(result.initial.value.program).toBe('iq');expect(result.offline).toEqual(result.initial);expect(result.isolated).toBe(true);expect(result.calls[0]).toEqual({name:'get_event_competition_program',args:{p_event:'one'}});
+});
+
+test('actual TM IQ CSV previews numeric partners and imports unscored matches',async({page})=>{
+ await mount(page,`window.imported=null;ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(IQ.default,{canEdit:true,parseCSV:text=>text.trim().split(/\\r?\\n/).map(line=>line.split(',')),onImport:async rows=>{window.imported=rows;}}));`);
+ await page.getByLabel('Import IQ schedule / results',{exact:false}).setInputFiles(fileURLToPath(new URL('./fixtures/iq-tm-matches.csv',import.meta.url)));
+ await expect(page.getByRole('heading',{name:'Review 24 IQ matches',exact:true})).toBeVisible();
+ await expect(page.getByRole('region',{name:'IQ import preview'}).getByText(/Q1 · 7 \+ 9/)).toBeVisible();
+ await page.getByRole('button',{name:'Apply IQ matches',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>window.imported?.length)).toBe(24);
+ expect(await page.evaluate(()=>window.imported.every(m=>m.red.length===2&&m.blue.length===0&&m.redScore===undefined))).toBe(true);
 });

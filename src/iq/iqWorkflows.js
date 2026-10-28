@@ -27,9 +27,9 @@ export function parseIQMatches(text, filename, parseCSV) {
     const round=String(m.phase??m.round??m.type??match).toLowerCase();
     let phase;if(/practice|^p\d/.test(round)||round==='1')phase='practice';else if(/final|^f\d/.test(round)||round==='5')phase='final';else if(/qual|^q\d/.test(round)||round==='2')phase='qual';else throw new Error(`Row ${i+1}: use Qualification, Practice or Finals in Round.`);
     const num=Number(match.match(/\d+/)?.[0]);if(!Number.isInteger(num)||num<1)throw new Error(`Row ${i+1}: invalid match number.`);
-    const teamSlots=Array.isArray(m.teams)?m.teams:Array.isArray(m.red)?[...m.red,...(m.blue||[])]:Object.entries(m).filter(([k])=>/^(?:team|red|blue)(?:team)?[12]$/.test(k)).map(([,v])=>v);
+    const teamSlots=Array.isArray(m.teams)?m.teams:Array.isArray(m.red)?[...m.red,...(m.blue||[])]:Object.entries(m).filter(([k])=>/^(?:team|red|blue)(?:team)?[123]$/.test(k)).map(([,v])=>v);
     const members=teamSlots.map(v=>String(v?.number??v??'').trim().toUpperCase()).filter(Boolean);
-    if(!members.length||members.length>2||new Set(members).size!==members.length||members.some(t=>!/^\d{1,6}[A-Z]{1,3}$/.test(t)))throw new Error(`Row ${i+1}: IQ matches require one or two distinct team numbers, not opposing alliances.`);
+    if(!members.length||members.length>2||new Set(members).size!==members.length||members.some(t=>!/^\d{1,6}(?:[A-Z]{1,3})?$/.test(t)))throw new Error(`Row ${i+1}: IQ matches require one or two distinct team numbers (for example 7 or 123A), not opposing alliances.`);
     const key=phase+':'+num;if(keys.has(key))throw new Error(`Duplicate match ${key}. Give tiebreaker matches their own number.`);keys.add(key);
     const rawScore=m.score??m.teamworkscore??m.alliancescore??m.redscore;
     const state=String(m.scored??m.state??m.status??'').toLowerCase();
@@ -39,6 +39,6 @@ export function parseIQMatches(text, filename, parseCSV) {
     if(m.bluescore!=null&&String(m.bluescore).trim()!==''&&Number(m.bluescore)!==0)throw new Error(`Row ${i+1}: two opposing scores are not an IQ teamwork result.`);
     return {phase,num,red:members,blue:[],field:String(m.field??''),label:String(m.label??''),...(scored?{redScore:score,blueScore:null,winner:null}: {})};
   });
-  if(!rows.length)throw new Error('No IQ matches found. Include Round, Match, Team1, Team2 and optional Score columns.');
+  if(!rows.length)throw new Error('No IQ matches found. Export Match List and Results from TM, or include Round, Match, Team1, Team2 and optional Score columns.');
   return rows;
 }

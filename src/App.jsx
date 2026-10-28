@@ -7512,7 +7512,7 @@ function TMSyncCenter({ isIQ = false, onClose, onConnectApi, onImportTeams, onIm
         </div>
         <div className="p-4 space-y-3">
           {onConnectApi && <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-800 p-3"><h3 className="font-semibold">Automatic TM sync · Experimental</h3><p className="mt-1 text-sm text-slate-500">Connect the local TM API to sync teams, match scores, qualification rankings, and skills. You can also add missing matches.</p><button onClick={onConnectApi} className="mt-3 w-full min-h-[44px] rounded-lg bg-red-700 text-white px-3 py-2 font-semibold">Connect Tournament Manager</button></div>}
-          {isIQ && <p className="text-sm">IQ: import categories individually. Schedule/results CSV uses Round, Match, Team1, Team2, Field and optional shared Score. Use Finals for ranked partnerships; no alliance-selection export is needed.</p>}
+          {isIQ && <p className="text-sm">IQ: import categories individually. In TM, choose File → Export → Match List and Results. Import that CSV directly: Red1 and Blue1 are partner teams, and Scored=False leaves scores unchanged. Round, Match, Team1, Team2, Field and optional shared Score columns also work. Use Finals for ranked partnerships; no alliance-selection export is needed.</p>}
           {leagueImport && (
             <div className="bg-white dark:bg-slate-800 rounded-xl border-2 border-sky-300 dark:border-sky-800 p-4">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">League</div>
