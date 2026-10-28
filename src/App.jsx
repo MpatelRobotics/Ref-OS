@@ -1,3 +1,4 @@
+import {sampleRobotPhoto} from './sampleRobotPhotos.js';
 import DemoLauncher from './components/DemoLauncher.jsx';
 import { isDemoEvent, DEMO_IDENTITY, RETIRED_IQ_DEMO_ID } from './demoEvents.js';
 import ExcellenceEligibility from './components/ExcellenceEligibility.jsx';
@@ -7059,6 +7060,7 @@ function RobotDetail({ meName, canEditAttendance = false, requiredRobotPhotos, i
   const photoSlots = sequenceIndex >= 0 && sequenceSlots.length ? sequenceSlots : robotPhotoSlots(requiredRobotPhotos,isIQ);
   const requiredCount = photoSlots.filter(slot=>slot.required).length;
   const photos = team.photoKeys || [];
+  const sampleSources = [...new Map(photos.map(sampleRobotPhoto).filter(Boolean).map(photo=>[photo.credit,photo])).values()];
   const pendingPhotos = team._pendingRobotPhotos || [];
   const slotData = photoSlots.map((angle) => ({
     ...angle,
@@ -7110,6 +7112,8 @@ function RobotDetail({ meName, canEditAttendance = false, requiredRobotPhotos, i
   return (
     <>
       {isIQ && <IQInspectionChecklist key={team.number} />}
+      {sampleSources.length>0 && <aside className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-950 dark:border-indigo-700 dark:bg-indigo-950 dark:text-indigo-100">Sample reference pictures from real VEX U teams; these are not this fictional team's robot or completed inspection views. Photo sources: {sampleSources.map(photo=><a key={photo.credit} href={photo.source} target="_blank" rel="noreferrer" className="ml-1 underline">{photo.credit}</a>)}</aside>}
+
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">{team.number}</div>
         {team.name && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{team.name}</div>}

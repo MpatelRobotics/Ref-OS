@@ -15,7 +15,7 @@ test('private test events are atomic, developer-only, absent from every public l
  create function public.archive_refos_event(p_event uuid) returns timestamptz language plpgsql security definer as $$begin update events set archived_at=now() where id=p_event;return now();end$$;
  create table public.league_sessions(id uuid default gen_random_uuid(),event_id uuid references events(id),name text,status text,started_at timestamptz);
  create table public.matches(event_id uuid references events(id),session_id uuid,phase text,num int,label text,red text[],blue text[],field text,red_score int,blue_score int);
- create table public.teams(event_id uuid references events(id) on delete cascade,number text,name text,primary key(event_id,number));
+ create table public.teams(event_id uuid references events(id) on delete cascade,number text,name text,photo_paths text[] default '{}',primary key(event_id,number));
  alter table events enable row level security;alter table event_members enable row level security;alter table teams enable row level security;
  create policy baseline on events for all using(true) with check(true);create policy baseline on event_members for all using(true) with check(true);create policy baseline on teams for all using(true) with check(true);
  grant select,insert,update,delete on events,event_members,teams,matches to anon,authenticated;
@@ -39,6 +39,13 @@ test('private test events are atomic, developer-only, absent from every public l
  assert.equal((await db.query('select * from teams where event_id=$1',[hidden.id])).rows.length,32);
  const matches=(await db.query('select * from matches where event_id=$1 order by num',[hidden.id])).rows;assert.equal(matches.length,48);
  const appearances=new Map();for(const m of matches){assert.equal(new Set([...m.red,...m.blue]).size,4);assert.equal(m.red.length,2);assert.equal(m.blue.length,2);assert.equal(m.red_score,null);assert.equal(m.blue_score,null);for(const team of [...m.red,...m.blue])appearances.set(team,(appearances.get(team)||0)+1);}
+ assert.equal((await db.query('select seed_developer_test_photos($1) as count',[hidden.id])).rows[0].count,0);
+ await assert.rejects(db.query('select seed_developer_test_photos($1)',['11111111-1111-4111-8111-111111111111']),/Private test event not found/);
+ await db.query("update teams set photo_paths=array_append(photo_paths,'existing-upload.webp') where event_id=$1 and number='97001A'",[hidden.id]);
+ assert.equal((await db.query('select seed_developer_test_photos($1) as count',[hidden.id])).rows[0].count,0);
+ assert.ok((await db.query("select photo_paths from teams where event_id=$1 and number='97001A'",[hidden.id])).rows[0].photo_paths.includes('existing-upload.webp'));
+
+ assert.ok((await db.query('select photo_paths from teams where event_id=$1',[hidden.id])).rows.every(t=>t.photo_paths.some(p=>p.includes('/sample-robot-'))));
  assert.equal(appearances.size,32);assert.ok([...appearances.values()].every(n=>n===6));assert.equal((await db.query('select seed_developer_test_matches($1) as count',[hidden.id])).rows[0].count,0);
  assert.equal((await db.query('select * from list_developer_test_events()')).rows.length,1);
  await db.exec('reset role');assert.equal((await db.query('select * from event_access_credentials where event_id=$1',[hidden.id])).rows.length,0);
@@ -49,6 +56,7 @@ test('private test events are atomic, developer-only, absent from every public l
  assert.equal((await db.query('select * from events where id=$1',[hidden.id])).rows.length,0);
  assert.equal((await db.query('select * from teams where event_id=$1',[hidden.id])).rows.length,0);
  await assert.rejects(db.query('select * from list_developer_test_events()'),/Developer access/);
+ await assert.rejects(db.query('select seed_developer_test_photos($1)',[hidden.id]),/Developer access/);
  await assert.rejects(db.query('select open_developer_test_event($1)',[hidden.id]),/Developer access/);
  await assert.rejects(db.query('select open_developer_event($1)',[hidden.id]),/Developer access/);
  await assert.rejects(db.query('select delete_developer_test_event($1,$2)',[hidden.id,'Hidden']),/Developer access/);

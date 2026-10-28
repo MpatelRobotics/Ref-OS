@@ -72,6 +72,34 @@ drop trigger if exists guard_developer_test_membership on public.event_members;
 create trigger guard_developer_test_membership before insert or update on public.event_members for each row execute function public.guard_developer_test_membership();
 
 -- Remove the old passcode-taking entry point and any credentials on existing test events.
+-- Reference photos are app assets, never private storage objects or inspection-angle evidence.
+create or replace function public.seed_developer_test_photos(p_event uuid)
+returns int language plpgsql security definer set search_path=public as $$
+declare v_event public.events%rowtype; v_session uuid; v_count int;
+begin
+ if not public.refos_is_developer(auth.uid()) then raise exception 'Developer access required.'; end if;
+ select e.* into v_event from public.events e join public.developer_test_events t on t.event_id=e.id where e.id=p_event for update of e;
+ if not found then raise exception 'Private test event not found.'; end if;
+ if v_event.archived_at is not null then raise exception 'Restore this test event first.'; end if;
+ if v_event.event_format='league' then
+  select id into v_session from public.league_sessions where event_id=p_event and status='active' limit 1;
+  if v_session is null then raise exception 'Start a league session before adding sample pictures.'; end if;
+ end if;
+ with samples as (
+  select (97000+i)::text||chr(65+(i-1)%26) as number,
+   p_event::text||'/team/'||(97000+i)::text||chr(65+(i-1)%26)||'/'||
+   case when v_session is null then '' else 's-'||v_session::text||'/' end||
+   'sample-robot-'||(array['blrs','whoop-2019-20','whoop-2022-23','whoop-2024-25'])[1+(i-1)%4]||'.jpg' as path
+  from generate_series(1,32)i
+ )
+ update public.teams t set photo_paths=array_append(coalesce(t.photo_paths,'{}'::text[]),s.path)
+ from samples s where t.event_id=p_event and t.number=s.number and not(s.path=any(coalesce(t.photo_paths,'{}'::text[])));
+ get diagnostics v_count=row_count;
+ return v_count;
+end $$;
+revoke all on function public.seed_developer_test_photos(uuid) from public,anon;
+grant execute on function public.seed_developer_test_photos(uuid) to authenticated;
+
 create or replace function public.seed_developer_test_matches(p_event uuid)
 returns int language plpgsql security definer set search_path=public as $$
 declare v_event public.events%rowtype; v_session uuid; roster text[]; round_num int; slot int; match_num int;
@@ -127,6 +155,7 @@ begin
   insert into public.teams(event_id,number,name)
   select v_event.id,(97000+i)::text||chr(65+(i-1)%26),'Test Team '||lpad(i::text,2,'0') from generate_series(1,32) i;
   perform public.seed_developer_test_matches(v_event.id);
+  perform public.seed_developer_test_photos(v_event.id);
   select * into v_event from public.events where id=v_event.id;
  end if;
  return next v_event;

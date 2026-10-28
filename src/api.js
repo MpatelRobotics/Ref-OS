@@ -1,3 +1,4 @@
+import {sampleRobotPhoto} from './sampleRobotPhotos.js';
 import { createSettingsReadCache } from './settingsReadCache.js';
 import { isDemoEvent } from './demoEvents.js';
 import {resolveDeveloperEventAccess} from './developerEventAccess.js';
@@ -497,6 +498,11 @@ export async function openDeveloperEvent(eventId) {
 export async function deleteDeveloperTestEvent(eventId,name) {
   const {error}=await supabase.rpc('delete_developer_test_event',{p_event:eventId,p_confirm_name:name});
   if(error)throw new Error('Could not delete this private test event. Refresh the list, confirm Developer access, and install the updated developer-test-events.sql.');
+}
+export async function seedDeveloperTestPhotos(eventId){
+ const {data,error}=await supabase.rpc('seed_developer_test_photos',{p_event:eventId});
+ if(error)throw new Error('Could not add sample robot pictures. Confirm Developer access and keep the fictional test teams.');
+ return Number(data)||0;
 }
 export async function seedDeveloperTestMatches(eventId){
   const {data,error}=await supabase.rpc('seed_developer_test_matches',{p_event:eventId});
@@ -1929,6 +1935,8 @@ export async function listFeedbackManagement(eventId) {
 }
 // Keep the legacy helper's null-on-error behavior for other callers.
 export async function photoUrlForDisplay(path) {
+  const sample=sampleRobotPhoto(path);
+  if(sample)return sample.url;
   if (E2E_MOCK) return null;
   const {data,error} = await supabase.storage.from("robot-photos").createSignedUrl(path,3600);
   if(error) throw error;
