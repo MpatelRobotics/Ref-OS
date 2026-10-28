@@ -453,6 +453,22 @@ export async function listMyEvents() {
   const { data } = await supabase.from("events").select("*").order("created_at", { ascending: false });
   return (data || []).map(mapEvent);
 }
+export async function listDeveloperTestEvents() {
+  await ensureAnonymousSession();
+  const {data,error}=await supabase.rpc('list_developer_test_events');
+  if(error)throw new Error('Could not load private test events. Install supabase/developer-test-events.sql and confirm Developer access.');
+  return (data||[]).map(mapEvent);
+}
+export async function createDeveloperTestEvent(name,credential,format,sampleTeams) {
+  await ensureAnonymousSession();
+  const {data,error}=await supabase.rpc('create_developer_test_event',{p_name:String(name||'').trim(),p_admin_credential:String(credential||'').trim().toUpperCase(),p_format:format,p_sample_teams:!!sampleTeams});
+  if(error)throw new Error('Could not create a private test event. Check the name, four-character code, Developer access, and developer-test-events.sql setup.');
+  return mapEvent(Array.isArray(data)?data[0]:data);
+}
+export async function openDeveloperTestEvent(eventId) {
+  const {error}=await supabase.rpc('open_developer_test_event',{p_event:eventId});
+  if(error)throw new Error('Developer access is required to open this private test event.');
+}
 export async function listSelectableEvents() {
   if (E2E_MOCK) return [{ id: "11111111-1111-4111-8111-111111111111", name: "Highlander Summit", branding: {} }];
   await ensureAnonymousSession();
