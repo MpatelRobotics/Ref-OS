@@ -498,6 +498,11 @@ export async function deleteDeveloperTestEvent(eventId,name) {
   const {error}=await supabase.rpc('delete_developer_test_event',{p_event:eventId,p_confirm_name:name});
   if(error)throw new Error('Could not delete this private test event. Refresh the list, confirm Developer access, and install the updated developer-test-events.sql.');
 }
+export async function seedDeveloperTestMatches(eventId){
+  const {data,error}=await supabase.rpc('seed_developer_test_matches',{p_event:eventId});
+  if(error)throw new Error('Could not add the sample schedule. Keep the original 32 fictional teams; for a league, start a session first. Existing schedules are preserved.');
+  return Number(data)||0;
+}
 export async function listSelectableEvents() {
   if (E2E_MOCK) return [{ id: "11111111-1111-4111-8111-111111111111", name: "Highlander Summit", branding: {} }];
   await ensureAnonymousSession();

@@ -72,6 +72,41 @@ drop trigger if exists guard_developer_test_membership on public.event_members;
 create trigger guard_developer_test_membership before insert or update on public.event_members for each row execute function public.guard_developer_test_membership();
 
 -- Remove the old passcode-taking entry point and any credentials on existing test events.
+create or replace function public.seed_developer_test_matches(p_event uuid)
+returns int language plpgsql security definer set search_path=public as $$
+declare v_event public.events%rowtype; v_session uuid; roster text[]; round_num int; slot int; match_num int;
+begin
+ if not public.refos_is_developer(auth.uid()) then raise exception 'Developer access required.'; end if;
+ select e.* into v_event from public.events e join public.developer_test_events t on t.event_id=e.id where e.id=p_event for update of e;
+ if not found then raise exception 'Private test event not found.'; end if;
+ if v_event.archived_at is not null then raise exception 'Restore this test event first.'; end if;
+ if exists(select 1 from public.matches where event_id=p_event) then return 0; end if;
+ if (select count(*) from public.teams where event_id=p_event)<>32 or
+    (select count(*) from public.teams where event_id=p_event and number in(select (97000+i)::text||chr(65+(i-1)%26) from generate_series(1,32)i))<>32 then
+  raise exception 'This schedule needs the original 32 fictional test teams.';
+ end if;
+ if v_event.event_format='league' then
+  select id into v_session from public.league_sessions where event_id=p_event and status='active' limit 1;
+  if v_session is null then
+   if exists(select 1 from public.league_sessions where event_id=p_event) then raise exception 'Start a league session before adding the fictional schedule.'; end if;
+   insert into public.league_sessions(event_id,name,status,started_at) values(p_event,'Test Session 1','active',now()) returning id into v_session;
+  end if;
+ end if;
+ for round_num in 0..5 loop
+  select array_agg(number order by md5(round_num::text||':'||number)) into roster from public.teams where event_id=p_event;
+  for slot in 0..7 loop
+   match_num:=round_num*8+slot+1;
+   insert into public.matches(event_id,session_id,phase,num,label,red,blue,field)
+   values(p_event,v_session,'qual',match_num,'Q'||match_num,array[roster[slot*4+1],roster[slot*4+2]],array[roster[slot*4+3],roster[slot*4+4]],
+     'Field '||case when v_event.event_format='league' then 1 else 1+(match_num-1)%2 end);
+  end loop;
+ end loop;
+ update public.events set quals=48 where id=p_event;
+ return 48;
+end $$;
+revoke all on function public.seed_developer_test_matches(uuid) from public,anon;
+grant execute on function public.seed_developer_test_matches(uuid) to authenticated;
+
 drop function if exists public.create_developer_test_event(text,text,text,boolean);
 delete from public.event_access_credentials where event_id in (select event_id from public.developer_test_events);
 create or replace function public.create_developer_test_event(p_name text,p_format text default 'tournament',p_sample_teams boolean default true)
@@ -91,6 +126,8 @@ begin
  if p_sample_teams then
   insert into public.teams(event_id,number,name)
   select v_event.id,(97000+i)::text||chr(65+(i-1)%26),'Test Team '||lpad(i::text,2,'0') from generate_series(1,32) i;
+  perform public.seed_developer_test_matches(v_event.id);
+  select * into v_event from public.events where id=v_event.id;
  end if;
  return next v_event;
 end $$;
