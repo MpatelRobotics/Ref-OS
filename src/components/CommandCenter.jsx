@@ -16,7 +16,7 @@ function ToolSection({ title, children, first = false, danger = false }) {
   );
 }
 
-export default function CommandCenter({ extraTools, matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onFieldNames, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onEventSetup, onTMSync, onVexSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, brand = null, onEventSettings, onEventManagement, onSyncStatus, syncModeLabel = "Cloud", league = null, onLeagueSessions, onClose }) {
+export default function CommandCenter({ extraTools, matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onFieldNames, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onTMSync, onVexSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, brand = null, onEventSettings, onEventManagement, onSyncStatus, syncModeLabel = "Cloud", league = null, onLeagueSessions, onClose }) {
   const accent = brand?.accent || "#0D0F32";
   const all = Object.values(matches);
   const replays = fieldLog.filter(e=>e.kind==="replay").length;
@@ -143,8 +143,7 @@ export default function CommandCenter({ extraTools, matches, viols, fieldLog, pr
               </button>
             )}
             {onVexSync && <button type="button" onClick={onVexSync} className={tool}><RefreshCw size={16}/> Sync everything</button>}
-            <button onClick={onEventSetup} className={tool}><CalendarDays size={16}/> Event Setup</button>
-            {onEventSettings && <button onClick={onEventSettings} className={tool}><Settings size={16}/> Event Settings</button>}
+            {onEventSettings && <button onClick={onEventSettings} className={tool}><Settings size={16}/> Event Setup &amp; Settings</button>}
             <button onClick={onRoleCodes} className={tool}><KeyRound size={16}/> Volunteer Access Codes</button>
             {onEventManagement && <button onClick={onEventManagement} className={tool}><Archive size={16}/> Event Management</button>}
             {onLeagueSessions && <button onClick={onLeagueSessions} className={tool}><CalendarDays size={16}/> League Sessions</button>}

@@ -1,3 +1,4 @@
+import EventProgramChoice from "../EventProgramChoice.jsx";
 import React, { useEffect, useMemo, useState } from "react";
 import { ROBOT_PHOTO_SLOTS, normalizeRequiredRobotPhotos } from "../../robotPhotoRequirements";
 import { CalendarDays, ImageOff, MapPin, Palette, RotateCcw, Save, Settings, X } from "lucide-react";
@@ -22,8 +23,12 @@ function FieldError({ children }) {
   return <p className="mt-1 text-xs font-semibold text-red-700 dark:text-red-300">{children}</p>;
 }
 
-export default function EventSettingsModal({ event, brand, eventTimezone = "", fieldNames = {}, requiredRobotPhotos, onSave, onClose, eventFormat = "tournament", fieldCount, canConvertToLeague = false, onConvertToLeague }) {
+export default function EventSettingsModal({ event, brand, eventTimezone = "", fieldNames = {}, requiredRobotPhotos, onSave, onClose, eventFormat = "tournament", competitionProgram = "v5", fieldCount, canConvertToLeague = false, onConvertToLeague }) {
   const [timezone,setTimezone]=useState(eventTimezone);
+  const initialSetup = {quals:Number(event?.quals)||0,practice:Number(event?.practice)||0,bracket:Number(event?.bracket ?? 16),finalsBestOf:Number(event?.finalsBestOf ?? 3),competitionProgram};
+  const [setup,setSetup]=useState(initialSetup);
+  const setSetupField=(key,value)=>setSetup(current=>({...current,[key]:value}));
+
   const timezones=useMemo(()=>[...new Set(['UTC',eventTimezone,...(Intl.supportedValuesOf?.('timeZone')||['America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Europe/London','Asia/Kolkata','Australia/Sydney'])])].filter(Boolean).sort(),[eventTimezone]);
   const initialCount = fieldCount || (eventFormat === "league" ? 1 : 3);
   const [count,setCount] = useState(initialCount);
@@ -132,11 +137,14 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
     };
     const fieldsChanged = FIELD_KEYS.some((key) => cleanedFields[key] !== initial.fields[key]);
     const nameChanged = cleanName !== initial.name;
+    const cleanSetup={...setup,quals:Number(setup.quals)||0,practice:Number(setup.practice)||0,bracket:setup.competitionProgram==='iq'?0:Number(setup.bracket),finalsBestOf:setup.competitionProgram==='iq'?1:Number(setup.finalsBestOf)};
+    const setupChanged=Object.keys(initialSetup).some(key=>cleanSetup[key]!==initialSetup[key]);
     const photoRequirementsChanged = JSON.stringify(photoRequirements) !== JSON.stringify(initialPhotoRequirements);
-    if (timezone===eventTimezone && count === initialCount && !nameChanged && !fieldsChanged && !photoRequirementsChanged && !Object.values(identityChanged).some(Boolean)) { onClose(); return; }
+    if (!setupChanged && timezone===eventTimezone && count === initialCount && !nameChanged && !fieldsChanged && !photoRequirementsChanged && !Object.values(identityChanged).some(Boolean)) { onClose(); return; }
     setSaving(true);
     try {
       await onSave({
+        setup:setupChanged?cleanSetup:null,
         timezone: timezone!==eventTimezone?timezone:null,
         name: nameChanged ? cleanName : null,
         branding: Object.values(identityChanged).some(Boolean) ? {
@@ -162,10 +170,10 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
         <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2 shrink-0" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
           <Settings size={19} className="text-slate-600 dark:text-slate-300" />
           <div className="min-w-0">
-            <h2 className="font-bold text-slate-900 dark:text-slate-100">Event Settings</h2>
+            <h2 className="font-bold text-slate-900 dark:text-slate-100">Event Setup &amp; Settings</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 truncate">Only changes this event · updates for everyone at this event</p>
           </div>
-          <button onClick={onClose} disabled={saving} className="ml-auto text-slate-400 disabled:opacity-40" aria-label="Close"><X size={22} /></button>
+          <button onClick={onClose} disabled={saving} className="ml-auto min-h-[44px] min-w-[44px] grid place-items-center text-slate-400 disabled:opacity-40" aria-label="Close"><X size={22} /></button>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y p-4 space-y-6">
@@ -239,6 +247,25 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Branding only: header, login, and event cards. Violation, warning, and success colors do not change.</p>
               <FieldError>{errors.accent}</FieldError>
             </div>
+          </section>
+
+
+          <section className="space-y-4">
+            <SectionTitle icon={CalendarDays}>Match setup</SectionTitle>
+            <EventProgramChoice value={setup.competitionProgram} onChange={value=>setSetupField('competitionProgram',value)} disabled={saving}/>
+            <label className="block text-sm font-semibold">Number of qualification matches
+              <input type="number" min="0" step="1" inputMode="numeric" value={setup.quals} onChange={e=>setSetupField('quals',e.target.value.replace(/\D/g,''))} className={inputClass}/>
+            </label>
+            <p className="text-xs text-slate-500">Sets the qualification choices when logging. Imported matches and results are kept.</p>
+            <label className="block text-sm font-semibold">Practice matches (optional)
+              <input type="number" min="0" step="1" inputMode="numeric" value={setup.practice} onChange={e=>setSetupField('practice',e.target.value.replace(/\D/g,''))} className={inputClass}/>
+            </label>
+            {setup.competitionProgram==='iq'
+              ? <p className="rounded-lg bg-sky-50 p-3 text-sm dark:bg-sky-950/30">IQ uses ranked partner finals, with one match per partnership. Review pairings in the Finals tab after importing official qualification ranks.</p>
+              : <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="block text-sm font-semibold">Elimination bracket<select value={setup.bracket} onChange={e=>setSetupField('bracket',Number(e.target.value))} className={inputClass}><option value="0">None</option><option value="4">Top 4</option><option value="8">Top 8</option><option value="16">Top 16</option></select></label>
+                <label className="block text-sm font-semibold">Finals<select value={setup.finalsBestOf} onChange={e=>setSetupField('finalsBestOf',Number(e.target.value))} disabled={Number(setup.bracket)===0} className={inputClass}><option value="1">Single</option><option value="3">Best of 3</option></select></label>
+              </div>}
           </section>
 
           <section className="space-y-4">

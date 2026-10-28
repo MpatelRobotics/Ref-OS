@@ -78,7 +78,6 @@ import TeamScanner from "./features/teams/TeamScanner.jsx";
 import IdentityModal from "./components/modals/IdentityModal.jsx";
 import ShareModal from "./components/modals/ShareModal.jsx";
 import AdminPasswordModal from "./components/modals/AdminPasswordModal.jsx";
-import EventModal from "./components/modals/EventModal.jsx";
 import ClearModal from "./components/modals/ClearModal.jsx";
 import AddTeamModal from "./components/modals/AddTeamModal.jsx";
 import AnnouncementModal from "./components/modals/AnnouncementModal.jsx";
@@ -1478,7 +1477,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
     setCreateError("");
     try {
       const ev = await api.createVexEvent(cleanName, cleanCode, format);
-      try { await api.upsertEventSetting(ev.id, "competition_program", { program:competitionProgram, label:programLabel(competitionProgram), manual:competitionProgram === "iq" ? "levelup-2.0" : null }); } catch { alert("The event was created, but its competition program could not be saved. Ask an Admin to set the program in Event Setup; do not create a duplicate event."); }
+      try { await api.upsertEventSetting(ev.id, "competition_program", { program:competitionProgram, label:programLabel(competitionProgram), manual:competitionProgram === "iq" ? "levelup-2.0" : null }); } catch { alert("The event was created, but its competition program could not be saved. Ask an Admin to set the program in Event Setup & Settings; do not create a duplicate event."); }
       // League: optionally create (and start) the first session now. Later sessions are added
       // from the League Overview; they are never required up front.
       if (format === "league" && firstSession.name.trim()) {
@@ -1967,7 +1966,6 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const [addTeam, setAddTeam] = useState(false);
   const [expandRule, setExpandRule] = useState(null);
   const [showShare, setShowShare] = useState(false);
-  const [showEvent, setShowEvent] = useState(false);
   const [showIdentity, setShowIdentity] = useState(false);
   const [showClear, setShowClear] = useState(false);
   const [showOnline, setShowOnline] = useState(false);
@@ -2037,7 +2035,6 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     setShowPreEventTest(false);
     setShowTwoDeviceSyncTest(false);
     setShowDiagnosticReport(false);
-    setShowEvent(false);
     setShowTMSync(false);
     setShowVexSyncSetup(false);
     setShowActivity(false);
@@ -2655,24 +2652,9 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     return () => { clearInterval(iv); leave(); };
   }, [eventId, isInspection, meName, myRole]);
 
-  const activityScreen = showCommandCenter ? 'Command Center' : showEventSettings || showEvent ? 'Event Settings' : showFeatures || showUserGuide ? 'Features & Guide' : showFeedback || showFeedbackViewer ? 'Feedback' : showOnline ? 'Volunteer status' : ({matches:'Matches',teams:'Teams',rulebook:'Rules',robots:'Robots',alliances:isIQ?'Finals':'Alliances',judging:'Nominations',interviews:'Judging',rankings:'Rankings','lost-found':'Lost & Found'}[view] || 'Other');
+  const activityScreen = showCommandCenter ? 'Command Center' : showEventSettings ? 'Event Setup & Settings' : showFeatures || showUserGuide ? 'Features & Guide' : showFeedback || showFeedbackViewer ? 'Feedback' : showOnline ? 'Volunteer status' : ({matches:'Matches',teams:'Teams',rulebook:'Rules',robots:'Robots',alliances:isIQ?'Finals':'Alliances',judging:'Nominations',interviews:'Judging',rankings:'Rankings','lost-found':'Lost & Found'}[view] || 'Other');
   const liveAction = editing ? 'Editing violation' : logFor !== null ? 'Entering violation' : nominating ? 'Adding nomination' : showTMSync ? 'Importing event data' : openTeam ? 'Viewing team' : openMatch ? 'Viewing match' : openRobot ? 'Viewing robot photos' : 'Viewing';
   useLiveActivity({eventId,sessionId:leagueSessionId,name:meName,screen:activityScreen,activity:liveAction});
-
-  const saveEvent = async (data) => {
-    if (data.fieldCount) { const saved = await api.upsertEventSetting(eventId, 'field_configuration', {count:Number(data.fieldCount)}); rememberSettingWrite(saved); setEventSettings(prev=>({...prev,field_configuration:saved})); }
-
-    if (data.competitionProgram) { const saved = await api.upsertEventSetting(eventId, "competition_program", { program:data.competitionProgram, label:programLabel(data.competitionProgram), manual:data.competitionProgram === "iq" ? "levelup-2.0" : null }); setEventSettings(prev => ({...prev, competition_program:saved})); }
-    const ev = await api.updateEvent(eventId, {
-      name: (data.name || "").trim(),
-      quals: Math.max(0, parseInt(data.quals, 10) || 0),
-      practice: Math.max(0, parseInt(data.practice, 10) || 0),
-      bracket: Number(data.bracket) || 0, finalsBestOf: Number(data.finalsBestOf) || 1,
-    });
-    setEvent(ev);
-    if (commandCenterChildOpen) returnToCommandCenter();
-    else setShowEvent(false);
-  };
 
   const upsertTeam = async (number, name) => {
     const num = normNum(number);
@@ -2870,10 +2852,10 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     }
   };
   // Phase 6: Event Settings. Writes ONLY this event's row (eventId) in:
-  //   events.name, event_settings "event_branding", event_settings "field_names".
+  //   event metadata and shared setup, branding, field and inspection settings.
   // Only the parts the Admin changed are written. Teams, matches, rankings, violations,
   // alliances, nominations, and access credentials are never touched.
-  const saveEventSettings = async ({ timezone, name, branding, fieldNames: nextFieldNames, requiredRobotPhotos: nextPhotoRequirements, fieldCount: nextFieldCount }) => {
+  const saveEventSettings = async ({ setup, timezone, name, branding, fieldNames: nextFieldNames, requiredRobotPhotos: nextPhotoRequirements, fieldCount: nextFieldCount }) => {
     if (!adminUnlocked) throw new Error("Only this event's Admin can change event settings.");
     try {
       if (timezone) {
@@ -2902,10 +2884,14 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         rememberSettingWrite(savedFields);
         setEventSettings((cur) => ({ ...cur, field_names: savedFields }));
       }
-      if (name) {
-        // Same row, same UUID: only the display name changes.
-        const renamed = await api.updateEvent(eventId, { ...event, name });
-        if (!renamed || renamed.id !== eventId) throw new Error("The event name could not be saved. Confirm this device still has Admin access.");
+      if (setup?.competitionProgram) {
+        const saved=await api.upsertEventSetting(eventId,"competition_program",{program:setup.competitionProgram,label:programLabel(setup.competitionProgram),manual:setup.competitionProgram==="iq"?"levelup-2.0":null},meName);
+        rememberSettingWrite(saved);
+        setEventSettings(current=>({...current,competition_program:saved}));
+      }
+      if (name || setup) {
+        const renamed = await api.updateEvent(eventId, { ...event, ...(setup?{quals:setup.quals,practice:setup.practice,bracket:setup.bracket,finalsBestOf:setup.finalsBestOf}:{}), ...(name?{name}:{}) });
+        if (!renamed || renamed.id !== eventId) throw new Error("The event setup could not be saved. Confirm this device still has Admin access.");
         setEvent(renamed);
       }
     } catch (error) {
@@ -4906,7 +4892,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         ) : (
           <>
             {!!event?.quals && (
-              <button onClick={() => requireAdmin(() => setShowEvent(true))} className="w-full mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 flex items-center gap-2 text-left hover:border-slate-300 dark:border-slate-600">
+              <button onClick={() => requireAdmin(() => setShowEventSettings(true))} className="w-full mb-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 flex items-center gap-2 text-left hover:border-slate-300 dark:border-slate-600">
                 <CalendarDays size={16} className="text-slate-400 shrink-0" />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate flex-1">{event.name || "Event"}</span>
                 <span className="text-xs text-slate-400">{event.quals} quals{event.bracket ? ` · top ${event.bracket}` : ""}</span>
@@ -5171,7 +5157,7 @@ onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!cu
       {showEventManagement && adminUnlocked && <EventManagementModal event={event} eventId={eventId} brand={brand} roleLabel={myRole} isProtected={eventProtected}
         onArchive={archiveCurrentEvent}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEventManagement(false)} />}
-      {showEventSettings && adminUnlocked && <EventSettingsModal eventTimezone={eventSettings?.event_timezone?.value?.zone||''} fieldCount={configuredFieldCount} event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
+      {showEventSettings && adminUnlocked && <EventSettingsModal competitionProgram={eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram || "v5"} eventTimezone={eventSettings?.event_timezone?.value?.zone||''} fieldCount={configuredFieldCount} event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
         eventFormat={league || event?.format === "league" ? "league" : "tournament"}
         canConvertToLeague={!league && !isHighlander && event?.format !== "league"}
         onConvertToLeague={() => setShowConvertLeague(true)}
@@ -5217,7 +5203,6 @@ onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!cu
         onPreEventTest={() => openCommandCenterTool(() => setShowPreEventTest(true))}
         onTwoDeviceSyncTest={() => openCommandCenterTool(() => setShowTwoDeviceSyncTest(true))}
         onDiagnosticReport={() => openCommandCenterTool(() => setShowDiagnosticReport(true))}
-        onEventSetup={() => openCommandCenterTool(() => setShowEvent(true))}
         onVexSync={!isIQ && !highlanderDemoLocked && !isVenueMode() ? () => openCommandCenterTool(() => setShowVexSyncSetup(true)) : undefined}
         onTMSync={() => openCommandCenterTool(() => setShowTMSync(true))}
         onExportViolations={exportCSV}
@@ -5333,7 +5318,6 @@ onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!cu
           <button onClick={() => setShowInstallHelp(false)} className="w-full mt-4 py-2.5 rounded-lg bg-[#0D0F32] text-white font-semibold">Got it</button>
         </Modal>
       )}
-      {showEvent && <EventModal fieldCount={configuredFieldCount} event={event} competitionProgram={eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram || "v5"} onSave={saveEvent} onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEvent(false)} />}
       {lightbox && createPortal(
         <div onClick={() => setLightbox(null)} role="dialog" aria-modal="true" aria-label="Robot photo" className="fixed inset-0 z-[200] bg-black/90 grid place-items-center p-4">
           <img src={lightbox} alt="Robot" className="max-h-full max-w-full object-contain rounded-lg" />
@@ -8190,9 +8174,9 @@ function FeaturesGuide({ isHighlander = true }) {
           <Li><b>Teams</b> — search teams, open their full history, add teams, review Tournament Manager rank, and start a new log from the team record.</Li>
           <Li><b>Team scanner</b> — use the camera OCR scanner to recognize a team number and jump to the team record.</Li>
           <Li><b>Watchlist</b> — add shared watch notes to teams. Watched teams are flagged and their notes appear during relevant matches.</Li>
-          <Li><b>Required inspection pictures</b> — capture the views selected in Event Settings. Defaults are Front, Side, Back, and Inspection Tag. Completion appears on each team card; a tag photo follows an inspection pass.</Li>
+          <Li><b>Required inspection pictures</b> — capture the views selected in Event Setup & Settings. Defaults are Front, Side, Back, and Inspection Tag. Completion appears on each team card; a tag photo follows an inspection pass.</Li>
           <Li><b>Take pictures in order</b> — open a separate camera dialog that starts with the views required for this event and then offers optional views. The red camera button names the next picture.</Li>
-          <Li><b>Lexan Diagram</b> — this view counts toward completion when selected as required in Event Settings.</Li>
+          <Li><b>Lexan Diagram</b> — this view counts toward completion when selected as required in Event Setup & Settings.</Li>
           <Li><b>Pictures on violation forms</b> — compact bordered thumbnails show each view name and identify the views required for this event.</Li>
           <Li><b>Offline picture queue</b> — required pictures remain visible as queued and upload automatically after connectivity returns.</Li>
         </ul>
