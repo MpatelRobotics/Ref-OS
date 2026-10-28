@@ -279,6 +279,25 @@ export async function clearAccessSession() {
   try { await supabase.auth.signOut({ scope: "local" }); }
   catch { await supabase.auth.signOut(); }
 }
+export async function hasDeveloperSession() {
+  if(E2E_MOCK)return false;
+  const {data:{session},error:sessionError}=await supabase.auth.getSession();
+  if(sessionError)throw sessionError;
+  if(!session?.user?.id)return false;
+  const {data,error}=await supabase.from('event_members').select('event_id').eq('user_id',session.user.id).eq('role','admin').eq('developer',true).limit(1);
+  if(error)throw new Error('Could not confirm Developer access. Check your connection and try again.');
+  return !!data?.length;
+}
+export async function signOutDeveloperSession() {
+  if(!E2E_MOCK){
+    const {data:{session}}=await supabase.auth.getSession();
+    // Revoke this device's event access as well as removing its saved browser session.
+    if(session?.user?.id)await supabase.functions.invoke('refos-developer-passkey',{body:{action:'manage-logout',userId:session.user.id}}).catch(()=>{});
+  }
+  if(E2E_MOCK)return;
+  const {error}=await supabase.auth.signOut({scope:'local'});
+  if(error)throw new Error('Could not finish signing out. Check your connection and try again.');
+}
 
 // Lock This Device -> Event Main Page keeps this device's session. Before "Unlock as <role>"
 // reopens the event, the server must confirm it again:
@@ -459,15 +478,19 @@ export async function listDeveloperTestEvents() {
   if(error)throw new Error('Could not load private test events. Install supabase/developer-test-events.sql and confirm Developer access.');
   return (data||[]).map(mapEvent);
 }
-export async function createDeveloperTestEvent(name,credential,format,sampleTeams) {
+export async function createDeveloperTestEvent(name,format,sampleTeams) {
   await ensureAnonymousSession();
-  const {data,error}=await supabase.rpc('create_developer_test_event',{p_name:String(name||'').trim(),p_admin_credential:String(credential||'').trim().toUpperCase(),p_format:format,p_sample_teams:!!sampleTeams});
-  if(error)throw new Error('Could not create a private test event. Check the name, four-character code, Developer access, and developer-test-events.sql setup.');
+  const {data,error}=await supabase.rpc('create_developer_test_event',{p_name:String(name||'').trim(),p_format:format,p_sample_teams:!!sampleTeams});
+  if(error)throw new Error('Could not create a private test event. Check the name, Developer access, and developer-test-events.sql setup.');
   return mapEvent(Array.isArray(data)?data[0]:data);
 }
 export async function openDeveloperTestEvent(eventId) {
   const {error}=await supabase.rpc('open_developer_test_event',{p_event:eventId});
   if(error)throw new Error('Developer access is required to open this private test event.');
+}
+export async function deleteDeveloperTestEvent(eventId,name) {
+  const {error}=await supabase.rpc('delete_developer_test_event',{p_event:eventId,p_confirm_name:name});
+  if(error)throw new Error('Could not delete this private test event. Refresh the list, confirm Developer access, and install the updated developer-test-events.sql.');
 }
 export async function listSelectableEvents() {
   if (E2E_MOCK) return [{ id: "11111111-1111-4111-8111-111111111111", name: "Highlander Summit", branding: {} }];

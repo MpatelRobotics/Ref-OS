@@ -71,24 +71,31 @@ revoke all on function public.guard_developer_test_membership() from public,anon
 drop trigger if exists guard_developer_test_membership on public.event_members;
 create trigger guard_developer_test_membership before insert or update on public.event_members for each row execute function public.guard_developer_test_membership();
 
-create or replace function public.create_developer_test_event(p_name text,p_admin_credential text,p_format text default 'tournament',p_sample_teams boolean default true)
+-- Remove the old passcode-taking entry point and any credentials on existing test events.
+drop function if exists public.create_developer_test_event(text,text,text,boolean);
+delete from public.event_access_credentials where event_id in (select event_id from public.developer_test_events);
+create or replace function public.create_developer_test_event(p_name text,p_format text default 'tournament',p_sample_teams boolean default true)
 returns setof public.events language plpgsql security definer set search_path=public as $$
-declare v_event public.events%rowtype;
+declare v_event public.events%rowtype; factory_code text;
 begin
  if not public.refos_is_developer(auth.uid()) then raise exception 'Developer access required.'; end if;
  if p_format not in ('tournament','league') then raise exception 'Choose Tournament or League.'; end if;
- select * into v_event from public.create_refos_vex_event_with_format(trim(p_name),upper(trim(p_admin_credential)),p_format) limit 1;
+ -- Reuse normal event/rule setup atomically. Its temporary credential is removed before
+ -- this transaction commits; private events have no usable event access code.
+ factory_code:=floor(random()*10)::int::text||chr(65+floor(random()*26)::int)||lpad(floor(random()*100)::int::text,2,'0');
+ select * into v_event from public.create_refos_vex_event_with_format(trim(p_name),factory_code,p_format) limit 1;
  if v_event.id is null then raise exception 'Could not create test event.'; end if;
  update public.event_members set developer=true where event_id=v_event.id and user_id=auth.uid();
  insert into public.developer_test_events(event_id,created_by) values(v_event.id,auth.uid());
+ delete from public.event_access_credentials where event_id=v_event.id;
  if p_sample_teams then
   insert into public.teams(event_id,number,name)
   select v_event.id,(97000+i)::text||chr(65+(i-1)%26),'Test Team '||lpad(i::text,2,'0') from generate_series(1,32) i;
  end if;
  return next v_event;
 end $$;
-revoke all on function public.create_developer_test_event(text,text,text,boolean) from public,anon;
-grant execute on function public.create_developer_test_event(text,text,text,boolean) to authenticated;
+revoke all on function public.create_developer_test_event(text,text,boolean) from public,anon;
+grant execute on function public.create_developer_test_event(text,text,boolean) to authenticated;
 
 create or replace function public.list_developer_test_events()
 returns setof public.events language plpgsql stable security definer set search_path=public as $$
@@ -109,4 +116,28 @@ begin
 end $$;
 revoke all on function public.open_developer_test_event(uuid) from public,anon;
 grant execute on function public.open_developer_test_event(uuid) to authenticated;
+
+create or replace function public.delete_developer_test_event(p_event uuid,p_confirm_name text)
+returns void language plpgsql security definer set search_path=public as $$
+declare v_event public.events%rowtype; v_table text;
+ v_known text[]:=array['push_dispatches','push_subscriptions','device_status','feedback','awp_status','field_reset_status','field_reset_checks','field_log','violations','nominations','shortlist','watch_notes','alliances','matches','teams','rules','ref_roster','event_settings','event_access_attempts','event_access_credentials','event_members'];
+begin
+ if not public.refos_is_developer(auth.uid()) then raise exception 'Developer access required.'; end if;
+ select e.* into v_event from public.events e join public.developer_test_events t on t.event_id=e.id where e.id=p_event for update of e;
+ if not found then raise exception 'Private test event not found.'; end if;
+ if v_event.name is distinct from p_confirm_name then raise exception 'The event name changed. Refresh and try again.'; end if;
+ -- Reuse normal archive/protection checks, but developer authorization replaces a passcode.
+ perform public.open_developer_test_event(p_event);
+ perform public.archive_refos_event(p_event);
+ foreach v_table in array v_known loop
+  if to_regclass('public.'||v_table) is not null then execute format('delete from public.%I where event_id=$1',v_table) using p_event; end if;
+ end loop;
+ for v_table in select c.table_name from information_schema.columns c join information_schema.tables t on t.table_schema=c.table_schema and t.table_name=c.table_name
+  where c.table_schema='public' and c.column_name='event_id' and c.data_type='uuid' and t.table_type='BASE TABLE' and c.table_name<>all(v_known)
+ loop execute format('delete from public.%I where event_id=$1',v_table) using p_event; end loop;
+ insert into public.refos_storage_purge_queue(purged_event_id) values(p_event) on conflict(purged_event_id) do update set requested_at=now();
+ delete from public.events where id=p_event;
+end $$;
+revoke all on function public.delete_developer_test_event(uuid,text) from public,anon;
+grant execute on function public.delete_developer_test_event(uuid,text) to authenticated;
 commit;

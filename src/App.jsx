@@ -96,6 +96,7 @@ import UniversalFeedback from "./components/UniversalFeedback.jsx";
 import DeveloperPageLock from "./components/DeveloperPageLock.jsx";
 import DeveloperAccessManager from "./components/DeveloperAccessManager.jsx";
 import DeveloperTestEvents from "./components/DeveloperTestEvents.jsx";
+import useDeveloperSession from "./useDeveloperSession.js";
 import LostFoundBoard from "./components/LostFoundBoard.jsx";
 import JudgingInterviews from "./components/JudgingInterviews.jsx";
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
@@ -925,8 +926,10 @@ export default function App() {
     setDeviceLock(null);
     setLockNotice("");
     setDeveloper(false);
-    try { await api.clearAccessSession(); } catch {}
-  }, []);
+    let keepDeveloper=developer;
+    try { keepDeveloper=keepDeveloper||await api.hasDeveloperSession(); } catch {}
+    if(!keepDeveloper)try { await api.clearAccessSession(); } catch {}
+  }, [developer]);
 
   useEffect(() => {
     if (!activeEventId) {
@@ -1373,22 +1376,9 @@ const formatEventDate = (value) => {
 const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, initialNotice = "" }) => {
   const [refPortal,setRefPortal]=useState(()=>REFEREE_PORTAL_ENABLED && new URLSearchParams(window.location.search).has("refPortal"));
   const developerPage = new URLSearchParams(window.location.search).get('page') === 'developer' || new URLSearchParams(window.location.search).get('open') === 'universal-feedback';
-  const [developerPageUnlocked, setDeveloperPageUnlocked] = useState(false);
-  const lockDeveloperPage=useCallback(()=>{setDeveloperPageUnlocked(false);setDeveloperPasskeySession(false);setLiveActivityOpen(false);setUniversalFeedbackOpen(false);},[]);
-  const [developerPasskeySession, setDeveloperPasskeySession] = useState(false);
-  useEffect(() => {
-    if (!developerPageUnlocked || !developerPasskeySession) return;
-    let lastActive = Date.now(), timer;
-    const lock = () => { setDeveloperPageUnlocked(false); setDeveloperPasskeySession(false); setLiveActivityOpen(false); setUniversalFeedbackOpen(false); };
-    const check = () => { clearTimeout(timer); const remaining = 180000 - (Date.now() - lastActive); if (remaining <= 0) lock(); else timer = setTimeout(check, remaining); };
-    const activity = () => { if (Date.now() - lastActive >= 180000) { lock(); return; } lastActive = Date.now(); check(); };
-    const visible = () => { if (!document.hidden) check(); };
-    const events = ['pointerdown', 'keydown', 'wheel', 'scroll'];
-    events.forEach(name => window.addEventListener(name, activity, { passive: true, capture: true }));
-    document.addEventListener('visibilitychange', visible);
-    check();
-    return () => { clearTimeout(timer); events.forEach(name => window.removeEventListener(name, activity, true)); document.removeEventListener('visibilitychange', visible); };
-  }, [developerPageUnlocked, developerPasskeySession]);
+  const developerSession=useDeveloperSession(developerPage);
+  const developerPageUnlocked=developerSession.unlocked;
+  const lockDeveloperPage=useCallback(()=>{developerSession.lock();setLiveActivityOpen(false);setUniversalFeedbackOpen(false);},[developerSession.lock]);
   const [liveActivityOpen,setLiveActivityOpen] = useState(false);
   const [universalFeedbackOpen, setUniversalFeedbackOpen] = useState(()=>new URLSearchParams(window.location.search).get("open") === "universal-feedback");
   const [creating, setCreating] = useState(false);
@@ -1520,11 +1510,13 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{view === "archived" ? "Archived events keep all of their data. Use the event’s Admin code or the Developer code to restore one." : "Select the event this device is working at."}</p>
       </div>
       {REFEREE_PORTAL_ENABLED && !developerPage && <button type="button" onClick={()=>setRefPortal(true)} className="mb-4 min-h-[44px] w-full rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white">Referee portal · Sign in or create account</button>}
-      {developerPage && !developerPageUnlocked ? <DeveloperPageLock events={events} onUnlock={method=>{setDeveloperPasskeySession(method==='passkey');setDeveloperPageUnlocked(true);}}/> : <>
+      {developerPage && developerSession.error && <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-300">{developerSession.error}</p>}
+      {developerPage && developerSession.checking ? <p className="py-4 text-center">Checking developer sign-in...</p> : developerPage && !developerPageUnlocked ? <DeveloperPageLock events={events} onUnlock={developerSession.unlock}/> : <>
       {developerPage && <>
       <a href="/" className="inline-flex items-center min-h-[44px] mb-3 font-semibold text-slate-600 dark:text-slate-300">Back to main page</a>
+      <button type="button" disabled={developerSession.signingOut} onClick={async()=>{await developerSession.signOut();setLiveActivityOpen(false);setUniversalFeedbackOpen(false);}} className="mb-4 min-h-[44px] w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-semibold disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800">{developerSession.signingOut?"Signing out...":"Sign Out"}</button>
       <DeveloperAccessManager onLock={lockDeveloperPage}/>
-      <DeveloperTestEvents onOpen={onChoose}/>
+      <DeveloperTestEvents onOpen={onChoose} onDeleted={cleanUpDeletedEventPhotos}/>
       {liveActivityOpen ? <DeveloperLiveActivity isDeveloper events={events} onClose={()=>setLiveActivityOpen(false)}/> : <button type="button" onClick={()=>setLiveActivityOpen(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 bg-white dark:bg-slate-800 p-3 font-semibold">Live user activity · Developer only</button>}
       {universalFeedbackOpen ? <UniversalFeedback isDeveloper events={events} onClose={()=>setUniversalFeedbackOpen(false)}/> : <button type="button" onClick={()=>setUniversalFeedbackOpen(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 bg-white dark:bg-slate-800 p-3 font-semibold">Universal Feedback · Developer only</button>}
       </>}
