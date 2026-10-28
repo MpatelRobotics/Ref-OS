@@ -19,7 +19,7 @@ import {parseViolationRuleNotes,validViolationRuleDetails,formatViolationRuleNot
 import DeveloperLiveActivity from "./components/DeveloperLiveActivity.jsx";
 import useLiveActivity from "./useLiveActivity.js";
 import EventLocalClock from "./components/EventLocalClock.jsx";
-import IQMatches, {IQMatchDetail, IQInspectionChecklist} from './iq/IQWorkflows.jsx';
+import IQMatches, {IQInspectionChecklist} from './iq/IQWorkflows.jsx';
 import {parseIQMatches, iqTeams} from './iq/iqWorkflows.js';
 import IQ_RULES from './iqLevelUpRules.json';
 import HighlanderPractice from "./components/HighlanderPractice.jsx";
@@ -3428,11 +3428,6 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     await reloadMatches();
     markTMSync("matches");
   };
-  const saveIQScore = async (match, score) => {
-    if (!adminUnlocked || !isIQ) throw new Error("Only an Admin can save an IQ shared score.");
-    await api.updateMatchScore(eventId, match.phase, match.num, score, null, null);
-    await reloadMatches();
-  };
   const importIQFile = async (file) => {
     try {
       const rows = parseIQMatches(await file.text(), file.name, parseCSV);
@@ -4821,7 +4816,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={isIQ ? undefined : teamRecords[openTeam]}
             onLog={highlanderDemoLocked ? undefined : () => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked && !highlanderDemoLocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : openMatch ? (
-          isIQ ? <IQMatchDetail key={openMatch} match={matches[openMatch]} teamName={teamNameMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} canEdit={adminUnlocked && !highlanderDemoLocked} onSaveScore={saveIQScore} onLogTeam={!isEmcee && !isJudge ? number => { const m=matches[openMatch]; setLogFor(number); setLogMatch({phase:m.phase,num:m.num}); } : null} onAddField={!isEmcee && !isJudge ? addFieldLog : null} /> : <MatchDetail tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
+          <MatchDetail isIQ={isIQ} tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
             fieldLog={fieldLog} fieldResetChecks={fieldResetChecks} onVerifyFieldReset={verifyFieldResetQuadrant} onResetFieldReset={resetFieldResetMatch}
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={highlanderDemoLocked ? undefined : (n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} emcee={isEmcee} />
@@ -4830,7 +4825,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         ) : view === "lost-found" ? (
           <LostFoundBoard embedded key={eventId} eventId={eventId} eventName={event?.name || "Current event"} meName={meName} canManage={adminUnlocked}/>
         ) : view === "matches" ? (
-          isIQ ? <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} parseCSV={parseCSV} /> : <MatchList tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
+          isIQ ? <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} renderMatches={rows=><MatchList isIQ matches={Object.fromEntries(rows.map(row=>[row.id,row]))} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={false} emcee={isEmcee} fieldNames={fieldNames} />} parseCSV={parseCSV} /> : <MatchList tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
           <><RobotCheckIn teams={scheduleTeams.scheduled} checkIn={eventSettings?.tm_check_in?.value} onOpen={setOpenRobot} /><RobotList followups={operationRows.filter(r=>r.kind==='inspection-followup'&&r.payload.status==='open'&&(r.session_id||null)===(leagueSessionId||null)&&(r.division_id===0||r.division_id===divisionId))} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={scheduleTeams.scheduled} query={query} setQuery={setQuery} onOpen={setOpenRobot} /><UnscheduledTeams teams={scheduleTeams.unscheduled} query={query} onOpen={setOpenRobot} robots /></>
         ) : view === "judging" ? (
@@ -4873,7 +4868,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         ) : view === "awp" ? (
           isIQ ? <p>AWP is a V5 tool. IQ teamwork has no autonomous win point.</p> : <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} fieldNames={fieldNames} />
         ) : view === "alliances" ? (
-          isIQ ? <IQMatches key={`iq-finals-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} parseCSV={parseCSV} /> : <AllianceSelection tmActivity={eventSettings?.tm_field_activity?.value} onOpenMatch={id => { setOpenMatch(id); setView("matches"); }} matches={matches} finalsBestOf={event?.finalsBestOf} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
+          isIQ ? <IQMatches key={`iq-finals-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} renderMatches={rows=><MatchList isIQ matches={Object.fromEntries(rows.map(row=>[row.id,row]))} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={false} emcee={isEmcee} fieldNames={fieldNames} />} parseCSV={parseCSV} /> : <AllianceSelection tmActivity={eventSettings?.tm_field_activity?.value} onOpenMatch={id => { setOpenMatch(id); setView("matches"); }} matches={matches} finalsBestOf={event?.finalsBestOf} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
         ) : (
           <>
             {!!event?.quals && (
@@ -5935,14 +5930,14 @@ function RulePicker({ ruleDetails, onSetRuleDetails, rules, knownRules, eventId,
 
 /* ============================ ADD TEAM MODAL ============================ */
 
-function MatchList({ tmTimes=[], eventTimezone='UTC', tmActivity, matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
+function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
   const [field, setField] = useState("all");
   const [liveNow, setLiveNow] = useState(Date.now);
   useEffect(() => { const timer = setInterval(() => setLiveNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
   const liveHighlights = tmMatchHighlights(matches, tmActivity, liveNow);
   const currentMatches = Object.values(matches || {}).filter(row => liveHighlights[row.id] === 'current').sort((a, b) => a.num - b.num);
   const all = Object.values(matches);
-  const hasElims = all.some((m) => m.phase && m.phase !== "qual");
+  const hasElims = !isIQ && all.some((m) => m.phase && m.phase !== "qual");
   const [tab, setTab] = useState(() => hasElims ? "elim" : "qual"); // "qual" | "elim"
 
   // Elimination matches take priority once they exist. This also handles the
@@ -5961,7 +5956,7 @@ function MatchList({ tmTimes=[], eventTimezone='UTC', tmActivity, matches, teamN
   const replayByMatch = Object.fromEntries(replayEntries.map((entry) => [entry.matchId, entry]));
   const timeoutSet = new Set(fieldLog.filter((e) => e.kind === "timeout" && e.matchId).map((e) => e.matchId));
   const faultSet = new Set(fieldLog.filter((e) => e.kind === "field_fault" && e.matchId).map((e) => e.matchId));
-  const inTab = all.filter((m) => (tab === "qual" ? (m.phase || "qual") === "qual" : (m.phase && m.phase !== "qual")));
+  const inTab = isIQ ? all : all.filter((m) => (tab === "qual" ? (m.phase || "qual") === "qual" : (m.phase && m.phase !== "qual")));
   const PHASE_ORDER = { qual: 0, practice: 1, r16: 2, qf: 3, sf: 4, final: 5 };
   const list = inTab.sort((a, b) => (PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase]) || tmMatchOrder(a,b));
   const fields = [...new Set(list.map((m) => m.field).filter(Boolean))].sort();
@@ -5993,7 +5988,7 @@ function MatchList({ tmTimes=[], eventTimezone='UTC', tmActivity, matches, teamN
           </div>
         </div>
       )}
-      {(hasElims || canAdd) && (
+      {!isIQ && (hasElims || canAdd) && (
         <div className="flex gap-1.5 mb-3">
           {[["qual", "Qualifications"], ["elim", "Eliminations"]].map(([k, lbl]) => (
             <button key={k} onClick={() => { setTab(k); setField("all"); }}
@@ -6029,20 +6024,21 @@ function MatchList({ tmTimes=[], eventTimezone='UTC', tmActivity, matches, teamN
               <button onClick={() => onOpen(m.id)} className={`w-full text-left rounded-xl border px-4 py-3 flex flex-wrap sm:flex-nowrap items-center gap-3 hover:shadow-sm transition ${liveHighlights[m.id] === 'current' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 dark:border-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'bg-amber-50 dark:bg-amber-950 border-amber-500 dark:border-amber-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}>
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-14 shrink-0">{rowLabel(m)}</span>
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
-                  <span className="text-red-700 dark:text-red-300 font-semibold">{m.red.join("  ")}</span>
-                  <span className="text-slate-500 dark:text-slate-400 font-sans">vs</span>
-                  <span className="text-blue-700 dark:text-blue-300 font-semibold">{m.blue.join("  ")}</span>
+                  <span className={isIQ?"text-slate-800 dark:text-slate-100 font-semibold":"text-red-700 dark:text-red-300 font-semibold"}>{isIQ?iqTeams(m).join(" + "):m.red.join("  ")}</span>
+                  {!isIQ && <span className="text-slate-500 dark:text-slate-400 font-sans">vs</span>}
+                  {!isIQ && <span className="text-blue-700 dark:text-blue-300 font-semibold">{m.blue.join("  ")}</span>}
                 </div>
                 <ScheduledMatchTime match={m} times={tmTimes} zone={eventTimezone}/>
                 {liveHighlights[m.id] && <span className={`text-xs font-semibold shrink-0 ${liveHighlights[m.id] === 'current' ? 'text-emerald-800 dark:text-emerald-200' : 'text-amber-800 dark:text-amber-200'}`}>{liveHighlights[m.id] === 'current' ? 'Playing now' : 'Up next'}</span>}
                 {m.field && <span className="text-[11px] text-slate-600 dark:text-slate-300 shrink-0">{fieldDisplayName(m.field, fieldNames)}</span>}
-                {m.redScore != null && m.blueScore != null && (
+                {isIQ && m.redScore != null && <span className="font-mono text-sm font-bold shrink-0 text-slate-800 dark:text-slate-100">Shared score: {m.redScore}</span>}
+                {!isIQ && m.redScore != null && m.blueScore != null && (
                   <span aria-label={`Score: red ${m.redScore}, blue ${m.blueScore}`} className="font-mono text-sm font-bold shrink-0"><span className="text-slate-500 mr-1">Score</span><span className="text-red-700 dark:text-red-300">{m.redScore}</span><span className="text-slate-500 dark:text-slate-400"> – </span><span className="text-blue-700 dark:text-blue-300">{m.blueScore}</span></span>
                 )}
-                {eliminationPairingKey(m) && eliminationResultLabel(m) && <span className="text-xs font-semibold text-amber-800 dark:text-amber-200">{eliminationResultLabel(m)}</span>}
-                {(m.redScore == null || m.blueScore == null) && <span className="text-xs text-slate-500 shrink-0">Awaiting score</span>}
+                {!isIQ && eliminationPairingKey(m) && eliminationResultLabel(m) && <span className="text-xs font-semibold text-amber-800 dark:text-amber-200">{eliminationResultLabel(m)}</span>}
+                {(m.redScore == null || (!isIQ && m.blueScore == null)) && <span className="text-xs text-slate-500 shrink-0">Awaiting score</span>}
                 {!emcee && replaySet.has(m.id) && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700 shrink-0"><RefreshCw size={10} /> REPLAY</span>}
-                {!emcee && timeoutSet.has(m.id) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700 shrink-0">TO</span>}
+                {!isIQ && !emcee && timeoutSet.has(m.id) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700 shrink-0">TO</span>}
                 {!emcee && faultSet.has(m.id) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-red-100 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-200 dark:border-red-700 shrink-0">FAULT</span>}
                 {!emcee && vcount[m.id] ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold border bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 shrink-0">{vcount[m.id]}</span> : null}
                 <ChevronRight size={16} className="text-slate-300 shrink-0" />
@@ -6152,7 +6148,7 @@ function AwpChecker({ onSave }) {
 
 const REPLAY_REASONS = ["Field fault", "Scoring or timer issue", "Match started incorrectly", "Safety interruption", "External interference", "Other"];
 
-function MatchDetail({ tmTimes=[], eventTimezone='UTC', tmActivity, match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, canManageViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
+function MatchDetail({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, canManageViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
   const league = useContext(LeagueUiContext);
   const [toOpen, setToOpen] = useState(false);
   const [toAlliance, setToAlliance] = useState("red");
@@ -6170,6 +6166,7 @@ function MatchDetail({ tmTimes=[], eventTimezone='UTC', tmActivity, match, match
   const liveHighlights = tmMatchHighlights(matches || {}, tmActivity, liveNow);
   const currentMatches = Object.values(matches || {}).filter(row => liveHighlights[row.id] === 'current').sort((a, b) => a.num - b.num);
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
+  if(isIQ && (iqTeams(match).length>2 || match.blueScore!=null))return <Empty title="Import an IQ teamwork schedule" sub="This match contains opposing alliances or scores." />;
   const m = match;
   const heading = m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`);
   const matchEntries = fieldLog.filter((e) => e.matchId === m.id).sort((a, b) => b.createdAt - a.createdAt);
@@ -6181,7 +6178,7 @@ function MatchDetail({ tmTimes=[], eventTimezone='UTC', tmActivity, match, match
   const fieldResetCount = new Set(matchFieldResetChecks.map((e) => Number(e.quadrant))).size;
   const allTimeouts = fieldLog.filter((e) => e.kind === "timeout");
   const allianceTeams = toAlliance === "red" ? (m.red || []) : (m.blue || []);
-  const isElim = m.phase && m.phase !== "qual" && m.phase !== "practice";
+  const isElim = !isIQ && m.phase && m.phase !== "qual" && m.phase !== "practice";
   const doTimeout = async () => {
     if (busy) return;
     // one timeout per alliance for the whole elimination bracket — an alliance is its set of teams
@@ -6244,18 +6241,18 @@ function MatchDetail({ tmTimes=[], eventTimezone='UTC', tmActivity, match, match
     else stat[t].codes["—"] = (stat[t].codes["—"] || 0) + 1;
   }
   const Alliance = ({ label, teams, color }) => (
-    <div className={`rounded-xl border p-3 ${color === "red" ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800" : "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"}`}>
-      <p className={`text-xs font-bold uppercase tracking-wide mb-2 ${color === "red" ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}>{label}</p>
+    <div className={`rounded-xl border p-3 ${isIQ ? "bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700" : color === "red" ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800" : "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"}`}>
+      <p className={`text-xs font-bold uppercase tracking-wide mb-2 ${isIQ ? "text-slate-600 dark:text-slate-300" : color === "red" ? "text-red-700 dark:text-red-300" : "text-blue-700 dark:text-blue-300"}`}>{label}</p>
       <div className="space-y-2">
         {teams.map((n) => {
           const s = stat[n];
           return (
-            <button key={n} onClick={emcee ? undefined : () => onLogTeam(n)} className={`w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2.5 text-left ${emcee ? "cursor-default" : "hover:border-slate-300 dark:border-slate-600"}`}>
+            <button key={n} onClick={emcee || !onLogTeam ? undefined : () => onLogTeam(n)} className={`w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2.5 text-left ${emcee ? "cursor-default" : "hover:border-slate-300 dark:border-slate-600"}`}>
               <div className="flex items-center gap-2">
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{n}</span>
                 {teamRank[n] != null && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-200 dark:border-indigo-800 text-[11px] font-bold shrink-0">Rank {teamRank[n]}</span>}
                 {teamName[n] && <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{teamName[n]}</span>}
-                {!emcee && <span className="ml-auto text-xs font-semibold text-[#D7212B] flex items-center gap-1 shrink-0"><Plus size={14} /> Log</span>}
+                {!emcee && onLogTeam && <span className="ml-auto text-xs font-semibold text-[#D7212B] flex items-center gap-1 shrink-0"><Plus size={14} /> Log</span>}
               </div>
               {!emcee && s && s.total > 0 && (
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -6292,7 +6289,8 @@ function MatchDetail({ tmTimes=[], eventTimezone='UTC', tmActivity, match, match
           <div>
             <div className="font-mono font-bold text-2xl text-slate-900 dark:text-slate-100 leading-none">{heading}</div>
             {match.field && <div className="text-sm text-slate-500 dark:text-slate-400 mt-1">{fieldDisplayName(match.field, fieldNames)}</div>}
-            {m.redScore != null && m.blueScore != null && (
+            {isIQ && <div className="mt-2 text-sm font-mono font-bold text-slate-800 dark:text-slate-100">Shared score: {m.redScore ?? "Not scored"}</div>}
+            {!isIQ && m.redScore != null && m.blueScore != null && (
               <div className="mt-2 inline-flex items-center gap-2 text-sm font-mono font-bold">
                 <span className={`px-2 py-0.5 rounded ${m.winner === "red" ? "bg-red-600 text-white" : "text-red-700 dark:text-red-300"}`}>{m.redScore}</span>
                 <span className="text-slate-400">–</span>
@@ -6326,6 +6324,7 @@ function MatchDetail({ tmTimes=[], eventTimezone='UTC', tmActivity, match, match
           </div>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+          {!isIQ && <>
           <button type="button" disabled={isElim} onClick={() => { setAwpOpen(true); setFieldResetOpen(false); setReplayOpen(false); setTimeout(() => document.getElementById(`match-operations-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }} className={`w-full text-left rounded-lg border px-3 py-2.5 transition hover:-translate-y-0.5 hover:shadow-sm disabled:hover:translate-y-0 disabled:hover:shadow-none ${isElim ? "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40 cursor-not-allowed" : awpEntry ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30" : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"}`}>
             <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400"><ClipboardCheck size={13} /> AWP</div>
             <div className={`mt-1 text-sm font-bold ${isElim ? "text-slate-500 dark:text-slate-400" : awpEntry ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}>{isElim ? "N/A" : awpEntry ? "Checked" : "Unchecked"}</div>
@@ -6336,6 +6335,7 @@ function MatchDetail({ tmTimes=[], eventTimezone='UTC', tmActivity, match, match
             <div className={`mt-1 text-sm font-bold ${fieldResetCount >= 4 ? "text-emerald-700 dark:text-emerald-300" : "text-blue-700 dark:text-blue-300"}`}>{fieldResetCount >= 4 ? "Ready" : `${fieldResetCount}/4`}</div>
           </button>
 
+          </>}
           <button type="button" onClick={() => document.getElementById(`match-violations-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })} className={`w-full text-left rounded-lg border px-3 py-2.5 transition hover:-translate-y-0.5 hover:shadow-sm ${mv.length > 0 ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30" : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40"}`}>
             <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400"><ShieldAlert size={13} /> Violations</div>
             <div className={`mt-1 text-sm font-bold ${mv.length > 0 ? "text-red-700 dark:text-red-300" : "text-slate-700 dark:text-slate-300"}`}>{mv.length > 0 ? `${mv.length} logged` : "None logged"}</div>
@@ -6350,8 +6350,7 @@ function MatchDetail({ tmTimes=[], eventTimezone='UTC', tmActivity, match, match
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-        <Alliance label="Red alliance" teams={match.red} color="red" />
-        <Alliance label="Blue alliance" teams={match.blue} color="blue" />
+        {isIQ ? <div className="sm:col-span-2"><Alliance label="Teamwork partners" teams={iqTeams(match)} /></div> : <><Alliance label="Red alliance" teams={match.red} color="red" /><Alliance label="Blue alliance" teams={match.blue} color="blue" /></>}
       </div>
       {!emcee && (<div id={`match-operations-${m.id}`} className="mb-4 scroll-mt-24">
         <div className="flex gap-2">
@@ -6369,10 +6368,10 @@ function MatchDetail({ tmTimes=[], eventTimezone='UTC', tmActivity, match, match
             <div className="flex gap-2"><button onClick={() => { setReplayOpen(false); setReplayReason(""); setReplayDetails(""); }} className="px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 font-semibold">Cancel</button><button onClick={saveReplay} disabled={!replayReason || (replayReason === "Other" && !replayDetails.trim()) || busy} className="flex-1 px-4 py-2.5 rounded-lg bg-amber-500 text-white font-bold disabled:bg-slate-300">{busy ? "Saving…" : "Mark for replay"}</button></div>
           </div>
         )}
-        {!isElim && <button onClick={() => { setAwpOpen((v) => !v); setToOpen(false); setFaultOpen(false); }} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${awpOpen ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"}`}><ClipboardCheck size={15} /> AWP check</button>}
-        {!isElim && awpOpen && <AwpChecker onSave={(note) => onAddField({ kind: "awp", matchId: m.id, matchRef: heading, note })} />}
-        <button onClick={() => setFieldResetOpen((v) => !v)} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${fieldResetOpen ? "bg-blue-600 text-white border-blue-600" : fieldResetCount >= 4 ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700"}`}><ShieldCheck size={15} /> {fieldResetCount >= 4 ? "Field Ready ✓" : `Quadrant check ${fieldResetCount}/4`}</button>
-        {fieldResetOpen && <QuadrantFieldReset checks={matchFieldResetChecks} meName={meName} matchLabel={heading} onClose={() => setFieldResetOpen(false)} onVerify={(quadrant) => onVerifyFieldReset(m.id, heading, quadrant)} onReset={() => onResetFieldReset(m.id)} />}
+        {!isIQ && !isElim && <button onClick={() => { setAwpOpen((v) => !v); setToOpen(false); setFaultOpen(false); }} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${awpOpen ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"}`}><ClipboardCheck size={15} /> AWP check</button>}
+        {!isIQ && !isElim && awpOpen && <AwpChecker onSave={(note) => onAddField({ kind: "awp", matchId: m.id, matchRef: heading, note })} />}
+        {!isIQ && <button onClick={() => setFieldResetOpen((v) => !v)} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${fieldResetOpen ? "bg-blue-600 text-white border-blue-600" : fieldResetCount >= 4 ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700"}`}><ShieldCheck size={15} /> {fieldResetCount >= 4 ? "Field Ready ✓" : `Quadrant check ${fieldResetCount}/4`}</button>}
+        {!isIQ && fieldResetOpen && <QuadrantFieldReset checks={matchFieldResetChecks} meName={meName} matchLabel={heading} onClose={() => setFieldResetOpen(false)} onVerify={(quadrant) => onVerifyFieldReset(m.id, heading, quadrant)} onReset={() => onResetFieldReset(m.id)} />}
         {isElim && toOpen && (
           <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2">
             <div className="flex gap-2">
