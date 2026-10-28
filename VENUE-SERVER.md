@@ -337,3 +337,9 @@ Build the web app, then run npm run build:venue-desktop. The venue-desktop-relea
 The Android Venue Server is a separate app (com.refos.venue), so it can be installed alongside TM Connect. It uses native SQLite and a foreground connected-device service with a visible Stop Server notification. Android 8 or later is required. Keep the device powered and connected to venue Wi-Fi. The service is not automatically restarted after force-stop or reboot. Records stay in app-private storage across server restarts; uninstalling deletes them. Export before uninstalling. Cloud reconciliation is still manual.
 
 Build the web app, run npm run prepare:venue-android, then from android run gradlew :venue:assembleDebug :venue:testDebugUnitTest. The Android release workflow uses the existing Android keystore secrets for installable APK updates; no paid Windows signing service is required.
+
+## Host app connection tools and backups
+
+Windows and Android host apps show QR codes containing only the local venue URL, a device list with a 90-second active cutoff, and a Check Readiness button. Readiness checks local health, a LAN address, event pairing, two recent device sync acknowledgments for the same event, and backup availability. It does not certify every Wi-Fi route or replace checking the sample entry on both screens.
+
+The host apps save consistent SQLite snapshots at startup, every five minutes while running, and before stopping. Only the latest 24 app-generated snapshots are rotated; unrelated files are untouched. Restore requires a stopped host and saves the current data first. Backups stay on the host; Windows can open the backup folder, and Android can export a selected snapshot through the document picker. Android backups disappear if the app is uninstalled. These backups do not automatically upload or reconcile with Cloud.

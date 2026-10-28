@@ -63,6 +63,7 @@ export function openStore(dataDir) {
       PRIMARY KEY (event_id, device_id)
     );
   `);
+  if (!db.prepare('PRAGMA table_info(devices)').all().some(column => column.name === 'last_seq')) db.exec('ALTER TABLE devices ADD COLUMN last_seq INTEGER NOT NULL DEFAULT 0');
   db.prepare("INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', ?)").run(String(SCHEMA_VERSION));
 
   const q = {
@@ -89,7 +90,7 @@ export function openStore(dataDir) {
     countChanges: db.prepare("SELECT COUNT(*) AS n FROM changes WHERE event_id = ?"),
     touchDevice: db.prepare(`INSERT INTO devices(event_id, device_id, label, last_seen) VALUES (?, ?, ?, ?)
       ON CONFLICT(event_id, device_id) DO UPDATE SET label = COALESCE(excluded.label, devices.label), last_seen = excluded.last_seen`),
-    listDevices: db.prepare("SELECT device_id, label, last_seen FROM devices WHERE event_id = ? ORDER BY last_seen DESC"),
+    listDevices: db.prepare("SELECT device_id, label, last_seen, last_seq FROM devices WHERE event_id = ? ORDER BY last_seen DESC"),
   };
 
   // Apply one validated change atomically. Returns { status, seq, version }.
@@ -175,6 +176,7 @@ export function openStore(dataDir) {
       return { records: byKind, changes: q.countChanges.get(eventId).n };
     },
     touchDevice: (eventId, deviceId, label, now) => q.touchDevice.run(eventId, deviceId, label || null, now),
+    acknowledgeDevice: (eventId, deviceId, seq) => db.prepare('UPDATE devices SET last_seq = MAX(last_seq, ?) WHERE event_id = ? AND device_id = ?').run(seq, eventId, deviceId),
     listDevices: (eventId) => q.listDevices.all(eventId),
     close: () => db.close(),
   };

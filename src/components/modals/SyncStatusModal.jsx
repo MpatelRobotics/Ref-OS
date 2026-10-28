@@ -156,14 +156,15 @@ export default function SyncStatusModal({ eventId, eventName = "", onClose }) {
             <ol className="mt-3 list-decimal space-y-3 pl-5">
               <li><b>Choose one host.</b> Download the Windows or Android app on the device that will host your event. On Android, open the downloaded APK and follow the installation prompts.</li>
               <li><b>Start sharing.</b> Open <b>Ref OS Venue Server</b> and tap <b>Start Server</b>. Keep the host powered on and connected to Wi-Fi. No command window or Node.js installation is needed.</li>
-              <li><b>Connect each device.</b> Join the same Wi-Fi as the host device. In this menu on each device, enter the host device’s full address in <b>Server URL</b> below, then tap <b>Open Ref OS at the venue address</b> and sign in.</li>
-              <li><b>Check sharing.</b> Add a sample violation and confirm it appears on a second device.</li>
+              <li><b>Connect each device.</b> Join the host’s Wi-Fi and scan the QR code in the Venue Server app. Or enter its address in <b>Server URL</b> below and tap <b>Open Ref OS at the venue address</b>. Sign in on each device.</li>
+              <li><b>Check sharing.</b> Add a sample violation and confirm it appears on a second device, then tap <b>Check Readiness</b> in the host app.</li>
             </ol>
             <details className="mt-3"><summary className="min-h-[44px] cursor-pointer py-2 font-semibold">First-time setup &amp; offline details</summary><div className="space-y-2 pt-1">
               <p>The Windows and Android apps include everything needed to run the server. <a className="underline" href="/Ref-OS-Venue-Server.zip" download>Advanced: download the command-line ZIP instead</a> (requires Node.js 22.13 or newer).</p>
               <p>Sign in on each device while internet is available. Keep the host device awake.</p>
               <p>On Android, allow the server notification so you can see when sharing is running. Keep the host plugged in. Force-stopping the app or restarting Android stops sharing; reopen the app and tap Start Server. Export your data before uninstalling the host app.</p>
               <p>Local sharing covers violations, field logs, roster and presence. Other features still use the cloud.</p>
+              <p>The host app lists connected devices and saves backups every 5 minutes while running. It keeps the latest 24 copies. Stop the server to restore a backup; the current data is backed up first. Copy or export backups off the host for extra protection.</p>
               <p>Venue records do not upload to the cloud automatically. Export Venue Data before switching back to Cloud.</p>
             </div></details>
           </div>

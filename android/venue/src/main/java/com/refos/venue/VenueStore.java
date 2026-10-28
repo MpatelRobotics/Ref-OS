@@ -16,11 +16,17 @@ final class VenueStore implements AutoCloseable {
   db.execSQL("CREATE TABLE IF NOT EXISTS changes(seq INTEGER PRIMARY KEY AUTOINCREMENT,event TEXT,change_id TEXT,kind TEXT,id TEXT,op TEXT,data TEXT,version INTEGER,status TEXT,device TEXT,ts INTEGER,UNIQUE(event,change_id))");
   db.execSQL("CREATE INDEX IF NOT EXISTS event_seq ON changes(event,seq)");
   db.execSQL("CREATE TABLE IF NOT EXISTS devices(event TEXT,id TEXT,label TEXT,seen INTEGER,PRIMARY KEY(event,id))");
+  boolean hasSeq=false;try(Cursor c=db.rawQuery("PRAGMA table_info(devices)",null)){while(c.moveToNext())if("last_seq".equals(c.getString(1)))hasSeq=true;}if(!hasSeq)db.execSQL("ALTER TABLE devices ADD COLUMN last_seq INTEGER NOT NULL DEFAULT 0");
  }
  synchronized String key(String event){try(Cursor c=db.rawQuery("SELECT key_hash FROM events WHERE id=?",new String[]{event})){return c.moveToFirst()?c.getString(0):null;}}
  synchronized void register(String event,String hash){db.execSQL("INSERT INTO events VALUES(?,?)",new Object[]{event,hash});}
  synchronized long latest(String event){try(Cursor c=db.rawQuery("SELECT COALESCE(MAX(seq),0) FROM changes WHERE event=?",new String[]{event})){c.moveToFirst();return c.getLong(0);}}
- synchronized void touch(String event,String id,String label){db.execSQL("INSERT OR REPLACE INTO devices VALUES(?,?,?,?)",new Object[]{event,id,label,System.currentTimeMillis()});}
+ synchronized void touch(String event,String id,String label){db.execSQL("INSERT OR IGNORE INTO devices(event,id,label,seen) VALUES(?,?,?,?)",new Object[]{event,id,label,System.currentTimeMillis()});db.execSQL("UPDATE devices SET label=?,seen=? WHERE event=? AND id=?",new Object[]{label,System.currentTimeMillis(),event,id});}
+ synchronized void acknowledge(String event,String id,long seq){db.execSQL("UPDATE devices SET last_seq=MAX(last_seq,?) WHERE event=? AND id=?",new Object[]{Math.min(seq,latest(event)),event,id});}
+ synchronized int eventCount(){try(Cursor c=db.rawQuery("SELECT COUNT(*) FROM events",null)){c.moveToFirst();return c.getInt(0);}}
+ synchronized JSONArray hostDevices()throws Exception{JSONArray rows=new JSONArray();try(Cursor c=db.rawQuery("SELECT event,id,label,seen,last_seq FROM devices ORDER BY seen DESC",null)){while(c.moveToNext())rows.put(new JSONObject().put("event",c.getString(0)).put("id",c.getString(1)).put("name",c.getString(2)).put("seen",c.getLong(3)).put("lastSeq",c.getLong(4)));}return rows;}
+ synchronized void checkpoint()throws Exception{try(Cursor c=db.rawQuery("PRAGMA wal_checkpoint(FULL)",null)){if(!c.moveToFirst()||c.getInt(0)!=0)throw new java.io.IOException("Database is busy; backup will retry.");}}
+ synchronized void backup(Context context)throws Exception{checkpoint();VenueBackups.copySnapshot(context);}
  synchronized JSONArray apply(String event,String device,JSONArray list) throws Exception {
   JSONArray result=new JSONArray();db.beginTransaction();
   try{for(int i=0;i<list.length();i++){

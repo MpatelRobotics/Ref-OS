@@ -1,8 +1,10 @@
 import {mkdir,copyFile,writeFile,cp} from 'node:fs/promises';
 import {build,Platform,Arch} from 'electron-builder';
+import {build as bundle} from 'esbuild';
 const dir='venue-desktop/build';
 await mkdir(dir,{recursive:true});
-for(const file of ['main.mjs','preload.cjs','index.html','style.css','renderer.js'])await copyFile('venue-desktop/'+file,dir+'/'+file);
+for(const file of ['main.mjs','hostTools.mjs','preload.cjs','index.html','style.css','renderer.js'])await copyFile('venue-desktop/'+file,dir+'/'+file);
+await bundle({stdin:{contents:"module.exports = require('qrcode');",resolveDir:process.cwd()},outfile:dir+'/qr.cjs',bundle:true,platform:'node',format:'cjs'});
 await mkdir(dir+'/resources/venue-server',{recursive:true});
 for(const file of ['server.mjs','store.mjs','validate.mjs','setup-page.mjs','package.json'])await copyFile('venue-server/'+file,dir+'/resources/venue-server/'+file);
 await cp('dist',dir+'/resources/dist',{recursive:true,filter:path=>! /\.(zip|exe|apk|map)$/i.test(path)});

@@ -29,7 +29,7 @@ jobs:
           if (!$env:VITE_SUPABASE_URL -or !$env:VITE_SUPABASE_ANON_KEY) { throw 'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY repository secrets before building the venue app.' }
       - run: npm run build
       - run: node scripts/build-venue-desktop.mjs --prepare
-      - run: node --test tests/venue-desktop.test.mjs tests/venue-reliability.test.mjs
+      - run: node --test tests/venue-desktop.test.mjs tests/venue-reliability.test.mjs tests/venue-host-tools.test.mjs
       - run: npm run build:venue-desktop
       - name: Publish Windows download
         env:

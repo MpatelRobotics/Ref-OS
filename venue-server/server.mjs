@@ -208,6 +208,7 @@ export function createVenueServer(config = readConfig()) {
 
     if (action === "changes" && req.method === "GET") {
       const since = Math.max(0, Number.parseInt(url.searchParams.get("since") || "0", 10) || 0);
+      if (device.id) store.acknowledgeDevice(eventId, device.id, Math.min(since, store.latestSeq(eventId)));
       const limit = Math.min(1000, Math.max(1, Number.parseInt(url.searchParams.get("limit") || "500", 10) || 500));
       const changes = store.changesSince(eventId, since, limit);
       const latestSeq = store.latestSeq(eventId);
