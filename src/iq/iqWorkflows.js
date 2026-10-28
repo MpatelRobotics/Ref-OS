@@ -6,10 +6,10 @@ export function iqScore(counts) {
   if(bags>38)throw new Error('The field has 38 bags. Count each bag only once.');
   return total;
 }
-// Partner order is the TM / printed match-list order, not opposing alliances.
+// Team color follows the TM / printed order; the starting goal is the opposite color.
 export const iqStartingPosition=index=>index===0
- ? {team:1,color:'blue',label:'Team 1 · Blue Pyramid Goal side'}
- : {team:2,color:'red',label:'Team 2 · Red Pyramid Goal side'};
+ ? {team:1,color:'red',label:'Team 1 (Red) · starts beside the blue Pyramid Goal'}
+ : {team:2,color:'blue',label:'Team 2 (Blue) · starts beside the red Pyramid Goal'};
 export const iqTeams=m=>[...new Set([...(m.red||[]),...(m.blue||[])])];
 export const iqMatchName=m=>`${m.phase==='qual'?'Q':m.phase==='practice'?'P':'F'}${m.num}`;
 export function iqFinalPairs(teams,count) {

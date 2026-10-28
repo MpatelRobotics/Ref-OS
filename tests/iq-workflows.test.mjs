@@ -46,9 +46,9 @@ test('IQ TM extra slots cannot hide a third partner',()=>{
  assert.throws(()=>parseIQMatches('Round,MatchNum,Red1,Blue1,Red3\n2,1,7,9,18','tm.csv',csv),/one or two/);
 });
 
-test('IQ starting-side colors follow partner order instead of the TM red/blue header names',()=>{
+test('IQ team colors follow TM order while starting goals use the opposite color',()=>{
  const text=readFileSync(new URL('./fixtures/iq-tm-matches.csv',import.meta.url),'utf8');
  const match=parseIQMatches(text,'IQMatches.csv',csv)[0];
  assert.deepEqual(match.red,['7','9']);
- assert.equal(iqStartingPosition(0).color,'blue');assert.equal(iqStartingPosition(1).color,'red');
+ assert.equal(iqStartingPosition(0).color,'red');assert.equal(iqStartingPosition(1).color,'blue');
 });

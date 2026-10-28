@@ -18,8 +18,8 @@ async function mount(page,mode='detail',iq=true){
 test('shared detail adapts IQ partners and score while removing scoring aid and V5 operations',async({page})=>{
  await page.setViewportSize({width:390,height:844});await mount(page);
  await expect(page.getByText('Teamwork partners',{exact:true})).toBeVisible();
- await expect(page.getByText('Team 1 · Blue Pyramid Goal side',{exact:true})).toHaveCSS('color','rgb(29, 78, 216)');
- await expect(page.getByText('Team 2 · Red Pyramid Goal side',{exact:true})).toHaveCSS('color','rgb(185, 28, 28)');
+ await expect(page.getByText('Team 1 (Red) · starts beside the blue Pyramid Goal',{exact:true})).toHaveCSS('color','rgb(185, 28, 28)');
+ await expect(page.getByText('Team 2 (Blue) · starts beside the red Pyramid Goal',{exact:true})).toHaveCSS('color','rgb(29, 78, 216)');
  await expect(page.getByText('Shared score: 42',{exact:true})).toBeVisible();
  for(const text of ['Level Up scoring aid','Referee quick checks','Red alliance','Blue alliance'])await expect(page.getByText(text,{exact:true})).toHaveCount(0);
  for(const text of ['AWP check','Timeout','Save shared score'])await expect(page.getByRole('button',{name:text,exact:true})).toHaveCount(0);

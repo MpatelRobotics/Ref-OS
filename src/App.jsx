@@ -5974,7 +5974,7 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
   const rowLabel = (m) => (m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`));
   return (
     <>
-      {isIQ&&<p className="mb-3 text-xs text-slate-600 dark:text-slate-300">Starting positions: <span className="text-blue-700 dark:text-blue-300">Team 1 · blue goal side</span> · <span className="text-red-700 dark:text-red-300">Team 2 · red goal side</span></p>}
+      {isIQ&&<p className="mb-3 text-xs text-slate-600 dark:text-slate-300">Partner colors: <span className="text-red-700 dark:text-red-300">Team 1 · Red</span> · <span className="text-blue-700 dark:text-blue-300">Team 2 · Blue</span></p>}
       {currentMatches.map(current => <button key={current.id} type="button" onClick={() => onOpen(current.id)} className="min-h-[44px] px-3 py-2 mb-3 mr-2 rounded-lg border border-emerald-500 bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 text-sm font-semibold">Jump to current match · {current.phase === 'qual' ? `Q${current.num}` : (fmtMatch({ phase: current.phase, num: current.num }) || current.label)}</button>)}
       {!emcee && replaySet.size > 0 && (
         <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/40 dark:border-amber-800 p-3">
@@ -6025,7 +6025,7 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
               <button onClick={() => onOpen(m.id)} className={`w-full text-left rounded-xl border px-4 py-3 flex flex-wrap sm:flex-nowrap items-center gap-3 hover:shadow-sm transition ${liveHighlights[m.id] === 'current' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 dark:border-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'bg-amber-50 dark:bg-amber-950 border-amber-500 dark:border-amber-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}>
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-14 shrink-0">{rowLabel(m)}</span>
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
-                  <span className={isIQ?"text-slate-800 dark:text-slate-100 font-semibold":"text-red-700 dark:text-red-300 font-semibold"}>{isIQ?iqTeams(m).map((number,index)=><React.Fragment key={number}>{index>0&&<span className="text-slate-500"> + </span>}<span title={iqStartingPosition(index).label} className={index===0?"text-blue-700 dark:text-blue-300":"text-red-700 dark:text-red-300"}>{number}</span></React.Fragment>):m.red.join("  ")}</span>
+                  <span className={isIQ?"text-slate-800 dark:text-slate-100 font-semibold":"text-red-700 dark:text-red-300 font-semibold"}>{isIQ?iqTeams(m).map((number,index)=><React.Fragment key={number}>{index>0&&<span className="text-slate-500"> + </span>}<span title={iqStartingPosition(index).label} className={index===0?"text-red-700 dark:text-red-300":"text-blue-700 dark:text-blue-300"}>{number}</span></React.Fragment>):m.red.join("  ")}</span>
                   {!isIQ && <span className="text-slate-500 dark:text-slate-400 font-sans">vs</span>}
                   {!isIQ && <span className="text-blue-700 dark:text-blue-300 font-semibold">{m.blue.join("  ")}</span>}
                 </div>
@@ -6250,12 +6250,12 @@ function MatchDetail({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, 
           return (
             <button key={n} onClick={emcee || !onLogTeam ? undefined : () => onLogTeam(n)} className={`w-full bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2.5 text-left ${emcee ? "cursor-default" : "hover:border-slate-300 dark:border-slate-600"}`}>
               <div className="flex items-center gap-2">
-                <span className={`font-mono font-bold ${isIQ?(index===0?"text-blue-700 dark:text-blue-300":"text-red-700 dark:text-red-300"):"text-slate-900 dark:text-slate-100"}`}>{n}</span>
+                <span className={`font-mono font-bold ${isIQ?(index===0?"text-red-700 dark:text-red-300":"text-blue-700 dark:text-blue-300"):"text-slate-900 dark:text-slate-100"}`}>{n}</span>
                 {teamRank[n] != null && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-200 dark:border-indigo-800 text-[11px] font-bold shrink-0">Rank {teamRank[n]}</span>}
                 {teamName[n] && <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{teamName[n]}</span>}
                 {!emcee && onLogTeam && <span className="ml-auto text-xs font-semibold text-[#D7212B] flex items-center gap-1 shrink-0"><Plus size={14} /> Log</span>}
               </div>
-              {isIQ&&<p className={`mt-1 text-xs font-medium ${index===0?"text-blue-700 dark:text-blue-300":"text-red-700 dark:text-red-300"}`}>{iqStartingPosition(index).label}</p>}
+              {isIQ&&<p className={`mt-1 text-xs font-medium ${index===0?"text-red-700 dark:text-red-300":"text-blue-700 dark:text-blue-300"}`}>{iqStartingPosition(index).label}</p>}
               {!emcee && s && s.total > 0 && (
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <span className="text-[11px] text-slate-400">Prior:</span>
