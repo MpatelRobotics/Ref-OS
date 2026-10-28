@@ -45,6 +45,7 @@ test('private test events are atomic, developer-only, absent from every public l
  assert.equal((await db.query('select * from teams where event_id=$1',[hidden.id])).rows.length,0);
  await assert.rejects(db.query('select * from list_developer_test_events()'),/Developer access/);
  await assert.rejects(db.query('select open_developer_test_event($1)',[hidden.id]),/Developer access/);
+ await assert.rejects(db.query('select open_developer_event($1)',[hidden.id]),/Developer access/);
  await assert.rejects(db.query('select delete_developer_test_event($1,$2)',[hidden.id,'Hidden']),/Developer access/);
  assert.equal((await db.query("update event_members set role='admin' where event_id=$1 returning *",[hidden.id])).rows.length,0);
  await db.exec(`reset role;create function attempt_private_join(p_event uuid) returns void language plpgsql security definer as $$begin insert into event_members values(p_event,auth.uid(),'admin',false) on conflict(event_id,user_id) do update set role='admin';end$$;set role authenticated`);
@@ -57,6 +58,8 @@ test('private test events are atomic, developer-only, absent from every public l
   }
  }
  await db.exec("reset role;set role authenticated;set request.jwt.claim.sub='"+actor+"'");
+ await db.exec("reset role");await db.query("update event_members set developer=false where event_id='11111111-1111-4111-8111-111111111111' and user_id=$1",[actor]);await db.exec("set role authenticated");
+ await db.query("select open_developer_event('11111111-1111-4111-8111-111111111111')");assert.equal((await db.query("select developer from event_members where event_id='11111111-1111-4111-8111-111111111111' and user_id=$1",[actor])).rows[0].developer,true);
  await assert.rejects(db.query('select delete_developer_test_event($1,$2)',['11111111-1111-4111-8111-111111111111','Public Event']),/not found/);
  await assert.rejects(db.query('select delete_developer_test_event($1,$2)',[hidden.id,'Wrong name']),/name changed/);
  await db.query('select delete_developer_test_event($1,$2)',[hidden.id,'Hidden']);

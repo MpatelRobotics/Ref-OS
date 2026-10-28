@@ -1,5 +1,6 @@
 import { createSettingsReadCache } from './settingsReadCache.js';
 import { isDemoEvent } from './demoEvents.js';
+import {resolveDeveloperEventAccess} from './developerEventAccess.js';
 import { isTmExtension, extensionTmRequest } from "./tmExtension.js";
 import { nominationsThroughSession, recordsThroughSession } from "./league/nominationCarryover.js";
 import { supabase } from "./supabaseClient";
@@ -201,7 +202,7 @@ export async function getMyEventAccess(eventId) {
   if (!sessionData?.session?.user) return null;
   const { data, error } = await readMyMembership(eventId, sessionData.session.user.id);
   if (error) return null;
-  return data;
+  return resolveDeveloperEventAccess(eventId,data,{hasDeveloperSession,openDeveloperEvent});
 }
 
 // Like getMyEventAccess, but THROWS when Supabase cannot be reached instead of answering "no
@@ -222,7 +223,8 @@ export async function getMyEventAccessChecked(eventId) {
     if (isNetworkFailure(error)) throw Object.assign(new TypeError(error.message || "Failed to fetch"), { cause: error });
     return null;
   }
-  return data ? { ...data, userId } : null;
+  const access=await resolveDeveloperEventAccess(eventId,data,{hasDeveloperSession,openDeveloperEvent});
+  return access ? { ...access, userId } : null;
 }
 
 export async function getCurrentUserId() {
@@ -487,6 +489,10 @@ export async function createDeveloperTestEvent(name,format,sampleTeams) {
 export async function openDeveloperTestEvent(eventId) {
   const {error}=await supabase.rpc('open_developer_test_event',{p_event:eventId});
   if(error)throw new Error('Developer access is required to open this private test event.');
+}
+export async function openDeveloperEvent(eventId) {
+  const {error}=await supabase.rpc('open_developer_event',{p_event:eventId});
+  if(error)throw new Error('Could not open this event as Developer. Check your connection and Developer access.');
 }
 export async function deleteDeveloperTestEvent(eventId,name) {
   const {error}=await supabase.rpc('delete_developer_test_event',{p_event:eventId,p_confirm_name:name});

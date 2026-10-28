@@ -1009,6 +1009,10 @@ export default function App() {
       setIdentityChecked(false);
       return;
     }
+    if(developer||isDemoEvent(activeEventId)){
+      setIdentityChecked(true);
+      return;
+    }
     let live = true;
     (async () => {
       try {
@@ -1037,7 +1041,7 @@ export default function App() {
       }
     })();
     return () => { live = false; };
-  }, [unlocked, activeEventId]);
+  }, [unlocked, activeEventId, developer]);
 
   useEffect(() => {
     if (!unlocked || !who.nickname) return;
