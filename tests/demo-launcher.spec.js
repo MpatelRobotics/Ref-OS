@@ -11,6 +11,7 @@ test('demo code comes before program choice and routes each program separately',
  await page.goto('/demo-launcher-test');
  await page.getByRole('button',{name:'Try the DEMO'}).click();
 
+ await expect(page.getByText('Demo passcode: DEMOV5',{exact:true})).toBeVisible();
  await page.getByLabel('Demo code').fill('NOPE');await page.getByRole('button',{name:'Continue',exact:true}).click();await expect(page.getByRole('alert')).toBeVisible();
  await page.getByLabel('Demo code').fill('DEMOV5');await page.getByRole('button',{name:'Continue',exact:true}).click();
  expect(await page.evaluate(()=>window.chosen)).toBe(DEMO_EVENTS.v5);
