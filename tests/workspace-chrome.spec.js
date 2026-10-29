@@ -34,7 +34,7 @@ test('compact neutral desktop navigation and flat team rows',async({page})=>{
  await page.screenshot({path:'test-results/clean-workspace-desktop.png',fullPage:true,animations:'disabled'});
  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Dark Mode',exact:true}).click();
  await expect(page.locator('.refos-header')).toHaveCSS('background-color','rgb(26, 38, 56)');
- await expect(nav.getByRole('button',{name:'Teams',exact:true})).toHaveCSS('background-color','rgb(23, 46, 76)');
+ await expect(nav.getByRole('button',{name:'Teams',exact:true})).toHaveCSS('background-color','rgb(26, 38, 56)');
  await expect(nav.getByRole('button',{name:'Teams',exact:true})).toHaveCSS('color','rgb(147, 197, 253)');
  await page.getByRole('button',{name:'Settings',exact:true}).click();
  await page.screenshot({path:'test-results/clean-workspace-dark.png',fullPage:true,animations:'disabled'});
@@ -48,11 +48,12 @@ test('mobile chrome stays neutral, readable and within viewport',async({page})=>
  await page.screenshot({path:'test-results/clean-workspace-mobile.png',fullPage:true,animations:'disabled'});
 });
 
-for(const [program,color,border] of [['iq','rgb(30, 64, 175)','rgb(191, 219, 254)'],['v5','rgb(153, 27, 27)','rgb(254, 202, 202)']]){
+for(const [program,color,border] of [['iq','rgb(30, 64, 175)','rgb(191, 219, 254)'],['v5','rgb(153, 27, 27)','rgb(185, 28, 28)']]){
  test(program+' program accents color headings and borders without recoloring IQ partner identities',async({page})=>{
   await page.setViewportSize({width:1440,height:1000});await mockIQApp(page,'admin',program);
   await expect(page.locator('.refos-shell')).toHaveAttribute('data-program',program);
   await expect(page.locator('.refos-page-heading h2')).toHaveCSS('color',color);
+  await expect(page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Matches',exact:true})).toHaveCSS('background-color','rgb(255, 255, 255)');
   await expect(page.locator('.refos-header')).toHaveCSS('border-bottom-color',border);
   await expect(page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Matches',exact:true})).toHaveCSS('color',color);
   await page.screenshot({path:'test-results/program-'+program+'-desktop.png',fullPage:true,animations:'disabled'});
@@ -64,9 +65,9 @@ test('unscheduled-team boxes retain colored borders but use the neutral page bac
  await page.goto('/neutral-boxes-test');await page.getByText('Not in match list (1)',{exact:true}).click();
  const section=page.locator('details');
  await expect(section).toHaveCSS('background-color','rgb(248, 250, 252)');
- await expect(section).toHaveCSS('border-top-color','rgb(254, 202, 202)');
+ await expect(section).toHaveCSS('border-top-color','rgb(185, 28, 28)');
  await expect(page.getByRole('button',{name:/4265P.*Over-Powered/})).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
  await page.evaluate(()=>document.documentElement.classList.add('dark'));
  await expect(section).toHaveCSS('background-color','rgb(16, 24, 39)');
- await expect(section).toHaveCSS('border-top-color','rgb(107, 52, 63)');
+ await expect(section).toHaveCSS('border-top-color','rgb(185, 28, 28)');
 });

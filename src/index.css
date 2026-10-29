@@ -350,21 +350,21 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
  --ref-active:#eff6ff; --ref-program-text:#1e40af;
 }
 .refos-shell[data-program='v5'] {
- --ref-accent:#b91c1c; --ref-border:#fecaca; --ref-nav-border:#fecaca;
- --ref-active:#fff1f2; --ref-program-text:#991b1b;
+ --ref-accent:#991b1b; --ref-border:#b91c1c; --ref-nav-border:#b91c1c;
+ --ref-active:#f1f3f5; --ref-program-text:#991b1b;
 }
 .dark .refos-shell[data-program='iq'] {
  --ref-accent:#93c5fd; --ref-border:#334f73; --ref-nav-border:#334f73;
  --ref-active:#172e4c; --ref-program-text:#93c5fd;
 }
 .dark .refos-shell[data-program='v5'] {
- --ref-accent:#fca5a5; --ref-border:#6b343f; --ref-nav-border:#6b343f;
- --ref-active:#3e202c; --ref-program-text:#fca5a5;
+ --ref-accent:#f87171; --ref-border:#b91c1c; --ref-nav-border:#b91c1c;
+ --ref-active:#222d3d; --ref-program-text:#f87171;
 }
 .refos-shell[data-program] .refos-header { border-bottom:2px solid var(--ref-border); }
 .refos-shell[data-program] :is(.refos-page-heading h2,.refos-eyebrow,.refos-header-event h1) { color:var(--ref-program-text); }
 .refos-shell[data-program] .refos-desktop-nav button[aria-current='page'] {
- color:var(--ref-program-text); background:var(--ref-active);
+ color:var(--ref-program-text); background:var(--ref-surface);
  box-shadow:inset 3px 0 var(--ref-accent);
 }
 .refos-shell[data-program] .refos-mobile-bottom button[aria-current='page'] { color:var(--ref-program-text); }
