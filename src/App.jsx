@@ -1,3 +1,4 @@
+import useMobileMenuIdle from "./useMobileMenuIdle.js";
 import IQFieldReset from "./features/field-reset/IQFieldReset.jsx";
 import {sampleRobotPhoto} from './sampleRobotPhotos.js';
 import DemoLauncher from './components/DemoLauncher.jsx';
@@ -1863,6 +1864,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const [importing, setImporting] = useState(null); // { label, done, total } | null while an import is writing
   const menuRef = useRef(null);
   useMenuViewport(menuRef, menu);
+  useMobileMenuIdle(menuRef,menu,setMenu);
 
   useEffect(() => {
     const footer = workspaceFooterRef.current;
