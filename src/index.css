@@ -350,8 +350,8 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
  --ref-active:#eff6ff; --ref-program-text:#1e40af;
 }
 .refos-shell[data-program='v5'] {
- --ref-accent:#991b1b; --ref-border:#b91c1c; --ref-nav-border:#b91c1c;
- --ref-active:#f1f3f5; --ref-program-text:#991b1b;
+ --ref-accent:#c43d3d; --ref-border:#b91c1c; --ref-nav-border:#b91c1c;
+ --ref-active:#f1f3f5; --ref-program-text:#c43d3d;
 }
 .dark .refos-shell[data-program='iq'] {
  --ref-accent:#93c5fd; --ref-border:#334f73; --ref-nav-border:#334f73;

@@ -42,7 +42,7 @@ test('mobile keeps touch navigation and safe viewport',async({page})=>{
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:'test-results/supabase-workspace-mobile.png',fullPage:true,animations:'disabled'});
 });
-for(const [program,color] of [['iq','rgb(30, 64, 175)'],['v5','rgb(153, 27, 27)']]){
+for(const [program,color] of [['iq','rgb(30, 64, 175)'],['v5','rgb(196, 61, 61)']]){
  test(program+' retains program identity with neutral borders',async({page})=>{
   await mockIQApp(page,'admin',program);
   await expect(page.locator('.refos-page-heading h2')).toHaveCSS('color',color);
