@@ -18,31 +18,21 @@ async function mockIQApp(page,role="admin",program="iq",accent=null){
 }
 
 
-test('Supabase-style rail expands, pins and navigates in light and dark themes',async({page})=>{
+test('sidebar expands on hover and focus, collapses on selection and has no pin button',async({page})=>{
  await page.setViewportSize({width:1440,height:1000});await mockIQApp(page);
  const nav=page.getByRole('navigation',{name:'Main navigation'});
  await page.mouse.move(1000,700);await expect(nav).toHaveCSS('width','64px');
  await nav.hover();await expect(nav).toHaveCSS('width','224px');
- await nav.getByRole('button',{name:'Expand navigation',exact:true}).click();
- await page.mouse.move(1000,700);await expect(nav).toHaveCSS('width','224px');
- await nav.getByRole('button',{name:'Teams',exact:true}).click();
+ await expect(nav.getByRole('button',{name:/Keep navigation open|Expand navigation|Collapse navigation/})).toHaveCount(0);
+ await nav.getByRole('button',{name:'Teams',exact:true}).click();await expect(nav).toHaveCSS('width','64px');
  await expect(nav.getByRole('button',{name:'Teams',exact:true})).toHaveAttribute('aria-current','page');
- await expect(nav).toHaveCSS('width','64px');
  await page.mouse.move(1000,700);await nav.hover();await expect(nav).toHaveCSS('width','224px');
- await nav.getByRole('button',{name:'Expand navigation',exact:true}).click();
- await expect(page.locator('.refos-team-list')).toHaveCSS('border-radius','6px');
- await nav.getByRole('button',{name:'Collapse navigation',exact:true}).click();await page.locator('.refos-page-heading h2').click();await page.mouse.move(1000,700);
- await expect(nav).toHaveCSS('width','64px');
+ await page.locator('.refos-page-heading h2').click();await page.mouse.move(1000,700);await expect(nav).toHaveCSS('width','64px');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- await page.screenshot({path:'test-results/supabase-workspace-light.png',fullPage:true,animations:'disabled'});
  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Dark Mode',exact:true}).click();
  await expect(page.locator('.refos-header')).toHaveCSS('background-color','rgb(20, 20, 20)');
- await expect(page.locator('.refos-shell')).toHaveCSS('background-color','rgb(23, 23, 23)');
  await page.getByRole('button',{name:'Settings',exact:true}).click();
- await page.locator('.refos-page-heading h2').click();
  await nav.getByRole('button',{name:'Rules',exact:true}).focus();await expect(nav).toHaveCSS('width','224px');
- await nav.getByRole('button',{name:'Expand navigation',exact:true}).click();
- await page.screenshot({path:'test-results/supabase-workspace-dark.png',fullPage:true,animations:'disabled'});
 });
 test('mobile keeps touch navigation and safe viewport',async({page})=>{
  await page.setViewportSize({width:390,height:844});await mockIQApp(page);

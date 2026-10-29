@@ -1863,7 +1863,6 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   // League: every import preview names the session the files go into.
   const confirmImport = (p) => new Promise((resolve) => setImportPreview({ ...p, chips: league ? [{ label: `Into ${league.session.name}` }, ...(p.chips || [])] : p.chips, resolve }));
   const [importing, setImporting] = useState(null); // { label, done, total } | null while an import is writing
-  const [navExpanded,setNavExpanded] = useState(false);
   const [navDismissed,setNavDismissed] = useState(false);
   const menuRef = useRef(null);
   useMenuViewport(menuRef, menu);
@@ -4414,7 +4413,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       || a.number.localeCompare(b.number, undefined, { numeric: true }));
 
   return (
-    <div data-navigation={navExpanded ? "expanded" : "collapsed"} data-program={isIQ ? "iq" : "v5"} className="refos-shell min-h-screen font-sans antialiased">
+    <div data-program={isIQ ? "iq" : "v5"} className="refos-shell min-h-screen font-sans antialiased">
       <a className="refos-skip" href="#workspace">Skip to workspace</a>
       <header className="refos-header sticky top-0 z-20" style={brand.accentSource === "saved" ? {"--ref-header-accent":brand.accent} : undefined}>
         <div className="refos-header-inner mx-auto px-4 py-3 flex items-center gap-3">
@@ -4591,11 +4590,11 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           const ActiveIcon = active?.Icon || Menu;
           return (
             <>
-              <nav aria-label="Main navigation" onMouseEnter={()=>setNavDismissed(false)} onFocusCapture={()=>setNavDismissed(false)} className={`refos-desktop-nav hidden sm:flex ${navExpanded ? "refos-nav-expanded" : ""} ${navDismissed ? "refos-nav-dismissed" : ""}`}>
+              <nav aria-label="Main navigation" onMouseEnter={()=>setNavDismissed(false)} onFocusCapture={()=>setNavDismissed(false)} className={`refos-desktop-nav hidden sm:flex ${navDismissed ? "refos-nav-dismissed" : ""}`}>
                 <div className="refos-sidebar-subtitle" aria-hidden="true">Referee Operating System</div>
                 <div className="refos-sidebar-section-label" aria-hidden="true">Event Navigation</div>
                 {navItems.map(({ k, label, Icon }) => (
-                  <button key={k} title={label} aria-label={label} aria-current={view === k ? "page" : undefined} onClick={(event) => { setView(k); setQuery(""); setNavExpanded(false); setNavDismissed(true); if(event.detail > 0)event.currentTarget.blur(); }}
+                  <button key={k} title={label} aria-label={label} aria-current={view === k ? "page" : undefined} onClick={(event) => { setView(k); setQuery(""); setNavDismissed(true); if(event.detail > 0)event.currentTarget.blur(); }}
                     className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
                     <Icon size={15} aria-hidden="true" /><span className="refos-nav-label">{label}</span>
                   </button>
@@ -4606,7 +4605,6 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
                   {!isInspection && <button onClick={() => setShowFieldLog(true)} title="Field Log" aria-label="Field Log" className="refos-sidebar-tool"><Flag size={16} aria-hidden="true" /><span className="refos-nav-label">Field Log</span></button>}
                   {!isInspection && <button onClick={() => setShowContactDirectory(true)} title="Contacts" aria-label="Contacts" className="refos-sidebar-tool"><Contact size={16} aria-hidden="true" /><span className="refos-nav-label">Contacts</span></button>}
                 </div>
-                <button className="refos-nav-pin" aria-label={navExpanded ? "Collapse navigation" : "Expand navigation"} aria-expanded={navExpanded} onClick={()=>setNavExpanded(value=>!value)}><Menu size={18} aria-hidden="true"/><span className="refos-nav-label">{navExpanded ? "Collapse navigation" : "Keep navigation open"}</span></button>
                 <div className="refos-sidebar-footer">
                   <span>{adminUnlocked ? (isDeveloper ? "Developer" : "Admin") : isInspection ? "Inspection" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
                   <span>v{APP_VERSION} · Official Release</span>
@@ -6036,7 +6034,7 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
         <ul className="refos-match-list space-y-2">
           {filtered.map((m,index) => (
             <li key={m.id}>
-              {tab === "elim" && eliminationPairingKey(m)!==eliminationPairingKey(filtered[index-1]||{}) && <h3 className="pt-3 pb-2 font-semibold">{eliminationPairingLabel(m)} · Games</h3>}
+              {tab === "elim" && eliminationPairingKey(m)!==eliminationPairingKey(filtered[index-1]||{}) && <h3 className="pt-3 pb-2 font-semibold">{eliminationPairingLabel(m)}</h3>}
               <button onClick={() => onOpen(m.id)} className={`w-full text-left rounded-xl border px-4 py-3 flex flex-wrap sm:flex-nowrap items-center gap-3 hover:shadow-sm transition ${liveHighlights[m.id] === 'current' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500 dark:border-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'bg-amber-50 dark:bg-amber-950 border-amber-500 dark:border-amber-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}>
                 <span className="font-mono font-bold text-slate-900 dark:text-slate-100 w-14 shrink-0">{rowLabel(m)}</span>
                 <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-mono">
@@ -7650,7 +7648,7 @@ function AllianceSelection({ tmActivity, onOpenMatch, matches, finalsBestOf = 1,
                 <div className="space-y-2">
                   {ms.map((m,index) => (
                     <React.Fragment key={m.id}>
-                    {eliminationPairingKey(m)!==eliminationPairingKey(ms[index-1]||{}) && <h4 className="pt-2 font-semibold">{eliminationPairingLabel(m)} · Games</h4>}
+                    {eliminationPairingKey(m)!==eliminationPairingKey(ms[index-1]||{}) && <h4 className="pt-2 font-semibold">{eliminationPairingLabel(m)}</h4>}
                     <div className={`rounded-xl border p-2.5 ${liveHighlights[m.id] === 'current' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'bg-amber-50 dark:bg-amber-950 border-amber-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                       {liveHighlights[m.id] && <p className={`text-sm font-semibold mb-2 ${liveHighlights[m.id] === 'current' ? 'text-emerald-800 dark:text-emerald-200' : 'text-amber-800 dark:text-amber-200'}`}>{liveHighlights[m.id] === 'current' ? 'Playing now' : 'Up next'}</p>}
                       <div className="refos-bracket-match">
