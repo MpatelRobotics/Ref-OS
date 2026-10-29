@@ -1,3 +1,4 @@
+import EliminationBracketIcon from "./components/EliminationBracketIcon.jsx";
 import RefOsWelcome from "./components/RefOsWelcome.jsx";
 import EventSelectorSidebar from "./components/EventSelectorSidebar.jsx";
 import {volunteerMember, volunteerLocation} from "./volunteerIdentity.js";
@@ -4577,13 +4578,13 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           ] : isJudge ? [
             { k: "judging", label: "Nominations", Icon: Trophy },
             ...(isDeveloper ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
-            { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch }
+            { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: EliminationBracketIcon }
           ] : [
             { k: "matches", label: "Matches", Icon: ListOrdered },
             { k: "teams", label: "Teams", Icon: Users },
             ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
             { k: "robots", label: "Robots", Icon: Camera },
-            { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch },
+            { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: EliminationBracketIcon },
             { k: "judging", label: "Nominations", Icon: Trophy },
             ...(isDeveloper ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
             ...(adminUnlocked ? [{ k: "rankings", label: "Rankings", Icon: BarChart3 }] : [])
@@ -4631,7 +4632,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         ] : isJudge ? [
           { k: "judging", label: "Nominations", Icon: Trophy },
             ...(isDeveloper ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
-          { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch }
+          { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: EliminationBracketIcon }
         ] : [
           { k: "matches", label: "Matches", Icon: ListOrdered },
           { k: "teams", label: "Teams", Icon: Users },
@@ -4657,13 +4658,13 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         ] : isJudge ? [
           { k: "judging", label: "Nominations", Icon: Trophy },
             ...(isDeveloper ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
-          { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch }
+          { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: EliminationBracketIcon }
         ] : [
           { k: "teams", label: "Teams", Icon: Users },
           { k: "matches", label: "Matches", Icon: ListOrdered },
           ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
           { k: "robots", label: "Robots", Icon: Camera },
-          { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: GitBranch },
+          { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: EliminationBracketIcon },
           { k: "judging", label: "Nominations", Icon: Trophy },
             ...(isDeveloper ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
           ...(adminUnlocked ? [{ k: "rankings", label: "Rankings", Icon: BarChart3 }] : [])
