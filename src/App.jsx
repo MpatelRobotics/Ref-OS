@@ -1863,6 +1863,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   // League: every import preview names the session the files go into.
   const confirmImport = (p) => new Promise((resolve) => setImportPreview({ ...p, chips: league ? [{ label: `Into ${league.session.name}` }, ...(p.chips || [])] : p.chips, resolve }));
   const [importing, setImporting] = useState(null); // { label, done, total } | null while an import is writing
+  const [navExpanded,setNavExpanded] = useState(false);
   const menuRef = useRef(null);
   useMenuViewport(menuRef, menu);
   useMenuIdle(menuRef,menu,setMenu);
@@ -4412,7 +4413,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       || a.number.localeCompare(b.number, undefined, { numeric: true }));
 
   return (
-    <div data-program={isIQ ? "iq" : "v5"} className="refos-shell min-h-screen font-sans antialiased">
+    <div data-navigation={navExpanded ? "expanded" : "collapsed"} data-program={isIQ ? "iq" : "v5"} className="refos-shell min-h-screen font-sans antialiased">
       <a className="refos-skip" href="#workspace">Skip to workspace</a>
       <header className="refos-header sticky top-0 z-20" style={brand.accentSource === "saved" ? {"--ref-header-accent":brand.accent} : undefined}>
         <div className="refos-header-inner mx-auto px-4 py-3 flex items-center gap-3">
@@ -4589,21 +4590,22 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           const ActiveIcon = active?.Icon || Menu;
           return (
             <>
-              <nav aria-label="Main navigation" className="refos-desktop-nav hidden sm:flex">
+              <nav aria-label="Main navigation" className={`refos-desktop-nav hidden sm:flex ${navExpanded ? "refos-nav-expanded" : ""}`}>
                 <div className="refos-sidebar-subtitle" aria-hidden="true">Referee Operating System</div>
                 <div className="refos-sidebar-section-label" aria-hidden="true">Event Navigation</div>
                 {navItems.map(({ k, label, Icon }) => (
-                  <button key={k} aria-current={view === k ? "page" : undefined} onClick={() => { setView(k); setQuery(""); }}
+                  <button key={k} title={label} aria-label={label} aria-current={view === k ? "page" : undefined} onClick={() => { setView(k); setQuery(""); }}
                     className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
-                    <Icon size={15} /> {label}
+                    <Icon size={15} aria-hidden="true" /><span className="refos-nav-label">{label}</span>
                   </button>
                 ))}
                 <div className="refos-desktop-utilities">
                   <div className="refos-sidebar-section-label refos-sidebar-tools-label" aria-hidden="true">Event Tools</div>
-                  {adminUnlocked && <button onClick={() => { loadEventMembers(); loadAlertStats(); setShowCommandCenter(true); }} className="refos-sidebar-tool"><BarChart3 size={16} /> Command Center</button>}
-                  {!isInspection && <button onClick={() => setShowFieldLog(true)} className="refos-sidebar-tool"><Flag size={16} /> Field Log</button>}
-                  {!isInspection && <button onClick={() => setShowContactDirectory(true)} className="refos-sidebar-tool"><Contact size={16} /> Contacts</button>}
+                  {adminUnlocked && <button onClick={() => { loadEventMembers(); loadAlertStats(); setShowCommandCenter(true); }} title="Command Center" aria-label="Command Center" className="refos-sidebar-tool"><BarChart3 size={16} aria-hidden="true" /><span className="refos-nav-label">Command Center</span></button>}
+                  {!isInspection && <button onClick={() => setShowFieldLog(true)} title="Field Log" aria-label="Field Log" className="refos-sidebar-tool"><Flag size={16} aria-hidden="true" /><span className="refos-nav-label">Field Log</span></button>}
+                  {!isInspection && <button onClick={() => setShowContactDirectory(true)} title="Contacts" aria-label="Contacts" className="refos-sidebar-tool"><Contact size={16} aria-hidden="true" /><span className="refos-nav-label">Contacts</span></button>}
                 </div>
+                <button className="refos-nav-pin" aria-label={navExpanded ? "Collapse navigation" : "Expand navigation"} aria-expanded={navExpanded} onClick={()=>setNavExpanded(value=>!value)}><Menu size={18} aria-hidden="true"/><span className="refos-nav-label">{navExpanded ? "Collapse navigation" : "Keep navigation open"}</span></button>
                 <div className="refos-sidebar-footer">
                   <span>{adminUnlocked ? (isDeveloper ? "Developer" : "Admin") : isInspection ? "Inspection" : isJudge ? "Judge Advisor" : isEmcee ? "Emcee" : "Referee"}</span>
                   <span>v{APP_VERSION} · Official Release</span>

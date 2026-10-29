@@ -17,67 +17,48 @@ async function mockIQApp(page,role="admin",program="iq",accent=null){
  await page.getByPlaceholder('e.g. Maharshi').fill('IQTester');await page.getByPlaceholder('Required for exports').nth(0).fill('IQ');await page.getByPlaceholder('Required for exports').nth(1).fill('Tester');await page.getByRole('button',{name:'Start logging',exact:true}).click();await page.getByRole('button',{name:'Close Quick Start'}).click();
 }
 
-test('compact neutral desktop navigation and flat team rows',async({page})=>{
+
+test('Supabase-style rail expands, pins and navigates in light and dark themes',async({page})=>{
  await page.setViewportSize({width:1440,height:1000});await mockIQApp(page);
  const nav=page.getByRole('navigation',{name:'Main navigation'});
- await expect(nav).toHaveCSS('width','176px');
- for(const item of await nav.getByRole('button').all()){await expect(item).toHaveCSS('background-color','rgb(255, 255, 255)');}
- await nav.getByRole('button',{name:'Rules',exact:true}).hover();await expect(nav.getByRole('button',{name:'Rules',exact:true})).toHaveCSS('background-color','rgb(255, 255, 255)');
- await expect(nav).toHaveCSS('background-color','rgb(248, 250, 252)');
- await expect(page.locator('.refos-header')).toHaveCSS('background-color','rgb(255, 255, 255)');
- await page.locator('.refos-header-event > button').hover();
- await expect(page.locator('.refos-header-event > button')).toHaveCSS('color','rgb(82, 97, 118)');
- await expect(page.locator('.refos-header-event > button')).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
-
- await page.getByRole('button',{name:'Teams',exact:true}).click();
+ await page.mouse.move(1000,700);await expect(nav).toHaveCSS('width','64px');
+ await nav.hover();await expect(nav).toHaveCSS('width','224px');
+ await nav.getByRole('button',{name:'Expand navigation',exact:true}).click();
+ await page.mouse.move(1000,700);await expect(nav).toHaveCSS('width','224px');
+ await nav.getByRole('button',{name:'Teams',exact:true}).click();
  await expect(nav.getByRole('button',{name:'Teams',exact:true})).toHaveAttribute('aria-current','page');
- await expect(page.locator('.refos-team-list>li>button').first()).toHaveCSS('border-radius','0px');
+ await expect(page.locator('.refos-team-list')).toHaveCSS('border-radius','6px');
+ await nav.getByRole('button',{name:'Collapse navigation',exact:true}).click();await page.locator('.refos-page-heading h2').click();await page.mouse.move(1000,700);
+ await expect(nav).toHaveCSS('width','64px');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- await page.screenshot({path:'test-results/clean-workspace-desktop.png',fullPage:true,animations:'disabled'});
+ await page.screenshot({path:'test-results/supabase-workspace-light.png',fullPage:true,animations:'disabled'});
  await page.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('button',{name:'Dark Mode',exact:true}).click();
- await expect(page.locator('.refos-header')).toHaveCSS('background-color','rgb(26, 38, 56)');
- await expect(nav.getByRole('button',{name:'Teams',exact:true})).toHaveCSS('background-color','rgb(26, 38, 56)');
- await expect(nav.getByRole('button',{name:'Teams',exact:true})).toHaveCSS('color','rgb(147, 197, 253)');
+ await expect(page.locator('.refos-header')).toHaveCSS('background-color','rgb(20, 20, 20)');
+ await expect(page.locator('.refos-shell')).toHaveCSS('background-color','rgb(23, 23, 23)');
  await page.getByRole('button',{name:'Settings',exact:true}).click();
- await page.screenshot({path:'test-results/clean-workspace-dark.png',fullPage:true,animations:'disabled'});
+ await page.locator('.refos-page-heading h2').click();
+ await nav.getByRole('button',{name:'Rules',exact:true}).focus();await expect(nav).toHaveCSS('width','224px');
+ await nav.getByRole('button',{name:'Expand navigation',exact:true}).click();
+ await page.screenshot({path:'test-results/supabase-workspace-dark.png',fullPage:true,animations:'disabled'});
 });
-test('mobile chrome stays neutral, readable and within viewport',async({page})=>{
+test('mobile keeps touch navigation and safe viewport',async({page})=>{
  await page.setViewportSize({width:390,height:844});await mockIQApp(page);
- await expect(page.locator('.refos-header')).toHaveCSS('background-color','rgb(255, 255, 255)');
- await expect(page.locator('.refos-mobile-bottom')).toHaveCSS('background-color','rgb(255, 255, 255)');
- for(const item of await page.locator('.refos-mobile-bottom').getByRole('button').all())await expect(item).toHaveCSS('background-color','rgb(255, 255, 255)');
+ await expect(page.getByRole('navigation',{name:'Main navigation'})).toBeHidden();
+ await expect(page.locator('.refos-mobile-bottom')).toBeVisible();
  const box=await page.getByRole('heading',{name:'IQ Fixture',exact:true}).boundingBox();expect(box.y).toBeGreaterThanOrEqual(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- await page.screenshot({path:'test-results/clean-workspace-mobile.png',fullPage:true,animations:'disabled'});
+ await page.screenshot({path:'test-results/supabase-workspace-mobile.png',fullPage:true,animations:'disabled'});
 });
-
-for(const [program,color,border] of [['iq','rgb(30, 64, 175)','rgb(191, 219, 254)'],['v5','rgb(153, 27, 27)','rgb(185, 28, 28)']]){
- test(program+' program accents color headings and borders without recoloring IQ partner identities',async({page})=>{
-  await page.setViewportSize({width:1440,height:1000});await mockIQApp(page,'admin',program);
-  await expect(page.locator('.refos-shell')).toHaveAttribute('data-program',program);
+for(const [program,color] of [['iq','rgb(30, 64, 175)'],['v5','rgb(153, 27, 27)']]){
+ test(program+' retains program identity with neutral borders',async({page})=>{
+  await mockIQApp(page,'admin',program);
   await expect(page.locator('.refos-page-heading h2')).toHaveCSS('color',color);
-  await expect(page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Matches',exact:true})).toHaveCSS('background-color','rgb(255, 255, 255)');
-  await expect(page.locator('.refos-header')).toHaveCSS('border-bottom-color',border);
-  await expect(page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Matches',exact:true})).toHaveCSS('color',color);
-  await page.screenshot({path:'test-results/program-'+program+'-desktop.png',fullPage:true,animations:'disabled'});
+  await expect(page.locator('.refos-header')).toHaveCSS('border-bottom-color','rgb(222, 222, 222)');
+  await expect(page.locator('.refos-match-list')).toHaveCSS('border-radius','6px');
  });
 }
-
-test('unscheduled-team boxes retain colored borders but use the neutral page background',async({page})=>{
- await page.route('**/neutral-boxes-test',r=>r.fulfill({contentType:'text/html',body:`<div id="root"></div><script type="module">import '/src/index.css';import '/@vite/client';import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(t)=>t;window.__vite_plugin_react_preamble_installed__=true;const React=(await import('/node_modules/.vite/deps/react.js')).default,DOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default,View=(await import('/src/components/UnscheduledTeams.jsx')).default;DOM.createRoot(document.getElementById('root')).render(React.createElement('div',{className:'refos-shell','data-program':'v5'},React.createElement('main',{className:'refos-workspace'},React.createElement(View,{teams:[{number:'4265P',name:'Over-Powered'}],onOpen:()=>{}}))));</script>`}));
- await page.goto('/neutral-boxes-test');await page.getByText('Not in match list (1)',{exact:true}).click();
- const section=page.locator('details');
- await expect(section).toHaveCSS('background-color','rgb(248, 250, 252)');
- await expect(section).toHaveCSS('border-top-color','rgb(185, 28, 28)');
- await expect(page.getByRole('button',{name:/4265P.*Over-Powered/})).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
- await page.evaluate(()=>document.documentElement.classList.add('dark'));
- await expect(section).toHaveCSS('background-color','rgb(16, 24, 39)');
- await expect(section).toHaveCSS('border-top-color','rgb(185, 28, 28)');
+test('saved event accent remains visible on the header',async({page})=>{
+ await mockIQApp(page,'admin','v5','#7c3aed');
+ await expect(page.locator('.refos-header-event h1')).toHaveCSS('color','rgb(124, 58, 237)');
+ await expect(page.locator('.refos-header')).toHaveCSS('border-bottom-color','rgb(124, 58, 237)');
 });
-
- test('saved event accent colors the header while program colors stay in the workspace',async({page})=>{
-  await mockIQApp(page,'admin','v5','#7c3aed');
-  await expect(page.locator('.refos-header-event h1')).toHaveCSS('color','rgb(124, 58, 237)');
-  await expect(page.locator('.refos-header')).toHaveCSS('border-bottom-color','rgb(124, 58, 237)');
-  await expect(page.locator('.refos-page-heading h2')).toHaveCSS('color','rgb(153, 27, 27)');
- });

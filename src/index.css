@@ -391,3 +391,89 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 }
 
 .refos-shell[data-program] .refos-header-event h1 { color:var(--ref-header-accent,var(--ref-program-text)); }
+
+/* Supabase-inspired workspace: expandable icon rail, compact controls, quiet bordered lists.
+   Event identity and red/blue match semantics remain independent of chrome. */
+:root { --ref-bg:#fafafa; --ref-surface:#ffffff; --ref-text:#1c1c1c; --ref-muted:#626262; --ref-chrome:#ffffff; --ref-line:#dedede; }
+.dark { --ref-bg:#171717; --ref-surface:#1c1c1c; --ref-text:#ededed; --ref-muted:#a1a1a1; --ref-chrome:#141414; --ref-line:#363636; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.refos-shell[data-program] { --ref-border:var(--ref-line); --ref-nav-border:var(--ref-line); --ref-active:#f4f4f4; --ref-nav:var(--ref-chrome); padding-left:0; }
+.dark .refos-shell[data-program] { --ref-active:#242424; }
+.refos-shell[data-program] .refos-header { background:var(--ref-chrome); border-bottom:1px solid var(--ref-header-accent,var(--ref-line)); }
+.refos-header-inner { max-width:1440px; gap:16px; }
+.refos-header-event h1 { font-weight:600; letter-spacing:0; }
+.refos-header-event > button { font-size:11px; }
+.refos-header .refos-user-chip { background:transparent; border:1px solid var(--ref-line); border-radius:6px; }
+.refos-header button[aria-label='Settings'],.refos-header button[title='By rule'] { border:1px solid var(--ref-line); border-radius:6px; }
+.refos-shell .refos-workspace { max-width:1280px; padding-top:24px; }
+.refos-page-heading { margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--ref-line); }
+.refos-page-heading h2 { font-size:24px; font-weight:600; letter-spacing:-.02em; }
+.refos-eyebrow { font-size:10px; letter-spacing:.08em; margin-bottom:6px; }
+.refos-description { margin-top:6px; }
+.refos-shell[data-program] .refos-role { background:transparent; border-radius:999px; padding:3px 10px; font-size:12px; }
+.refos-shell[data-program] .refos-workspace details { border-radius:6px; background:var(--ref-bg); box-shadow:none; }
+.refos-shell[data-program] .refos-workspace details > summary { color:var(--ref-text); font-size:14px; }
+.refos-workspace :is(input:not([type=checkbox]):not([type=radio]),select,textarea) { border-radius:6px; box-shadow:none; font-size:14px; }
+.refos-workspace :is(.rounded-2xl,.rounded-xl) { border-radius:6px; }
+.refos-workspace :is(.shadow-xl,.shadow-lg,.shadow-sm) { box-shadow:none; }
+.refos-shell main button { font-size:14px; }
+.refos-shell[data-program] .refos-workspace :is(.refos-team-list,.refos-match-list) { display:block; overflow:hidden; border:1px solid var(--ref-line); border-radius:6px; background:var(--ref-surface); gap:0; }
+.refos-workspace :is(.refos-team-list,.refos-match-list)>li { margin:0; }
+.refos-shell[data-program] .refos-workspace :is(.refos-team-list,.refos-match-list)>li>button { min-height:56px; border-bottom:1px solid var(--ref-line); padding:12px 16px; background:transparent; }
+.refos-workspace :is(.refos-team-list,.refos-match-list)>li:last-child>button { border-bottom:0; }
+.refos-shell[data-program] .refos-workspace :is(.refos-team-list,.refos-match-list)>li>button:hover { background:var(--ref-active); }
+.refos-workspace .refos-stats { border:1px solid var(--ref-line); border-radius:6px; gap:0; grid-template-columns:repeat(3,minmax(0,1fr)); }
+.refos-stats>div { border:0; border-right:1px solid var(--ref-line); padding:16px; }
+.refos-stats>div:last-child { border-right:0; }
+.refos-stats dd { font-size:24px; margin-top:4px; }
+.refos-modal-panel { border-radius:8px; }
+@media(max-width:639px) {
+ .refos-header-inner { gap:8px; }
+ .refos-shell .refos-workspace { padding-top:20px; }
+ .refos-page-heading h2 { font-size:22px; }
+ .refos-shell[data-program] .refos-mobile-bottom { background:var(--ref-surface); border-top:1px solid var(--ref-line); }
+ .refos-shell[data-program] .refos-mobile-bottom button[aria-current='page'] { border-radius:0; box-shadow:inset 0 2px var(--ref-accent); }
+ .refos-stats>div { padding:12px; }
+}
+
+@media(min-width:640px) {
+ .refos-shell[data-program] { padding-left:64px; }
+ .refos-header-inner { max-width:none; min-height:88px; padding:14px 24px; }
+ .refos-header-brand { display:flex; }
+ .refos-header-brand>div { display:none; }
+ .refos-header-brand::after { content:'/'; color:var(--ref-muted); margin-left:8px; font-size:22px; font-weight:300; }
+ .refos-header-event { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:4px 16px; }
+ .refos-header-event>div:first-child { grid-column:1/-1; align-items:center; }
+ .refos-header-event>button { margin:0; }
+ .refos-header-event>div:has(>time) { margin:0; font-size:11px; }
+ .refos-shell:has(.refos-desktop-nav) .refos-desktop-nav { position:fixed; left:0; top:0; bottom:0; z-index:40; width:64px; max-width:none; flex-direction:column; align-items:stretch; padding:64px 8px 12px; background:var(--ref-chrome); border:0; border-right:1px solid var(--ref-line); gap:4px; overflow-x:hidden; overflow-y:auto; transition:width 150ms ease; scrollbar-width:thin; }
+ .refos-shell .refos-desktop-nav:is(:hover,:focus-within),.refos-shell .refos-desktop-nav.refos-nav-expanded { width:224px; box-shadow:8px 0 24px #0000000a; }
+ .refos-desktop-nav::before { content:'R'; position:absolute; top:20px; left:24px; color:var(--ref-program-text); font-size:19px; font-weight:700; }
+ .refos-desktop-nav:is(:hover,:focus-within,.refos-nav-expanded)::before { content:'REF-OS'; left:20px; }
+ .refos-sidebar-subtitle,.refos-sidebar-section-label,.refos-sidebar-footer { display:none; }
+ .refos-shell[data-program] .refos-desktop-nav button { display:flex; align-items:center; width:100%; min-height:44px; padding:10px 14px; border:0; border-radius:6px; font-size:13px; font-weight:500; color:var(--ref-muted); background:transparent; box-shadow:none; justify-content:flex-start; gap:12px; white-space:nowrap; }
+ .refos-shell[data-program] .refos-desktop-nav button:hover { background:var(--ref-active); color:var(--ref-text); }
+ .refos-shell[data-program] .refos-desktop-nav button[aria-current='page'] { background:var(--ref-active); color:var(--ref-program-text); font-weight:600; box-shadow:inset 2px 0 var(--ref-accent); }
+ .refos-desktop-nav button svg { width:18px; height:18px; flex-shrink:0; }
+ .refos-nav-label { opacity:0; transition:opacity 100ms; }
+ .refos-desktop-nav:is(:hover,:focus-within,.refos-nav-expanded) .refos-nav-label { opacity:1; }
+ .refos-desktop-utilities { flex-shrink:0; display:flex; flex-direction:column; gap:4px; margin:12px 0 0; padding:12px 0 0; border:0; border-top:1px solid var(--ref-line); }
+ .refos-shell[data-program] .refos-desktop-nav .refos-sidebar-tool { min-height:44px; }
+ .refos-shell .refos-workspace { max-width:1440px; padding:24px 32px 100px; }
+ .refos-shell:not(:has(.refos-desktop-nav)) { padding-left:0; }
+ body:has(.refos-desktop-nav) .refos-event-tm-sync { margin-left:64px; }
+ .refos-workspace input:not([type=checkbox]):not([type=radio]),.refos-workspace select { min-height:36px; }
+ .refos-shell[data-navigation='expanded'] { padding-left:224px; }
+ .refos-shell[data-navigation='expanded'] .refos-desktop-nav { width:224px; }
+ .refos-shell[data-program] .refos-desktop-nav .refos-nav-pin { margin-top:auto; }
+}
+
+/* Existing dialogs and forms share the same neutral surface palette. */
+.refos-stats>div:first-child { padding-left:16px; }
+.refos-menu-pop { border-radius:8px; box-shadow:0 8px 24px #00000018; }
+.dark .refos-shell :is([class~="dark:bg-slate-800"],[class~="dark:bg-slate-900"],[class~="dark:bg-slate-700"]) { background-color:var(--ref-surface); }
+.dark .refos-shell :is([class~="dark:border-slate-700"],[class~="dark:border-slate-600"]) { border-color:var(--ref-line); }
+.dark .refos-shell :is(input,textarea,select) { background-color:var(--ref-surface); color:var(--ref-text); }
+.dark .refos-shell .refos-menu-pop button:hover { background:var(--ref-active); }
+.dark .refos-shell .refos-menu-pop { background:var(--ref-surface); border-color:var(--ref-line); }
+.refos-shell .refos-menu-pop :is(.text-slate-400,.text-slate-500) { color:var(--ref-muted); }
