@@ -65,5 +65,7 @@ for(const mobile of [false,true]) test((mobile?'mobile':'desktop')+' tabs reset 
  await page.evaluate(()=>window.scrollTo(0,600));await nav.getByRole('button',{name:'Teams',exact:true}).click();await expect.poll(()=>page.evaluate(()=>scrollY)).toBe(0);
  await page.getByRole('button',{name:'Settings',exact:true}).click();const menu=page.getByRole('region',{name:'Event settings menu'});
  await expect(menu).toHaveCSS('overflow-y','auto');
+ if(mobile)await expect(page.locator('.refos-log-fab')).toHaveCSS('visibility','hidden');
  if(mobile){expect(await menu.evaluate(e=>e.scrollHeight>e.clientHeight)).toBe(true);const box=await menu.boundingBox();expect(box.y+box.height).toBeLessThan(560);await menu.evaluate(e=>e.scrollTop=e.scrollHeight);await expect.poll(()=>menu.evaluate(e=>e.scrollTop)).toBeGreaterThan(0);}
+ await page.getByRole('button',{name:'Settings',exact:true}).click();if(mobile)await expect(page.locator('.refos-log-fab')).toHaveCSS('visibility','visible');
 });

@@ -4414,7 +4414,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       || a.number.localeCompare(b.number, undefined, { numeric: true }));
 
   return (
-    <div data-program={isIQ ? "iq" : "v5"} className="refos-shell min-h-screen font-sans antialiased">
+    <div data-settings-open={menu ? "true" : "false"} data-program={isIQ ? "iq" : "v5"} className="refos-shell min-h-screen font-sans antialiased">
       <a className="refos-skip" href="#workspace">Skip to workspace</a>
       <header className="refos-header sticky top-0 z-20" style={brand.accentSource === "saved" ? {"--ref-header-accent":brand.accent} : undefined}>
         <div className="refos-header-inner mx-auto px-4 py-3 flex items-center gap-3">
@@ -4944,7 +4944,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       </main>
 
       {!highlanderDemoLocked && !isInspection && !footerVisible && !openTeam && !openMatch && !openRobot && view !== "judging" && view !== "interviews" && view !== "matches" && !isEmcee && (
-        <button onClick={() => setLogFor("")} className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] sm:bottom-5 left-1/2 -translate-x-1/2 z-50 sm:z-20 bg-[#D7212B] text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
+        <button onClick={() => setLogFor("")} className="refos-log-fab fixed bottom-[calc(76px+env(safe-area-inset-bottom))] sm:bottom-5 left-1/2 -translate-x-1/2 z-50 sm:z-20 bg-[#D7212B] text-white px-5 py-3.5 rounded-full shadow-xl flex items-center gap-2 font-semibold hover:bg-[#B42024] active:scale-95 transition">
           <Plus size={20} /> Log violation
         </button>
       )}

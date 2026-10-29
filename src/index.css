@@ -483,3 +483,5 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
  .refos-desktop-nav.refos-nav-dismissed .refos-nav-label { opacity:0; }
  .refos-desktop-nav.refos-nav-dismissed::before { content:'R'; left:24px; }
 }
+
+@media(max-width:639px) { .refos-shell[data-settings-open="true"] .refos-log-fab { visibility:hidden; pointer-events:none; } }
