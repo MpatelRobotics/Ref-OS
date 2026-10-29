@@ -38,3 +38,10 @@ test('event directory fills desktop width and groups become a mobile column',asy
  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  expect((await groups[1].boundingBox()).y).toBeGreaterThan((await groups[0].boundingBox()).y);
 });
+
+test('event selector theme button toggles both ways and remembers the choice',async({page})=>{
+ await page.route('https://example.supabase.co/**',r=>r.fulfill({contentType:'application/json',body:'[]'}));
+ await page.goto('/');await page.getByRole('button',{name:'Dark mode',exact:true}).click();
+ await expect(page.locator('html')).toHaveClass(/dark/);await page.reload();await expect(page.getByRole('button',{name:'Light mode',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Light mode',exact:true}).click();await expect(page.locator('html')).not.toHaveClass(/dark/);
+});

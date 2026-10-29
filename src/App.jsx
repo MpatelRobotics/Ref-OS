@@ -1188,6 +1188,8 @@ export default function App() {
   if (!syncBooted) return <FullPage>Connecting…</FullPage>;
   if (!activeEventId) return (
     <EventSelector
+      theme={theme}
+      onToggleTheme={() => setTheme(current => current === "dark" ? "light" : "dark")}
       events={eventChoices}
       loading={eventsLoading}
       error={eventChoiceError}
@@ -1381,7 +1383,7 @@ const formatEventDate = (value) => {
   return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 };
 
-const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, initialNotice = "" }) => {
+const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, theme="light", onToggleTheme, initialNotice = "" }) => {
   const [refPortal,setRefPortal]=useState(()=>REFEREE_PORTAL_ENABLED && new URLSearchParams(window.location.search).has("refPortal"));
   const developerPage = new URLSearchParams(window.location.search).get('page') === 'developer' || new URLSearchParams(window.location.search).get('open') === 'universal-feedback';
   const developerSession=useDeveloperSession(developerPage);
@@ -1512,6 +1514,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
   return (
   <div className="refos-event-selector refos-safe-page min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-5 flex items-center justify-center">
     <div className="refos-event-selector-content w-full max-w-xl">
+      <div className="flex justify-end mb-4"><button type="button" onClick={onToggleTheme} className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">{theme === "dark" ? <Sun size={17} aria-hidden="true"/> : <Moon size={17} aria-hidden="true"/>}{theme === "dark" ? "Light mode" : "Dark mode"}</button></div>
       <div className="text-center mb-6">
         <img src="/refos-logo.svg" alt="Ref OS" className="h-20 mx-auto mb-3" />
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
