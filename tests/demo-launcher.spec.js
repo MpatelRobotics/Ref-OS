@@ -16,3 +16,14 @@ test('demo code comes before program choice and routes each program separately',
  expect(await page.evaluate(()=>window.chosen)).toBe(DEMO_EVENTS.v5);
  expect(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('refosDemoEntry')).code)).toBe('DEMOV5');
 });
+
+test('event selector and demo form use readable text in dark mode',async({page})=>{
+ await page.addInitScript(()=>localStorage.setItem('refosTheme','dark'));
+ await page.route('https://example.supabase.co/**',r=>r.fulfill({contentType:'application/json',body:'[]'}));
+ await page.goto('/');
+ await expect(page.getByText(/Explore V5 Override with 32 fictional teams/)).toHaveCSS('color','rgb(241, 245, 249)');
+ await expect(page.getByRole('button',{name:'Expand all',exact:true})).toHaveCSS('color','rgb(241, 245, 249)');
+ await page.getByRole('button',{name:'Try the DEMO',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Cancel',exact:true})).toHaveCSS('color','rgb(241, 245, 249)');
+ await expect(page.getByRole('heading',{name:'Try Ref OS',exact:true})).toHaveCSS('color','rgb(241, 245, 249)');
+});

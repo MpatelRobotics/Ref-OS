@@ -1510,7 +1510,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
   if(REFEREE_PORTAL_ENABLED && refPortal) return <RefereePortal onOpenEvent={id=>{setRefPortal(false);onReload?.();onChoose(id);}} onClose={()=>{setRefPortal(false);window.history.replaceState(null,"",window.location.pathname);onReload?.();}}/>;
 
   return (
-  <div className="refos-safe-page min-h-screen bg-slate-100 dark:bg-slate-900 p-5 flex items-center justify-center">
+  <div className="refos-safe-page min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-5 flex items-center justify-center">
     <div className="w-full max-w-xl">
       <div className="text-center mb-6">
         <img src="/refos-logo.svg" alt="Ref OS" className="h-20 mx-auto mb-3" />
