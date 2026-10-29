@@ -382,3 +382,10 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 
 /* Refresh metadata stays readable instead of fading to the old dark-header hover color. */
 .refos-header-event > button:hover { color:var(--ref-muted); background:transparent; }
+
+
+/* Navigation uses a consistent neutral surface; color marks the active destination. */
+.refos-shell[data-program] :is(.refos-desktop-nav,.refos-mobile-bottom) button,
+.refos-shell[data-program] :is(.refos-desktop-nav,.refos-mobile-bottom) button:hover {
+ background:var(--ref-surface);
+}

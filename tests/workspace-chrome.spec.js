@@ -21,6 +21,8 @@ test('compact neutral desktop navigation and flat team rows',async({page})=>{
  await page.setViewportSize({width:1440,height:1000});await mockIQApp(page);
  const nav=page.getByRole('navigation',{name:'Main navigation'});
  await expect(nav).toHaveCSS('width','176px');
+ for(const item of await nav.getByRole('button').all()){await expect(item).toHaveCSS('background-color','rgb(255, 255, 255)');}
+ await nav.getByRole('button',{name:'Rules',exact:true}).hover();await expect(nav.getByRole('button',{name:'Rules',exact:true})).toHaveCSS('background-color','rgb(255, 255, 255)');
  await expect(nav).toHaveCSS('background-color','rgb(248, 250, 252)');
  await expect(page.locator('.refos-header')).toHaveCSS('background-color','rgb(255, 255, 255)');
  await page.locator('.refos-header-event > button').hover();
@@ -43,6 +45,7 @@ test('mobile chrome stays neutral, readable and within viewport',async({page})=>
  await page.setViewportSize({width:390,height:844});await mockIQApp(page);
  await expect(page.locator('.refos-header')).toHaveCSS('background-color','rgb(255, 255, 255)');
  await expect(page.locator('.refos-mobile-bottom')).toHaveCSS('background-color','rgb(255, 255, 255)');
+ for(const item of await page.locator('.refos-mobile-bottom').getByRole('button').all())await expect(item).toHaveCSS('background-color','rgb(255, 255, 255)');
  const box=await page.getByRole('heading',{name:'IQ Fixture',exact:true}).boundingBox();expect(box.y).toBeGreaterThanOrEqual(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:'test-results/clean-workspace-mobile.png',fullPage:true,animations:'disabled'});
