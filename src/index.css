@@ -361,7 +361,7 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
  --ref-accent:#f87171; --ref-border:#b91c1c; --ref-nav-border:#b91c1c;
  --ref-active:#222d3d; --ref-program-text:#f87171;
 }
-.refos-shell[data-program] .refos-header { border-bottom:2px solid var(--ref-border); }
+.refos-shell[data-program] .refos-header { border-bottom:2px solid var(--ref-header-accent,var(--ref-border)); }
 .refos-shell[data-program] :is(.refos-page-heading h2,.refos-eyebrow,.refos-header-event h1) { color:var(--ref-program-text); }
 .refos-shell[data-program] .refos-desktop-nav button[aria-current='page'] {
  color:var(--ref-program-text); background:var(--ref-surface);
@@ -389,3 +389,5 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 .refos-shell[data-program] :is(.refos-desktop-nav,.refos-mobile-bottom) button:hover {
  background:var(--ref-surface);
 }
+
+.refos-shell[data-program] .refos-header-event h1 { color:var(--ref-header-accent,var(--ref-program-text)); }

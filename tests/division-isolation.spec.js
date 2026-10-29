@@ -22,3 +22,31 @@ test('division schedules, standings and alliance seeds stay isolated; Skills sta
  });
  expect(result.a[0].redScore).toBe(10);expect(result.b[0].redScore).toBeUndefined();expect(result.rankA).toBe(1);expect(result.rankB).toBe(4);expect(result.alliancesA[0].teams).toEqual(['1A']);expect(result.alliancesB[0].teams).toEqual(['3A']);expect(result.skills.rows[0].total).toBe(40);expect(result.remainingB).toBe(1);expect(result.legacy).toBe(true);
 });
+
+ test('division league settings, violations, logs, reset checks and history stay scoped',async({page})=>{
+  await page.goto('/');
+  const result=await page.evaluate(async()=>{
+   const {createDivisionApi}=await import('/src/divisionApi.js');
+   const settings={},logs=[],checks=[],violations=[],history=[];
+   let session='session-2';
+   const base={leagueSessionFor:()=>session,listEventSettings:async()=>({...settings}),upsertEventSetting:async(e,k,value)=>settings[k]={key:k,value},deleteEventSetting:async(e,k)=>delete settings[k],
+    buildViolationRow:(e,v)=>v,addViolation:async(e,v)=>violations.push(v),listViolations:async()=>violations,
+    addFieldLog:async(e,v)=>logs.push(v),listFieldLog:async()=>logs,
+    verifyFieldResetQuadrant:async(e,id)=>checks.push({matchId:id}),listFieldResetChecks:async()=>checks,clearFieldResetMatch:async(e,id)=>{for(let i=checks.length-1;i>=0;i--)if(checks[i].matchId===id)checks.splice(i,1);},
+    listOtherSessionMatches:async(e,options)=>{history.push(options.divisionId);return [];}};
+   const a=createDivisionApi(base,'event',1),b=createDivisionApi(base,'event',2);
+   await a.upsertEventSetting('event','qualification_records',{team:'A'});
+   await b.upsertEventSetting('event','qualification_records',{team:'B'});
+   await a.addViolation('event',{match:{num:1}});await b.addViolation('event',{match:{num:1}});
+   await a.addFieldLog('event',{matchId:'1'});await b.addFieldLog('event',{matchId:'1'});
+   await a.verifyFieldResetQuadrant('event','1');await b.verifyFieldResetQuadrant('event','1');
+   const before={a:(await a.listEventSettings()).qualification_records.value,b:(await b.listEventSettings()).qualification_records.value,violationsA:await a.listViolations(),violationsB:await b.listViolations(),logsA:await a.listFieldLog(),checksB:await b.listFieldResetChecks()};
+   await a.clearFieldResetChecks();await a.listOtherSessionMatches();await b.listOtherSessionMatches();
+   session='session-3';const c=createDivisionApi(base,'event',1);
+   return {...before,remainingB:await b.listFieldResetChecks(),newSession:(await c.listEventSettings()).qualification_records||null,history};
+  });
+  expect(result.a).toEqual({team:'A'});expect(result.b).toEqual({team:'B'});
+  expect(result.violationsA).toEqual([{match:{num:1,division:1}}]);expect(result.violationsB).toEqual([{match:{num:1,division:2}}]);
+  expect(result.logsA).toEqual([{matchId:'1'}]);expect(result.checksB).toHaveLength(1);expect(result.remainingB).toHaveLength(1);
+  expect(result.newSession).toBeNull();expect(result.history).toEqual([1,2]);
+ });

@@ -1,4 +1,4 @@
-import useMobileMenuIdle from "./useMobileMenuIdle.js";
+import useMenuIdle from "./useMenuIdle.js";
 import IQFieldReset from "./features/field-reset/IQFieldReset.jsx";
 import {sampleRobotPhoto} from './sampleRobotPhotos.js';
 import DemoLauncher from './components/DemoLauncher.jsx';
@@ -1864,7 +1864,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const [importing, setImporting] = useState(null); // { label, done, total } | null while an import is writing
   const menuRef = useRef(null);
   useMenuViewport(menuRef, menu);
-  useMobileMenuIdle(menuRef,menu,setMenu);
+  useMenuIdle(menuRef,menu,setMenu);
 
   useEffect(() => {
     const footer = workspaceFooterRef.current;
@@ -4415,7 +4415,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   return (
     <div data-program={isIQ ? "iq" : "v5"} className="refos-shell min-h-screen font-sans antialiased">
       <a className="refos-skip" href="#workspace">Skip to workspace</a>
-      <header className="refos-header sticky top-0 z-20">
+      <header className="refos-header sticky top-0 z-20" style={brand.accentSource === "saved" ? {"--ref-header-accent":brand.accent} : undefined}>
         <div className="refos-header-inner mx-auto px-4 py-3 flex items-center gap-3">
           {(openTeam || openMatch || openRobot) ? (
             <button onClick={() => { setOpenTeam(null); setOpenMatch(null); setOpenRobot(null); }} aria-label={`Back to ${openTeam ? "Teams" : openRobot ? "Robots" : "Matches"}`} className="refos-back-button refos-back-button-on-dark">

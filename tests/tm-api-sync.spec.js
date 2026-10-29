@@ -153,7 +153,7 @@ test('two-division setup stays available without an existing Ref OS division cat
 });
 
 test('Chrome extension enables browser TM forms and live field sync without the Windows app',async({page})=>{
- await page.route(/\/src\/tmExtension\.js(?:\?.*)?$/,route=>route.fulfill({contentType:'application/javascript',body:'export const isTmExtension=()=>true;'}));
+ await page.route(/\/src\/tmExtension\.js(?:\?.*)?$/,route=>route.fulfill({contentType:'application/javascript',body:'export const isTmExtension=()=>true; export const extensionTmRequest=async()=>null;'}));
  await mount(page,false);await review(page);
  await expect(page.getByText('Chrome TM extension connected · live field updates supported.')).toBeVisible();
  await expect(page.getByRole('link',{name:'Download Ref OS TM Connect for Windows'})).toBeVisible();

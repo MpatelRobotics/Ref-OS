@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-async function mockIQApp(page,role="admin",program="iq"){
+async function mockIQApp(page,role="admin",program="iq",accent=null){
  await page.route('https://example.supabase.co/**',r=>r.fulfill({contentType:'application/json',body:'[]'}));
  await page.route(/\/src\/api(?:\.js)?(?:\?.*)?$/,async r=>{
   const res=await r.fetch();let source=await res.text();
@@ -8,7 +8,7 @@ async function mockIQApp(page,role="admin",program="iq"){
   source=source.replace('name: "Highlander Summit E2E"','name: "IQ Fixture"');
   source=source.replace('export async function getMyEventAccess(eventId) {','export async function getMyEventAccess(eventId) { if(E2E_MOCK) return {role:"'+role+'",developer:false};');
   source=source.replace('export async function getEventCompetitionProgram(eventId) {','export async function getEventCompetitionProgram(eventId) { if(E2E_MOCK) return {key:"competition_program",value:{program:"'+program+'"}};');
-  source=source.replace('export async function listEventSettings(eventId) {','export async function listEventSettings(eventId) { if(E2E_MOCK) return {competition_program:{value:{program:"'+program+'"}},qualification_records:{value:{records:{"123A":{avgPoints:42,played:4},"456B":{avgPoints:38,played:4}}}}};');
+  source=source.replace('export async function listEventSettings(eventId) {','export async function listEventSettings(eventId) { if(E2E_MOCK) return {competition_program:{value:{program:"'+program+'"}},event_branding:{value:{accent:'+JSON.stringify(accent)+'}},qualification_records:{value:{records:{"123A":{avgPoints:42,played:4},"456B":{avgPoints:38,played:4}}}}};');
   source=source.replace(/export async function listMatches\(eventId[^\n]+\{\r?\n/,'export async function listMatches(eventId) { if(E2E_MOCK) return [{id:"1",phase:"qual",num:1,red:["123A","456B"],blue:[],redScore:42,blueScore:null,field:"Field 1"}];');
   await r.fulfill({response:res,body:source});
  });
@@ -74,3 +74,10 @@ test('unscheduled-team boxes retain colored borders but use the neutral page bac
  await expect(section).toHaveCSS('background-color','rgb(16, 24, 39)');
  await expect(section).toHaveCSS('border-top-color','rgb(185, 28, 28)');
 });
+
+ test('saved event accent colors the header while program colors stay in the workspace',async({page})=>{
+  await mockIQApp(page,'admin','v5','#7c3aed');
+  await expect(page.locator('.refos-header-event h1')).toHaveCSS('color','rgb(124, 58, 237)');
+  await expect(page.locator('.refos-header')).toHaveCSS('border-bottom-color','rgb(124, 58, 237)');
+  await expect(page.locator('.refos-page-heading h2')).toHaveCSS('color','rgb(153, 27, 27)');
+ });
