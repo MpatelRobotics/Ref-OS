@@ -1060,7 +1060,7 @@ export default function App() {
 
   useEffect(() => {
     const profile = resolveEventBranding(activeEventId, event || activeChoice, activeChoice?.branding);
-    document.title = `Ref OS · ${profile.name}`;
+    document.title = "Ref-OS - Referee Operating System";
     let favicon = document.querySelector('link[rel="icon"]');
     if (!favicon) {
       favicon = document.createElement("link");
@@ -2189,7 +2189,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const eventBranding = eventSettings?.event_branding?.value || {};
   // Phase 6: saved event setting -> built-in event profile -> Ref OS default.
   const brand = useMemo(() => resolveEventBranding(eventId, event, eventBranding), [eventId, event?.name, eventSettings?.event_branding]);
-  useEffect(() => { document.title = `Ref OS · ${brand.name}`; }, [brand.name]);
+  useEffect(() => { document.title = "Ref-OS - Referee Operating System"; }, [brand.name]);
   // Email alerts are disabled for every event (the Edge Function no longer sends email).
   const notificationDeliveryLabel = "Push only";
   const refreshPushState = useCallback(async () => {
