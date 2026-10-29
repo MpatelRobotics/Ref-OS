@@ -28,3 +28,10 @@ export function planVexRosterUpdates(existing, roster){
  return roster.filter(t=>!known.has(t.number)||(t.name&&t.name!==known.get(t.number).name))
   .map(t=>({number:t.number,name:t.name||known.get(t.number)?.name||''}));
 }
+
+// Public league feeds can retain matches from a completed session. Do not assign
+// those matches/results to the current session merely because its schedule is empty.
+export function excludeHistoricalLeagueMatches(rows,history){
+ const sameMatch=(a,b)=>a.phase===b.phase&&Number(a.num)===Number(b.num)&&sameTeams(a.red,b.red)&&sameTeams(a.blue,b.blue);
+ return rows.filter(row=>!history.some(prior=>sameMatch(row,prior)));
+}

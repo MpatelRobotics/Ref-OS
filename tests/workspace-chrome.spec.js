@@ -23,6 +23,10 @@ test('compact neutral desktop navigation and flat team rows',async({page})=>{
  await expect(nav).toHaveCSS('width','176px');
  await expect(nav).toHaveCSS('background-color','rgb(248, 250, 252)');
  await expect(page.locator('.refos-header')).toHaveCSS('background-color','rgb(255, 255, 255)');
+ await page.locator('.refos-header-event > button').hover();
+ await expect(page.locator('.refos-header-event > button')).toHaveCSS('color','rgb(82, 97, 118)');
+ await expect(page.locator('.refos-header-event > button')).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
+
  await page.getByRole('button',{name:'Teams',exact:true}).click();
  await expect(nav.getByRole('button',{name:'Teams',exact:true})).toHaveAttribute('aria-current','page');
  await expect(page.locator('.refos-team-list>li>button').first()).toHaveCSS('border-radius','0px');
@@ -54,3 +58,15 @@ for(const [program,color,border] of [['iq','rgb(30, 64, 175)','rgb(191, 219, 254
   await page.screenshot({path:'test-results/program-'+program+'-desktop.png',fullPage:true,animations:'disabled'});
  });
 }
+
+test('unscheduled-team boxes retain colored borders but use the neutral page background',async({page})=>{
+ await page.route('**/neutral-boxes-test',r=>r.fulfill({contentType:'text/html',body:`<div id="root"></div><script type="module">import '/src/index.css';import '/@vite/client';import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(t)=>t;window.__vite_plugin_react_preamble_installed__=true;const React=(await import('/node_modules/.vite/deps/react.js')).default,DOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default,View=(await import('/src/components/UnscheduledTeams.jsx')).default;DOM.createRoot(document.getElementById('root')).render(React.createElement('div',{className:'refos-shell','data-program':'v5'},React.createElement('main',{className:'refos-workspace'},React.createElement(View,{teams:[{number:'4265P',name:'Over-Powered'}],onOpen:()=>{}}))));</script>`}));
+ await page.goto('/neutral-boxes-test');await page.getByText('Not in match list (1)',{exact:true}).click();
+ const section=page.locator('details');
+ await expect(section).toHaveCSS('background-color','rgb(248, 250, 252)');
+ await expect(section).toHaveCSS('border-top-color','rgb(254, 202, 202)');
+ await expect(page.getByRole('button',{name:/4265P.*Over-Powered/})).toHaveCSS('background-color','rgba(0, 0, 0, 0)');
+ await page.evaluate(()=>document.documentElement.classList.add('dark'));
+ await expect(section).toHaveCSS('background-color','rgb(16, 24, 39)');
+ await expect(section).toHaveCSS('border-top-color','rgb(107, 52, 63)');
+});

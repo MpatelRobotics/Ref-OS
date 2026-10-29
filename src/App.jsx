@@ -15,7 +15,7 @@ import {parseManualScheduledTime,mergeManualMatchTimes,isTmTimesOnlyTable,parseT
 import ScheduledMatchTime from './components/ScheduledMatchTime';
 import { eliminationPairingKey, eliminationPairingLabel, eliminationResultLabel } from './tmReplayGrouping.js';
 import { tmPairingNumber, tmGameNumber, tmMatchOrder } from './tmMatchIdentity.js';
-import {planScoreUpdates,planMissingVexMatches,planVexRosterUpdates} from "./vexScoreSync.js";
+import {planScoreUpdates,planMissingVexMatches,planVexRosterUpdates,excludeHistoricalLeagueMatches} from "./vexScoreSync.js";
 import {parseViolationRuleNotes,validViolationRuleDetails,formatViolationRuleNotes} from "./violationRuleNotes.js";
 import DeveloperLiveActivity from "./components/DeveloperLiveActivity.jsx";
 import useLiveActivity from "./useLiveActivity.js";
@@ -3629,22 +3629,32 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     if (!adminUnlocked || highlanderDemoLocked || isVenueMode()) throw new Error("Cloud administrator access is required.");
     const targetApi = data.division && data.divisions?.length>1 ? createDivisionApi(eventApi,eventId,Number(data.division)) : api;
     if (kind === "scores") {
+      const targetSession=leagueSessionId;
+      const assertSession=()=>{if(eventApi.leagueSessionFor(eventId)!==targetSession)throw Error('League session changed. Reopen sync in the intended session.');};
+      assertSession();
+      const history=targetSession?await targetApi.listOtherSessionMatches(eventId):[];
+      assertSession();
+      const inputRows=data.matches||data.scores||[];
+      const scheduleRows=excludeHistoricalLeagueMatches(inputRows,history);
+      const scoreRows=excludeHistoricalLeagueMatches(data.scores||[],history);
+      const historicalSkipped=inputRows.length-scheduleRows.length;
       let rosterUpdated=0;
       if(Array.isArray(data.teams)&&data.teams.length){
         const existing=await api.listTeams(eventId);
         const changes=planVexRosterUpdates(existing,data.teams);
         if(changes.length){await api.bulkUpsertTeams(eventId,changes);rosterUpdated=changes.length;setTeams(await api.listTeams(eventId));}
       }
-      if(targetApi.claimMatchingSchedule)await targetApi.claimMatchingSchedule(data.scores||[]);
+      assertSession();
+      if(targetApi.claimMatchingSchedule)await targetApi.claimMatchingSchedule(scoreRows);
       let fresh=await targetApi.listMatches(eventId, {strict:true});
-      const missing=planMissingVexMatches(fresh,data.matches||data.scores||[]);
+      const missing=planMissingVexMatches(fresh,scheduleRows);
       const numbers=[...new Set(missing.flatMap(m=>[...m.red,...m.blue]))];
       if(numbers.length){const known=await api.listTeams(eventId);const absent=numbers.filter(number=>!known.some(t=>t.number===number));if(absent.length)await api.bulkUpsertTeams(eventId,absent.map(number=>({number,name:""})));}
       let added=0;
-      for(const row of missing)if(await targetApi.insertTmMatch(eventId,row))added++;
+      for(const row of missing){assertSession();if(await targetApi.insertTmMatch(eventId,row))added++;}
       if(missing.length)fresh=await targetApi.listMatches(eventId,{strict:true});
-      const plan=planScoreUpdates(fresh,data.scores||[]);
-      let updated=0;for(const row of plan.updates)updated+=await targetApi.updateExistingVexScore(eventId,row);
+      const plan=planScoreUpdates(fresh,scoreRows);
+      let updated=0;for(const row of plan.updates){assertSession();updated+=await targetApi.updateExistingVexScore(eventId,row);}
       const isCurrentDivision=!data.division || Number(data.division)===divisionId || !divisionId;
       if ((data.matches||data.scores||[]).length && fresh.length) {
         const prior=await targetApi.getEventSetting(eventId,"vex_schedule_team_filter");
@@ -3654,7 +3664,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         }
       }
       if(isCurrentDivision){await reloadMatches();if(numbers.length)setTeams(await api.listTeams(eventId));}
-      return {message:`${rosterUpdated} teams added or updated · ${added} matches added · ${updated} match scores updated · ${plan.skipped + plan.updates.length-updated} unmatched or changed matches skipped.`};
+      return {message:`${rosterUpdated} teams added or updated · ${added} matches added · ${updated} match scores updated · ${plan.skipped + plan.updates.length-updated} unmatched or changed matches skipped.${historicalSkipped ? ` ${historicalSkipped} matches from other league sessions ignored; use a session-specific TM import if a new session repeats the same pairing.` : ""}`};
     }
     if (!["rankings","skills"].includes(kind)) throw new Error("Unsupported VEX sync category.");
     const rows = data[kind] || [];

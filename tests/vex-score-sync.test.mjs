@@ -1,3 +1,4 @@
+import {excludeHistoricalLeagueMatches} from '../src/vexScoreSync.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mapVexScores,fetchVexStandings,describeVexScores,mapVexTeams} from '../supabase/functions/vex-event-lookup/matches.js';
@@ -79,4 +80,14 @@ test('roster includes teams without matches and preserves saved names when upstr
  assert.equal(existing[0].photoKeys[0],'photo');
  assert.deepEqual(planVexRosterUpdates([],roster),roster);
  assert.throws(()=>mapVexTeams([{number:'1A'},{number:'1A'}]),/duplicate/);
+});
+
+test('league VEX sync excludes earlier session matches and results but permits new session pairings',()=>{
+ const old={phase:'qual',num:12,red:['32092X','32092E'],blue:['32092B','32092F']};
+ const history=[{...old,session_id:'session-2'}];
+ const repeated={...old,red:[...old.red].reverse(),redScore:51,blueScore:65};
+ const fresh={...old,num:1},newPair={...old,red:['OTHER1','OTHER2']};
+ assert.deepEqual(excludeHistoricalLeagueMatches([repeated,fresh,newPair],history),[fresh,newPair]);
+ assert.deepEqual(excludeHistoricalLeagueMatches([repeated],[]),[repeated]);
+ assert.equal(history.length,1);
 });

@@ -12,6 +12,7 @@ export function createDivisionApi(base, eventId, division, client = supabase) {
  const row = m => ({event_id:eventId,division_id:division,session_id:sid,phase:m.phase||'qual',num:Number(m.num),red:m.red||[],blue:m.blue||[],field:m.field||null,label:m.label||null,...(m.redScore!=null?{red_score:m.redScore}:{}),...(m.blueScore!=null?{blue_score:m.blueScore}:{}),...(m.winner?{winner:m.winner}:{})});
  const checked = async query => {const result=await query;if(result.error)throw result.error;return result.data;};
  const api={...base};
+ api.listOtherSessionMatches=()=>base.listOtherSessionMatches(eventId,{divisionId:division});
  api.listMatches=async()=>{
   const rows=await checked(scoped(client.from('matches').select('*')).order('num'));
   return (rows||[]).map(m=>({id:m.phase==='qual'?String(m.num):`${m.phase}-${m.num}`,phase:m.phase,num:m.num,divisionId:division,red:m.red||[],blue:m.blue||[],field:m.field||'',label:m.label||'',winner:m.winner||'',redScore:m.red_score,blueScore:m.blue_score}));

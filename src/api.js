@@ -1099,6 +1099,18 @@ export async function finishTeamPhotoCleanup(eventId, reset) {
 }
 
 /* ================= matches (qualification schedule) ================= */
+export async function listOtherSessionMatches(eventId,{divisionId=0}={}){
+ const sessionId=leagueSessionFor(eventId);
+ if(!sessionId||E2E_MOCK)return [];
+ const rows=[];
+ for(let offset=0;;offset+=500){
+  const {data,error}=await supabase.from('matches').select('session_id,phase,num,red,blue').eq('event_id',eventId).eq('division_id',divisionId).neq('session_id',sessionId).order('session_id').order('phase').order('num').range(offset,offset+499);
+  if(error)throw error;
+  rows.push(...(data||[]));
+  if(!data||data.length<500)break;
+ }
+ return rows;
+}
 export async function listMatches(eventId, { strict = false } = {}) {
   if (E2E_MOCK) return [];
   const sessionId = leagueSessionFor(eventId);

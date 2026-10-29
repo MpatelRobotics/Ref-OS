@@ -331,7 +331,7 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 .refos-header .refos-back-button-on-dark:hover { background:var(--ref-active); }
 .refos-header :is(.text-slate-200,.text-slate-300,.text-slate-400) { color:var(--ref-muted); }
 .refos-header .refos-user-chip { background:var(--ref-active); }
-.refos-header button:hover { background-color:var(--ref-active); }
+.refos-header button:hover { background-color:color-mix(in srgb,var(--ref-active) 35%,var(--ref-surface)); }
 .refos-header .refos-user-chip > span:first-child,
 .refos-online-cluster .hidden > span { background:var(--ref-active); color:var(--ref-text); --tw-ring-color:var(--ref-border); }
 .refos-online-cluster > span { background:var(--ref-active); color:var(--ref-text); border-color:var(--ref-border); }
@@ -347,19 +347,19 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
    Alliance, violation and connection-status colors retain their own meaning. */
 .refos-shell[data-program='iq'] {
  --ref-accent:#1d4ed8; --ref-border:#bfdbfe; --ref-nav-border:#bfdbfe;
- --ref-active:#eff6ff; --ref-program-text:#1e40af; --ref-program-soft:#f5f9ff;
+ --ref-active:#eff6ff; --ref-program-text:#1e40af;
 }
 .refos-shell[data-program='v5'] {
  --ref-accent:#b91c1c; --ref-border:#fecaca; --ref-nav-border:#fecaca;
- --ref-active:#fff1f2; --ref-program-text:#991b1b; --ref-program-soft:#fff7f7;
+ --ref-active:#fff1f2; --ref-program-text:#991b1b;
 }
 .dark .refos-shell[data-program='iq'] {
  --ref-accent:#93c5fd; --ref-border:#334f73; --ref-nav-border:#334f73;
- --ref-active:#172e4c; --ref-program-text:#93c5fd; --ref-program-soft:#142237;
+ --ref-active:#172e4c; --ref-program-text:#93c5fd;
 }
 .dark .refos-shell[data-program='v5'] {
  --ref-accent:#fca5a5; --ref-border:#6b343f; --ref-nav-border:#6b343f;
- --ref-active:#3e202c; --ref-program-text:#fca5a5; --ref-program-soft:#281d2b;
+ --ref-active:#3e202c; --ref-program-text:#fca5a5;
 }
 .refos-shell[data-program] .refos-header { border-bottom:2px solid var(--ref-border); }
 .refos-shell[data-program] :is(.refos-page-heading h2,.refos-eyebrow,.refos-header-event h1) { color:var(--ref-program-text); }
@@ -370,7 +370,7 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 .refos-shell[data-program] .refos-mobile-bottom button[aria-current='page'] { color:var(--ref-program-text); }
 .refos-shell[data-program] :is(.border-slate-200,.border-slate-300) { border-color:var(--ref-border); }
 .refos-shell[data-program] .refos-workspace details {
- border-color:var(--ref-border); background:var(--ref-program-soft);
+ border-color:var(--ref-border); background:var(--ref-bg);
 }
 .refos-shell[data-program] .refos-workspace details > summary { color:var(--ref-program-text); }
 .refos-shell[data-program] .refos-role { color:var(--ref-program-text); border-color:var(--ref-border); background:var(--ref-active); }
@@ -379,3 +379,6 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
 .refos-shell[data-program] .refos-workspace select:focus { border-color:var(--ref-accent); }
 
 .refos-shell[data-program] .refos-desktop-nav::before { color:var(--ref-program-text); }
+
+/* Refresh metadata stays readable instead of fading to the old dark-header hover color. */
+.refos-header-event > button:hover { color:var(--ref-muted); background:transparent; }
