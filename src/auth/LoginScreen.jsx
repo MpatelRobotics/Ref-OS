@@ -129,6 +129,29 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
     await finishServerLogin(clean);
   };
 
+  const updateTypedCode = (value) => {
+    if(checkingCode || loginInFlight.current)return;
+    const next=String(value||'').toUpperCase().replace(/\s|-/g,'').slice(0,4);
+    if(next && !/^\d(?:[A-Z]\d{0,2})?$/.test(next))return;
+    setErr('');setCode(next);
+    if(next.length===4)void finishServerLogin(next);
+  };
+  useEffect(()=>{
+    if(mode!=='code'||showRemembered||showDelete||refPortal||groupPortal)return;
+    const keydown=e=>{
+      if(e.ctrlKey||e.metaKey||e.altKey||e.isComposing||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName||'')||e.target?.isContentEditable)return;
+      if(/^[0-9a-z]$/i.test(e.key)){e.preventDefault();enterCodeKey(e.key);}
+      else if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();if(!checkingCode){setCode(cur=>cur.slice(0,-1));setErr('');}}
+      else if(e.key==='Enter'&&code.length===4){e.preventDefault();void submitCode();}
+    };
+    const paste=e=>{
+      if(/^(INPUT|TEXTAREA)$/.test(e.target?.tagName||''))return;
+      e.preventDefault();updateTypedCode(e.clipboardData?.getData('text')||'');
+    };
+    window.addEventListener('keydown',keydown);window.addEventListener('paste',paste);
+    return()=>{window.removeEventListener('keydown',keydown);window.removeEventListener('paste',paste);};
+  },[mode,showRemembered,showDelete,refPortal,groupPortal,code,checkingCode]);
+
   if(JUDGE_GROUP_LOGIN_ENABLED && groupPortal)return <JudgeGroupPortal eventId={eventId} eventName={eventName} onClose={()=>setGroupPortal(false)}/>;
   if(REFEREE_PORTAL_ENABLED && refPortal) return <RefereePortal eventId={eventId} onUnlock={onUnlock} onClose={()=>setRefPortal(false)}/>;
   return (
@@ -174,14 +197,18 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
               </button>
             )}
             <p className="text-sm text-slate-600 text-center">Enter the 4 character access code provided by event leadership.</p>
-            <div className="flex justify-center gap-3 my-5">
+            <div className="relative flex justify-center gap-3 my-5 rounded-xl focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-offset-4">
+              <input aria-label="Event access code" type="text" inputMode="text" autoComplete="one-time-code" autoCapitalize="characters" spellCheck={false} autoFocus value={code} disabled={checkingCode}
+                onChange={e=>updateTypedCode(e.target.value)} onPaste={e=>{e.preventDefault();updateTypedCode(e.clipboardData.getData('text'));}}
+                onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();if(code.length===4)void submitCode();}}}
+                className="absolute inset-0 z-10 w-full h-full opacity-0 cursor-text" />
               {[0,1,2,3].map((i) => (
-                <div key={i} className={`w-14 h-14 rounded-xl border grid place-items-center text-2xl font-bold ${code.length > i ? (highlander ? "bg-[#11172F] text-white border-[#11172F]" : "bg-slate-900 text-white border-slate-900") : "bg-slate-50 border-slate-300 text-slate-400"}`}>
+                <div aria-hidden="true" key={i} className={`w-14 h-14 rounded-xl border grid place-items-center text-2xl font-bold ${code.length > i ? (highlander ? "bg-[#11172F] text-white border-[#11172F]" : "bg-slate-900 text-white border-slate-900") : "bg-slate-50 border-slate-300 text-slate-400"}`}>
                   {code.length > i ? code[i] : (i === 1 ? "A" : "0")}
                 </div>
               ))}
             </div>
-            <div className="text-xs text-slate-500 text-center mb-3">Format: number · A-Z · number · number</div>
+            <div className="text-xs text-slate-500 text-center mb-3">Type, paste, or use the keypad. Format: number · A-Z · number · number</div>
             {code.length === 1 ? (
               <div className="grid grid-cols-6 gap-2 mb-3">
                 {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((key) => (
