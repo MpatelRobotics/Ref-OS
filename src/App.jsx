@@ -1510,8 +1510,8 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
   if(REFEREE_PORTAL_ENABLED && refPortal) return <RefereePortal onOpenEvent={id=>{setRefPortal(false);onReload?.();onChoose(id);}} onClose={()=>{setRefPortal(false);window.history.replaceState(null,"",window.location.pathname);onReload?.();}}/>;
 
   return (
-  <div className="refos-safe-page min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-5 flex items-center justify-center">
-    <div className="w-full max-w-xl">
+  <div className="refos-event-selector refos-safe-page min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-5 flex items-center justify-center">
+    <div className="refos-event-selector-content w-full max-w-xl">
       <div className="text-center mb-6">
         <img src="/refos-logo.svg" alt="Ref OS" className="h-20 mx-auto mb-3" />
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
@@ -1604,13 +1604,13 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
         </>
       ) : (
       <>
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 space-y-3">
+      <div className="refos-event-catalog bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 space-y-3">
         {loading && <p className="text-center text-slate-500 py-8">Loading events…</p>}
         {!loading && error && <p className="text-center text-red-600 py-5">{error}</p>}
         {!loading && !error && selectorEvents.length === 0 && (
           <p className="text-center text-slate-500 py-8">No active Ref OS events are available.</p>
         )}
-        {!loading && !error && selectorGroups.some(group=>group.name) && <button type="button" className="min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700" onClick={()=>setExpandedStates(Object.fromEntries(selectorGroups.filter(group=>group.name).map(group=>[group.name,!allStatesExpanded])))}>{allStatesExpanded ? "Collapse all" : "Expand all"}</button>}
+        {!loading && !error && selectorGroups.some(group=>group.name) && <button type="button" className="refos-expand-events min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700" onClick={()=>setExpandedStates(Object.fromEntries(selectorGroups.filter(group=>group.name).map(group=>[group.name,!allStatesExpanded])))}>{allStatesExpanded ? "Collapse all" : "Expand all"}</button>}
         {!loading && !error && selectorGroups.filter(group=>group.events.length).map(group=>{
           const cards=group.events.map((ev) => {
           const profile = resolveEventBranding(ev.id, ev, ev.branding);

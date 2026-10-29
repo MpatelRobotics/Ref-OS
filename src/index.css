@@ -485,3 +485,15 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
 }
 
 @media(max-width:639px) { .refos-shell[data-settings-open="true"] .refos-log-fab { visibility:hidden; pointer-events:none; } }
+
+/* Event discovery uses the available screen instead of a phone-width column. */
+.refos-event-selector-content { max-width:none; min-width:0; }
+.refos-event-catalog { display:grid; grid-template-columns:minmax(0,1fr); align-items:start; gap:16px; }
+.refos-event-catalog > * { min-width:0; margin-top:0!important; }
+.refos-event-catalog > .refos-expand-events,.refos-event-catalog > p { grid-column:1/-1; justify-self:start; }
+.refos-event-selector-content > section { max-width:720px; margin-left:auto; margin-right:auto; }
+@media(min-width:1024px) {
+ .refos-event-selector { align-items:flex-start; padding:32px; }
+ .refos-event-catalog { grid-template-columns:repeat(2,minmax(0,1fr)); padding:20px; }
+}
+@media(min-width:1600px) { .refos-event-catalog { grid-template-columns:repeat(3,minmax(0,1fr)); } }
