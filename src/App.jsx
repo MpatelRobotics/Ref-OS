@@ -1,3 +1,4 @@
+import {volunteerMember, volunteerLocation} from "./volunteerIdentity.js";
 import useMenuIdle from "./useMenuIdle.js";
 import IQFieldReset from "./features/field-reset/IQFieldReset.jsx";
 import {sampleRobotPhoto} from './sampleRobotPhotos.js';
@@ -1946,9 +1947,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     return names;
   }, [savedFieldNames]);
   const volunteerAssignments = eventSettings?.volunteer_assignments?.value || {};
-  const myAssignment = volunteerAssignments[currentUserId]?.location || Object.values(volunteerAssignments).find((assignment) =>
-    (assignment?.name || "").trim().toLowerCase() === (meName || "").trim().toLowerCase()
-  )?.location || "";
+  const myAssignment = volunteerLocation(volunteerAssignments, currentUserId, meName);
   const [failedSyncItems, setFailedSyncItems] = useState([]);
   const announcements = fieldLog.filter((e) => e.kind === "announcement").sort((a,b) => b.createdAt - a.createdAt);
   const activeAnnouncement = announcements.find((e) => {
@@ -6895,10 +6894,7 @@ function OnlineList({ isDeveloper=false, fieldCount=3, presence, roster, meName,
         {refs.map((r) => {
           const isOnline = !!onlineCounts[r.name];
           const presenceUserId = userIdByName[r.name];
-          const member = eventMembers.find((m) =>
-            (presenceUserId && m.user_id === presenceUserId) ||
-            (m.name || "").trim().toLowerCase() === (r.name || "").trim().toLowerCase()
-          );
+          const member = volunteerMember(eventMembers, presenceUserId, r.name);
           const adminTarget = member || (presenceUserId ? { user_id: presenceUserId, role: String(roleByName[r.name] || r.role || "").toLowerCase() } : null);
           const role = member?.developer === true && member?.role === "admin" ? "Developer" : member?.role === "admin" ? "Admin" : (roleByName[r.name] || r.role || "");
           const assignment = member?.user_id ? assignments[member.user_id]?.location || "" : "";
