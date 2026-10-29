@@ -45,3 +45,18 @@ test('event selector theme button toggles both ways and remembers the choice',as
  await expect(page.locator('html')).toHaveClass(/dark/);await page.reload();await expect(page.getByRole('button',{name:'Light mode',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Light mode',exact:true}).click();await expect(page.locator('html')).not.toHaveClass(/dark/);
 });
+
+test('selector sidebar opens demo, archives, event creation and returns to events',async({page})=>{
+ await page.route('https://example.supabase.co/**',r=>r.fulfill({contentType:'application/json',body:'[]'}));
+ await page.setViewportSize({width:1440,height:1000});await page.goto('/');
+ const nav=page.getByRole('navigation',{name:'Event selection navigation'});
+ await page.mouse.move(1000,700);await expect(nav).toHaveCSS('width','64px');
+ await nav.hover();await expect(nav).toHaveCSS('width','224px');
+ await nav.getByRole('button',{name:'Try the demo',exact:true}).click();await expect(page.getByLabel('Demo code')).toBeVisible();await expect(nav).toHaveCSS('width','64px');
+ await nav.getByRole('button',{name:'Archived events',exact:true}).click();await expect(page.getByRole('heading',{name:'Archived Events',exact:true})).toBeVisible();
+ await nav.getByRole('button',{name:'Create event',exact:true}).click();await expect(page.getByRole('heading',{name:'Create VEX Event',exact:true})).toBeVisible();
+ await nav.getByRole('button',{name:'Events',exact:true}).click();await expect(page.getByRole('heading',{name:'Create VEX Event',exact:true})).toHaveCount(0);
+ await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:'test-results/event-selector-sidebar-mobile.png',fullPage:true});
+ await page.setViewportSize({width:1440,height:1000});await page.mouse.move(1000,700);await page.screenshot({path:'test-results/event-selector-sidebar-desktop.png',fullPage:true});
+});

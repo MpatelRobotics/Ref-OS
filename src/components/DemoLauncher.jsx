@@ -1,7 +1,8 @@
-import React,{useState} from 'react';
+import React,{useState,useEffect} from 'react';
 import {DEMO_EVENTS} from '../demoEvents.js';
-export default function DemoLauncher({onChoose}){
+export default function DemoLauncher({onChoose,openRequest=0}){
  const [open,setOpen]=useState(false),[code,setCode]=useState(''),[error,setError]=useState('');
+ useEffect(()=>{if(openRequest)setOpen(true);},[openRequest]);
  return <section className="text-slate-900 dark:text-slate-100 my-4 rounded-2xl border border-indigo-300 bg-indigo-50 p-4 dark:border-indigo-700 dark:bg-indigo-950/30">
  {!open?<><button type="button" className="min-h-[48px] w-full rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white hover:bg-indigo-800" onClick={()=>setOpen(true)}>Try the DEMO</button><p className="mt-2 text-center text-sm">Explore V5 Override with 32 fictional teams. Demo login: <b>DEMOV5</b></p></>:<>
  <div className="flex items-center justify-between gap-2"><h2 className="font-bold">Try Ref OS</h2><button type="button" className="min-h-[44px] rounded-lg border px-3" onClick={()=>{setOpen(false);setCode('');setError('');}}>Cancel</button></div>

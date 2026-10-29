@@ -1,3 +1,4 @@
+import EventSelectorSidebar from "./components/EventSelectorSidebar.jsx";
 import {volunteerMember, volunteerLocation} from "./volunteerIdentity.js";
 import useMenuIdle from "./useMenuIdle.js";
 import IQFieldReset from "./features/field-reset/IQFieldReset.jsx";
@@ -1384,6 +1385,8 @@ const formatEventDate = (value) => {
 };
 
 const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, theme="light", onToggleTheme, initialNotice = "" }) => {
+  const [demoRequest,setDemoRequest]=useState(0);
+  const [selectorSection,setSelectorSection]=useState("active");
   const [refPortal,setRefPortal]=useState(()=>REFEREE_PORTAL_ENABLED && new URLSearchParams(window.location.search).has("refPortal"));
   const developerPage = new URLSearchParams(window.location.search).get('page') === 'developer' || new URLSearchParams(window.location.search).get('open') === 'universal-feedback';
   const developerSession=useDeveloperSession(developerPage);
@@ -1513,8 +1516,8 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
 
   return (
   <div className="refos-event-selector refos-safe-page min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-5 flex items-center justify-center">
+    <EventSelectorSidebar active={view === "archived" ? "archived" : creating ? "create" : selectorSection} theme={theme} onToggleTheme={onToggleTheme} developerPage={developerPage} onSelect={key=>{setSelectorSection(key);setView(key==='archived'?'archived':'active');setCreating(key==='create');setNotice('');setDemoRequest(value=>key==='demo'?value+1:0);window.scrollTo({top:0,left:0,behavior:'instant'});if(key==='create')requestAnimationFrame(()=>document.getElementById('refos-create-event')?.scrollIntoView({block:'start'}));}}/>
     <div className="refos-event-selector-content w-full max-w-xl">
-      <div className="flex justify-end mb-4"><button type="button" onClick={onToggleTheme} className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">{theme === "dark" ? <Sun size={17} aria-hidden="true"/> : <Moon size={17} aria-hidden="true"/>}{theme === "dark" ? "Light mode" : "Dark mode"}</button></div>
       <div className="text-center mb-6">
         <img src="/refos-logo.svg" alt="Ref OS" className="h-20 mx-auto mb-3" />
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
@@ -1532,7 +1535,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
       {universalFeedbackOpen ? <UniversalFeedback isDeveloper events={events} onClose={()=>setUniversalFeedbackOpen(false)}/> : <button type="button" onClick={()=>setUniversalFeedbackOpen(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 bg-white dark:bg-slate-800 p-3 font-semibold">Universal Feedback · Developer only</button>}
       </>}
       {!universalFeedbackOpen && <>
-      {!developerPage && view === "active" && <DemoLauncher onChoose={onChoose}/>}
+      {!developerPage && view === "active" && <DemoLauncher key={demoRequest} openRequest={demoRequest} onChoose={onChoose}/>}
       {notice && view === "active" && (
         <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">{notice}</div>
       )}
@@ -1644,17 +1647,17 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
       </div>
         {!developerPage && !loading && !error && (
           <button type="button" onClick={() => { setView("archived"); setNotice(""); }}
-            className="w-full mt-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300">
+            className="sm:hidden w-full mt-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300">
             Archived Events ({archivedEvents.length})
           </button>
         )}
         {!creating ? (
           <button type="button" onClick={() => setCreating(true)}
-            className="w-full mt-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold px-4 py-3">
+            className="sm:hidden w-full mt-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold px-4 py-3">
             + Create VEX Event
           </button>
         ) : (
-          <div className="mt-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4">
+          <div id="refos-create-event" className="mt-4 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4">
             <h2 className="font-bold text-slate-900 dark:text-white">Create VEX Event</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">Create the event shell now. Use TM Sync Center after login to import teams, schedules, rankings, skills, and alliances.</p>
             <EventProgramChoice value={competitionProgram} onChange={setCompetitionProgram} disabled={saving || vexLookupBusy} />
@@ -1703,7 +1706,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
       )}
       </>}
       <p className="text-xs text-center text-slate-400 mt-4">Ref OS 2.0 · Event Selector</p>
-      {!developerPage && <a href="/?page=developer" className="mx-auto mt-1 flex w-fit min-h-[44px] items-center justify-center rounded px-2 text-xs font-medium text-slate-500 dark:text-slate-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600">Developer login</a>}
+      {!developerPage && <a href="/?page=developer" className="sm:hidden mx-auto mt-1 flex w-fit min-h-[44px] items-center justify-center rounded px-2 text-xs font-medium text-slate-500 dark:text-slate-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600">Developer login</a>}
       </>}
       {deleteTarget && (
         <DeleteEventModal event={deleteTarget} profile={resolveEventBranding(deleteTarget.id, deleteTarget, deleteTarget.branding)}
