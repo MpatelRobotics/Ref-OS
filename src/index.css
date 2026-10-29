@@ -544,3 +544,11 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
 .refos-welcome-start p+p { margin-top:12px; font-size:13px; }
 @media(max-width:1023px) { .refos-welcome-features { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:639px) { .refos-welcome-features { grid-template-columns:minmax(0,1fr); } .refos-welcome { margin-top:24px; } .refos-welcome-features article { padding:20px; } }
+
+/* Use the Ref-OS brand mark in both collapsed and expanded event navigation. */
+.refos-shell[data-program] .refos-desktop-nav::before,
+.refos-shell[data-program] .refos-desktop-nav:is(:hover,:focus-within,.refos-nav-expanded)::before,
+.refos-shell[data-program] .refos-desktop-nav.refos-nav-dismissed::before {
+ content:''; top:16px; left:20px; width:28px; height:28px;
+ background:url('/refos-logo.svg') center/contain no-repeat;
+}
