@@ -1,3 +1,4 @@
+import IQFieldReset from "./features/field-reset/IQFieldReset.jsx";
 import {sampleRobotPhoto} from './sampleRobotPhotos.js';
 import DemoLauncher from './components/DemoLauncher.jsx';
 import { isDemoEvent, DEMO_IDENTITY, RETIRED_IQ_DEMO_ID } from './demoEvents.js';
@@ -6332,12 +6333,13 @@ function MatchDetail({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, 
             <div className={`mt-1 text-sm font-bold ${isElim ? "text-slate-500 dark:text-slate-400" : awpEntry ? "text-emerald-700 dark:text-emerald-300" : "text-amber-700 dark:text-amber-300"}`}>{isElim ? "N/A" : awpEntry ? "Checked" : "Unchecked"}</div>
           </button>
 
+          </>}
           <button type="button" onClick={() => { setFieldResetOpen(true); setAwpOpen(false); setReplayOpen(false); setTimeout(() => document.getElementById(`match-operations-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }} className={`w-full text-left rounded-lg border px-3 py-2.5 transition hover:-translate-y-0.5 hover:shadow-sm ${fieldResetCount >= 4 ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30" : "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30"}`}>
             <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400"><Check size={13} /> Field reset</div>
             <div className={`mt-1 text-sm font-bold ${fieldResetCount >= 4 ? "text-emerald-700 dark:text-emerald-300" : "text-blue-700 dark:text-blue-300"}`}>{fieldResetCount >= 4 ? "Ready" : `${fieldResetCount}/4`}</div>
           </button>
 
-          </>}
+
           <button type="button" onClick={() => document.getElementById(`match-violations-${m.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })} className={`w-full text-left rounded-lg border px-3 py-2.5 transition hover:-translate-y-0.5 hover:shadow-sm ${mv.length > 0 ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30" : "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40"}`}>
             <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400"><ShieldAlert size={13} /> Violations</div>
             <div className={`mt-1 text-sm font-bold ${mv.length > 0 ? "text-red-700 dark:text-red-300" : "text-slate-700 dark:text-slate-300"}`}>{mv.length > 0 ? `${mv.length} logged` : "None logged"}</div>
@@ -6372,8 +6374,8 @@ function MatchDetail({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, 
         )}
         {!isIQ && !isElim && <button onClick={() => { setAwpOpen((v) => !v); setToOpen(false); setFaultOpen(false); }} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${awpOpen ? "bg-emerald-600 text-white border-emerald-600" : "bg-white dark:bg-slate-800 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"}`}><ClipboardCheck size={15} /> AWP check</button>}
         {!isIQ && !isElim && awpOpen && <AwpChecker onSave={(note) => onAddField({ kind: "awp", matchId: m.id, matchRef: heading, note })} />}
-        {!isIQ && <button onClick={() => setFieldResetOpen((v) => !v)} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${fieldResetOpen ? "bg-blue-600 text-white border-blue-600" : fieldResetCount >= 4 ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700"}`}><ShieldCheck size={15} /> {fieldResetCount >= 4 ? "Field Ready ✓" : `Quadrant check ${fieldResetCount}/4`}</button>}
-        {!isIQ && fieldResetOpen && <QuadrantFieldReset checks={matchFieldResetChecks} meName={meName} matchLabel={heading} onClose={() => setFieldResetOpen(false)} onVerify={(quadrant) => onVerifyFieldReset(m.id, heading, quadrant)} onReset={() => onResetFieldReset(m.id)} />}
+        {<button onClick={() => setFieldResetOpen((v) => !v)} className={`w-full mt-2 py-2 rounded-lg border text-sm font-semibold flex items-center justify-center gap-1.5 ${fieldResetOpen ? "bg-blue-600 text-white border-blue-600" : fieldResetCount >= 4 ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700" : "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700"}`}><ShieldCheck size={15} /> {fieldResetCount >= 4 ? "Field Ready ✓" : `${isIQ?"Field reset":"Quadrant check"} ${fieldResetCount}/4`}</button>}
+        {fieldResetOpen && (isIQ ? <IQFieldReset checks={matchFieldResetChecks} meName={meName} matchLabel={heading} canVerify={!emcee} onClose={() => setFieldResetOpen(false)} onVerify={area => onVerifyFieldReset(m.id,heading,area)} onReset={() => onResetFieldReset(m.id)} /> : <QuadrantFieldReset checks={matchFieldResetChecks} meName={meName} matchLabel={heading} onClose={() => setFieldResetOpen(false)} onVerify={(quadrant) => onVerifyFieldReset(m.id, heading, quadrant)} onReset={() => onResetFieldReset(m.id)} />)}
         {isElim && toOpen && (
           <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2">
             <div className="flex gap-2">
