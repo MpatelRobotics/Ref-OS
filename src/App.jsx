@@ -1517,14 +1517,14 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
 
   return (
   <div className="refos-event-selector refos-safe-page min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 p-5 flex items-center justify-center">
-    <EventSelectorSidebar active={view === "archived" ? "archived" : creating ? "create" : selectorSection} theme={theme} onToggleTheme={onToggleTheme} developerPage={developerPage} onSelect={key=>{setSelectorSection(key);setView(key==='archived'?'archived':'active');setCreating(key==='create');setNotice('');setDemoRequest(value=>key==='demo'?value+1:0);window.scrollTo({top:0,left:0,behavior:'instant'});if(key==='create')requestAnimationFrame(()=>document.getElementById('refos-create-event')?.scrollIntoView({block:'start'}));}}/>
+    <EventSelectorSidebar active={view === "archived" ? "archived" : creating ? "create" : selectorSection} theme={theme} onToggleTheme={onToggleTheme} developerPage={developerPage} canArchive={developerPage&&developerPageUnlocked} onSelect={key=>{setSelectorSection(key);setView(key==='archived'?'archived':'active');setCreating(key==='create');setNotice('');setDemoRequest(value=>key==='demo'?value+1:0);window.scrollTo({top:0,left:0,behavior:'instant'});if(key==='create')requestAnimationFrame(()=>document.getElementById('refos-create-event')?.scrollIntoView({block:'start'}));}}/>
     <div className="refos-event-selector-content w-full max-w-xl">
       <div className="text-center mb-6">
         <img src="/refos-logo.svg" alt="Ref OS" className="h-20 mx-auto mb-3" />
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{!developerPage && selectorSection === "about" ? "Ref-OS - Referee Operating System" : view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{!developerPage && selectorSection === "about" ? "Tools for the volunteers who keep VEX events moving." : view === "archived" ? "Archived events keep all of their data. Use the event’s Admin code or the Developer code to restore one." : "Select the event this device is working at."}</p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{!developerPage && selectorSection === "about" ? "Ref-OS - Referee Operating System" : !developerPage && selectorSection === "demo" ? "Try the Ref-OS demo" : view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{!developerPage && selectorSection === "about" ? "Tools for the volunteers who keep VEX events moving." : !developerPage && selectorSection === "demo" ? "Explore V5 Override with 32 fictional teams. Use demo code DEMOV5." : view === "archived" ? "Archived events keep all of their data. Use the event’s Admin code or the Developer code to restore one." : "Select the event this device is working at."}</p>
       </div>
-      {!developerPage && selectorSection === "about" ? <RefOsWelcome onEvents={()=>{setSelectorSection("active");window.scrollTo({top:0,left:0,behavior:'instant'});}} onDemo={()=>{setSelectorSection("demo");setDemoRequest(value=>value+1);window.scrollTo({top:0,left:0,behavior:'instant'});}}/> : <>
+      {!developerPage && selectorSection === "about" ? <RefOsWelcome onEvents={()=>{setSelectorSection("active");window.scrollTo({top:0,left:0,behavior:'instant'});}} onDemo={()=>{setSelectorSection("demo");setDemoRequest(value=>value+1);window.scrollTo({top:0,left:0,behavior:'instant'});}}/> : !developerPage && selectorSection === "demo" ? <DemoLauncher key={demoRequest} openRequest={demoRequest} onChoose={onChoose}/> : <>
       {REFEREE_PORTAL_ENABLED && !developerPage && <button type="button" onClick={()=>setRefPortal(true)} className="mb-4 min-h-[44px] w-full rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white">Referee portal · Sign in or create account</button>}
       {developerPage && developerSession.error && <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-300">{developerSession.error}</p>}
       {developerPage && developerSession.checking ? <p className="py-4 text-center">Checking developer sign-in...</p> : developerPage && !developerPageUnlocked ? <DeveloperPageLock events={events} onUnlock={developerSession.unlock}/> : <>
@@ -1537,13 +1537,12 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
       {universalFeedbackOpen ? <UniversalFeedback isDeveloper events={events} onClose={()=>setUniversalFeedbackOpen(false)}/> : <button type="button" onClick={()=>setUniversalFeedbackOpen(true)} className="w-full min-h-[44px] mb-4 rounded-xl border border-sky-300 bg-white dark:bg-slate-800 p-3 font-semibold">Universal Feedback · Developer only</button>}
       </>}
       {!universalFeedbackOpen && <>
-      {!developerPage && view === "active" && <DemoLauncher key={demoRequest} openRequest={demoRequest} onChoose={onChoose}/>}
       {notice && view === "active" && (
         <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">{notice}</div>
       )}
       {view === "archived" ? (
         <>
-          <button type="button" onClick={() => { setView("active"); setRestoringId(""); setArchivedNotice(""); }}
+          <button type="button" onClick={() => { setView("active"); setSelectorSection("active"); setRestoringId(""); setArchivedNotice(""); }}
             className="mb-3 inline-flex items-center gap-1 text-sm font-semibold text-slate-600 dark:text-slate-300">
             <ChevronLeft size={18} /> Back to Active Events
           </button>
@@ -1647,12 +1646,6 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
           </details> : <React.Fragment key="main-events">{cards}</React.Fragment>;
         })}
       </div>
-        {!developerPage && !loading && !error && (
-          <button type="button" onClick={() => { setView("archived"); setNotice(""); }}
-            className="sm:hidden w-full mt-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-white/60 dark:bg-slate-800/60 px-4 py-2.5 text-sm font-semibold text-slate-600 dark:text-slate-300">
-            Archived Events ({archivedEvents.length})
-          </button>
-        )}
         {!creating ? (
           <button type="button" onClick={() => setCreating(true)}
             className="sm:hidden w-full mt-4 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-semibold px-4 py-3">

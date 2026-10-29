@@ -21,9 +21,10 @@ test('event selector and demo form use readable text in dark mode',async({page})
  await page.addInitScript(()=>localStorage.setItem('refosTheme','dark'));
  await page.route('https://example.supabase.co/**',r=>r.fulfill({contentType:'application/json',body:'[]'}));
  await page.goto('/?page=events');
- await expect(page.getByText(/Explore V5 Override with 32 fictional teams/)).toHaveCSS('color','rgb(241, 245, 249)');
+ await expect(page.getByRole('button',{name:'Try the DEMO',exact:true})).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Expand all',exact:true})).toHaveCSS('color','rgb(241, 245, 249)');
- await page.getByRole('button',{name:'Try the DEMO',exact:true}).click();
+ await page.getByRole('navigation',{name:'Event selection navigation'}).getByRole('button',{name:'Try the demo',exact:true}).click();
+ await expect(page.locator('.refos-event-catalog')).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Cancel',exact:true})).toHaveCSS('color','rgb(241, 245, 249)');
  await expect(page.getByRole('heading',{name:'Try Ref OS',exact:true})).toHaveCSS('color','rgb(241, 245, 249)');
 });
@@ -52,8 +53,8 @@ test('selector sidebar opens demo, archives, event creation and returns to event
  const nav=page.getByRole('navigation',{name:'Event selection navigation'});
  await page.mouse.move(1000,700);await expect(nav).toHaveCSS('width','64px');
  await nav.hover();await expect(nav).toHaveCSS('width','224px');
- await nav.getByRole('button',{name:'Try the demo',exact:true}).click();await expect(page.getByLabel('Demo code')).toBeVisible();await expect(nav).toHaveCSS('width','64px');
- await nav.getByRole('button',{name:'Archived events',exact:true}).click();await expect(page.getByRole('heading',{name:'Archived Events',exact:true})).toBeVisible();
+ await nav.getByRole('button',{name:'Try the demo',exact:true}).click();await expect(page.getByLabel('Demo code')).toBeVisible();await expect(page.locator('.refos-event-catalog')).toHaveCount(0);await expect(page.getByRole('button',{name:'+ Create VEX Event',exact:true})).toHaveCount(0);await expect(nav).toHaveCSS('width','64px');
+ await expect(page.getByRole('button',{name:/Archived events/i})).toHaveCount(0);
  await nav.getByRole('button',{name:'Create event',exact:true}).click();await expect(page.getByRole('heading',{name:'Create VEX Event',exact:true})).toBeVisible();
  await nav.getByRole('button',{name:'Events',exact:true}).click();await expect(page.getByRole('heading',{name:'Create VEX Event',exact:true})).toHaveCount(0);
  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
@@ -73,4 +74,9 @@ test('first visit explains Ref-OS; Events reveals state groups and Other Events'
  await page.screenshot({path:'test-results/refos-welcome-desktop.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:'test-results/refos-welcome-mobile.png',fullPage:true});
+});
+
+test('archive navigation is offered only to an unlocked developer',async({page})=>{
+ await page.route('**/selector-nav-test',r=>r.fulfill({contentType:'text/html',body:`<div id="root"></div><script type="module">import '/src/index.css';import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>t=>t;window.__vite_plugin_react_preamble_installed__=true;const React=(await import('/node_modules/.vite/deps/react.js')).default,DOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default,C=(await import('/src/components/EventSelectorSidebar.jsx')).default;window.renderNav=(developerPage,canArchive)=>DOM.createRoot(document.getElementById('root')).render(React.createElement(C,{developerPage,canArchive,theme:'light',onSelect:k=>window.selected=k}));window.renderNav(true,true);</script>`}));
+ await page.goto('/selector-nav-test');await page.getByRole('button',{name:'Archived events',exact:true}).click();expect(await page.evaluate(()=>window.selected)).toBe('archived');
 });
