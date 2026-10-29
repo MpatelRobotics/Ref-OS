@@ -12,7 +12,7 @@ async function mockIQApp(page,role="admin",program="iq",accent=null){
   source=source.replace(/export async function listMatches\(eventId[^\n]+\{\r?\n/,'export async function listMatches(eventId) { if(E2E_MOCK) return [{id:"1",phase:"qual",num:1,red:["123A","456B"],blue:[],redScore:42,blueScore:null,field:"Field 1"}];');
   await r.fulfill({response:res,body:source});
  });
- await page.goto('/');await page.getByRole('button',{name:/IQ Fixture/}).first().click();
+ await page.goto('/?page=events');await page.getByRole('button',{name:'Expand all',exact:true}).click();await page.getByRole('button',{name:/IQ Fixture/}).first().click();
 
  await page.getByPlaceholder('e.g. Maharshi').fill('IQTester');await page.getByPlaceholder('Required for exports').nth(0).fill('IQ');await page.getByPlaceholder('Required for exports').nth(1).fill('Tester');await page.getByRole('button',{name:'Start logging',exact:true}).click();await page.getByRole('button',{name:'Close Quick Start'}).click();
 }

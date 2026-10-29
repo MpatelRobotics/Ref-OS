@@ -20,7 +20,7 @@ test('demo code comes before program choice and routes each program separately',
 test('event selector and demo form use readable text in dark mode',async({page})=>{
  await page.addInitScript(()=>localStorage.setItem('refosTheme','dark'));
  await page.route('https://example.supabase.co/**',r=>r.fulfill({contentType:'application/json',body:'[]'}));
- await page.goto('/');
+ await page.goto('/?page=events');
  await expect(page.getByText(/Explore V5 Override with 32 fictional teams/)).toHaveCSS('color','rgb(241, 245, 249)');
  await expect(page.getByRole('button',{name:'Expand all',exact:true})).toHaveCSS('color','rgb(241, 245, 249)');
  await page.getByRole('button',{name:'Try the DEMO',exact:true}).click();
@@ -31,7 +31,7 @@ test('event selector and demo form use readable text in dark mode',async({page})
 test('event directory fills desktop width and groups become a mobile column',async({page})=>{
  await page.route('https://example.supabase.co/**',r=>r.fulfill({contentType:'application/json',body:'[]'}));
  await page.route(/\/src\/api(?:\.js)?(?:\?.*)?$/,async r=>{const response=await r.fetch();const source=(await response.text()).replace('name: "Highlander Summit", branding: {} }];','name: "Highlander Summit", branding: {} },{id:"22222222-2222-4222-8222-222222222222",name:"Colorado fixture",state:"CO",branding:{}}];');await r.fulfill({response,body:source});});
- await page.setViewportSize({width:1440,height:1000});await page.goto('/');
+ await page.setViewportSize({width:1440,height:1000});await page.goto('/?page=events');
  const catalog=page.locator('.refos-event-catalog');await expect(catalog.locator('details')).toHaveCount(2);
  expect((await catalog.boundingBox()).width).toBeGreaterThan(1300);
  const groups=await catalog.locator('details').all();expect((await groups[0].boundingBox()).y).toBe((await groups[1].boundingBox()).y);
@@ -41,14 +41,14 @@ test('event directory fills desktop width and groups become a mobile column',asy
 
 test('event selector theme button toggles both ways and remembers the choice',async({page})=>{
  await page.route('https://example.supabase.co/**',r=>r.fulfill({contentType:'application/json',body:'[]'}));
- await page.goto('/');await page.getByRole('button',{name:'Dark mode',exact:true}).click();
+ await page.goto('/?page=events');await page.getByRole('button',{name:'Dark mode',exact:true}).click();
  await expect(page.locator('html')).toHaveClass(/dark/);await page.reload();await expect(page.getByRole('button',{name:'Light mode',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Light mode',exact:true}).click();await expect(page.locator('html')).not.toHaveClass(/dark/);
 });
 
 test('selector sidebar opens demo, archives, event creation and returns to events',async({page})=>{
  await page.route('https://example.supabase.co/**',r=>r.fulfill({contentType:'application/json',body:'[]'}));
- await page.setViewportSize({width:1440,height:1000});await page.goto('/');
+ await page.setViewportSize({width:1440,height:1000});await page.goto('/?page=events');
  const nav=page.getByRole('navigation',{name:'Event selection navigation'});
  await page.mouse.move(1000,700);await expect(nav).toHaveCSS('width','64px');
  await nav.hover();await expect(nav).toHaveCSS('width','224px');
@@ -59,4 +59,18 @@ test('selector sidebar opens demo, archives, event creation and returns to event
  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:'test-results/event-selector-sidebar-mobile.png',fullPage:true});
  await page.setViewportSize({width:1440,height:1000});await page.mouse.move(1000,700);await page.screenshot({path:'test-results/event-selector-sidebar-desktop.png',fullPage:true});
+});
+
+test('first visit explains Ref-OS; Events reveals state groups and Other Events',async({page})=>{
+ await page.route('https://example.supabase.co/**',r=>r.fulfill({contentType:'application/json',body:'[]'}));
+ await page.route(/\/src\/api(?:\.js)?(?:\?.*)?$/,async r=>{const response=await r.fetch();const source=(await response.text()).replace('name: "Highlander Summit", branding: {} }];','name: "Highlander Summit", branding: {} },{id:"22222222-2222-4222-8222-222222222222",name:"Unassigned state fixture",branding:{}}];');await r.fulfill({response,body:source});});
+ await page.goto('/');
+ await expect(page.getByRole('main',{name:'About Ref-OS'})).toBeVisible();await expect(page.locator('.refos-event-catalog')).toHaveCount(0);
+ const nav=page.getByRole('navigation',{name:'Event selection navigation'});await nav.getByRole('button',{name:'Events',exact:true}).click();
+ await expect(page.locator('.refos-event-catalog')).toBeVisible();const other=page.locator('details').filter({has:page.getByText('Other Events (1)',{exact:true})});await expect(other).not.toHaveAttribute('open','');
+ await other.locator('summary').click();await expect(page.getByRole('button',{name:/Unassigned state fixture/})).toBeVisible();
+ await nav.getByRole('button',{name:'About Ref-OS',exact:true}).click();await expect(page.getByRole('main',{name:'About Ref-OS'})).toBeVisible();
+ await page.screenshot({path:'test-results/refos-welcome-desktop.png',fullPage:true});
+ await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:'test-results/refos-welcome-mobile.png',fullPage:true});
 });

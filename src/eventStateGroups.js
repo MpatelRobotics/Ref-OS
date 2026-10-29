@@ -11,5 +11,5 @@ export function eventState(event){
 export function groupEventsByState(events){
  const groups=new Map();
  for(const event of events){const state=eventState(event);if(!groups.has(state))groups.set(state,[]);groups.get(state).push(event);}
- return [...groups].sort(([a],[b])=>!a?-1:!b?1:US_STATES[codes.indexOf(a)].localeCompare(US_STATES[codes.indexOf(b)])).map(([state,events])=>({name:state?state+' Events':'',events}));
+ return [...groups].sort(([a],[b])=>!a?-1:!b?1:US_STATES[codes.indexOf(a)].localeCompare(US_STATES[codes.indexOf(b)])).map(([state,events])=>({name:state?state+' Events':'Other Events',events}));
 }
