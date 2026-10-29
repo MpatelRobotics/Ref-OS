@@ -43,7 +43,7 @@ import { applyTmSnapshot } from "./tmApplySnapshot.js";
 import VexEventLookup from "./components/VexEventLookup.jsx";
 import useMenuViewport from "./useMenuViewport.js";
 import Thumb from "./components/PhotoThumbnail.jsx";
-import React, { useState, useEffect, useMemo, useRef, useCallback, useContext } from "react";
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback, useContext } from "react";
 import { createPortal } from "react-dom";
 import {
   Plus, Camera, Trash2, ChevronLeft, AlertTriangle, ShieldAlert, Pencil,
@@ -1730,6 +1730,7 @@ function Tracker(props) {
   const eventId=props.initialEvent.id;
   const [view, setView] = useState(props.role === "judge" ? "judging" : props.role === "inspection" ? "robots" : "matches");
   useEffect(()=>{if(view==="interviews"&&!props.isDeveloper)setView(props.role==="judge"?"judging":"matches");},[view,props.isDeveloper,props.role]);
+  useLayoutEffect(()=>{window.scrollTo({top:0,left:0,behavior:"instant"});},[view]);
   const [divisions,setDivisions]=useState([]);
   const storageKey=`refosDivision:${eventId}:${props.league?.session?.id||''}`;
   const [selected,setSelected]=useState(()=>{try{return Number(localStorage.getItem(storageKey))||0;}catch{return 0;}});
@@ -4494,7 +4495,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           <div className="relative">
             <button aria-label="Settings" onClick={() => setMenu((m) => !m)} className="p-1.5 rounded hover:bg-white/10"><Settings size={19} /></button>
             {menu && (
-              <div ref={menuRef} className="refos-menu-pop absolute right-0 mt-2 w-56 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
+              <div ref={menuRef} role="region" aria-label="Event settings menu" className="refos-menu-pop absolute right-0 mt-2 w-56 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 text-sm">
                 {isInspection ? (
                   <>
                     <div className="px-4 py-2 text-[11px] uppercase tracking-wide text-slate-400 flex items-center gap-1.5"><ClipboardCheck size={12} /> Inspection</div>
@@ -4594,7 +4595,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
                 <div className="refos-sidebar-subtitle" aria-hidden="true">Referee Operating System</div>
                 <div className="refos-sidebar-section-label" aria-hidden="true">Event Navigation</div>
                 {navItems.map(({ k, label, Icon }) => (
-                  <button key={k} title={label} aria-label={label} aria-current={view === k ? "page" : undefined} onClick={(event) => { setView(k); setQuery(""); setNavDismissed(true); if(event.detail > 0)event.currentTarget.blur(); }}
+                  <button key={k} title={label} aria-label={label} aria-current={view === k ? "page" : undefined} onClick={(event) => { setView(k); setQuery(""); window.scrollTo({top:0,left:0,behavior:"instant"}); setNavDismissed(true); if(event.detail > 0)event.currentTarget.blur(); }}
                     className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
                     <Icon size={15} aria-hidden="true" /><span className="refos-nav-label">{label}</span>
                   </button>
@@ -4638,7 +4639,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         return (
           <nav className="refos-mobile-bottom sm:hidden" aria-label="Mobile navigation">
             {primary.map(({ k, label, Icon }) => (
-              <button key={k} aria-current={view === k ? "page" : undefined} onClick={() => { setView(k); setQuery(""); }}>
+              <button key={k} aria-current={view === k ? "page" : undefined} onClick={() => { setView(k); setQuery(""); window.scrollTo({top:0,left:0,behavior:"instant"}); }}>
                 <Icon size={19}/><span>{label}</span>
               </button>
             ))}
@@ -4674,7 +4675,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
               </div>
               <div className="p-2">
                 {[...navItems, { k: "lost-found", label: "Lost & Found", Icon: Flag }].map(({ k, label, Icon }) => (
-                  <button key={k} onClick={() => { setView(k); setQuery(""); setMobileNavOpen(false); }}
+                  <button key={k} onClick={() => { setView(k); setQuery(""); window.scrollTo({top:0,left:0,behavior:"instant"}); setMobileNavOpen(false); }}
                     className={`w-full px-3 py-3 rounded-xl flex items-center gap-3 text-left font-semibold ${view === k ? "bg-[#0D0F32] text-white" : "text-slate-800 dark:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-700"}`}>
                     <Icon size={20}/>
                     <span>{label}</span>
@@ -4822,7 +4823,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           <div><dt>Match schedule</dt><dd>{Object.keys(matches).length}<span> matches</span></dd></div>
           {!isJudge && !isEmcee && <div><dt>Shared log</dt><dd>{viols.length}<span> entries</span></dd></div>}
         </dl>}
-        {(isDeveloper||view==='robots')&&!openTeam&&!openMatch&&!openRobot&&['matches','teams','robots'].includes(view)&&<EventOperations key={`${divisionId}:${leagueSessionId||''}:${view}`} eventId={eventId} sessionId={leagueSessionId} division={divisionId} divisions={divisionCatalog} area={view==='robots'?'robots':view==='interviews'?'judging':'communication'} onRows={setOperationRows} teams={teams} canManage={adminUnlocked&&!highlanderDemoLocked} canInspect={!isJudge&&!isEmcee&&!highlanderDemoLocked} canJudge={isJudge&&!highlanderDemoLocked}/> }
+        {view==='robots'&&!openTeam&&!openMatch&&!openRobot&&<EventOperations key={`${divisionId}:${leagueSessionId||''}:${view}`} eventId={eventId} sessionId={leagueSessionId} division={divisionId} divisions={divisionCatalog} area="robots" onRows={setOperationRows} teams={teams} canManage={adminUnlocked&&!highlanderDemoLocked} canInspect={!isJudge&&!isEmcee&&!highlanderDemoLocked} canJudge={isJudge&&!highlanderDemoLocked}/> }
         {view === 'matches' && <TmFieldActivity value={eventSettings?.tm_field_activity?.value} />}
 
         {openTeam ? (

@@ -55,3 +55,15 @@ test('saved event accent remains visible on the header',async({page})=>{
  await expect(page.locator('.refos-header-event h1')).toHaveCSS('color','rgb(124, 58, 237)');
  await expect(page.locator('.refos-header')).toHaveCSS('border-bottom-color','rgb(124, 58, 237)');
 });
+
+for(const mobile of [false,true]) test((mobile?'mobile':'desktop')+' tabs reset scrolling and gear menu stays scrollable',async({page})=>{
+ await page.setViewportSize(mobile?{width:390,height:640}:{width:1440,height:900});await mockIQApp(page);
+ await page.addStyleTag({content:'.refos-workspace {min-height:2000px}'});
+ await page.evaluate(()=>window.scrollTo(0,600));expect(await page.evaluate(()=>scrollY)).toBeGreaterThan(0);
+ const nav=mobile?page.locator('.refos-mobile-bottom'):page.getByRole('navigation',{name:'Main navigation'});
+ await nav.getByRole('button',{name:'Teams',exact:true}).click();await expect.poll(()=>page.evaluate(()=>scrollY)).toBe(0);
+ await page.evaluate(()=>window.scrollTo(0,600));await nav.getByRole('button',{name:'Teams',exact:true}).click();await expect.poll(()=>page.evaluate(()=>scrollY)).toBe(0);
+ await page.getByRole('button',{name:'Settings',exact:true}).click();const menu=page.getByRole('region',{name:'Event settings menu'});
+ await expect(menu).toHaveCSS('overflow-y','auto');
+ if(mobile){expect(await menu.evaluate(e=>e.scrollHeight>e.clientHeight)).toBe(true);const box=await menu.boundingBox();expect(box.y+box.height).toBeLessThan(560);await menu.evaluate(e=>e.scrollTop=e.scrollHeight);await expect.poll(()=>menu.evaluate(e=>e.scrollTop)).toBeGreaterThan(0);}
+});
