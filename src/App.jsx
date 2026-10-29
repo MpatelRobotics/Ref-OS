@@ -4400,7 +4400,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       || a.number.localeCompare(b.number, undefined, { numeric: true }));
 
   return (
-    <div className="refos-shell min-h-screen font-sans antialiased">
+    <div data-program={isIQ ? "iq" : "v5"} className="refos-shell min-h-screen font-sans antialiased">
       <a className="refos-skip" href="#workspace">Skip to workspace</a>
       <header className="refos-header sticky top-0 z-20">
         <div className="refos-header-inner mx-auto px-4 py-3 flex items-center gap-3">
