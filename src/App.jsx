@@ -1864,6 +1864,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const confirmImport = (p) => new Promise((resolve) => setImportPreview({ ...p, chips: league ? [{ label: `Into ${league.session.name}` }, ...(p.chips || [])] : p.chips, resolve }));
   const [importing, setImporting] = useState(null); // { label, done, total } | null while an import is writing
   const [navExpanded,setNavExpanded] = useState(false);
+  const [navDismissed,setNavDismissed] = useState(false);
   const menuRef = useRef(null);
   useMenuViewport(menuRef, menu);
   useMenuIdle(menuRef,menu,setMenu);
@@ -4590,11 +4591,11 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           const ActiveIcon = active?.Icon || Menu;
           return (
             <>
-              <nav aria-label="Main navigation" className={`refos-desktop-nav hidden sm:flex ${navExpanded ? "refos-nav-expanded" : ""}`}>
+              <nav aria-label="Main navigation" onMouseEnter={()=>setNavDismissed(false)} onFocusCapture={()=>setNavDismissed(false)} className={`refos-desktop-nav hidden sm:flex ${navExpanded ? "refos-nav-expanded" : ""} ${navDismissed ? "refos-nav-dismissed" : ""}`}>
                 <div className="refos-sidebar-subtitle" aria-hidden="true">Referee Operating System</div>
                 <div className="refos-sidebar-section-label" aria-hidden="true">Event Navigation</div>
                 {navItems.map(({ k, label, Icon }) => (
-                  <button key={k} title={label} aria-label={label} aria-current={view === k ? "page" : undefined} onClick={() => { setView(k); setQuery(""); }}
+                  <button key={k} title={label} aria-label={label} aria-current={view === k ? "page" : undefined} onClick={(event) => { setView(k); setQuery(""); setNavExpanded(false); setNavDismissed(true); if(event.detail > 0)event.currentTarget.blur(); }}
                     className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${view === k ? "border-[#D7212B] text-white" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
                     <Icon size={15} aria-hidden="true" /><span className="refos-nav-label">{label}</span>
                   </button>

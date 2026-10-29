@@ -27,6 +27,9 @@ test('Supabase-style rail expands, pins and navigates in light and dark themes',
  await page.mouse.move(1000,700);await expect(nav).toHaveCSS('width','224px');
  await nav.getByRole('button',{name:'Teams',exact:true}).click();
  await expect(nav.getByRole('button',{name:'Teams',exact:true})).toHaveAttribute('aria-current','page');
+ await expect(nav).toHaveCSS('width','64px');
+ await page.mouse.move(1000,700);await nav.hover();await expect(nav).toHaveCSS('width','224px');
+ await nav.getByRole('button',{name:'Expand navigation',exact:true}).click();
  await expect(page.locator('.refos-team-list')).toHaveCSS('border-radius','6px');
  await nav.getByRole('button',{name:'Collapse navigation',exact:true}).click();await page.locator('.refos-page-heading h2').click();await page.mouse.move(1000,700);
  await expect(nav).toHaveCSS('width','64px');

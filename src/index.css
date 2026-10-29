@@ -477,3 +477,9 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
 .dark .refos-shell .refos-menu-pop button:hover { background:var(--ref-active); }
 .dark .refos-shell .refos-menu-pop { background:var(--ref-surface); border-color:var(--ref-line); }
 .refos-shell .refos-menu-pop :is(.text-slate-400,.text-slate-500) { color:var(--ref-muted); }
+
+@media(min-width:640px) {
+ .refos-shell .refos-desktop-nav.refos-nav-dismissed { width:64px; box-shadow:none; }
+ .refos-desktop-nav.refos-nav-dismissed .refos-nav-label { opacity:0; }
+ .refos-desktop-nav.refos-nav-dismissed::before { content:'R'; left:24px; }
+}
