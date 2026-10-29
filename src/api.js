@@ -1,3 +1,4 @@
+import {createSessionEnsurer} from "./anonymousSession.js";
 import {sampleRobotPhoto} from './sampleRobotPhotos.js';
 import { createSettingsReadCache } from './settingsReadCache.js';
 import { isDemoEvent } from './demoEvents.js';
@@ -96,17 +97,11 @@ async function upsertSessionKeyed(table, rows, newTarget, oldTarget, { sessionId
 }
 
 /* ================= server enforced event access ================= */
+const ensureSharedAnonymousSession=createSessionEnsurer(supabase.auth);
 export async function ensureAnonymousSession() {
-  if (E2E_MOCK) return { user: { id: "e2e-user" } };
-  const { data: existing } = await supabase.auth.getSession();
-  if (existing?.session?.user) return existing.session;
-  const { data, error } = await supabase.auth.signInAnonymously();
-  if (error) throw new Error(
-    error.message?.includes("Anonymous") ?
-      "Anonymous Sign-Ins are not enabled in Supabase Auth. Enable them before using Ref OS 1.2." :
-      error.message
-  );
-  return data.session;
+ if(E2E_MOCK)return {user:{id:"e2e-user"}};
+ try{return await ensureSharedAnonymousSession();}
+ catch(error){throw new Error(error.message?.includes("Anonymous")?"Anonymous Sign-Ins are not enabled in Supabase Auth.":error.message);}
 }
 
 export async function claimEventAccess(eventId, credential) {

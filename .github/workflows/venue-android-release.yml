@@ -35,7 +35,8 @@ jobs:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
       - run: npm ci
-      - run: npm run build
+      - name: Build web app and prepare Android projects
+        run: npm run mobile:sync
       - run: node scripts/prepare-venue-android.mjs
       - name: Restore existing Android app key
         env:

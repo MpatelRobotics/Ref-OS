@@ -1,3 +1,4 @@
+import {loadWorkspaceEvent} from "./loadWorkspaceEvent.js";
 import EliminationBracketIcon from "./components/EliminationBracketIcon.jsx";
 import RefOsWelcome from "./components/RefOsWelcome.jsx";
 import EventSelectorSidebar from "./components/EventSelectorSidebar.jsx";
@@ -834,6 +835,7 @@ export default function App() {
   const who = isDemoEvent(activeEventId) ? DEMO_IDENTITY : developer ? DEVELOPER_IDENTITY : { nickname: meName, fullName: meFullName, phone: mePhone };
   const [event, setEvent] = useState(null);
   const [loadErr, setLoadErr] = useState(false);
+  const [eventLoadAttempt,setEventLoadAttempt]=useState(0);
 
   // Volunteer identity is stored per event on this device. Reload it whenever the selected
   // event changes (including an event restored after a refresh) so one event's name is never
@@ -1007,7 +1009,7 @@ export default function App() {
   useEffect(() => {
     if (!unlocked || !who.nickname) return;
     api.setEventMemberName(activeEventId, who.nickname).catch(() => {});
-  }, [unlocked, who.nickname, activeEventId]);
+  }, [unlocked, who.nickname, activeEventId,eventLoadAttempt]);
 
   useEffect(() => {
     if (!unlocked) {
@@ -1052,7 +1054,7 @@ export default function App() {
     if (!unlocked || !who.nickname) return;
     let live = true;
     setLoadErr(false);
-    api.getEvent(activeEventId)
+    loadWorkspaceEvent(api,activeEventId)
       .then((ev) => { if (live) { ev ? setEvent(ev) : setLoadErr(true); } })
       .catch(() => { if (live) setLoadErr(true); });
     return () => { live = false; };
@@ -1229,7 +1231,8 @@ export default function App() {
     <FullPage>
       <div className="max-w-sm">
         <p className="font-semibold text-slate-700 dark:text-slate-200">Couldn't load the event</p>
-        <p className="text-sm mt-1">Confirm the Ref OS security migration has been run and this device still has event access.</p>
+        <p className="text-sm mt-1">{isDemoEvent(activeEventId)?"The demo could not be opened. Check your connection and try again.":"Check your connection and event access, then try again."}</p>
+        <div className="mt-4 flex flex-wrap justify-center gap-3"><button type="button" onClick={()=>{setLoadErr(false);setEventLoadAttempt(value=>value+1);}} className="min-h-[44px] rounded-lg bg-indigo-700 px-4 py-2 text-white">Try again</button><button type="button" onClick={chooseAnotherEvent} className="min-h-[44px] rounded-lg border border-slate-400 px-4 py-2">Back to main page</button></div>
       </div>
     </FullPage>
   );
@@ -1705,6 +1708,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
       {!developerPage && <a href="/?page=developer" className="sm:hidden mx-auto mt-1 flex w-fit min-h-[44px] items-center justify-center rounded px-2 text-xs font-medium text-slate-500 dark:text-slate-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600">Developer login</a>}
       </>}
       </>}
+      {!developerPage && selectorSection === "about" && <footer className="mt-8 pb-4 text-center text-sm text-slate-600 dark:text-slate-300">Created by Maharshi Patel · <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="underline">@mpatel_ref</a> · v{APP_VERSION}</footer>}
       {deleteTarget && (
         <DeleteEventModal event={deleteTarget} profile={resolveEventBranding(deleteTarget.id, deleteTarget, deleteTarget.branding)}
           onDelete={deletePermanently} onClose={() => setDeleteTarget(null)} />

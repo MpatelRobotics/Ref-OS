@@ -81,3 +81,20 @@ test('archive navigation is offered only to an unlocked developer',async({page})
  await page.route('**/selector-nav-test',r=>r.fulfill({contentType:'text/html',body:`<div id="root"></div><script type="module">import '/src/index.css';import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>t=>t;window.__vite_plugin_react_preamble_installed__=true;const React=(await import('/node_modules/.vite/deps/react.js')).default,DOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default,C=(await import('/src/components/EventSelectorSidebar.jsx')).default;window.renderNav=(developerPage,canArchive)=>DOM.createRoot(document.getElementById('root')).render(React.createElement(C,{developerPage,canArchive,theme:'light',onSelect:k=>window.selected=k}));window.renderNav(true,true);</script>`}));
  await page.goto('/selector-nav-test');await page.getByRole('button',{name:'Archived events',exact:true}).click();expect(await page.evaluate(()=>window.selected)).toBe('archived');
 });
+
+test('demo entry recovers a failed initial event read and main page credits the creator',async({page})=>{
+ await page.route('https://example.supabase.co/**',r=>r.fulfill({contentType:'application/json',body:'[]'}));
+ await page.route(/\/src\/api(?:\.js)?(?:\?.*)?$/,async r=>{
+  const response=await r.fetch();let source=await response.text();
+  source=source.replace('name: "Highlander Summit", branding: {} }];','name: "Highlander Summit", branding: {} },{id:"5296a93c-792b-4ba1-9da2-b7df52d20d88",name:"Public demo",branding:{}}];');
+  source=source.replace('export async function claimEventAccess(eventId, credential) {',`export async function claimEventAccess(eventId, credential) { if(E2E_MOCK && credential==='DEMOV5'){window.demoClaims=(window.demoClaims||0)+1;return {role:'ref',serverRole:'admin',isAdmin:true,developer:false};}`);
+  source=source.replace('export async function getEvent(id,{strict=false}={}) {',`export async function getEvent(id,{strict=false}={}) { if(E2E_MOCK && id==='5296a93c-792b-4ba1-9da2-b7df52d20d88'){window.demoReads=(window.demoReads||0)+1;if(window.demoReads===1)return null;}`);
+  await r.fulfill({response,body:source});
+ });
+ await page.goto('/');await expect(page.getByText(/Created by Maharshi Patel/)).toBeVisible();
+ await page.getByRole('navigation',{name:'Event selection navigation'}).getByRole('button',{name:'Try the demo',exact:true}).click();
+ await page.getByLabel('Demo code').fill('DEMOV5');await page.getByRole('button',{name:'Continue',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Match center',exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>window.demoClaims)).toBe(2);expect(await page.evaluate(()=>window.demoReads)).toBeGreaterThanOrEqual(2);
+ await expect(page.getByPlaceholder('e.g. Maharshi')).toHaveCount(0);
+});
