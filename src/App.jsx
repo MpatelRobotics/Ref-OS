@@ -2838,6 +2838,14 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     try { await api.deleteFieldLog(id); setFieldLog((cur) => cur.filter((x) => x.id !== id)); }
     catch (e) { if (outbox.isOffline(e)) { alert("You're offline — reconnect to remove this."); return; } throw e; }
   };
+  const saveRadios = async (update) => {
+    if (!adminUnlocked) throw new Error("Only an Admin can manage event radios.");
+    const latest = await eventApi.getEventSetting(eventId, "event_radios");
+    const value = update(latest?.value || { channels: [], radios: [] });
+    const saved = await eventApi.upsertEventSetting(eventId, "event_radios", value, meName);
+    rememberSettingWrite(saved);
+    setEventSettings(cur => ({ ...cur, event_radios: saved }));
+  };
   const saveEventContacts = async (contacts) => {
     try {
       const saved = await api.upsertEventSetting(eventId, "contact_directory", contacts, meName);
@@ -5176,7 +5184,7 @@ onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!cu
           }} />
       )}
       {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowOfflineTest(false)} />}
-      {showCommandCenter && adminUnlocked && <CommandCenter group={commandCenterGroup} onGroupChange={setCommandCenterGroup} extraTools={<EventArchiveTools eventId={eventId} eventName={event?.name||'Event'} divisions={divisionCatalog} isLeague={Boolean(league)}/>} readinessTools={<OfflineEventTools eventId={eventId} sessionId={leagueSessionId} division={divisionId} teams={teams} matches={matches} failed={failedSyncItems} onRetry={retryFailedSync}/>} matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
+      {showCommandCenter && adminUnlocked && <CommandCenter radioData={eventSettings.event_radios?.value} onSaveRadios={saveRadios} group={commandCenterGroup} onGroupChange={setCommandCenterGroup} extraTools={<EventArchiveTools eventId={eventId} eventName={event?.name||'Event'} divisions={divisionCatalog} isLeague={Boolean(league)}/>} readinessTools={<OfflineEventTools eventId={eventId} sessionId={leagueSessionId} division={divisionId} teams={teams} matches={matches} failed={failedSyncItems} onRetry={retryFailedSync}/>} matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
         eventMembers={eventMembers} meName={meName} onSetAdmin={setVolunteerAdmin}
         alertStats={alertStats} alertStatsLoading={alertStatsLoading} onRefreshAlertStats={loadAlertStats} onResetAlertStats={resetAlertStats}
         alertDeliveryLabel={notificationDeliveryLabel}
