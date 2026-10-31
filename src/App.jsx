@@ -5966,8 +5966,9 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
   const liveHighlights = tmMatchHighlights(matches, tmActivity, liveNow);
   const currentMatches = Object.values(matches || {}).filter(row => liveHighlights[row.id] === 'current').sort((a, b) => a.num - b.num);
   const all = Object.values(matches);
-  const hasElims = !isIQ && all.some((m) => m.phase && m.phase !== "qual");
-  const [tab, setTab] = useState(() => hasElims ? "elim" : "qual"); // "qual" | "elim"
+  const hasPractice = all.some(m => m.phase === "practice");
+  const hasElims = !isIQ && all.some((m) => m.phase && m.phase !== "qual" && m.phase !== "practice");
+  const [tab, setTab] = useState(() => hasElims ? "elim" : "qual"); // "qual" | "practice" | "elim"
 
   // Elimination matches take priority once they exist. This also handles the
   // normal async load where MatchList first renders before matches arrive.
@@ -5985,7 +5986,7 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
   const replayByMatch = Object.fromEntries(replayEntries.map((entry) => [entry.matchId, entry]));
   const timeoutSet = new Set(fieldLog.filter((e) => e.kind === "timeout" && e.matchId).map((e) => e.matchId));
   const faultSet = new Set(fieldLog.filter((e) => e.kind === "field_fault" && e.matchId).map((e) => e.matchId));
-  const inTab = isIQ ? all : all.filter((m) => (tab === "qual" ? (m.phase || "qual") === "qual" : (m.phase && m.phase !== "qual")));
+  const inTab = all.filter(m => tab === "practice" ? m.phase === "practice" : tab === "elim" ? m.phase && m.phase !== "qual" && m.phase !== "practice" : m.phase !== "practice" && (isIQ || (m.phase || "qual") === "qual"));
   const PHASE_ORDER = { qual: 0, practice: 1, r16: 2, qf: 3, sf: 4, final: 5 };
   const list = inTab.sort((a, b) => (PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase]) || tmMatchOrder(a,b));
   const fields = [...new Set(list.map((m) => m.field).filter(Boolean))].sort();
@@ -6018,10 +6019,10 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
           </div>
         </div>
       )}
-      {!isIQ && (hasElims || canAdd) && (
+      {(hasPractice || (!isIQ && (hasElims || canAdd))) && (
         <div className="flex gap-1.5 mb-3">
-          {[["qual", "Qualifications"], ["elim", "Eliminations"]].map(([k, lbl]) => (
-            <button key={k} onClick={() => { setTab(k); setField("all"); }}
+          {[["qual", "Qualifications"], ...(hasPractice ? [["practice", "Practice"]] : []), ...(!isIQ ? [["elim", "Eliminations"]] : [])].map(([k, lbl]) => (
+            <button key={k} aria-pressed={tab === k} onClick={() => { setTab(k); setField("all"); }}
               className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold border ${tab === k ? "bg-[#0D0F32] text-white border-[#0D0F32]" : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700"}`}>{lbl}</button>
           ))}
         </div>
@@ -6045,7 +6046,7 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
         <button onClick={onAddMatch} className="w-full mb-3 py-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 font-medium flex items-center justify-center gap-2 hover:border-slate-400"><Plus size={16} /> Add elimination match</button>
       )}
       {filtered.length === 0 ? (
-        <Empty title={tab === "elim" ? "No elimination matches" : "No matches"} sub={tab === "elim" ? (canAdd ? "Add an elimination match, or import the bracket from Tournament Manager." : "Elimination matches will appear here once loaded.") : "Try a different match number or team."} />
+        <Empty title={tab === "practice" ? "No practice matches" : tab === "elim" ? "No elimination matches" : "No matches"} sub={tab === "elim" ? (canAdd ? "Add an elimination match, or import the bracket from Tournament Manager." : "Elimination matches will appear here once loaded.") : "Try a different match number or team."} />
       ) : (
         <ul className="refos-match-list space-y-2">
           {filtered.map((m,index) => (
