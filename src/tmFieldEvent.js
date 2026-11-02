@@ -12,11 +12,23 @@ export function applyFieldEvent(set, message, now = Date.now()) {
     const m = message.match;
     if (!m || !positive(m.division) || !nonnegative(m.session) || !positive(m.match) || !positive(m.instance) || typeof m.round !== 'string' || m.round.length > 30) return false;
     field.match = { division: m.division, session: m.session, round: m.round, match: m.match, instance: m.instance };
-    field.status = 'queued';field.startedAt = null;
+    field.status = 'queued';field.startedAt = null;field.stoppedAt = null;field.assignedAt = now;
   } else if (message.type === 'fieldActivated') {
     for (const row of set.fields) row.active = row === field;
-  } else if (message.type === 'matchStarted') {field.status = 'playing';field.startedAt = now;}
-  else if (message.type === 'matchStopped') field.status = 'stopped';
+  } else if (message.type === 'matchStarted') {
+    if (field.status !== 'playing') {
+      field.startedAt = now;field.stoppedAt = null;
+      if (field.match) field.timingHistory = [...(field.timingHistory || []), { match: {...field.match}, assignedAt: field.assignedAt || null, startedAt: now, stoppedAt: null }].slice(-500);
+    }
+    field.status = 'playing';
+  } else if (message.type === 'matchStopped') {
+    if (field.status === 'playing') {
+      field.stoppedAt = now;
+      const run = field.timingHistory?.at(-1);
+      if (run?.startedAt === field.startedAt) run.stoppedAt = now;
+    }
+    field.status = 'stopped';
+  }
   else return false;
   field.observedAt = now; return true;
 }

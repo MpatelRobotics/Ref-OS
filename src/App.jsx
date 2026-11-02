@@ -43,6 +43,7 @@ import {collectArchive,downloadFile} from './eventArchive';
 import TmFieldActivity from "./components/TmFieldActivity.jsx";
 import RobotCheckIn from "./components/RobotCheckIn.jsx";
 import { tmMatchHighlights } from "./tmMatchHighlights.js";
+import { mergeTmTiming } from "./tmTiming.js";
 import { applyTmSnapshot } from "./tmApplySnapshot.js";
 import VexEventLookup from "./components/VexEventLookup.jsx";
 import useMenuViewport from "./useMenuViewport.js";
@@ -5088,7 +5089,15 @@ onFetch:settings => api.getTmSnapshot(eventId, settings),
 onApply:applyTmApiSnapshot,
 onActivity:api.getTmFieldActivity,
 onDisconnect:(id, pairing) => api.getTmFieldActivity(id, pairing, true),
-onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!current()) return; if(targetDivision&&!divisionCatalog.some(d=>Number(d.id)===targetDivision))throw Error('Invalid Ref OS division.');const targetApi=targetDivision===divisionId?api:createDivisionApi(eventApi,eventId,targetDivision);const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', value, meName); if (current()&&targetDivision===divisionId) setEventSettings(prev => ({ ...prev, tm_field_activity: row })); },
+onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!current()) return; if(targetDivision&&!divisionCatalog.some(d=>Number(d.id)===targetDivision))throw Error('Invalid Ref OS division.');const targetApi=targetDivision===divisionId?api:createDivisionApi(eventApi,eventId,targetDivision);const previous = await targetApi.getEventSetting(eventId,'tm_match_timing');
+const capturedMatches = await targetApi.listMatches(eventId,{strict:true});
+if(!current())return;
+const timing = mergeTmTiming({timing:previous?.value?.rows || []},value,capturedMatches);
+let timingRow=previous;
+if(JSON.stringify(timing)!==JSON.stringify(previous?.value?.rows || []))timingRow=await targetApi.upsertEventSetting(eventId,'tm_match_timing',{rows:timing},meName);
+if(!current())return;
+const compact={...value,fieldSets:(value.fieldSets||[]).map(set=>({...set,fields:(set.fields||[]).map(({timingHistory,...field})=>field)}))};
+const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', compact, meName); if (current()&&targetDivision===divisionId) setEventSettings(prev => ({ ...prev, tm_field_activity: row, ...(timingRow?{tm_match_timing:timingRow}:{}) })); },
       }}/>
 
       <input ref={matchFileRef} type="file" accept=".csv,.json,text/csv,application/json" className="hidden"
@@ -5184,7 +5193,7 @@ onPublishActivity:async (value, current, targetDivision=divisionId) => { if (!cu
           }} />
       )}
       {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowOfflineTest(false)} />}
-      {showCommandCenter && adminUnlocked && <CommandCenter radioData={eventSettings.event_radios?.value} onSaveRadios={saveRadios} group={commandCenterGroup} onGroupChange={setCommandCenterGroup} extraTools={<EventArchiveTools eventId={eventId} eventName={event?.name||'Event'} divisions={divisionCatalog} isLeague={Boolean(league)}/>} readinessTools={<OfflineEventTools eventId={eventId} sessionId={leagueSessionId} division={divisionId} teams={teams} matches={matches} failed={failedSyncItems} onRetry={retryFailedSync}/>} matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
+      {showCommandCenter && adminUnlocked && <CommandCenter tmActivity={{...eventSettings?.tm_field_activity?.value,timing:eventSettings?.tm_match_timing?.value?.rows || []}} tmTimes={eventSettings?.tm_match_times?.value?.rows || []} eventTimezone={eventSettings?.event_timezone?.value?.zone || "UTC"} radioData={eventSettings.event_radios?.value} onSaveRadios={saveRadios} group={commandCenterGroup} onGroupChange={setCommandCenterGroup} extraTools={<EventArchiveTools eventId={eventId} eventName={event?.name||'Event'} divisions={divisionCatalog} isLeague={Boolean(league)}/>} readinessTools={<OfflineEventTools eventId={eventId} sessionId={leagueSessionId} division={divisionId} teams={teams} matches={matches} failed={failedSyncItems} onRetry={retryFailedSync}/>} matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
         eventMembers={eventMembers} meName={meName} onSetAdmin={setVolunteerAdmin}
         alertStats={alertStats} alertStatsLoading={alertStatsLoading} onRefreshAlertStats={loadAlertStats} onResetAlertStats={resetAlertStats}
         alertDeliveryLabel={notificationDeliveryLabel}

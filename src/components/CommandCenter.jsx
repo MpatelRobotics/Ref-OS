@@ -1,5 +1,6 @@
 import React, {useState} from "react";
 import { AlertTriangle, Archive, BarChart3, Bell, CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, Clock, CloudOff, Contact, Download, Flag, KeyRound, ListOrdered, Mail, MapPin, RefreshCw, Radio, Server, Settings, ShieldCheck, Trash2, Trophy, Users, Wifi, X } from "lucide-react";
+import TmTimingReport from "./TmTimingReport.jsx";
 import RadioManagement from "./RadioManagement.jsx";
 import EventLogo from "./EventLogo.jsx";
 
@@ -17,7 +18,7 @@ function ToolSection({ title, children, first = false, danger = false }) {
   );
 }
 
-export default function CommandCenter({ extraTools, readinessTools, radioData, onSaveRadios, group:controlledGroup, onGroupChange, matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onTMSync, onVexSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, brand = null, onEventSettings, onEventManagement, onSyncStatus, syncModeLabel = "Cloud", league = null, onLeagueSessions, onClose }) {
+export default function CommandCenter({ extraTools, readinessTools, tmActivity, tmTimes, eventTimezone, radioData, onSaveRadios, group:controlledGroup, onGroupChange, matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onTMSync, onVexSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, brand = null, onEventSettings, onEventManagement, onSyncStatus, syncModeLabel = "Cloud", league = null, onLeagueSessions, onClose }) {
   const [localGroup,setLocalGroup]=useState('');
   const group=controlledGroup??localGroup;
   const setGroup=onGroupChange||setLocalGroup;
@@ -111,6 +112,7 @@ export default function CommandCenter({ extraTools, readinessTools, radioData, o
         </div>
   );
   const groups={
+    timing:{title:'TM match timing',icon:Clock,hint:'Connector-observed starts, finishes, schedule delay and match cycle breakdown'},
     radios:{title:'Radios (optional)',icon:Radio,hint:'Crew channels and radio checkout, only if your event uses radios'},
     volunteers:{title:'Volunteer Access',icon:KeyRound,hint:'Access codes, roles, sign-ins and volunteer status'},
     sync:{title:'Event Data & Sync',icon:RefreshCw,hint:'VEX sync, Tournament Manager, imports and venue connections'},
@@ -125,6 +127,7 @@ export default function CommandCenter({ extraTools, readinessTools, radioData, o
     </header>
     <div className="flex-1 min-h-0 overflow-y-auto"><div className="max-w-2xl mx-auto p-4 space-y-4" style={{paddingBottom:'max(1rem,env(safe-area-inset-bottom))'}}>
       <p className="text-sm text-slate-600 dark:text-slate-300">{groups[group].hint}</p>
+      {group==='timing'&&<TmTimingReport activity={tmActivity} times={tmTimes} matches={matches} zone={eventTimezone}/>}
       {group==='radios'&&<RadioManagement data={radioData} onSave={onSaveRadios} volunteers={roster || []}/>}
       {group==='volunteers'&&<>
         {action(onRoleCodes,'Manage access codes',KeyRound,'Set or change the codes used by event volunteers.')}
