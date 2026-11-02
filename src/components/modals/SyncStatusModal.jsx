@@ -151,7 +151,7 @@ export default function SyncStatusModal({ eventId, eventName = "", onClose }) {
           </fieldset>
 
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950/30"><h3 className="font-bold">Set up local sharing</h3>
-            <a href="https://github.com/MpatelRobotics/Ref-OS/releases/download/venue-server/Ref-OS-Venue-Server.exe" download className="mt-3 flex min-h-[48px] items-center justify-center rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white hover:bg-indigo-800">Download Venue Server for Windows</a>
+            <a href="https://github.com/MpatelRobotics/Ref-OS/releases/download/tm-connect/Ref-OS-TM-Connect.exe" download className="mt-3 flex min-h-[48px] items-center justify-center rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white hover:bg-indigo-800">Download Ref-OS Desktop for Windows</a><p className="mt-2 text-sm">Includes TM Connect and Venue Server in one app. Open Manage Venue Server, then click Start Server.</p>
             <a href="https://github.com/MpatelRobotics/Ref-OS/releases/download/venue-server-android/Ref-OS-Venue-Server.apk" download className="mt-2 flex min-h-[48px] items-center justify-center rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white hover:bg-indigo-800">Download Venue Server for Android</a>
             <ol className="mt-3 list-decimal space-y-3 pl-5">
               <li><b>Choose one host.</b> Download the Windows or Android app on the device that will host your event. On Android, open the downloaded APK and follow the installation prompts.</li>

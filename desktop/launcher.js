@@ -31,3 +31,7 @@ for(const action of ['browser','proxy','copy'])document.querySelector('#'+action
  try{await window.refosTmDesktop.networkHelp(action,input.value.trim());output.textContent=action==='copy'?'Error copied. Send it to school IT or the developer.':action==='proxy'?'Windows proxy settings opened. Review them with school IT, then retry.':'Browser opened. Check whether Ref OS loads there, then return here.';}
  catch(error){output.textContent=error.message||'Could not open troubleshooting option.';}
 });
+
+document.querySelector('#venue').addEventListener('click',async()=>{try{await window.refosTmDesktop.openVenueServer();document.querySelector('#venue-status').textContent='Venue controls opened. Click Start Server there to begin sharing.';}catch(e){document.querySelector('#venue-status').textContent=e.message;}});
+
+const refreshDesktop=async()=>{try{const s=await window.refosTmDesktop.desktopStatus();document.querySelector('#desktop-status').textContent=`TM sync: ${s.syncing?'running':'not started'} · Venue Server: ${s.hosting?'running':'stopped'}`;}catch{}};void refreshDesktop();setInterval(refreshDesktop,3000);

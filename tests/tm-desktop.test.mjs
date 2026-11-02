@@ -8,7 +8,7 @@ test('real desktop opens securely, reaches its native connector, and hides while
   try {
     const page = await desktop.firstWindow();
     await page.waitForLoadState('domcontentloaded');
-    assert.equal(await page.title(), 'Ref OS TM Connect');
+    assert.equal(await page.title(), 'Ref-OS Desktop');
     assert.equal(await page.evaluate(() => typeof window.require), 'undefined');
     const prefs = await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences());
     assert.equal(prefs.contextIsolation, true); assert.equal(prefs.sandbox, true); assert.equal(prefs.nodeIntegration, false); assert.equal(await desktop.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.getBackgroundThrottling()), false);

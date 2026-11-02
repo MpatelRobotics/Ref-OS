@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - 'desktop/**'
+      - 'venue-desktop/**'
+      - 'venue-server/**'
       - 'tm-bridge/**'
       - 'scripts/build-tm-desktop.mjs'
       - 'src/**'
@@ -34,6 +36,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 25
     env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || secrets.VITE_SUPABASE_ANON_KEY }}
       REFOS_DESKTOP_VERSION: 2.0.${{ github.run_number }}
     steps:
       - uses: actions/checkout@v7.0.1
@@ -44,12 +48,13 @@ jobs:
       - run: npm ci
       - name: Verify TM sync and live field behavior
         run: node --test tests/tm-api.test.mjs tests/tm-live-fields.test.mjs tests/tm-mobile.test.mjs tests/tm-client-pool.test.mjs
+      - run: npm run build
       - run: npm run build:tm-desktop
       - name: Verify packaged desktop app
         shell: pwsh
         run: |
           $env:REFOS_PACKAGED_EXE = (Resolve-Path 'desktop/release/win-unpacked/Ref OS TM Connect.exe').Path
-          node --test tests/tm-desktop.test.mjs
+          node --test tests/tm-desktop.test.mjs tests/combined-desktop.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Desktop verification failed.' }
       - name: Generate download checksum
         shell: pwsh
