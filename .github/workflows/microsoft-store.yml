@@ -1,0 +1,33 @@
+name: Build Microsoft Store package
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  store:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      REFOS_DESKTOP_VERSION: 2.1.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/build-microsoft-store.mjs
+      - name: Test packaged app
+        shell: pwsh
+        run: |
+          $env:REFOS_PACKAGED_EXE = (Resolve-Path 'desktop/store-release/win-unpacked/Ref OS TM Connect.exe').Path
+          node --test tests/tm-desktop.test.mjs tests/combined-desktop.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Store app tests failed.' }
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: Ref-OS-Microsoft-Store
+          path: desktop/store-release/*.appx
+          if-no-files-found: error
