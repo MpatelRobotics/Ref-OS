@@ -197,7 +197,7 @@ export default function TmApiSync({ open, onClose, target, onFetch, onApply, onA
       {(desktop||mobile||extension)&&<>
       {<button className={buttonClass} disabled={busy||running||(!desktop&&!mobile&&!extension)} onClick={()=>setMultiple(true)}>Sync both TM divisions</button>}
       <fieldset disabled={busy || running} className="space-y-3 disabled:opacity-70">
-        <label className="block">TM server address<input className={inputClass} value={address} onChange={e => reset(setAddress)(e.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} /></label>
+        <label className="block">TM server address<input placeholder="192.168.1.238 or 192.168.1.238:8080" aria-describedby="tm-address-help" className={inputClass} value={address} onChange={e => reset(setAddress)(e.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} /></label><p id="tm-address-help" className="text-sm">Enter just the IP address, with a port if needed. We add http:// automatically. An explicit http:// or https:// address also works.</p>
 
         <label className="block">Event TM API key<input className={inputClass} type="password" value={apiKey} onChange={e => reset(setApiKey)(e.target.value)} autoComplete="off" autoCapitalize="none" spellCheck={false} /></label>
         <p className="text-sm text-slate-500">The event key is kept in memory and cleared when you leave this event or reload.</p>
