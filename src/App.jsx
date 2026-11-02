@@ -7665,33 +7665,38 @@ function AllianceSelection({ tmActivity, onOpenMatch, matches, finalsBestOf = 1,
               <span className="text-sm text-amber-800 dark:text-amber-200">Champion alliance: <b className="font-mono">{champion}</b></span>
             </div>
           )}
-          {ROUNDS.map(([phase, label]) => {
-            const ms = byPhase(phase);
-            if (!ms.length) return null;
-            return (
-              <div key={phase} className="mb-4">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2 px-1">{label}</h3>
-                <div className="space-y-2">
-                  {ms.map((m,index) => (
-                    <React.Fragment key={m.id}>
-                    {eliminationPairingKey(m)!==eliminationPairingKey(ms[index-1]||{}) && <h4 className="pt-2 font-semibold">{eliminationPairingLabel(m)}</h4>}
-                    <div className={`rounded-xl border p-2.5 ${liveHighlights[m.id] === 'current' ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'bg-amber-50 dark:bg-amber-950 border-amber-500' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
-                      {liveHighlights[m.id] && <p className={`text-sm font-semibold mb-2 ${liveHighlights[m.id] === 'current' ? 'text-emerald-800 dark:text-emerald-200' : 'text-amber-800 dark:text-amber-200'}`}>{liveHighlights[m.id] === 'current' ? 'Playing now' : 'Up next'}</p>}
-                      <div className="refos-bracket-match">
-                        <span className="refos-bracket-label font-mono text-[11px] font-bold text-slate-400 w-16 shrink-0">{phase === "final" ? `Final ${m.num}` : fmtMatch({ phase: m.phase, num: m.num })}</span>
-                        <Side m={m} side="red" />
-                        <span className="text-slate-300 text-xs font-sans shrink-0">vs</span>
-                        <Side m={m} side="blue" />
-                        <span className="text-sm font-mono font-bold">{m.redScore != null && m.blueScore != null ? `Score ${m.redScore} – ${m.blueScore}${eliminationResultLabel(m) ? " · "+eliminationResultLabel(m) : ""}` : "Awaiting score"}</span>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Follow the ladder from left to right. Scroll sideways to see later rounds.</p>
+          <div className="refos-bracket-scroll" tabIndex={0} role="region" aria-label="Scrollable elimination bracket ladder">
+            <div className="refos-bracket-ladder">
+              {ROUNDS.slice(ROUNDS.findIndex(([phase]) => byPhase(phase).length)).map(([phase, label], roundIndex, visibleRounds) => {
+                const count = {r16:8,qf:4,sf:2,final:1}[phase];
+                const ms = byPhase(phase);
+                const groups = Array.from({length:count}, (_,i) => ms.filter(m => eliminationPairingKey(m) === `${phase}:${i+1}`));
+                const previous = visibleRounds[roundIndex-1]?.[0];
+                return <section key={phase} className="refos-bracket-round" aria-label={label}>
+                  <h3 className="refos-bracket-round-title font-semibold">{label}</h3>
+                  <div className="refos-bracket-slots" style={{gridTemplateRows:`repeat(${count}, minmax(0, 1fr))`}}>
+                    {groups.map((games, slot) => <div key={slot} className={`refos-bracket-slot ${roundIndex ? 'has-feeder' : ''} ${roundIndex < visibleRounds.length-1 ? 'has-next' : ''} ${slot%2===0?'pair-top':'pair-bottom'}`}>
+                      <div className="refos-bracket-series rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                        <h4 className="text-sm font-semibold px-3 pt-3">{phase==='final'?'Final':`${{r16:'R16',qf:'QF',sf:'SF'}[phase]}-${slot+1}`}</h4>
+                        {games.length ? games.map(m => <div key={m.id} className={`refos-ladder-game p-3 ${liveHighlights[m.id] === 'current' ? 'ring-2 ring-inset ring-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'ring-2 ring-inset ring-amber-500' : ''}`}>
+                          {liveHighlights[m.id] && <p className="text-xs font-semibold mb-2">{liveHighlights[m.id] === 'current' ? 'Playing now' : 'Up next'}</p>}
+                          <span className="block text-xs text-slate-500 dark:text-slate-400 mb-2">{phase==='final'?`Final ${m.num}`:fmtMatch(m)}</span>
+                          <div className="refos-ladder-sides"><Side m={m} side="red"/><Side m={m} side="blue"/></div>
+                          <p className="text-xs font-mono mt-2">{m.redScore != null && m.blueScore != null ? `Score ${m.redScore} – ${m.blueScore}${eliminationResultLabel(m) ? ' · '+eliminationResultLabel(m) : ''}` : 'Awaiting score'}</p>
+                          {canEditBracket && m.redScore != null && m.blueScore != null && <button type="button" className="mt-2 min-h-[44px] rounded-lg border px-3 text-sm" onClick={()=>onSetWinner(m,'double_dq')}>{m.winner==='double_dq'?'Clear double DQ':'Mark double DQ'}</button>}
+                        </div>) : <div className="p-3 text-xs text-slate-500 dark:text-slate-400 space-y-3">
+                          <p>{previous ? `Winner of ${{r16:'R16',qf:'QF',sf:'SF'}[previous]}-${slot*2+1}` : 'Alliance to be determined'}</p>
+                          <p>{previous ? `Winner of ${{r16:'R16',qf:'QF',sf:'SF'}[previous]}-${slot*2+2}` : 'Alliance to be determined'}</p>
+                          <p>Awaiting matchup</p>
+                        </div>}
                       </div>
-                      {canEditBracket && m.redScore != null && m.blueScore != null && <button type="button" className="mt-2 min-h-[44px] rounded-lg border px-3 text-sm" onClick={()=>onSetWinner(m,'double_dq')}>{m.winner==='double_dq'?'Clear double DQ':'Mark double DQ'}</button>}
-                    </div>
-                    </React.Fragment>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
+                    </div>)}
+                  </div>
+                </section>;
+              })}
+            </div>
+          </div>
         </div>
       )}
     </section>

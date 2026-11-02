@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { transformSync } from 'esbuild';
 const source = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
 const start = source.indexOf('function AllianceSelection(');
@@ -84,7 +84,7 @@ test('automatic advancement creates the configured number of finals',async()=>{
 test('elimination bracket highlights live match and only jumps on request', async ({page}) => {
   await mount(page,{phase:'qf',live:true});
   await expect(page.getByText('Playing now',{exact:true})).toBeVisible();
-  await expect(page.getByText('Playing now',{exact:true}).locator('..')).toHaveClass(/bg-emerald-50/);
+  await expect(page.getByText('Playing now',{exact:true}).locator('..')).toHaveClass(/ring-emerald-500/);
   expect(await page.evaluate(()=>window.openedMatch)).toBeUndefined();
   await page.getByRole('button',{name:'Jump to current match · qf 1'}).click();
   expect(await page.evaluate(()=>window.openedMatch)).toBe('test');
@@ -92,9 +92,24 @@ test('elimination bracket highlights live match and only jumps on request', asyn
 
 test('replays share one pairing heading and preserve double DQ and tie labels',async({page})=>{
  await mount(page,{replay:true});
- await expect(page.getByRole('heading',{name:'QF2 · Games',exact:true})).toHaveCount(1);
+ await expect(page.getByRole('heading',{name:'QF-2',exact:true})).toHaveCount(1);
  await expect(page.getByText('Score 0 – 0 · Double DQ',{exact:true})).toBeVisible();
  await expect(page.getByText('Score 8 – 8 · Tie',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Clear double DQ',exact:true}).click();
  expect(await page.evaluate(()=>window.selectedWinner)).toEqual({id:'qf-2',side:'double_dq'});
+});
+
+test('ladder connects round columns and keeps future pairings visible on mobile', async ({page}) => {
+  await page.setViewportSize({width:390,height:844});
+  await mount(page);
+  await expect(page.getByRole('region',{name:'Scrollable elimination bracket ladder'})).toBeVisible();
+  await page.addStyleTag({content:readFileSync('dist/assets/'+readdirSync('dist/assets').find(name=>name.endsWith('.css')),'utf8')});
+  const ladder=page.getByRole('region',{name:'Scrollable elimination bracket ladder'});
+  await expect(ladder.locator('.refos-bracket-round')).toHaveCount(4);
+  await expect(page.getByText('Winner of R16-1',{exact:true})).toBeVisible();
+  expect(await ladder.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  await page.screenshot({path:'test-results/bracket-ladder-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1440,height:1000});
+  await page.screenshot({path:'test-results/bracket-ladder-desktop.png',fullPage:true});
 });
