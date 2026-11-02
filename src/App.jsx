@@ -1940,7 +1940,8 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     }
     setEventSettings(next);
   }, []);
-  const highlanderDemoLocked = eventId === "11111111-1111-4111-8111-111111111111" && eventSettings?.highlander_demo_lock?.value?.locked !== false;
+  // Highlander is a normal live event; the separate public demo owns demo behavior.
+  const highlanderDemoLocked = false;
   const explainDemoLock = () => alert("Highlander Summit matches, alliances, and violations are read only for the demo.");
   const configuredFieldCount = Math.max(1, Math.min(3, Number(eventSettings?.field_configuration?.value?.count) || (event?.format === 'league' || league ? 1 : 3)));
   const savedFieldNames = eventSettings?.field_names?.value;
