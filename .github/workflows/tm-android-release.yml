@@ -12,6 +12,8 @@ on:
       - 'android/**'
       - 'mobile/tm-sockets/**'
       - 'scripts/sync-mobile.mjs'
+      - 'scripts/prepare-venue-android.mjs'
+      - 'venue-server/**'
       - 'capacitor.config.*'
       - 'package.json'
       - 'package-lock.json'
@@ -89,7 +91,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if ! gh release view tm-connect-android > /dev/null 2>&1; then
-            gh release create tm-connect-android --target "$GITHUB_SHA" --title 'Ref OS TM Connect for Android' --notes 'Install Ref-OS-TM-Connect.apk on one Android device on the TM network. Sign in, select the event, enter the TM IP and API key, and start syncing. Keep the app open. Android 7 or later is required. Physical-device and live-event verification is still pending.'
+            gh release create tm-connect-android --target "$GITHUB_SHA" --title 'Ref-OS Connect for Android' --notes 'Install Ref-OS-TM-Connect.apk on one Android device on the TM network. Sign in, select the event, enter the TM IP and API key, and start syncing. Keep the app open. Android 7 or later is required. Physical-device and live-event verification is still pending.'
           fi
           gh release upload tm-connect-android Ref-OS-TM-Connect.apk Ref-OS-TM-Connect.apk.sha256 --clobber
       - name: Remove temporary signing key

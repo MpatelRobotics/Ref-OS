@@ -6,4 +6,6 @@ const assets='android/venue/src/main/assets';
 await mkdir(assets,{recursive:true});
 await build({entryPoints:['venue-server/validate.mjs'],outfile:assets+'/validation.js',bundle:true,format:'iife',globalName:'VenueValidation',target:'es2015'});
 await cp('dist',assets+'/public',{recursive:true,filter:path=>! /\.(zip|exe|apk|map)$/i.test(path)});
+await mkdir('android/app/src/main/assets',{recursive:true});
+await cp(assets+'/validation.js','android/app/src/main/assets/validation.js');
 console.log('Android venue host includes the production web app and shared input validation.');
