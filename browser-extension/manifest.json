@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Ref OS TM Connect",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "minimum_chrome_version": "116",
   "description": "Connect Ref OS to your chosen local Tournament Manager server, including live fields.",
   "permissions": [
@@ -43,5 +43,6 @@
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; connect-src http: https: ws: wss:"
-  }
+  },
+  "homepage_url": "https://www.ref-os.fyi/"
 }

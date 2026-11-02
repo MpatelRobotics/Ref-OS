@@ -67,7 +67,7 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
   await init;
   if(!sender.tab||sender.frameId!==0||!websiteAllowed(sender.url))throw Error('Open the official Ref OS website to use this extension.');
   if(message.route==='credentials'){const {address}=await chrome.storage.local.get('address');const {tmCredentials}=await chrome.storage.session.get('tmCredentials');return {address:address||'',apiKey:tmCredentials?.address===address?tmCredentials.apiKey:''};}
-  if(message.route==='ping')return {available:true,version:'1.0.0',liveFields:true};
+  if(message.route==='ping')return {available:true,version:chrome.runtime.getManifest().version,liveFields:true};
   const {address}=await chrome.storage.local.get('address');validateRequest(message.route,message.body,address);
   if(message.route==='snapshot')await addressAllowed(address);
   let state=tabs.get(sender.tab.id);if(!state){if(tabs.size>=4)throw Error('Too many Ref OS tabs are connected. Close another tab first.');state=make(sender.tab.id);tabs.set(sender.tab.id,state);}
