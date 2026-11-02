@@ -35,7 +35,6 @@ jobs:
       VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
       VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
-      REFOS_ANDROID_VERSION_CODE: ${{ github.run_number }}
       REFOS_ANDROID_VERSION_NAME: 2.0.${{ github.run_number }}
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -66,6 +65,8 @@ jobs:
           pathlib.Path(os.environ['ANDROID_KEYSTORE_PATH']).write_bytes(base64.b64decode(os.environ['ANDROID_KEYSTORE_BASE64'], validate=True))
           PY
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Set shared Android version code
+        run: echo "REFOS_ANDROID_VERSION_CODE=$(($(date +%s) - 1577836800))" >> "$GITHUB_ENV"
       - run: npm ci
       - run: node --test tests/tm-mobile.test.mjs tests/tm-live-fields.test.mjs tests/tm-api.test.mjs tests/tm-client-pool.test.mjs
       - run: node scripts/sync-mobile.mjs --android
@@ -91,7 +92,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if ! gh release view tm-connect-android > /dev/null 2>&1; then
-            gh release create tm-connect-android --target "$GITHUB_SHA" --title 'Ref-OS Connect for Android' --notes 'Install Ref-OS-TM-Connect.apk on one Android device on the TM network. Sign in, select the event, enter the TM IP and API key, and start syncing. Keep the app open. Android 7 or later is required. Physical-device and live-event verification is still pending.'
+            gh release create tm-connect-android --target "$GITHUB_SHA" --title 'Ref-OS Connect for Android' --notes 'Install Ref-OS-TM-Connect.apk on one Android device on the TM network. Sign in, select the event, enter the TM IP and API key, and start syncing. Keep the app open. Android 8 or later is required. Physical-device and live-event verification is still pending.'
           fi
           gh release upload tm-connect-android Ref-OS-TM-Connect.apk Ref-OS-TM-Connect.apk.sha256 --clobber
       - name: Remove temporary signing key

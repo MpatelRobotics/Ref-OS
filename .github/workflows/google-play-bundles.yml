@@ -1,0 +1,76 @@
+name: Build Google Play app bundles
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: google-play-bundles
+  cancel-in-progress: false
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+      VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
+      REFOS_ANDROID_VERSION_NAME: 2.0.${{ github.run_number }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v4.0.4
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - name: Restore signing key
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/ref-os-android.p12
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          python3 - <<'PY'
+          import base64, os, pathlib
+          for name in ['ANDROID_KEYSTORE_BASE64','ANDROID_KEYSTORE_PASSWORD','ANDROID_KEY_ALIAS','ANDROID_KEY_PASSWORD','VITE_SUPABASE_URL','VITE_SUPABASE_ANON_KEY']:
+              if not os.environ.get(name): raise SystemExit(f'Missing secret or variable: {name}')
+          pathlib.Path(os.environ['ANDROID_KEYSTORE_PATH']).write_bytes(base64.b64decode(os.environ['ANDROID_KEYSTORE_BASE64'], validate=True))
+          PY
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Set shared Android version code
+        run: echo "REFOS_ANDROID_VERSION_CODE=$(($(date +%s) - 1577836800))" >> "$GITHUB_ENV"
+      - run: npm ci
+      - run: node --test tests/tm-mobile.test.mjs tests/tm-live-fields.test.mjs tests/tm-api.test.mjs tests/tm-client-pool.test.mjs
+      - run: node scripts/sync-mobile.mjs --android
+      - name: Build signed Google Play bundles
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/ref-os-android.p12
+        working-directory: android
+        run: bash gradlew :app:bundleRelease :referee:bundleRelease --no-daemon
+      - name: Verify signed bundles
+        run: |
+          jarsigner -verify android/app/build/outputs/bundle/release/app-release.aab
+          jarsigner -verify android/referee/build/outputs/bundle/release/referee-release.aab
+          cp android/app/build/outputs/bundle/release/app-release.aab Ref-OS-Connect.aab
+          cp android/referee/build/outputs/bundle/release/referee-release.aab Ref-OS.aab
+          sha256sum Ref-OS.aab Ref-OS-Connect.aab > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: Ref-OS-Google-Play
+          path: |
+            Ref-OS.aab
+            Ref-OS-Connect.aab
+            SHA256SUMS.txt
+          if-no-files-found: error
+      - name: Remove temporary signing key
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/ref-os-android.p12
+        if: always()
+        run: python3 -c "import os,pathlib; pathlib.Path(os.environ['ANDROID_KEYSTORE_PATH']).unlink(missing_ok=True)"

@@ -14,4 +14,6 @@ for (const args of [['scripts/check-schema.mjs'], ['node_modules/vite/bin/vite.j
 if (process.argv.includes("--android")) {
  const result=spawnSync(process.execPath,["scripts/prepare-venue-android.mjs"],{stdio:"inherit",env});
  if(result.status!==0)process.exit(result.status||1);
+ const main=spawnSync(process.execPath,["scripts/prepare-referee-android.mjs"],{stdio:"inherit",env});
+ if(main.status!==0)process.exit(main.status||1);
 }

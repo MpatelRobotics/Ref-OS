@@ -37,3 +37,6 @@ public/Ref-OS-Venue-Server.apk
 # Microsoft Store package output
 desktop/store-release/
 desktop/store-artifacts/
+
+android/referee/build/
+android/referee/src/main/assets/
