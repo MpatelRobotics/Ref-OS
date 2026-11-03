@@ -4427,8 +4427,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const scheduleTeams = partitionScheduledTeams(teams, matches, eventSettings?.vex_schedule_team_filter?.value?.enabled === true);
   const filteredTeams = scheduleTeams.scheduled
     .filter((t) => { const q = query.trim().toLowerCase(); return !q || t.number.toLowerCase().includes(q) || (t.name || "").toLowerCase().includes(q); })
-    .sort((a, b) => (countsByTeam[b.number]?.total || 0) - (countsByTeam[a.number]?.total || 0)
-      || a.number.localeCompare(b.number, undefined, { numeric: true }));
+    .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true, sensitivity: "base" }));
 
   return (
     <div data-settings-open={menu ? "true" : "false"} data-program={isIQ ? "iq" : "v5"} className="refos-shell min-h-screen font-sans antialiased">
