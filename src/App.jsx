@@ -5602,7 +5602,11 @@ function LogModal({ requiredRobotPhotos, isIQ = false, practice = false, teams, 
   const ruleBook = useMemo(() => {
     const m = {}; for (const r of (rules || [])) m[r.code] = r.desc; return m;
   }, [rules]);
-  const [team, setTeam] = useState((edit && edit.team) || presetTeam || (teams[0]?.number ?? ""));
+  const sortedLogTeams = useMemo(() => [...teams].sort((a,b) => String(a.number).localeCompare(String(b.number), "en", {numeric:true,sensitivity:"base"})), [teams]);
+  const [team, setTeam] = useState((edit && edit.team) || presetTeam || (sortedLogTeams[0]?.number ?? ""));
+  const [teamSearch, setTeamSearch] = useState("");
+  const matchingLogTeams = sortedLogTeams.filter(t => `${t.number} ${t.name || ""}`.toLowerCase().includes(teamSearch.trim().toLowerCase()));
+  const selectedLogTeam = sortedLogTeams.find(t => t.number === team);
   const [creatingNew, setCreatingNew] = useState(!edit && teams.length === 0);
   const [newNumber, setNewNumber] = useState("");
   const [newName, setNewName] = useState("");
@@ -5697,9 +5701,14 @@ function LogModal({ requiredRobotPhotos, isIQ = false, practice = false, teams, 
                 {teams.length > 0 && <button onClick={() => setCreatingNew(false)} className="text-sm text-slate-500 dark:text-slate-400 underline">Pick an existing team instead</button>}
               </div>
             ) : (
-              <select value={team} onChange={(e) => setTeam(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
-                {teams.map((t) => <option key={t.number} value={t.number}>{t.number}{t.name ? ` — ${t.name}` : ""}</option>)}
-              </select>
+              <div className="space-y-2">
+                <input type="search" aria-label="Search violation teams" placeholder="Search team number or name" value={teamSearch} onChange={e=>setTeamSearch(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm" />
+                <select aria-label="Violation team" value={team} onChange={(e) => setTeam(e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                  {selectedLogTeam && !matchingLogTeams.some(t=>t.number===team) && <option value={team}>Selected: {team}{selectedLogTeam.name ? ` — ${selectedLogTeam.name}` : ""}</option>}
+                  {matchingLogTeams.map((t) => <option key={t.number} value={t.number}>{t.number}{t.name ? ` — ${t.name}` : ""}</option>)}
+                </select>
+                {teamSearch && <p role="status" className="text-xs text-slate-500 dark:text-slate-400">{matchingLogTeams.length ? `${matchingLogTeams.length} matching team${matchingLogTeams.length===1?'':'s'}` : 'No matching teams. Your selected team has not changed.'}</p>}
+              </div>
             )}
             {(() => {
               const rk = (teams.find((t) => t.number === team)?.photoKeys) || [];
