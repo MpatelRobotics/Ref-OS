@@ -7,6 +7,7 @@ const alliance=source.slice(source.indexOf('function AllianceSelection('),source
 const moduleCode=transformSync(`import React from '/node_modules/.vite/deps/react.js'; const {useState,useEffect,useMemo}=React;
 import ReactDOM from '/node_modules/.vite/deps/react-dom.js'; const {createPortal}=ReactDOM;
 import {tmMatchOrder} from '/src/tmMatchIdentity.js';
+import {eliminationPairingKey,eliminationPairingLabel,eliminationResultLabel} from '/src/tmReplayGrouping.js';
 import {tmMatchHighlights} from '/src/tmMatchHighlights.js';
 const TmFieldActivity=()=>null;
 const X=()=>null, Trophy=()=>null, UserCircle2=()=>null, Check=()=>null, GitBranch=()=>null;

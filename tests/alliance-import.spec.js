@@ -72,14 +72,12 @@ test('best of 3 shows three finals and needs two wins', async ({page}) => {
   await expect(page.getByText('Champion alliance:',{exact:false})).toContainText('1A 2B');
 });
 test('automatic advancement creates the configured number of finals',async()=>{
-  const start=source.indexOf('  const advanceBracket = async (map) =>');
-  const fn=source.slice(start,source.indexOf('  const setMatchWinner =',start));
-  const run=new Function('event','map',`return (async()=>{const created=[];const api={addMatch:async(_,match)=>created.push(match)};const tmPairingNumber=(phase,num)=>Number(num)%1000;const tmMatchOrder=(a,b)=>Number(a.num)-Number(b.num);const eventId='test';const reloadMatches=async()=>{};const winnerTeams=m=>m&&m.winner?(m.winner==='red'?m.red:m.blue):null;${fn}await advanceBracket(map);return created;})();`);
-  const map={'sf-1':{winner:'red',red:['1A','2B'],blue:[]},'sf-2':{winner:'blue',red:[],blue:['3C','4D']}};
-  expect((await run({finalsBestOf:1},map)).filter(m=>m.phase==='final').map(m=>m.num)).toEqual([1]);
-  expect((await run({finalsBestOf:3},map)).filter(m=>m.phase==='final').map(m=>m.num)).toEqual([1,2,3]);
+ const {planBracketCorrection}=await import('../src/bracketCorrection.js');
+ const one={id:'sf-1',phase:'sf',num:1,winner:'red',red:['1A','2B'],blue:['5E','6F']};
+ const two={id:'sf-2',phase:'sf',num:2,winner:'blue',red:['7G','8H'],blue:['3C','4D']};
+ const map={'sf-1':one,'sf-2':two};
+ for(const count of [1,3])expect(planBracketCorrection(map,one,'red',count).changes.filter(m=>m.phase==='final').map(m=>m.num)).toEqual(Array.from({length:count},(_,i)=>i+1));
 });
-
 
 test('elimination bracket highlights live match and only jumps on request', async ({page}) => {
   await mount(page,{phase:'qf',live:true});

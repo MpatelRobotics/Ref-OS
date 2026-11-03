@@ -27,7 +27,7 @@ test('developer sees newest feedback, can search and return',async({page})=>{
   await expect(page.locator('article')).toHaveCount(1);
   await expect(page.locator('article')).toContainText('Add a timer');
   await page.getByRole('textbox',{name:'Search feedback'}).fill('unmatched');
-  await expect(page.getByRole('status')).toHaveText('No feedback matches your search.');
+  await expect(page.getByRole('status')).toHaveText('No feedback matches your search or status filter.');
   await page.getByRole('button',{name:'Back to Features & Help'}).click();
   expect(await page.evaluate(()=>window.feedbackClosed)).toBe(true);
 });

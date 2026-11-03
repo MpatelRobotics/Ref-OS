@@ -1,3 +1,4 @@
+import {planBracketCorrection} from './bracketCorrection.js';
 import {loadWorkspaceEvent} from "./loadWorkspaceEvent.js";
 import EliminationBracketIcon from "./components/EliminationBracketIcon.jsx";
 import RefOsWelcome from "./components/RefOsWelcome.jsx";
@@ -3723,36 +3724,20 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     setTeams(freshTeams); setMatches(Object.fromEntries(freshMatches.map(m => [m.id, m]))); setEventSettings(settings);
     return message;
   };
-  const winnerTeams = (m) => (m && ["red", "blue"].includes(m.winner) ? (m.winner === "red" ? m.red : m.blue) : null);
-  const advanceBracket = async (map) => {
-    const get = (phase, num) => Object.values(map).filter(m=>m.phase===phase&&tmPairingNumber(phase,m.num)===num).sort(tmMatchOrder).at(-1) || map[`${phase}-${num}`];
-    const toCreate = [];
-    const push = (phase, num, red, blue, label) => {
-      const ex = get(phase, num);
-      toCreate.push({ phase, num, red, blue, label, field: (ex && ex.field) || "" });
-    };
-    for (let i = 1; i <= 4; i++) { const w1 = winnerTeams(get("r16", 2 * i - 1)), w2 = winnerTeams(get("r16", 2 * i)); if (w1 && w2) push("qf", i, w1, w2, `QF ${i}`); }
-    for (let i = 1; i <= 2; i++) { const w1 = winnerTeams(get("qf", 2 * i - 1)), w2 = winnerTeams(get("qf", 2 * i)); if (w1 && w2) push("sf", i, w1, w2, `SF ${i}`); }
-    { const w1 = winnerTeams(get("sf", 1)), w2 = winnerTeams(get("sf", 2)); if (w1 && w2) for (let g = 1; g <= (Number(event?.finalsBestOf) === 3 ? 3 : 1); g++) push("final", g, w1, w2, `Final ${g}`); }
-    if (toCreate.length) { for (const mm of toCreate) await api.addMatch(eventId, mm); await reloadMatches(); }
-  };
+  const [bracketSaving, setBracketSaving] = useState(false);
+  const bracketSaveLock = useRef(false);
   const setMatchWinner = async (m, winner) => {
-    if (highlanderDemoLocked) { explainDemoLock(); return; }
-    const next = m.winner === winner ? "" : winner; // tapping the current winner clears it
+    if (bracketSaveLock.current) return;
+    const next = m.winner === winner ? "" : winner;
+    const plan = planBracketCorrection(matches, m, next, event?.finalsBestOf);
+    if (plan.invalidated && !confirm(`This correction invalidates ${plan.invalidated} later match result(s). Clear those results and rebuild the affected bracket?`)) return;
+    bracketSaveLock.current = true; setBracketSaving(true);
     try {
-      await api.setMatchWinner(eventId, m.phase, m.num, next);
-    } catch (e) {
-      if (outbox.isOffline(e)) { alert("You're offline — reconnect to set the match winner."); return; }
-      throw e;
-    }
-    const map = { ...matches, [m.id]: { ...m, winner: next } };
-    setMatches(map);
-    try {
-      await advanceBracket(map);
-    } catch (e) {
-      if (outbox.isOffline(e)) { alert("Winner saved, but you went offline before the next round could be created — reconnect and tap the winner again to advance the bracket."); return; }
-      throw e;
-    }
+      await api.applyBracketCorrection(eventId, plan);
+      await reloadMatches();
+    } catch (error) {
+      alert(outbox.isOffline(error) ? "You're offline — the bracket correction was not confirmed. Reconnect and refresh the bracket before trying again." : (error.message || "Bracket correction failed. Refresh before trying again."));
+    } finally { bracketSaveLock.current = false; setBracketSaving(false); }
   };
   // 16-alliance single-elimination Round of 16 seeding (higher seed = red)
   const ELIM16 = [[1, 16], [8, 9], [5, 12], [4, 13], [3, 14], [6, 11], [7, 10], [2, 15]];
@@ -4898,7 +4883,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         ) : view === "awp" ? (
           isIQ ? <p>AWP is a V5 tool. IQ teamwork has no autonomous win point.</p> : <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} fieldNames={fieldNames} />
         ) : view === "alliances" ? (
-          isIQ ? <IQMatches key={`iq-finals-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} renderMatches={rows=><MatchList isIQ matches={Object.fromEntries(rows.map(row=>[row.id,row]))} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={false} emcee={isEmcee} fieldNames={fieldNames} />} parseCSV={parseCSV} /> : <AllianceSelection tmActivity={eventSettings?.tm_field_activity?.value} onOpenMatch={id => { setOpenMatch(id); setView("matches"); }} matches={matches} finalsBestOf={event?.finalsBestOf} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
+          isIQ ? <IQMatches key={`iq-finals-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} renderMatches={rows=><MatchList isIQ matches={Object.fromEntries(rows.map(row=>[row.id,row]))} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={false} emcee={isEmcee} fieldNames={fieldNames} />} parseCSV={parseCSV} /> : <AllianceSelection tmActivity={eventSettings?.tm_field_activity?.value} onOpenMatch={id => { setOpenMatch(id); setView("matches"); }} matches={matches} finalsBestOf={event?.finalsBestOf} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!bracketSaving && !isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
         ) : (
           <>
             {!!event?.quals && (

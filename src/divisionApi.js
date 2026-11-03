@@ -17,6 +17,7 @@ export function createDivisionApi(base, eventId, division, client = supabase) {
   const rows=await checked(scoped(client.from('matches').select('*')).order('num'));
   return (rows||[]).map(m=>({id:m.phase==='qual'?String(m.num):`${m.phase}-${m.num}`,phase:m.phase,num:m.num,divisionId:division,red:m.red||[],blue:m.blue||[],field:m.field||'',label:m.label||'',winner:m.winner||'',redScore:m.red_score,blueScore:m.blue_score}));
  };
+ api.applyBracketCorrection=(event,plan)=>base.applyBracketCorrection(event,plan,division);
  api.addMatch=async(_event,m)=>{await checked(client.from('matches').upsert(row(m),{onConflict:'event_id,session_key,division_id,phase,num'}));};
  api.insertTmMatch=async(_event,m)=>{const result=await client.from('matches').insert(row(m));if(result.error?.code==='23505')return false;if(result.error)throw result.error;return true;};
  const update=async(phase,num,value)=>checked(scoped(client.from('matches').update(value)).eq('phase',phase).eq('num',Number(num)));

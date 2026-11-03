@@ -54,7 +54,8 @@ test('loaded guide search and reading work without network and fit mobile width'
 });
 test('Features & Help and contextual help open the guide in the real workspace', async ({ page }) => {
   await page.route('https://example.supabase.co/**', (route) => route.fulfill({ contentType: 'application/json', body: '[]' }));
-  await page.goto('/');
+  await page.goto('/?page=events');
+  await page.getByRole('button',{name:'Expand all',exact:true}).click();
   await page.getByRole('button', { name: /Highlander Summit/ }).first().click();
   await page.getByRole('button', { name: 'Admin login', exact: true }).click();
   await page.getByPlaceholder('Admin password').fill('test-admin');
@@ -72,7 +73,5 @@ test('Features & Help and contextual help open the guide in the real workspace',
   await expect(page.getByRole('heading', { name: 'Ref OS User Guide', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back to Features & Help' }).click();
   await page.getByRole('button', { name: 'Back', exact: true }).click();
-  await page.getByRole('button', { name: 'Help with this section' }).click();
-  await expect(page.getByRole('heading', { name: 'Schedules and match details', exact: true })).toBeVisible();
-  await page.screenshot({ path: test.info().outputPath('contextual-guide.png'), fullPage: true });
+  await expect(page.getByRole('button', { name: 'Help with this section' })).toHaveCount(0);
 });

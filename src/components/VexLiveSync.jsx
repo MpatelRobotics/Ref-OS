@@ -14,7 +14,7 @@ export default forwardRef(function VexLiveSync({category='rankings',initialCode=
   for(const id of division){
    try{const data=await onFetch(code,id,kind);if(!active.current)return;if(data.warnings?.length)throw Error(data.warnings[0]);await onApply(data,kind);}catch(e){failures.push(`Division ${id}: ${e.message||'Sync failed'}`);}
   }
-  if(failures.length)setError(failures.join(' '));
+  if(failures.length)throw new Error(failures.join(' '));
   setStatus('All divisions checked '+new Date().toLocaleTimeString());return;
  }
  const data=await onFetch(code,division||null,kind);if(!active.current)return;await onSaveCode(data.code || code.trim().toUpperCase());if(!active.current)return;setDivisions(data.divisions);
@@ -38,7 +38,7 @@ export default forwardRef(function VexLiveSync({category='rankings',initialCode=
     try{data=await onFetch(selectedCode,id,kind);if(!active.current)return;if(data.warnings?.length)throw Error(data.warnings[0]);result=await onApply(data,kind);}catch(e){failures.push(`Division ${id}: ${e.message||'Sync failed'}`);}
    }
    if(!data)throw Error(failures.join(' '));
-   if(failures.length)setError(failures.join(' '));
+   if(failures.length)throw new Error(failures.join(' '));
    if(!active.current)return;
    if(data.warnings?.length)throw new Error(data.warnings[0]);
    if(!active.current)return;

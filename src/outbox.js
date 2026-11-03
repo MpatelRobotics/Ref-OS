@@ -25,62 +25,70 @@ async function kvGet(key) {
   const d = await db();
   return new Promise((res, rej) => {
     const req = d.transaction(STORE, "readonly").objectStore(STORE).get(key);
-    req.onsuccess = () => res(req.result || null);
-    req.onerror = () => rej(req.error);
+    req.onsuccess = () => { const value = req.result || null; d.close(); res(value); };
+    req.onerror = () => { d.close(); rej(req.error); };
   });
 }
-async function kvSet(key, val) {
+// Read/modify/write stays inside one transaction. IndexedDB serializes these
+// transactions across connections and tabs, preventing lost concurrent saves.
+async function mutate(keys, change) {
   const d = await db();
-  return new Promise((res, rej) => {
-    const req = d.transaction(STORE, "readwrite").objectStore(STORE).put(val, key);
-    req.onsuccess = () => res(true);
-    req.onerror = () => rej(req.error);
+  return new Promise((resolve, reject) => {
+    const tx = d.transaction(STORE, "readwrite"), store = tx.objectStore(STORE);
+    const values = {}; let remaining = keys.length, result;
+    tx.oncomplete = () => { d.close(); resolve(result); };
+    tx.onabort = tx.onerror = () => { d.close(); reject(tx.error || new Error("Local save failed")); };
+    for (const key of keys) {
+      const request = store.get(key);
+      request.onsuccess = () => {
+        values[key] = request.result;
+        if (--remaining) return;
+        try {
+          result = change(values);
+          for (const name of keys) store.put(values[name], name);
+        } catch (error) { tx.abort(); reject(error); }
+      };
+    }
   });
 }
-
-const qKey = (eventId) => `outbox:${eventId}`;
-const failedKey = (eventId) => `failed:${eventId}`;
+async function kvSet(key, val) { return mutate([key], values => { values[key] = val; return true; }); }
+const qKey = eventId => `outbox:${eventId}`;
+const failedKey = eventId => `failed:${eventId}`;
 export async function loadQueue(eventId) { return (await kvGet(qKey(eventId))) || []; }
 export async function saveEventSnapshot(event,session,division,value){return kvSet(`eventSnapshot:${event}:${session||''}:${division}`,value);}
 export async function loadEventSnapshot(event,session,division){return kvGet(`eventSnapshot:${event}:${session||''}:${division}`);}
-async function saveQueue(eventId, q) { await kvSet(qKey(eventId), q); return q; }
 export async function loadFailed(eventId) { return (await kvGet(failedKey(eventId))) || []; }
-async function saveFailed(eventId, items) { await kvSet(failedKey(eventId), items); return items; }
 export async function discardFailed(eventId, failedId) {
-  const items = (await loadFailed(eventId)).filter((item) => item.failedId !== failedId);
-  return saveFailed(eventId, items);
+  const key = failedKey(eventId);
+  return mutate([key], values => values[key] = (values[key] || []).filter(item => item.failedId !== failedId));
 }
 export async function retryFailed(eventId, failedId) {
-  const items = await loadFailed(eventId);
-  const failed = items.find((item) => item.failedId === failedId);
-  if (!failed) return false;
-  await enqueue(eventId, failed.op);
-  await saveFailed(eventId, items.filter((item) => item.failedId !== failedId));
-  return true;
+  const q = qKey(eventId), f = failedKey(eventId);
+  return mutate([q,f], values => {
+    const items = values[f] || [], failed = items.find(item => item.failedId === failedId);
+    if (!failed) { values[q] ||= []; values[f] = items; return false; }
+    values[q] = [...(values[q] || []).filter(item => item.id !== failed.op.id), failed.op];
+    values[f] = items.filter(item => item.failedId !== failedId);
+    return true;
+  });
 }
 async function keepFailed(eventId, op, error) {
-  const items = await loadFailed(eventId);
-  const failedId = `${op.id}:failed:${Date.now()}`;
-  items.unshift({
-    failedId,
-    op,
-    message: error?.message || String(error || "Unknown sync error"),
-    failedAt: Date.now(),
+  const key = failedKey(eventId), failedId = `${op.id}:failed:${Date.now()}`;
+  return mutate([key], values => {
+    values[key] = [{failedId, op, message:error?.message || String(error || "Unknown sync error"), failedAt:Date.now()}, ...(values[key] || []).filter(item => item.op.id !== op.id)];
+    return failedId;
   });
-  await saveFailed(eventId, items.slice(0, 100));
-  return failedId;
 }
-
 export async function enqueue(eventId, op) {
-  const q = await loadQueue(eventId);
-  q.push(op);
-  await saveQueue(eventId, q);
-  return op;
+  const key = qKey(eventId);
+  return mutate([key], values => {
+    values[key] = [...(values[key] || []).filter(item => item.id !== op.id), op];
+    return op;
+  });
 }
 export async function removeOp(eventId, opId) {
-  const q = (await loadQueue(eventId)).filter((o) => o.id !== opId);
-  await saveQueue(eventId, q);
-  return q;
+  const key = qKey(eventId);
+  return mutate([key], values => values[key] = (values[key] || []).filter(item => item.id !== opId));
 }
 
 /* Treat "no network" as retryable; treat a real server rejection (RLS,

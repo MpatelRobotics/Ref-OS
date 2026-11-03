@@ -48,7 +48,7 @@ test('wrong event is blocked and connection errors have a recoverable message',a
 });
 test('browser setup only shows the connector download',async({page})=>{
   await mount(page, false);
-  await expect(page.getByRole('link',{name:'Download Ref OS TM Connect for Windows'})).toHaveAttribute('href','https://github.com/MpatelRobotics/Ref-OS/releases/download/tm-connect/Ref-OS-TM-Connect.exe');
+  await expect(page.getByRole('link',{name:'Download Ref-OS Desktop for Windows'})).toHaveAttribute('href','https://github.com/MpatelRobotics/Ref-OS/releases/download/tm-connect/Ref-OS-TM-Connect.exe');
   await expect(page.getByLabel('Event TM API key',{exact:true})).toHaveCount(0);await expect(page.getByLabel('TM server address',{exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Sync both TM divisions'})).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await expect(page.getByRole('button',{name:'Start TM syncing'})).toHaveCount(0);
@@ -101,7 +101,7 @@ test('match start triggers one score refresh after 30 seconds and stop cancels p
 
  test('native mobile connects with IP and key, hides desktop download, and pauses polling while hidden', async ({page}) => {
   await mount(page, false, true); await page.clock.install();
-  await expect(page.getByRole('link',{name:'Download Ref OS TM Connect for Windows'})).toHaveCount(0);
+  await expect(page.getByRole('link',{name:'Download Ref-OS Desktop for Windows'})).toHaveCount(0);
   await expect(page.getByText('Connect this device to the event Wi-Fi, then enter the TM address and event key.',{exact:false})).toBeVisible();
   await page.getByLabel('TM server address',{exact:true}).fill('192.168.0.164');
   await review(page);
@@ -156,8 +156,8 @@ test('Chrome extension enables browser TM forms and live field sync without the 
  await page.route(/\/src\/tmExtension\.js(?:\?.*)?$/,route=>route.fulfill({contentType:'application/javascript',body:'export const isTmExtension=()=>true; export const extensionTmRequest=async()=>null;'}));
  await mount(page,false);await review(page);
  await expect(page.getByText('Chrome TM extension connected · live field updates supported.')).toBeVisible();
- await expect(page.getByRole('link',{name:'Download Ref OS TM Connect for Windows'})).toBeVisible();
- await expect(page.getByRole('link',{name:'Download Chrome TM extension'})).toBeVisible();
+ await expect(page.getByRole('link',{name:'Download Ref-OS Desktop for Windows'})).toBeVisible();
+ await expect(page.getByRole('link',{name:'Install Chrome Extension'})).toBeVisible();
  await page.getByRole('button',{name:'Start TM syncing'}).click();
  await expect.poll(()=>page.evaluate(()=>window.applies.length)).toBe(1);
  expect(await page.evaluate(()=>window.lastFetchSettings.liveFields)).toBe(true);

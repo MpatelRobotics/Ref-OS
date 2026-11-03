@@ -1174,6 +1174,13 @@ export async function updateMatchScore(eventId, phase, num, redScore, blueScore,
   if (error) throw error;
 }
 
+export async function applyBracketCorrection(eventId, plan, divisionId = 0) {
+  const { error } = await supabase.rpc("apply_refos_bracket_correction", {
+    p_event:eventId, p_session:leagueSessionFor(eventId), p_division:divisionId,
+    p_expected:plan.expected, p_changes:plan.changes,
+  });
+  if (error) throw error;
+}
 export async function setMatchWinner(eventId, phase, num, winner) {
   const { error } = await inSession(supabase.from("matches").update({ winner: winner || null }).eq("event_id", eventId).eq("phase", phase).eq("num", Number(num)).eq("division_id",0), eventId);
   if (error) throw error;
@@ -1607,10 +1614,18 @@ export async function deleteViolation(v) {
 }
 export async function clearViolations(eventId) {
   if (E2E_MOCK) { e2eState.violations = []; return; }
-  const { data: vs } = await inSession(supabase.from("violations").select("photo_paths").eq("event_id", eventId), eventId);
-  const paths = (vs || []).flatMap((v) => v.photo_paths || []);
-  if (paths.length) await supabase.storage.from("robot-photos").remove(paths);
-  await inSession(supabase.from("violations").delete().eq("event_id", eventId), eventId);
+  const { data: rows, error: readError } = await inSession(supabase.from("violations").select("id,photo_paths").eq("event_id", eventId), eventId);
+  if (readError) throw readError;
+  if (!rows?.length) return;
+  const { data: deleted, error } = await inSession(supabase.from("violations").delete().eq("event_id", eventId).in("id", rows.map(row => row.id)), eventId).select("id");
+  if (error) throw error;
+  const removed = new Set((deleted || []).map(row => row.id));
+  const paths = [...new Set(rows.filter(row => removed.has(row.id)).flatMap(row => row.photo_paths || []))];
+  for (let i = 0; i < paths.length; i += 100) {
+    const { error: cleanupError } = await supabase.storage.from("robot-photos").remove(paths.slice(i, i + 100));
+    if (cleanupError) throw new Error("Violation records were deleted, but photo cleanup failed. Refresh the event and retry cleanup with an Admin. " + cleanupError.message);
+  }
+  if (removed.size !== rows.length) throw new Error("Some violations could not be deleted. Their evidence photos were kept. Refresh and check your event access.");
 }
 export async function clearTeams(eventId) {
   if (E2E_MOCK) { e2eState.teams = []; return; }
@@ -1618,7 +1633,8 @@ export async function clearTeams(eventId) {
   if (error) throw error;
 }
 export async function clearMatches(eventId) {
-  await inSession(supabase.from("matches").delete().eq("event_id", eventId).eq("division_id", 0), eventId);
+  const { error } = await inSession(supabase.from("matches").delete().eq("event_id", eventId).eq("division_id", 0), eventId);
+  if (error) throw error;
 }
 export async function clearRankings(eventId) {
   if (leagueSessionFor(eventId)) return deleteEventSetting(eventId, "rank_snapshot");
