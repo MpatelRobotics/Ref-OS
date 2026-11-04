@@ -103,7 +103,7 @@ if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance', () => { win?.show(); win?.focus(); });
   app.whenReady().then(async () => {
-    win = new BrowserWindow({ width: 1100, height: 820, minWidth: 440, minHeight: 600, show: !testMode, title: 'Ref-OS Desktop',
+    win = new BrowserWindow({ width: 1100, height: 820, minWidth: 440, minHeight: 600, show: !testMode, title: 'Ref-OS Desktop', icon: local('icon.png'),
       webPreferences: { preload: local('preload.cjs'), nodeIntegration: false, contextIsolation: true, sandbox: true, backgroundThrottling: false } });
     win.setMenuBarVisibility(false);
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));

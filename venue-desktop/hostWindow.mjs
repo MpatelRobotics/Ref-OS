@@ -47,7 +47,7 @@ ipcMain.handle('venue:action',async(e,action,value)=>{
 });
 async function open(){
  if(win&&!win.isDestroyed()){win.show();win.focus();return win;}
- win=new BrowserWindow({width:720,height:760,minWidth:480,minHeight:540,title:'Ref OS Venue Server',autoHideMenuBar:true,webPreferences:{preload:join(here,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
+ win=new BrowserWindow({width:720,height:760,minWidth:480,minHeight:540,title:'Ref OS Venue Server',icon:join(here,'icon.png'),autoHideMenuBar:true,webPreferences:{preload:join(here,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true}});
  win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
  win.webContents.on('will-navigate',e=>e.preventDefault());
  await win.loadFile(join(here,'index.html'));
