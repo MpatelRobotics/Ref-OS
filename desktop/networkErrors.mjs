@@ -6,6 +6,9 @@ export function connectionDetails(error, stage = 'website') {
  if(stage==='local'){
   title='The local TM connector could not start';
   steps=['Close other copies of Ref OS TM Connect and retry.', 'If it still fails, ask school IT to allow local loopback connections for this application.'];
+ }else if(code==='ERR_APP_NOT_READY'){
+  title='The website opened, but Ref OS did not finish loading';
+  steps=['Retry the connection.', 'Try the Ref OS backup address if this network cannot load the main website.', 'If both addresses fail, send this error to refos.app@gmail.com.'];
  }else if(/CERT_|SSL_/.test(code)){
   title='The secure connection could not be verified';
   steps=['Check the computer’s date and time.', 'Ask school IT to check its web-filter certificate and trust configuration for Ref OS TM Connect. Do not turn off certificate checking.'];

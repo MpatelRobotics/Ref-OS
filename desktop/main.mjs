@@ -45,6 +45,19 @@ ipcMain.handle('tm:open', async (event, entered) => {
     await writeFile(`${app.getPath('userData')}/website.json`, JSON.stringify({ website: url.href }));
     stage = 'website';
     await win.loadURL(url.href);
+    // A successful HTML response can still leave an empty window if the app's
+    // scripts fail to load. Return to setup instead of stranding the user there.
+    const ready = await win.webContents.executeJavaScript(`new Promise(resolve => {
+      const started = Date.now();
+      const check = () => {
+        const root = document.querySelector('#root') || document.body;
+        if (root?.innerText.trim() || root?.querySelector('canvas, input, button')) return resolve(true);
+        if (Date.now() - started >= 15000) return resolve(false);
+        setTimeout(check, 200);
+      };
+      check();
+    })`);
+    if (!ready) throw Object.assign(new Error('The website loaded without app content.'), { code: 'ERR_APP_NOT_READY' });
   } catch (error) {
     lastConnectionHelp = connectionDetails(error, stage);
     lastConnectionError = connectionFailure(error, stage);

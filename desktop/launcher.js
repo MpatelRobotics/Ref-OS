@@ -35,3 +35,5 @@ for(const action of ['browser','proxy','copy'])document.querySelector('#'+action
 document.querySelector('#venue').addEventListener('click',async()=>{try{await window.refosTmDesktop.openVenueServer();document.querySelector('#venue-status').textContent='Venue controls opened. Click Start Server there to begin sharing.';}catch(e){document.querySelector('#venue-status').textContent=e.message;}});
 
 const refreshDesktop=async()=>{try{const s=await window.refosTmDesktop.desktopStatus();document.querySelector('#desktop-status').textContent=`TM sync: ${s.syncing?'running':'not started'} · Venue Server: ${s.hosting?'running':'stopped'}`;}catch{}};void refreshDesktop();setInterval(refreshDesktop,3000);
+
+document.querySelector('#backup').addEventListener('click',()=>{input.value='https://ref-os.vercel.app/';void openWebsite();});
