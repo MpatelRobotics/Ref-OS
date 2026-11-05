@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { X, Server, Cloud, RefreshCw, Download, Wifi, AlertTriangle } from "lucide-react";
 import { getSyncConfig, setSyncConfig, normalizeServerUrl, mixedContentProblem, DEFAULT_VENUE_URL } from "../../sync/syncConfig";
+import VenueServerAccess from "../VenueServerAccess.jsx";
 import * as venueSync from "../../sync/venueSync";
 
 // Admin/Developer panel: choose Cloud or Local Venue Server for THIS device, test the venue
@@ -150,6 +151,7 @@ export default function SyncStatusModal({ eventId, eventName = "", onClose }) {
             </div>
           </fieldset>
 
+          {window.refosTmDesktop?.openVenueServer && <VenueServerAccess/>}
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950/30"><h3 className="font-bold">Set up local sharing</h3>
             <a href="https://apps.microsoft.com/detail/9PBVDZJLG8SP" target="_blank" rel="noopener noreferrer" className="mt-3 flex min-h-[48px] items-center justify-center rounded-xl bg-indigo-700 px-4 py-3 text-center font-semibold text-white hover:bg-indigo-800">Get Ref-OS Connect from Microsoft Store</a>
             <p className="mt-2 text-sm">Includes TM Connect and Venue Server in one app. Open Manage Venue Server, then click Start Server.</p>

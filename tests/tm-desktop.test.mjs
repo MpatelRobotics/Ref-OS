@@ -16,13 +16,13 @@ test('real desktop opens securely, reaches its native connector, and hides while
     assert.equal(invalid, true);
     if (!process.env.REFOS_PACKAGED_EXE) await page.screenshot({ path: resolve('desktop/build/launcher-preview.png') });
     const launcherUrl=page.url();
-    await page.route('https://www.ref-os.fyi/**', route => route.fulfill({contentType:'text/html',body:'<h1>Automatic Ref OS launch</h1>'}));
+    await page.route('https://ref-os.vercel.app/**', route => route.fulfill({contentType:'text/html',body:'<h1>Automatic Ref OS launch</h1>'}));
     await desktop.evaluate(async ({BrowserWindow}) => {
       const win=BrowserWindow.getAllWindows()[0];
       const url=new URL(win.webContents.getURL());url.search='?autoOpen=1';
       await win.loadURL(url.href);
     });
-    await page.waitForURL('https://www.ref-os.fyi/');
+    await page.waitForURL('https://ref-os.vercel.app/');
     assert.equal(await page.locator('h1').innerText(),'Automatic Ref OS launch');
     await desktop.evaluate(async ({BrowserWindow},url) => {
       await BrowserWindow.getAllWindows()[0].loadURL(url);

@@ -10,12 +10,14 @@ import { createConnector } from '../tm-bridge/connector.mjs';
 
 const local = name => fileURLToPath(new URL(name, import.meta.url));
 const isLauncher = value => { const url = new URL(value); url.search = ''; url.hash = ''; return url.href === new URL('launcher.html', import.meta.url).href; };
+const officialOrigins = new Set(['https://www.ref-os.fyi', 'https://ref-os.fyi', 'https://ref-os.vercel.app']);
+const trustedApp = event => trusted(event) && officialOrigins.has(origin);
 let lastConnectionError = '', lastConnectionHelp = null;
 let venueHost, shuttingDown=false;
 let win, tray, server, origin = '', pairingCode = '', port, syncing = false, quitting = false;
 async function openVenue(){if(!venueHost){const {createVenueHostWindow}=await import('./venue/hostWindow.mjs');const legacy=['Ref OS Venue Server','refos-venue-server'].map(name=>join(app.getPath('appData'),name,'venue-data')).find(path=>existsSync(join(path,'refos-venue.sqlite')));venueHost=createVenueHostWindow({resources:app.isPackaged?process.resourcesPath:local('resources/'),keepRunningOnClose:true,dataDirectory:testMode?undefined:legacy});}return venueHost.open();}
-ipcMain.handle('desktop:status',event=>{if(event.sender!==win?.webContents||event.senderFrame!==win.webContents.mainFrame||!isLauncher(event.senderFrame.url))throw Error('Desktop status unavailable.');return {syncing,hosting:venueHost?.isRunning()||false};});
-ipcMain.handle('desktop:venue',async event=>{if(event.sender!==win?.webContents||event.senderFrame!==win.webContents.mainFrame||!isLauncher(event.senderFrame.url))throw Error('Open the desktop home screen first.');await openVenue();return true;});
+ipcMain.handle('desktop:status',event=>{if(event.sender!==win?.webContents||event.senderFrame!==win.webContents.mainFrame||!(isLauncher(event.senderFrame.url)||trustedApp(event)))throw Error('Desktop status unavailable.');return {syncing,hosting:venueHost?.isRunning()||false};});
+ipcMain.handle('desktop:venue',async event=>{if(event.sender!==win?.webContents||event.senderFrame!==win.webContents.mainFrame||!trustedApp(event))throw Error('Open Ref-OS before opening venue controls.');await openVenue();return true;});
 const testMode = process.env.REFOS_DESKTOP_TEST === '1';
 if (testMode) app.setPath('userData', mkdtempSync(join(tmpdir(), 'refos-tm-test-')));
 function trusted(event) {
@@ -114,7 +116,7 @@ else {
     tray.setToolTip('Ref OS TM Connect — ready');
     tray.setContextMenu(Menu.buildFromTemplate([
       { label: 'Open Ref-OS Desktop', click: () => win.show() },
-      { label: 'Venue Server', click: () => {void openVenue();} },
+      { label: 'Venue Server', click: () => {if (officialOrigins.has(origin)) void openVenue();} },
       { label: 'Desktop home / Change website', click: async () => {
         if (syncing && dialog.showMessageBoxSync(win, { type: 'question', message: 'Stop syncing and change the website?', buttons: ['Keep syncing', 'Stop and change'] }) !== 1) return;
         await stopConnector(); origin = ''; await win.loadFile(local('launcher.html')); win.show();
@@ -123,7 +125,7 @@ else {
     ]));
     tray.on('double-click', () => win.show());
     win.on('close', event => { if (!quitting && (syncing || venueHost?.isRunning())) { event.preventDefault(); win.hide(); } });
-    await win.loadFile(local('launcher.html'), { query: {} });
+    await win.loadFile(local('launcher.html'), { query: testMode ? {} : {autoOpen:'1'} });
   });
   app.on('window-all-closed', () => {if(!venueHost?.isRunning())app.quit();});
   app.on('before-quit', event => { quitting=true;if(venueHost&&!shuttingDown){event.preventDefault();shuttingDown=true;venueHost.dispose().then(()=>app.quit());return;}server?.close();server?.closeAllConnections();tray?.destroy(); });
