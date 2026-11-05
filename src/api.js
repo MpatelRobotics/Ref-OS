@@ -12,12 +12,15 @@ import { isVenueMode } from "./sync/syncConfig";
 import * as venue from "./sync/venueSync";
 import { isTmMobile, mobileTmRequest } from './tmMobile.js';
 import { normalizeTmAddress } from './tmAddress.js';
+import { createTmPortDiscovery } from './tmPortDiscovery.js';
+const discoverTmPort = createTmPortDiscovery();
 
 export async function getTmSnapshot(eventId, settings) {
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session?.access_token) throw Error('Sign in before connecting TM.');
-  if (isTmMobile()) return mobileTmRequest('snapshot', { ...settings, address: normalizeTmAddress(settings.address), eventId, authorization: `Bearer ${data.session.access_token}`, anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY });
-  if (window.refosTmDesktop) return window.refosTmDesktop.request('snapshot', { ...settings, address: normalizeTmAddress(settings.address), eventId, authorization: `Bearer ${data.session.access_token}`, anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY });
+  const body = { ...settings, eventId, authorization: `Bearer ${data.session.access_token}`, anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY };
+  if (isTmMobile()) return discoverTmPort(body, request => mobileTmRequest('snapshot', request));
+  if (window.refosTmDesktop) return discoverTmPort(body, request => window.refosTmDesktop.request('snapshot', request));
   if (isTmExtension()) return extensionTmRequest('snapshot', { ...settings, address: normalizeTmAddress(settings.address), eventId, authorization: `Bearer ${data.session.access_token}`, anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY });
   throw Error('Install the Ref OS TM extension or open Ref OS TM Connect to connect Tournament Manager.');
 }
