@@ -13,14 +13,14 @@ export function planScoreUpdates(matches,scores){
 }
 
 // Insert only unambiguous, complete schedules. Existing assignments are never replaced.
-export function planMissingVexMatches(matches, rows) {
+export function planMissingVexMatches(matches, rows, program='v5') {
  const existing = new Set(Object.values(matches).map(m => `${m.phase}:${m.num}`));
  const counts = new Map();
  for (const row of rows) counts.set(`${row.phase}:${row.num}`, (counts.get(`${row.phase}:${row.num}`) || 0) + 1);
  return rows.filter(row => !existing.has(`${row.phase}:${row.num}`) && counts.get(`${row.phase}:${row.num}`) === 1
   && ['practice','qual','r16','qf','sf','final'].includes(row.phase) && Number.isInteger(row.num) && row.num > 0
-  && Array.isArray(row.red) && Array.isArray(row.blue) && row.red.length === 2 && row.blue.length === 2
-  && new Set([...row.red,...row.blue]).size === 4 && [...row.red,...row.blue].every(n => /^[A-Z0-9-]+$/.test(n)));
+  && Array.isArray(row.red) && Array.isArray(row.blue) && (program==='iq' ? ['practice','qual','final'].includes(row.phase)&&row.red.length>=1&&row.red.length<=2&&row.blue.length===0 : row.red.length===2&&row.blue.length===2)
+  && new Set([...row.red,...row.blue]).size === row.red.length+row.blue.length && [...row.red,...row.blue].every(n => /^[A-Z0-9-]+$/.test(n)));
 }
 
 export function planVexRosterUpdates(existing, roster){

@@ -2001,7 +2001,7 @@ export async function getEventRobotPhotoRequirements(eventId) {
 
 export async function updateExistingVexScore(eventId,row){
  const {existing}=row;
- let query=supabase.from('matches').update({red_score:row.redScore,blue_score:row.blueScore,winner:row.redScore>row.blueScore?'red':row.blueScore>row.redScore?'blue':'tie'})
+ let query=supabase.from('matches').update({red_score:row.redScore,blue_score:row.blueScore,winner:row.program==='iq'?null:row.redScore>row.blueScore?'red':row.blueScore>row.redScore?'blue':'tie'})
  .eq('event_id',eventId).eq('division_id',0).eq('phase',row.phase).eq('num',Number(row.num))
  .contains('red',existing.red).containedBy('red',existing.red).contains('blue',existing.blue).containedBy('blue',existing.blue);
  const session=leagueSessionFor(eventId);query=session?query.eq('session_id',session):query.is('session_id',null);

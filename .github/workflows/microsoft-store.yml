@@ -18,6 +18,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - run: node --test tests/iq-sync.test.mjs tests/tm-api.test.mjs tests/vex-score-sync.test.mjs
       - run: npm run build
       - run: node scripts/build-microsoft-store.mjs
       - name: Test packaged app

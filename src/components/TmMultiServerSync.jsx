@@ -3,7 +3,7 @@ import {normalizeTmSnapshot} from '../tmSnapshot.js';
 import {matchTmDivision} from '../tmDivisionMapping.js';
 import {scopeTmFieldActivity} from '../tmFieldActivity.js';
 
-export default function TmMultiServerSync({open,onClose,onExit,refosDivisions=[],expectedCode='',initialAddress='',initialApiKey='',onDiscoverDivisions,...props}) {
+export default function TmMultiServerSync({open,onClose,onExit,program='v5',refosDivisions=[],expectedCode='',initialAddress='',initialApiKey='',onDiscoverDivisions,...props}) {
  const [rows,setRows]=useState(()=>[0,1].map(i=>({id:`server-${i+1}`,address:'',apiKey:'',target:String(refosDivisions[i]?.id||''),division:'',session:'',remote:[],sessions:[],reviewed:null,ready:false,status:''})));
  const [address,setAddress]=useState(initialAddress),[apiKey,setApiKey]=useState(initialApiKey);
  const credentialsChanged=()=>{setRows(old=>old.map(row=>({...row,division:'',remote:[],session:'',sessions:[],ready:false,reviewed:null,status:''})));};
@@ -45,7 +45,7 @@ export default function TmMultiServerSync({open,onClose,onExit,refosDivisions=[]
    if(!division)throw Error('Choose the TM division, then review again.');
    const data=await latest.current.onFetch({...request(row),division,liveFields:false});
    if(!active.current||ticket!==epoch.current)return;validEvent(data);
-   const snapshot=normalizeTmSnapshot(data,row.session===''?undefined:Number(row.session));
+   const snapshot=normalizeTmSnapshot(data,row.session===''?undefined:Number(row.session),program);
    update(row.id,{reviewed:data.event.code||data.event.name,sessions:snapshot.sessions,ready:snapshot.selectedSession!=null||!snapshot.sessions.length,status:`${data.event.name} · ${snapshot.matches.length} matches · ${snapshot.scores.length} scores`});
   }catch(e){if(active.current)update(row.id,{ready:false,status:e.message||'Review failed.'});}
   finally{working.current=false;if(active.current)setBusy(false);}
@@ -62,7 +62,7 @@ export default function TmMultiServerSync({open,onClose,onExit,refosDivisions=[]
      const data=await latest.current.onFetch(request(row));if(!current()){if(data.connectionId)await latest.current.onDisconnect?.(data.connectionId,'').catch(()=>{});return;}validEvent(data);
      if(!data.multiServer)throw Error('Update the connector to enable multi-division syncing.');
      if((data.event.code||data.event.name)!==row.reviewed)throw Error('TM event changed. Stop and review the divisions again.');
-     const snapshot=normalizeTmSnapshot(data,row.session===''?undefined:Number(row.session));
+     const snapshot=normalizeTmSnapshot(data,row.session===''?undefined:Number(row.session),program);
      if(snapshot.sessions.length&&snapshot.selectedSession==null)throw Error('Choose a TM session.');
      await latest.current.onApply(snapshot,{includeSchedule:true,includeSkills:row.id===currentRows.current[0].id,hashes:state.hashes,current,refosDivisionId:Number(row.target)});
      if(!current())return;state.session=snapshot.selectedSession;state.connectionId=data.connectionId;if(state.refresh&&Date.now()>=state.refresh)state.refresh=0;
@@ -72,7 +72,7 @@ export default function TmMultiServerSync({open,onClose,onExit,refosDivisions=[]
     if(latest.current.robotsActive&&!document.hidden&&navigator.onLine&&Date.now()>=(state.checkInDue||0)){
      const data=await latest.current.onFetch({...request(row),checkInOnly:true});if(!current())return;validEvent(data);
      if((data.event?.code||data.event?.name)!==row.reviewed)throw Error('TM event changed. Stop and review the divisions again.');
-     await latest.current.onApply(normalizeTmSnapshot(data),{checkInOnly:true,hashes:state.hashes,current,refosDivisionId:Number(row.target)});
+     await latest.current.onApply(normalizeTmSnapshot(data,undefined,program),{checkInOnly:true,hashes:state.hashes,current,refosDivisionId:Number(row.target)});
      state.checkInDue=Date.now()+5000;
     }
     if(state.connectionId&&latest.current.onActivity){

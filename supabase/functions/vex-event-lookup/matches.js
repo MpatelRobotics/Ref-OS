@@ -8,8 +8,9 @@ export async function fetchVexStandings(code, division, token, fetcher=fetch, ki
   const events=await get('events',{'sku[]':code});const found=events.data?.filter(e=>e.sku?.toUpperCase()===code);
   if(found?.length!==1||!Number.isSafeInteger(found[0].id))throw new Error('No unique event found for that code.');
   const event=await get('events/'+found[0].id);
+  const program=/\bIQ\b|VIQRC|VIQC|(?:RE|VE)-IQ/i.test(String(event.program?.name||'')+' '+code)?'iq':'v5';
   const divisions=(event.divisions||[]).filter(d=>Number.isSafeInteger(d.id)).map(d=>({id:d.id,name:String(d.name||'Division '+d.id)}));
-  if(kind!=='skills'&&!division)return {code,divisions,rankings:[],skills:[]};
+  if(kind!=='skills'&&!division)return {code,program,divisions,rankings:[],skills:[]};
   if(kind!=='skills'&&!divisions.some(d=>d.id===Number(division)))throw new Error('VEX division is not available for this event.');
   const rows=[];
   for(let page=1;page<=20;page++){const result=await get(kind==='skills'?`events/${found[0].id}/skills`:`events/${found[0].id}/divisions/${Number(division)}/${kind==='scores'?'matches':kind}`,{page,per_page:250});const last=Number(result.meta?.last_page);if(!Array.isArray(result.data)||!Number.isInteger(last)||last<page||last>20)throw new Error('VEX standings pagination is incomplete. No standings were imported.');rows.push(...result.data);if(page===last)break;}
@@ -25,27 +26,27 @@ export async function fetchVexStandings(code, division, token, fetcher=fetch, ki
    teams=mapVexTeams(roster);
   }
   const warnings=[];
-  const scores=kind==='scores'?mapVexScores(rows):[];
-  const notScored=kind==='scores'?rows.filter(row=>!vexMatchIsScored(row)).length:0;
-  return {code,divisions,kind,warnings,teams,upstreamRows:rows.length,rankings:kind==='rankings'?mapVexRankings(rows):[],skills:kind==='skills'?mapVexSkills(rows):[],scores,matches:kind==='scores'?mapVexScores(rows,false):[],scoreSummary:kind==='scores'?{received:rows.length,notScored,unsupported:rows.length-notScored-scores.length}:undefined,scoreDiagnostics:kind==='scores'?describeVexScores(rows,scores):undefined,checkedAt:new Date().toISOString()};
+  const scores=kind==='scores'?mapVexScores(rows,true,program):[];
+  const notScored=kind==='scores'?rows.filter(row=>program==='iq'?!mapVexScores([row],true,'iq').length:!vexMatchIsScored(row)).length:0;
+  return {code,program,divisions,kind,warnings,teams,upstreamRows:rows.length,rankings:kind==='rankings'?mapVexRankings(rows,program):[],skills:kind==='skills'?mapVexSkills(rows,program):[],scores,matches:kind==='scores'?mapVexScores(rows,false,program):[],scoreSummary:kind==='scores'?{received:rows.length,notScored,unsupported:rows.length-notScored-scores.length}:undefined,scoreDiagnostics:kind==='scores'?describeVexScores(rows,scores):undefined,checkedAt:new Date().toISOString()};
  }finally{clearTimeout(timer);}
 }
 
-export function mapVexRankings(rows) {
+export function mapVexRankings(rows,program='v5') {
  const seen=new Set();return rows.map(row=>{
  const number=String(row.team?.name||'').trim().toUpperCase();
  if(!/^[A-Z0-9-]+$/.test(number)||!Number.isInteger(row.rank)||row.rank<1||seen.has(number))throw new Error('VEX returned incomplete or duplicate rankings.');seen.add(number);
- return {number,rank:row.rank,w:row.wins??null,l:row.losses??null,t:row.ties??null,wp:row.wp??null,ap:row.ap??null,sp:row.sp??null};
+ return {number,rank:row.rank,...(program==='iq'?{avgPoints:[row.average_points,row.average_score,row.averagePoints,row.avgPoints].find(v=>typeof v==='number'&&Number.isFinite(v)&&v>=0)??null,played:[row.matches_played,row.matchesPlayed,row.played].find(v=>Number.isSafeInteger(v)&&v>=0)??null}:{}),w:row.wins??null,l:row.losses??null,t:row.ties??null,wp:row.wp??null,ap:row.ap??null,sp:row.sp??null};
  });
 }
-export function mapVexSkills(rows) {
- const teams=new Map();for(const row of rows){
+export function mapVexSkills(rows,program='v5') {
+ const teams=new Map(), publishedRanks=new Map();for(const row of rows){
  if(!['driver','programming'].includes(row.type))throw new Error('VEX Skills format is not supported for this event.');
  const number=String(row.team?.name||'').trim().toUpperCase();
  if(!/^[A-Z0-9-]+$/.test(number)||!Number.isFinite(row.score)||row.score<0)throw new Error('VEX returned incomplete Skills scores.');
- const previous=teams.get(number)||{number,driver:null,programming:null,rank:null};previous[row.type]=Math.max(previous[row.type]??0,row.score);teams.set(number,previous);
+ const previous=teams.get(number)||{number,driver:null,programming:null,rank:null};if(program==='iq'&&Number.isSafeInteger(row.rank)&&row.rank>0){const ranks=publishedRanks.get(number)||new Set();ranks.add(row.rank);publishedRanks.set(number,ranks);previous.rank=ranks.size===1?row.rank:null;}previous[row.type]=Math.max(previous[row.type]??0,row.score);teams.set(number,previous);
  }
- return [...teams.values()].map(row=>({...row,total:(row.driver??0)+(row.programming??0)})).sort((a,b)=>b.total-a.total||a.number.localeCompare(b.number,'en',{numeric:true}));
+ return [...teams.values()].map(row=>({...row,total:(row.driver??0)+(row.programming??0)})).sort((a,b)=>(program==='iq'&&a.rank&&b.rank?a.rank-b.rank:0)||b.total-a.total||a.number.localeCompare(b.number,'en',{numeric:true}));
 }
 
 
@@ -73,9 +74,23 @@ export function describeVexScores(rows,scores){
  }));
  return {message,samples};
 }
-export function mapVexScores(rows, scoredOnly=true){
+export function mapVexScores(rows, scoredOnly=true, program='v5'){
  const result=[];
  for(const row of rows){
+  if(program==='iq'){
+   const phase={1:'practice',2:'qual',5:'final'}[row.round];
+   const alliances=row.alliances;
+   if(!phase||!Number.isSafeInteger(row.matchnum)||row.matchnum<1||!Array.isArray(alliances)||![1,2].includes(alliances.length))continue;
+   const ordered=[...alliances].sort((a,b)=>(a.color==='blue')-(b.color==='blue'));
+   const partners=ordered.flatMap(a=>(a.teams||[]).map(t=>String(t.team?.name??'').trim().toUpperCase()));
+   if(partners.length<1||partners.length>2||new Set(partners).size!==partners.length||partners.some(n=>!/^\d{1,6}[A-Z]{0,3}$/.test(n)))continue;
+   const scores=ordered.map(a=>a.score);
+   const valid=scores.every(n=>Number.isSafeInteger(n)&&n>=0)&&!(scores.length===2&&scores[1]!==0&&scores[1]!==scores[0]);
+   const complete=row.scored===true||typeof row.scored==='string'&&/^\d{4}-\d{2}-\d{2}[T ]/.test(row.scored)&&Number.isFinite(Date.parse(row.scored))||[false,null,undefined,''].includes(row.scored)&&scores[0]>0;
+   if(scoredOnly&&(!valid||!complete))continue;
+   result.push({program:'iq',phase,num:row.matchnum,red:partners,blue:[],...(scoredOnly?{redScore:scores[0],blueScore:null,winner:null}:{})});
+   continue;
+  }
   if(scoredOnly&&!vexMatchIsScored(row))continue;
   const phase={1:'practice',2:'qual',3:'qf',4:'sf',5:'final',6:'r16'}[row.round];
   if(!phase)continue;

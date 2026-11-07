@@ -3669,7 +3669,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       assertSession();
       if(targetApi.claimMatchingSchedule)await targetApi.claimMatchingSchedule(scoreRows);
       let fresh=await targetApi.listMatches(eventId, {strict:true});
-      const missing=planMissingVexMatches(fresh,scheduleRows);
+      const missing=planMissingVexMatches(fresh,scheduleRows,isIQ?'iq':'v5');
       const numbers=[...new Set(missing.flatMap(m=>[...m.red,...m.blue]))];
       if(numbers.length){const known=await api.listTeams(eventId);const absent=numbers.filter(number=>!known.some(t=>t.number===number));if(absent.length)await api.bulkUpsertTeams(eventId,absent.map(number=>({number,name:""})));}
       let added=0;
@@ -3696,7 +3696,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     if (missing.length) await api.bulkUpsertTeams(eventId, missing.map(number => ({ number, name: "" })));
     if (kind === "rankings") {
       await targetApi.bulkUpsertRankings(eventId, rows.map(r => ({ number:r.number, rank:r.rank })));
-      const saved = await targetApi.upsertEventSetting(eventId, "qualification_records", { records:Object.fromEntries(rows.map(r => [r.number, { w:r.w, l:r.l, t:r.t, wp:r.wp, ap:r.ap, sp:r.sp }])), importedAt:Date.now() });
+      const saved = await targetApi.upsertEventSetting(eventId, "qualification_records", { records:Object.fromEntries(rows.map(r => [r.number, { w:r.w, l:r.l, t:r.t, wp:r.wp, ap:r.ap, sp:r.sp, avgPoints:r.avgPoints, played:r.played }])), importedAt:Date.now() });
       if(!divisionId || Number(data.division)===divisionId)setEventSettings(prev => ({ ...prev, qualification_records:saved }));
 
     }
@@ -5028,7 +5028,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         <TMSyncCenter isIQ={isIQ}
           protectedKeys={highlanderDemoLocked ? ["matches", "alliances", "scores"] : []}
           onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowTMSync(false)}
-          onConnectApi={!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode() ? () => { setShowTMSync(false); setShowTmApiSync(true); } : null}
+          onConnectApi={adminUnlocked && !highlanderDemoLocked && !isVenueMode() ? () => { setShowTMSync(false); setShowTmApiSync(true); } : null}
           onImportTeams={() => teamFileRef.current?.click()}
           onImportMatches={() => matchFileRef.current?.click()}
           onImportRankings={() => rankingFileRef.current?.click()}
@@ -5062,7 +5062,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           syncStatus={tmSyncStatus}
         />
       )}
-      <EventTmSyncRegistration config={{enabled:!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode(),
+      <EventTmSyncRegistration config={{program:isIQ?'iq':'v5',enabled:adminUnlocked && !highlanderDemoLocked && !isVenueMode(),
 target:`${event?.name || 'Current event'}${league ? ' · ' + league.sessionName(leagueSessionId) : ''}`,
 robotsActive:view === 'robots',
 expectedCode:eventSettings?.vex_event?.value?.code || '',
@@ -5203,7 +5203,7 @@ const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', com
         onPreEventTest={() => openCommandCenterTool(() => setShowPreEventTest(true))}
         onTwoDeviceSyncTest={() => openCommandCenterTool(() => setShowTwoDeviceSyncTest(true))}
         onDiagnosticReport={() => openCommandCenterTool(() => setShowDiagnosticReport(true))}
-        onVexSync={!isIQ && !highlanderDemoLocked && !isVenueMode() ? () => openCommandCenterTool(() => setShowVexSyncSetup(true)) : undefined}
+        onVexSync={!highlanderDemoLocked && !isVenueMode() ? () => openCommandCenterTool(() => setShowVexSyncSetup(true)) : undefined}
         onTMSync={() => openCommandCenterTool(() => setShowTMSync(true))}
         onExportViolations={exportCSV}
         onExportNominations={exportNominations}
@@ -5267,7 +5267,7 @@ const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', com
           </div>
         </div>
       )}
-      {!isIQ && adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexSyncManager onDiscoverDivisions={async divisions=>{await eventApi.upsertEventSetting(eventId,"vex_divisions",{divisions},meName);}} autoStart initialDivision={eventSettings?.vex_event?.value?.division} showLaunch={false} setupOpen={showVexSyncSetup} onSetupClose={()=>commandCenterChildOpen ? returnToCommandCenter() : setShowVexSyncSetup(false)} showStatus={showCommandCenter || showVexSyncSetup} visible={{rankings:showVexLiveSync,skills:showVexSkillsSync,scores:showVexScoresSync}} onOpen={category=>{setShowVexLiveSync(category==='rankings');setShowVexSkillsSync(category==='skills');setShowVexScoresSync(category==='scores');}} key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || event?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onSaveCode={async (code, division) => { if (eventSettings?.vex_event?.value?.code === code && (division == null || eventSettings?.vex_event?.value?.division === division)) return; const saved = await api.upsertEventSetting(eventId, "vex_event", { ...(eventSettings?.vex_event?.value || {}), code, ...(division != null ? {division} : {}) }); setEventSettings(prev => ({ ...prev, vex_event:saved })); }} onFetch={api.getVexStandings} onApply={applyVexSnapshot} onClose={category=>{if(category==='rankings')setShowVexLiveSync(false);if(category==='skills')setShowVexSkillsSync(false);if(category==='scores')setShowVexScoresSync(false);}} />}
+      {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexSyncManager program={isIQ?'iq':'v5'} onDiscoverDivisions={async divisions=>{await eventApi.upsertEventSetting(eventId,"vex_divisions",{divisions},meName);}} autoStart initialDivision={eventSettings?.vex_event?.value?.division} showLaunch={false} setupOpen={showVexSyncSetup} onSetupClose={()=>commandCenterChildOpen ? returnToCommandCenter() : setShowVexSyncSetup(false)} showStatus={showCommandCenter || showVexSyncSetup} visible={{rankings:showVexLiveSync,skills:showVexSkillsSync,scores:showVexScoresSync}} onOpen={category=>{setShowVexLiveSync(category==='rankings');setShowVexSkillsSync(category==='skills');setShowVexScoresSync(category==='scores');}} key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || event?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onSaveCode={async (code, division) => { if (eventSettings?.vex_event?.value?.code === code && (division == null || eventSettings?.vex_event?.value?.division === division)) return; const saved = await api.upsertEventSetting(eventId, "vex_event", { ...(eventSettings?.vex_event?.value || {}), code, ...(division != null ? {division} : {}) }); setEventSettings(prev => ({ ...prev, vex_event:saved })); }} onFetch={async(...args)=>{const data=await api.getVexStandings(...args);if(data.program!==(isIQ?'iq':'v5'))throw Error('VEX event program does not match this Ref OS event.');return data;}} onApply={applyVexSnapshot} onClose={category=>{if(category==='rankings')setShowVexLiveSync(false);if(category==='skills')setShowVexSkillsSync(false);if(category==='scores')setShowVexScoresSync(false);}} />}
       {showFeedback && <FeedbackModal meName={meName} myRole={myRole} onSubmit={async (entry, screenshots) => { if (!screenshots?.length) return addFieldLog(entry); await submitFeedbackScreenshots({eventId, id:entry.id, note:entry.note, by:meName, sessionId:leagueSessionId || null, screenshots}); setFieldLog(await api.listFieldLog(eventId)); }} onClose={() => setShowFeedback(false)} />}
       {showOnboarding && <QuickStartModal step={onboardingStep} setStep={setOnboardingStep} onClose={closeOnboarding} />}
       {undoPrompt && (
@@ -7545,7 +7545,7 @@ function TMSyncCenter({ isIQ = false, onClose, onConnectApi, onImportTeams, onIm
         </div>
         <div className="p-4 space-y-3">
           {onConnectApi && <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-800 p-3"><h3 className="font-semibold">Automatic TM sync · Experimental</h3><p className="mt-1 text-sm text-slate-500">Connect the local TM API to sync teams, match scores, qualification rankings, and skills. You can also add missing matches.</p><button onClick={onConnectApi} className="mt-3 w-full min-h-[44px] rounded-lg bg-red-700 text-white px-3 py-2 font-semibold">Connect Tournament Manager</button></div>}
-          {isIQ && <p className="text-sm">IQ: import categories individually. In TM, choose File → Export → Match List and Results. Import that CSV directly: Red1 and Blue1 are partner teams, and Scored=False leaves scores unchanged. Round, Match, Team1, Team2, Field and optional shared Score columns also work. Use Finals for ranked partnerships; no alliance-selection export is needed.</p>}
+          {isIQ && <p className="text-sm">IQ supports live TM API and VEX Events sync, or import categories individually. In TM, choose File → Export → Match List and Results. Import that CSV directly: Red1 and Blue1 are partner teams, and Scored=False leaves scores unchanged. Round, Match, Team1, Team2, Field and optional shared Score columns also work. Use Finals for ranked partnerships; no alliance-selection export is needed.</p>}
           {leagueImport && (
             <div className="bg-white dark:bg-slate-800 rounded-xl border-2 border-sky-300 dark:border-sky-800 p-4">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">League</div>

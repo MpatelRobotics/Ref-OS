@@ -26,7 +26,7 @@ export function createDivisionApi(base, eventId, division, client = supabase) {
  api.deleteMatch=async(_event,phase,num)=>checked(scoped(client.from('matches').delete()).eq('phase',phase).eq('num',Number(num)));
  api.clearMatches=async()=>checked(scoped(client.from('matches').delete()));
  api.updateExistingVexScore=async(_event,m)=>{
-  const query=scoped(client.from('matches').update({red_score:m.redScore,blue_score:m.blueScore,winner:m.redScore>m.blueScore?'red':m.blueScore>m.redScore?'blue':'tie'})).eq('phase',m.phase).eq('num',Number(m.num)).contains('red',m.existing.red).containedBy('red',m.existing.red).contains('blue',m.existing.blue).containedBy('blue',m.existing.blue).select('num');
+  const query=scoped(client.from('matches').update({red_score:m.redScore,blue_score:m.blueScore,winner:m.program==='iq'?null:m.redScore>m.blueScore?'red':m.blueScore>m.redScore?'blue':'tie'})).eq('phase',m.phase).eq('num',Number(m.num)).contains('red',m.existing.red).containedBy('red',m.existing.red).contains('blue',m.existing.blue).containedBy('blue',m.existing.blue).select('num');
   return (await checked(query)||[]).length;
  };
  api.listEventSettings=async()=>{

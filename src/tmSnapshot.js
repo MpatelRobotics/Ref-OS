@@ -1,16 +1,19 @@
 import { tmMatchIdentity } from './tmMatchIdentity.js';
-const number = value => typeof value === 'string' && /^[0-9]+[A-Z]*$/i.test(value.trim()) ? value.trim().toUpperCase() : null;
+const number = value => (typeof value === 'string' || Number.isSafeInteger(value)) && /^[0-9]+[A-Z]*$/i.test(String(value).trim()) ? String(value).trim().toUpperCase() : null;
 const integer = value => Number.isSafeInteger(value) && value >= 0;
 const positive = value => integer(value) && value > 0;
 function list(value, label) { if (!Array.isArray(value)) throw Error(`TM returned an invalid ${label} list.`); return value; }
-export function normalizeTmSnapshot(data, session) {
+export function normalizeTmSnapshot(data, session, program = 'v5') {
   if (!data.event || typeof data.event.name !== 'string' || data.event.code != null && typeof data.event.code !== 'string') throw Error('TM returned invalid event information.');
+  const iq = program === 'iq';
+  const sourceProgram = /(?:RE|VE)-(?:IQ|VIQ)/i.test(data.event.code || '') ? 'iq' : /(?:RE|VE)-(?:V5|VRC|VURC|U)-/i.test(data.event.code || '') ? 'v5' : null;
+  if (sourceProgram && sourceProgram !== program) throw Error('TM event program does not match this Ref OS event.');
   const warnings = [];
   const teams = list(data.teams, 'teams').map(t => ({ number: number(t.number), name: typeof t.name === 'string' ? t.name : '' })).filter(t => t.number);
   const rankings = list(data.rankings, 'rankings').flatMap(r => {
     const members = r.alliance?.teams;
     if (!Array.isArray(members) || members.length !== 1 || !number(members[0].number) || !positive(r.rank)) return [];
-    return [{ number: number(members[0].number), rank: r.rank, w: r.wins, l: r.losses, t: r.ties, wp: r.wp, ap: r.ap, sp: r.sp }];
+    return [{ number: number(members[0].number), rank: r.rank, ...(iq ? {avgPoints: [r.averageScore,r.average_score,r.avgPoints,r.averagePoints].find(v=>typeof v==='number'&&Number.isFinite(v)&&v>=0) ?? null, played:[r.matchesPlayed,r.played,r.numMatches].find(integer) ?? null} : {}), w: r.wins, l: r.losses, t: r.ties, wp: r.wp, ap: r.ap, sp: r.sp }];
   });
   const skills = list(data.skills, 'skills').flatMap(r => !number(r.number) || !positive(r.rank) || ![r.totalScore, r.driverHighScore, r.progHighScore].every(integer) ? [] : [{ number: number(r.number), rank: r.rank, total: r.totalScore, driver: r.driverHighScore, programming: r.progHighScore, driverAttempts: r.driverAttempts, programmingAttempts: r.progAttempts }]);
   const rawMatches = list(data.matches, 'matches');
@@ -21,13 +24,19 @@ export function normalizeTmSnapshot(data, session) {
     const identity = tmMatchIdentity(tuple);
     if (!identity || tuple.session !== selectedSession) return [];
     const alliances = info.alliances;
-    if (!Array.isArray(alliances) || alliances.length !== 2) return [];
+    if (!Array.isArray(alliances) || (iq ? ![1,2].includes(alliances.length) : alliances.length !== 2)) return [];
     const red = (alliances[0].teams || []).map(t => number(t.number));
-    const blue = (alliances[1].teams || []).map(t => number(t.number));
-    if (red.length !== 2 || blue.length !== 2 || [...red, ...blue].some(t => !t) || new Set([...red,...blue]).size !== 4) return [];
-    const row = { ...identity, red, blue };
+    const blue = (alliances[1]?.teams || []).map(t => number(t.number));
+    const partners = [...red,...blue];
+    if (iq ? (!['practice','qual','final'].includes(identity.phase) || partners.length < 1 || partners.length > 2 || partners.some(t=>!t) || new Set(partners).size !== partners.length) : (red.length !== 2 || blue.length !== 2 || partners.some(t=>!t) || new Set(partners).size !== 4)) return [];
+    const row = { ...identity, red: iq ? partners : red, blue: iq ? [] : blue, ...(iq ? {program:'iq'} : {}) };
     if(Number.isSafeInteger(info.timeScheduled)&&info.timeScheduled>0&&Number.isFinite(new Date(info.timeScheduled*1000).getTime()))row.scheduledAt=new Date(info.timeScheduled*1000).toISOString();
-    if (info.state === 'SCORED' && Array.isArray(m.finalScore) && m.finalScore.length === 2 && m.finalScore.every(integer)) {
+    if (iq && info.state === 'SCORED') {
+      const scores = m.finalScore;
+      if (!Array.isArray(scores) || !scores.length || scores.length>2 || !scores.every(integer) || scores.length===2 && scores[1]!==0 && scores[1]!==scores[0]) return [];
+      row.redScore=scores[0]; row.blueScore=null; row.winner=null;
+    }
+    if (!iq && info.state === 'SCORED' && Array.isArray(m.finalScore) && m.finalScore.length === 2 && m.finalScore.every(integer)) {
       row.redScore = m.finalScore[0]; row.blueScore = m.finalScore[1];
     }
     return [row];
@@ -44,5 +53,5 @@ export function normalizeTmSnapshot(data, session) {
     if (new Set(rows.map(r => r.number)).size !== rows.length) throw Error(`TM returned duplicate ${name} rows. Existing data is kept.`);
   }
   const checkIns = data.teams.filter(t => number(t.number)).map(t => ({ number: number(t.number), checkedIn: typeof t.checkedIn === 'boolean' ? t.checkedIn : null }));
-  return { event: data.event, teams, checkIns, rankings, skills, matches, scores: matches.filter(m => m.redScore != null), sessions, selectedSession, warnings };
+  return { program, event: data.event, teams, checkIns, rankings, skills, matches, scores: matches.filter(m => m.redScore != null), sessions, selectedSession, warnings };
 }

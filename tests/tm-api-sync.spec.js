@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-async function mount(page, desktop = true, mobile = false, mapping = false) {
+async function mount(page, desktop = true, mobile = false, mapping = false, iq = false) {
   if (mobile) await page.addInitScript(() => { window.Capacitor = { isNativePlatform: () => true }; });
   if (desktop) await page.addInitScript(() => { window.refosTmDesktop = { setSyncActive: async active => { window.desktopActive = active; } }; });
   await page.route('**/tm-sync-test', route => route.fulfill({ contentType: 'text/html', body: `<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
@@ -12,8 +12,9 @@ async function mount(page, desktop = true, mobile = false, mapping = false) {
   const Fields=(await import('/src/components/TmFieldActivity.jsx')).default;
   window.reads=0;window.applies=[];window.fail=false;
   const snapshot={event:{name:'ButterNova',code:'VE-V5-26-65633'},divisions:[{id:1,name:'Division 1'}],teams:[{number:'32092X',name:'Team X'}],rankings:[{rank:1,alliance:{teams:[{number:'32092X'}]}}],skills:[{rank:1,number:'1082C',totalScore:10,driverHighScore:0,progHighScore:10}],matches:[{finalScore:[133,0],matchInfo:{state:'SCORED',matchTuple:{session:0,division:1,round:'QUAL',instance:1,match:1},alliances:[{teams:[{number:'32092X'},{number:'32092G'}]},{teams:[{number:'13713A'},{number:'32092H'}]}]}}]};
+  if (${iq}) { snapshot.event.code='VE-IQ-27-12345';snapshot.teams=[{number:7,name:'Seven'},{number:9,name:'Nine'}];snapshot.matches[0].matchInfo.alliances=[{teams:[{number:7},{number:9}]}];snapshot.matches[0].finalScore=[0];snapshot.rankings=[{rank:1,alliance:{teams:[{number:7}]},averageScore:42,matchesPlayed:5}]; }
   window.fieldData={fieldSets:[{id:1,name:'Set 1',connected:true,fields:[{id:1,name:'Yellow Field',status:'playing',active:true,match:{division:1,session:0,round:'QUAL',match:2,instance:1}}]}]};window.published=[];window.disconnected=0;
-  function Harness(){const [open,setOpen]=React.useState(true),[activity,setActivity]=React.useState(null);return React.createElement(React.Fragment,null,React.createElement('button',{onClick:()=>setOpen(true)},'Manage TM'),React.createElement(Fields,{value:activity}),React.createElement(Component,{open,onClose:()=>setOpen(false),target:'ButterNova · Session 1',refosDivisions:${mapping ? JSON.stringify([{id:99,name:'Division 1'}]) : '[]'},refosDivisionId:${mapping ? 99 : 0},onSaveDivisionMapping:async(id,name)=>{window.savedMapping={id,name};},expectedCode:'VE-V5-26-65633',onFetch:async settings=>{window.reads++;window.lastFetchSettings=settings;if(window.eliminations && !snapshot.matches.some(m=>m.matchInfo.matchTuple.round==='QF'))snapshot.matches.push({...snapshot.matches[0],matchInfo:{...snapshot.matches[0].matchInfo,matchTuple:{session:0,division:1,round:'QF',instance:2,match:1}}});if(window.fail)throw Error('Event administrator access is required.');return {...snapshot,connectionId:settings.liveFields?'live-id':'',event:{...snapshot.event,code:window.mismatch?'WRONG':snapshot.event.code}};},onActivity:async()=>window.fieldData,onDisconnect:async()=>{window.disconnected++;},onPublishActivity:async(value)=>{window.published.push(value);setActivity(value);},onApply:async(data,options)=>{window.applies.push({data,includeSchedule:options.includeSchedule});return '1 scores updated';}}));}
+  function Harness(){const [open,setOpen]=React.useState(true),[activity,setActivity]=React.useState(null);return React.createElement(React.Fragment,null,React.createElement('button',{onClick:()=>setOpen(true)},'Manage TM'),React.createElement(Fields,{value:activity}),React.createElement(Component,{open,onClose:()=>setOpen(false),program:${iq ? "'iq'" : "'v5'"},target:'ButterNova · Session 1',refosDivisions:${mapping ? JSON.stringify([{id:99,name:'Division 1'}]) : '[]'},refosDivisionId:${mapping ? 99 : 0},onSaveDivisionMapping:async(id,name)=>{window.savedMapping={id,name};},expectedCode:${iq ? "'VE-IQ-27-12345'" : "'VE-V5-26-65633'"},onFetch:async settings=>{window.reads++;window.lastFetchSettings=settings;if(window.eliminations && !snapshot.matches.some(m=>m.matchInfo.matchTuple.round==='QF'))snapshot.matches.push({...snapshot.matches[0],matchInfo:{...snapshot.matches[0].matchInfo,matchTuple:{session:0,division:1,round:'QF',instance:2,match:1}}});if(window.fail)throw Error('Event administrator access is required.');return {...snapshot,connectionId:settings.liveFields?'live-id':'',event:{...snapshot.event,code:window.mismatch?'WRONG':snapshot.event.code}};},onActivity:async()=>window.fieldData,onDisconnect:async()=>{window.disconnected++;},onPublishActivity:async(value)=>{window.published.push(value);setActivity(value);},onApply:async(data,options)=>{window.applies.push({data,includeSchedule:options.includeSchedule});return '1 scores updated';}}));}
   DOM.createRoot(document.getElementById('root')).render(React.createElement(Harness));
   </script></body></html>` }));
   await page.goto('/tm-sync-test');
@@ -48,7 +49,7 @@ test('wrong event is blocked and connection errors have a recoverable message',a
 });
 test('browser setup only shows the connector download',async({page})=>{
   await mount(page, false);
-  await expect(page.getByRole('link',{name:'Download Ref-OS Desktop for Windows'})).toHaveAttribute('href','https://github.com/MpatelRobotics/Ref-OS/releases/download/tm-connect/Ref-OS-TM-Connect.exe');
+  await expect(page.getByRole('link',{name:/Get Ref-OS Connect from Microsoft Store/})).toHaveAttribute('href','https://apps.microsoft.com/detail/9PBVDZJLG8SP');
   await expect(page.getByLabel('Event TM API key',{exact:true})).toHaveCount(0);await expect(page.getByLabel('TM server address',{exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:'Sync both TM divisions'})).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
   await expect(page.getByRole('button',{name:'Start TM syncing'})).toHaveCount(0);
@@ -101,7 +102,7 @@ test('match start triggers one score refresh after 30 seconds and stop cancels p
 
  test('native mobile connects with IP and key, hides desktop download, and pauses polling while hidden', async ({page}) => {
   await mount(page, false, true); await page.clock.install();
-  await expect(page.getByRole('link',{name:'Download Ref-OS Desktop for Windows'})).toHaveCount(0);
+  await expect(page.getByRole('link',{name:/Get Ref-OS Connect from Microsoft Store/})).toHaveCount(0);
   await expect(page.getByText('Connect this device to the event Wi-Fi, then enter the TM address and event key.',{exact:false})).toBeVisible();
   await page.getByLabel('TM server address',{exact:true}).fill('192.168.0.164');
   await review(page);
@@ -156,9 +157,19 @@ test('Chrome extension enables browser TM forms and live field sync without the 
  await page.route(/\/src\/tmExtension\.js(?:\?.*)?$/,route=>route.fulfill({contentType:'application/javascript',body:'export const isTmExtension=()=>true; export const extensionTmRequest=async()=>null;'}));
  await mount(page,false);await review(page);
  await expect(page.getByText('Chrome TM extension connected · live field updates supported.')).toBeVisible();
- await expect(page.getByRole('link',{name:'Download Ref-OS Desktop for Windows'})).toBeVisible();
+ await expect(page.getByRole('link',{name:/Get Ref-OS Connect from Microsoft Store/})).toBeVisible();
+ await page.getByText('Backup option: Chrome extension',{exact:true}).click();
  await expect(page.getByRole('link',{name:'Install Chrome Extension'})).toBeVisible();
  await page.getByRole('button',{name:'Start TM syncing'}).click();
  await expect.poll(()=>page.evaluate(()=>window.applies.length)).toBe(1);
  expect(await page.evaluate(()=>window.lastFetchSettings.liveFields)).toBe(true);
+});
+
+test('IQ desktop TM preview and start import partners and shared zero with official averages',async({page})=>{
+ await mount(page,true,false,false,true);await review(page);
+ await expect(page.getByRole('button',{name:'Start TM syncing'})).toBeEnabled();
+ await page.getByRole('button',{name:'Start TM syncing'}).click();
+ await expect.poll(()=>page.evaluate(()=>window.applies.length)).toBe(1);
+ const result=await page.evaluate(()=>window.applies[0].data);
+ expect(result.program).toBe('iq');expect(result.scores[0].red).toEqual(['7','9']);expect(result.scores[0].blue).toEqual([]);expect(result.scores[0].redScore).toBe(0);expect(result.scores[0].blueScore).toBeNull();expect(result.rankings[0].avgPoints).toBe(42);
 });

@@ -53,7 +53,7 @@ export async function applyTmSnapshot(snapshot, { api, eventId, by, includeSched
     await api.bulkUpsertRankings(eventId, snapshot.rankings);
     if (!current()) return;
     await api.upsertEventSetting(eventId, 'qualification_records', {
-      records: Object.fromEntries(snapshot.rankings.map(r => [r.number, { w: r.w, l: r.l, t: r.t, wp: r.wp, ap: r.ap, sp: r.sp }])), importedAt: Date.now(), source: 'TM API',
+      records: Object.fromEntries(snapshot.rankings.map(r => [r.number, { w: r.w, l: r.l, t: r.t, wp: r.wp, ap: r.ap, sp: r.sp, avgPoints:r.avgPoints, played:r.played }])), importedAt: Date.now(), source: 'TM API',
     }, by);
     remember('rankings', snapshot.rankings);
   }

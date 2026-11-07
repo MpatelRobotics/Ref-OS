@@ -1,6 +1,6 @@
 # Tournament Manager API setup
 
-Ref OS TM Connect supports Windows and Android for read-only TM integration in V5RC / VEX U events. IQ retains its CSV import workflow. TM is the official competition data source; Ref OS does not send match-control commands.
+Ref OS TM Connect supports Windows and Android for read-only TM integration in V5RC / VEX U and VEX IQ events. IQ uses teamwork partners, one shared score, qualification averages and ranked finals; CSV imports remain available. TM is the official competition data source; Ref OS does not send match-control commands.
 
 ## Server configuration
 
@@ -17,7 +17,7 @@ The function validates Supabase authentication and the event administrator role 
 ## Event setup
 
 1. Enable **Tools → Options → Web Publishing → Local TM API** in TM.
-2. Open the Windows connector, enter your Ref OS HTTPS website address and sign in. On Android, install the connector APK and sign in directly.
+2. Open Ref-OS Connect from Microsoft Store. Ref OS opens automatically; sign in and select the event. On Android, install the connector APK and sign in directly.
 3. Select the Ref OS event and league session, if applicable. Enter the TM server IP and event API key.
 4. For a single division, connect, select the TM division, review and start.
 5. For two divisions on one server, choose **Sync both TM divisions**, enter one IP/key, choose **Load TM divisions**, map both TM divisions to different Ref OS divisions, review each, then **Start both divisions**. Ref OS can initialize an empty division list from TM; existing lists must have the intended destinations available.
