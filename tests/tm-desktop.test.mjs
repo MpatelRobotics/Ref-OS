@@ -52,6 +52,8 @@ test('real desktop opens securely, reaches its native connector, and hides while
     await page.evaluate(() => window.refosTmDesktop.setSyncActive(false));
     await page.route('https://other.example.test/**', route => route.fulfill({ contentType: 'text/html', body: '<h1>Other website</h1>' }));
     await desktop.evaluate(async ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].loadURL('https://other.example.test/'));
+    await page.waitForURL('https://other.example.test/');
+    await page.getByRole('heading', { name: 'Other website', exact: true }).waitFor();
     const untrusted = await page.evaluate(async () => { try { await window.refosTmDesktop.request('activity', {}); return false; } catch { return true; } });
     assert.equal(untrusted, true);
   } finally { await desktop.close(); }
