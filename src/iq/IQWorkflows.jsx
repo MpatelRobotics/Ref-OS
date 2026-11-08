@@ -1,3 +1,4 @@
+import {tmMatchOrder,latestTmAttempts} from '../tmMatchIdentity.js';
 import React,{useState} from 'react';
 import {iqTeams,iqMatchName,iqFinalPairs,parseIQMatches} from './iqWorkflows.js';
 const button='min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 font-semibold text-sm';
@@ -5,11 +6,11 @@ const input='w-full min-h-[44px] rounded-lg border border-slate-300 dark:border-
 
 export default function IQMatches({target='Current event / session',matches={},teams=[],finals=false,query='',setQuery=()=>{},onOpen,canEdit=false,onImport,onCreateFinals,parseCSV,renderMatches}){
  const [preview,setPreview]=useState(null),[count,setCount]=useState('5'),[error,setError]=useState(''),[busy,setBusy]=useState(false);
- const all=Object.values(matches),rows=all.filter(m=>finals?m.phase==='final':m.phase!=='final').filter(m=>(iqMatchName(m)+' '+iqTeams(m).join(' ')+' '+(m.field||'')).toLowerCase().includes(query.toLowerCase())).sort((a,b)=>({practice:0,qual:1,final:2}[a.phase]-{practice:0,qual:1,final:2}[b.phase])||Number(a.num)-Number(b.num));
+ const all=Object.values(matches),rows=all.filter(m=>finals?m.phase==='final':m.phase!=='final').filter(m=>(iqMatchName(m)+' '+iqTeams(m).join(' ')+' '+(m.field||'')).toLowerCase().includes(query.toLowerCase())).sort((a,b)=>({practice:0,qual:1,final:2}[a.phase]-{practice:0,qual:1,final:2}[b.phase])||tmMatchOrder(a,b));
  async function read(file){if(!file)return;setPreview(null);setError('');try{const parsed=parseIQMatches(await file.text(),file.name,parseCSV);setPreview({rows:parsed,kind:'import'});}catch(e){setError(e.message);}}
  function pair(){setPreview(null);setError('');try{const pairs=iqFinalPairs(teams,count);if(all.some(m=>m.phase==='final'))throw new Error('Finals already exist. Import the reviewed TM finals schedule to update them.');setPreview({rows:pairs,kind:'finals'});}catch(e){setError(e.message);}}
  async function apply(){setBusy(true);setError('');try{if(preview.kind==='finals')await onCreateFinals(preview.rows);else await onImport(preview.rows);setPreview(null);}catch(e){setError((e.message||'Could not save.')+' Some rows may have saved. Review and retry.');}finally{setBusy(false);}}
- const scoredFinals=all.filter(m=>m.phase==='final'&&m.redScore!=null).sort((a,b)=>Number(b.redScore)-Number(a.redScore));
+ const scoredFinals=latestTmAttempts(all).filter(m=>m.phase==='final'&&m.redScore!=null).sort((a,b)=>Number(b.redScore)-Number(a.redScore));
  return <section className="space-y-4">
   {!renderMatches && <>
   <p className="text-sm">{finals?'Finals pair adjacent official ranks: 1 + 2, 3 + 4, and so on (T12). Lowest seed plays first; each partnership plays one finals match. Highest score wins, with T14 tiebreakers resolved in Tournament Manager.':'IQ teamwork has two partner teams and one shared score. Import the official schedule and results from Tournament Manager.'}</p>

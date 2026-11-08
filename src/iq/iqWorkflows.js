@@ -1,3 +1,4 @@
+import {tmPairingNumber,tmGameNumber,tmMatchIdentity} from '../tmMatchIdentity.js';
 // Level Up v2.0: SC1-SC5, T10-T14. TM remains the official standings authority.
 export const IQ_LEVELS = [{key:'floor',label:'Floor Goal',points:1},{key:'l1',label:'L1 Goal',points:3},{key:'l2',label:'L2 Goal',points:6},{key:'l3',label:'L3 Goal',points:12},{key:'l4',label:'L4 Goal (yellow only)',points:16}];
 export function iqScore(counts) {
@@ -11,7 +12,7 @@ export const iqStartingPosition=index=>index===0
  ? {team:1,color:'red',label:'Team 1 (Red) · starts beside the blue Pyramid Goal'}
  : {team:2,color:'blue',label:'Team 2 (Blue) · starts beside the red Pyramid Goal'};
 export const iqTeams=m=>[...new Set([...(m.red||[]),...(m.blue||[])])];
-export const iqMatchName=m=>`${m.phase==='qual'?'Q':m.phase==='practice'?'P':'F'}${m.num}`;
+export const iqMatchName=m=>`${m.phase==='qual'?'Q':m.phase==='practice'?'P':'F'}${tmPairingNumber(m.phase,m.num)}${tmGameNumber(m.phase,m.num)>1?'-'+tmGameNumber(m.phase,m.num):''}`;
 export function iqFinalPairs(teams,count) {
   const n=Number(count);if(!Number.isInteger(n)||n<1)throw new Error('Enter a positive whole number of finals matches.');
   const ranked=teams.filter(t=>Number(t.rank)>0).sort((a,b)=>Number(a.rank)-Number(b.rank));
@@ -30,7 +31,7 @@ export function parseIQMatches(text, filename, parseCSV) {
     const match=String(m.matchnum??m.matchnumber??m.match??m.num??'').trim();
     const round=String(m.phase??m.round??m.type??match).toLowerCase();
     let phase;if(/practice|^p\d/.test(round)||round==='1')phase='practice';else if(/final|^f\d/.test(round)||round==='5')phase='final';else if(/qual|^q\d/.test(round)||round==='2')phase='qual';else throw new Error(`Row ${i+1}: use Qualification, Practice or Finals in Round.`);
-    const num=Number(match.match(/\d+/)?.[0]);if(!Number.isInteger(num)||num<1)throw new Error(`Row ${i+1}: invalid match number.`);
+    const originalNum=Number(match.match(/\d+/)?.[0]);const num=tmMatchIdentity({round:({qual:'QUAL',practice:'PRACTICE',final:'FINAL'})[phase],match:originalNum,instance:m.instance==null||m.instance===''?1:Number(m.instance)})?.num;if(!Number.isInteger(num)||num<1)throw new Error(`Row ${i+1}: invalid match number.`);
     const teamSlots=Array.isArray(m.teams)?m.teams:Array.isArray(m.red)?[...m.red,...(m.blue||[])]:Object.entries(m).filter(([k])=>/^(?:team|red|blue)(?:team)?[123]$/.test(k)).map(([,v])=>v);
     const members=teamSlots.map(v=>String(v?.number??v??'').trim().toUpperCase()).filter(Boolean);
     if(!members.length||members.length>2||new Set(members).size!==members.length||members.some(t=>!/^\d{1,6}(?:[A-Z]{1,3})?$/.test(t)))throw new Error(`Row ${i+1}: IQ matches require one or two distinct team numbers (for example 7 or 123A), not opposing alliances.`);

@@ -6,7 +6,7 @@ const start = source.indexOf('function AllianceSelection(');
 const component = source.slice(start, source.indexOf('function AddMatchModal(', start));
 const compiled = transformSync(`import React from '/node_modules/.vite/deps/react.js';import {eliminationGameLabel} from '/src/tmReplayGrouping.js';
 const {useState,useEffect}=React;
-import {tmMatchOrder} from '/src/tmMatchIdentity.js';
+import {tmMatchOrder,latestTmAttempts} from '/src/tmMatchIdentity.js';
 import {eliminationPairingKey,eliminationPairingLabel,eliminationResultLabel} from '/src/tmReplayGrouping.js';
 import {tmMatchHighlights} from '/src/tmMatchHighlights.js';
 const TmFieldActivity=()=>null;

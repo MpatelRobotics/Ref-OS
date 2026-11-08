@@ -88,7 +88,9 @@ export function mapVexScores(rows, scoredOnly=true, program='v5'){
    const valid=scores.every(n=>Number.isSafeInteger(n)&&n>=0)&&!(scores.length===2&&scores[1]!==0&&scores[1]!==scores[0]);
    const complete=row.scored===true||typeof row.scored==='string'&&/^\d{4}-\d{2}-\d{2}[T ]/.test(row.scored)&&Number.isFinite(Date.parse(row.scored))||[false,null,undefined,''].includes(row.scored)&&scores[0]>0;
    if(scoredOnly&&(!valid||!complete))continue;
-   result.push({program:'iq',phase,num:row.matchnum,red:partners,blue:[],...(scoredOnly?{redScore:scores[0],blueScore:null,winner:null}:{})});
+   if(row.matchnum>=1000000||row.instance!=null&&(!Number.isSafeInteger(row.instance)||row.instance<0||row.instance>1000))continue;
+   const num=(Math.max(1,row.instance??1)-1)*1000000+row.matchnum;
+   result.push({program:'iq',phase,num,red:partners,blue:[],...(scoredOnly?{redScore:scores[0],blueScore:null,winner:null}:{})});
    continue;
   }
   if(scoredOnly&&!vexMatchIsScored(row))continue;
@@ -98,7 +100,8 @@ export function mapVexScores(rows, scoredOnly=true, program='v5'){
   // so a tied game and its replay never overwrite or hide one another.
   const pairing=['r16','qf','sf'].includes(phase);
   if(!Number.isSafeInteger(row.matchnum)||row.matchnum<1||pairing&&(!Number.isSafeInteger(row.instance)||row.instance<1||row.instance>=1000||row.matchnum>1000))continue;
-  const num=pairing?(row.matchnum-1)*1000+row.instance:row.matchnum;
+  if(!pairing&&(row.matchnum>=1000000||row.instance!=null&&(!Number.isSafeInteger(row.instance)||row.instance<0||row.instance>1000)))continue;
+  const num=pairing?(row.matchnum-1)*1000+row.instance:(Math.max(1,row.instance??1)-1)*1000000+row.matchnum;
   const red=row.alliances?.find(a=>a.color==='red'),blue=row.alliances?.find(a=>a.color==='blue');
   const teams=a=>(a?.teams||[]).map(t=>String(t.team?.name||'').trim().toUpperCase());
   const r=teams(red),b=teams(blue);

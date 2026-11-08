@@ -22,7 +22,7 @@ import RefereePortal from "./components/RefereePortal";
 import {parseManualScheduledTime,mergeManualMatchTimes,isTmTimesOnlyTable,parseTmTimesOnly} from './manualTmTimes';
 import ScheduledMatchTime from './components/ScheduledMatchTime';
 import { eliminationPairingKey, eliminationPairingLabel, eliminationResultLabel, eliminationGameLabel } from './tmReplayGrouping.js';
-import { tmPairingNumber, tmGameNumber, tmMatchOrder } from './tmMatchIdentity.js';
+import { latestTmAttempts, tmMatchIdentity, tmPairingNumber, tmGameNumber, tmMatchOrder } from './tmMatchIdentity.js';
 import {planScoreUpdates,planMissingVexMatches,planVexRosterUpdates,excludeHistoricalLeagueMatches} from "./vexScoreSync.js";
 import {parseViolationRuleNotes,validViolationRuleDetails,formatViolationRuleNotes} from "./violationRuleNotes.js";
 import DeveloperLiveActivity from "./components/DeveloperLiveActivity.jsx";
@@ -425,7 +425,9 @@ function parseMatchesFile(text, filename = "", timeContext={}) {
     // TM elimination series are identified by Instance (R16 1-8, QF 1-4, SF 1-2); MatchNum is
     // the game within the series. Finals are one series, so the match number identifies the game.
     const instance = instanceCol >= 0 ? _numFrom(r[instanceCol]) : null;
-    const num = ["r16", "qf", "sf"].includes(phase) && instance > 0 ? instance : matchNumber;
+    const identity = tmMatchIdentity({round:({qual:'QUAL',practice:'PRACTICE',r16:'R16',qf:'QF',sf:'SF',final:'FINAL'})[phase],match:matchNumber,instance:instance??1});
+    if (!identity) continue;
+    const num = identity.num;
     const red = redCols.map((c) => clean(r[c])).filter(isTeam);
     const blue = blueCols.map((c) => clean(r[c])).filter(isTeam);
     const scheduledAt=timeCol>=0?readTime(r[timeCol],dateCol>=0?r[dateCol]:null):null;
@@ -634,6 +636,7 @@ const fmtMatch = (m) => {
   const num = String(m.num == null ? "" : m.num).trim();
   if (m.phase.startsWith("skills")) return num ? `${p.abbrev} ${num}` : p.abbrev;
   if (!num) return p.abbrev;
+  if (['practice','qual','final'].includes(m.phase) && Number(num)>=1000000) return `${p.abbrev}${tmPairingNumber(m.phase,num)}-${tmGameNumber(m.phase,num)}`;
   if (['r16', 'qf', 'sf'].includes(m.phase) && Number(num) >= 1000) return `${p.abbrev}${tmPairingNumber(m.phase, num)}-${tmGameNumber(m.phase, num)}`;
   return /\d$/.test(p.abbrev) ? `${p.abbrev}-${num}` : `${p.abbrev}${num}`;
 };
@@ -4029,7 +4032,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     const rec = {};
     if (isIQ) return rec;
     const bump = (team, k) => { const x = rec[team] = rec[team] || { w: 0, l: 0, t: 0 }; x[k]++; };
-    for (const m of Object.values(matches)) {
+    for (const m of latestTmAttempts(matches)) {
       if (m.phase !== "qual") continue; // W-L-T is the qualification record
       let result = null;
       if (m.winner === "red" || m.winner === "blue" || m.winner === "tie") result = m.winner;
@@ -6005,7 +6008,7 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
   const filtered = q
     ? base.filter((m) => String(m.num) === q || String(m.num).startsWith(q) || (m.label || "").toUpperCase().includes(q) || m.red.some((t) => t.includes(q)) || m.blue.some((t) => t.includes(q)))
     : base;
-  const rowLabel = (m) => (m.phase === "qual" ? `Q${m.num}` : ((eliminationGameLabel(m, matches) || fmtMatch({ phase: m.phase, num: m.num })) || m.label || `${m.phase} ${m.num}`));
+  const rowLabel = (m) => (eliminationGameLabel(m, matches) || (m.phase==='qual'?`Q${m.num}`:fmtMatch({ phase: m.phase, num: m.num })) || m.label || `${m.phase} ${m.num}`);
   return (
     <>
       {isIQ&&<p className="mb-3 text-xs text-slate-600 dark:text-slate-300">Partner colors: <span className="text-red-700 dark:text-red-300">Team 1 · Red</span> · <span className="text-blue-700 dark:text-blue-300">Team 2 · Blue</span></p>}
@@ -6016,7 +6019,7 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
           <div className="flex flex-wrap gap-1.5">
             {all.filter((m) => replaySet.has(m.id)).sort((a, b) => a.num - b.num).map((m) => (
               <button key={m.id} onClick={() => onOpen(m.id)} title={replayByMatch[m.id]?.note || "Replay reason not recorded"} className="text-left px-2 py-1 rounded-md bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200">
-                <span className="block font-mono text-xs font-bold">{m.phase === "qual" ? `Q${m.num}` : ((eliminationGameLabel(m, matches) || fmtMatch({ phase: m.phase, num: m.num })) || m.label)}</span>
+                <span className="block font-mono text-xs font-bold">{eliminationGameLabel(m, matches) || fmtMatch(m) || m.label}</span>
                 {replayByMatch[m.id]?.note && <span className="block text-[10px] font-semibold max-w-[180px] truncate">{replayByMatch[m.id].note}</span>}
               </button>
             ))}
@@ -6070,7 +6073,7 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
                 {!isIQ && m.redScore != null && m.blueScore != null && (
                   <span aria-label={`Score: red ${m.redScore}, blue ${m.blueScore}`} className="font-mono text-sm font-bold shrink-0"><span className="text-slate-500 mr-1">Score</span><span className="text-red-700 dark:text-red-300">{m.redScore}</span><span className="text-slate-500 dark:text-slate-400"> – </span><span className="text-blue-700 dark:text-blue-300">{m.blueScore}</span></span>
                 )}
-                {!isIQ && eliminationPairingKey(m) && eliminationResultLabel(m) && <span className="text-xs font-semibold text-amber-800 dark:text-amber-200">{eliminationResultLabel(m)}</span>}
+                {!isIQ && eliminationResultLabel(m) && <span className="text-xs font-semibold text-amber-800 dark:text-amber-200">{eliminationResultLabel(m)}</span>}
                 {(m.redScore == null || (!isIQ && m.blueScore == null)) && <span className="text-xs text-slate-500 shrink-0">Awaiting score</span>}
                 {!emcee && replaySet.has(m.id) && <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700 shrink-0"><RefreshCw size={10} /> REPLAY</span>}
                 {!isIQ && !emcee && timeoutSet.has(m.id) && <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700 shrink-0">TO</span>}
@@ -6203,7 +6206,7 @@ function MatchDetail({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, 
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
   if(isIQ && (iqTeams(match).length>2 || match.blueScore!=null))return <Empty title="Import an IQ teamwork schedule" sub="This match contains opposing alliances or scores." />;
   const m = match;
-  const heading = m.phase === "qual" ? `Q${m.num}` : ((eliminationGameLabel(m, matches) || fmtMatch({ phase: m.phase, num: m.num })) || m.label || `${m.phase} ${m.num}`);
+  const heading = eliminationGameLabel(m, matches) || (m.phase==='qual'?`Q${m.num}`:fmtMatch({ phase: m.phase, num: m.num })) || m.label || `${m.phase} ${m.num}`;
   const matchEntries = fieldLog.filter((e) => e.matchId === m.id).sort((a, b) => b.createdAt - a.createdAt);
   const replayEntry = matchEntries.find((e) => e.kind === "replay");
   const awpEntry = matchEntries.find((e) => e.kind === "awp");
@@ -7614,7 +7617,7 @@ function AllianceSelection({ tmActivity, onOpenMatch, matches, finalsBestOf = 1,
   const byPhase = (p) => Object.values(matches || {}).filter((m) => m.phase === p).sort(tmMatchOrder);
   const hasBracket = ROUNDS.some(([phase]) => byPhase(phase).length > 0);
   // Replay games remain visible and only decisive results count toward the series.
-  const finals = byPhase("final");
+  const finals = latestTmAttempts(byPhase("final"));
   let champion = null;
   if (finals.length) {
     const tally = {};
@@ -7676,7 +7679,7 @@ function AllianceSelection({ tmActivity, onOpenMatch, matches, finalsBestOf = 1,
                         <h4 className="text-sm font-semibold px-3 pt-3">{phase==='final'?'Final':`${{r16:'R16',qf:'QF',sf:'SF'}[phase]}-${slot+1}`}</h4>
                         {games.length ? games.map(m => <div key={m.id} className={`refos-ladder-game p-3 ${liveHighlights[m.id] === 'current' ? 'ring-2 ring-inset ring-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'ring-2 ring-inset ring-amber-500' : ''}`}>
                           {liveHighlights[m.id] && <p className="text-xs font-semibold mb-2">{liveHighlights[m.id] === 'current' ? 'Playing now' : 'Up next'}</p>}
-                          <span className="block text-xs text-slate-500 dark:text-slate-400 mb-2">{phase==='final'?`Final ${m.num}`:(eliminationGameLabel(m, matches) || fmtMatch(m))}</span>
+                          <span className="block text-xs text-slate-500 dark:text-slate-400 mb-2">{eliminationGameLabel(m, matches) || (phase==='final'?`Final ${m.num}`:fmtMatch(m))}</span>
                           <div className="refos-ladder-sides"><Side m={m} side="red"/><Side m={m} side="blue"/></div>
                           <p className="text-xs font-mono mt-2">{m.redScore != null && m.blueScore != null ? `Score ${m.redScore} – ${m.blueScore}${eliminationResultLabel(m) ? ' · '+eliminationResultLabel(m) : ''}` : 'Awaiting score'}</p>
                           {canEditBracket && m.redScore != null && m.blueScore != null && <button type="button" className="mt-2 min-h-[44px] rounded-lg border px-3 text-sm" onClick={()=>onSetWinner(m,'double_dq')}>{m.winner==='double_dq'?'Clear double DQ':'Mark double DQ'}</button>}
