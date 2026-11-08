@@ -21,7 +21,7 @@ import {accountUser} from "./refereePortalApi";
 import RefereePortal from "./components/RefereePortal";
 import {parseManualScheduledTime,mergeManualMatchTimes,isTmTimesOnlyTable,parseTmTimesOnly} from './manualTmTimes';
 import ScheduledMatchTime from './components/ScheduledMatchTime';
-import { eliminationPairingKey, eliminationPairingLabel, eliminationResultLabel } from './tmReplayGrouping.js';
+import { eliminationPairingKey, eliminationPairingLabel, eliminationResultLabel, eliminationGameLabel } from './tmReplayGrouping.js';
 import { tmPairingNumber, tmGameNumber, tmMatchOrder } from './tmMatchIdentity.js';
 import {planScoreUpdates,planMissingVexMatches,planVexRosterUpdates,excludeHistoricalLeagueMatches} from "./vexScoreSync.js";
 import {parseViolationRuleNotes,validViolationRuleDetails,formatViolationRuleNotes} from "./violationRuleNotes.js";
@@ -6005,7 +6005,7 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
   const filtered = q
     ? base.filter((m) => String(m.num) === q || String(m.num).startsWith(q) || (m.label || "").toUpperCase().includes(q) || m.red.some((t) => t.includes(q)) || m.blue.some((t) => t.includes(q)))
     : base;
-  const rowLabel = (m) => (m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`));
+  const rowLabel = (m) => (m.phase === "qual" ? `Q${m.num}` : ((eliminationGameLabel(m, matches) || fmtMatch({ phase: m.phase, num: m.num })) || m.label || `${m.phase} ${m.num}`));
   return (
     <>
       {isIQ&&<p className="mb-3 text-xs text-slate-600 dark:text-slate-300">Partner colors: <span className="text-red-700 dark:text-red-300">Team 1 · Red</span> · <span className="text-blue-700 dark:text-blue-300">Team 2 · Blue</span></p>}
@@ -6016,7 +6016,7 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
           <div className="flex flex-wrap gap-1.5">
             {all.filter((m) => replaySet.has(m.id)).sort((a, b) => a.num - b.num).map((m) => (
               <button key={m.id} onClick={() => onOpen(m.id)} title={replayByMatch[m.id]?.note || "Replay reason not recorded"} className="text-left px-2 py-1 rounded-md bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-200">
-                <span className="block font-mono text-xs font-bold">{m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label)}</span>
+                <span className="block font-mono text-xs font-bold">{m.phase === "qual" ? `Q${m.num}` : ((eliminationGameLabel(m, matches) || fmtMatch({ phase: m.phase, num: m.num })) || m.label)}</span>
                 {replayByMatch[m.id]?.note && <span className="block text-[10px] font-semibold max-w-[180px] truncate">{replayByMatch[m.id].note}</span>}
               </button>
             ))}
@@ -6203,7 +6203,7 @@ function MatchDetail({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, 
   if (!match) return <Empty title="Match not found" sub="This match isn't in the loaded schedule." />;
   if(isIQ && (iqTeams(match).length>2 || match.blueScore!=null))return <Empty title="Import an IQ teamwork schedule" sub="This match contains opposing alliances or scores." />;
   const m = match;
-  const heading = m.phase === "qual" ? `Q${m.num}` : (fmtMatch({ phase: m.phase, num: m.num }) || m.label || `${m.phase} ${m.num}`);
+  const heading = m.phase === "qual" ? `Q${m.num}` : ((eliminationGameLabel(m, matches) || fmtMatch({ phase: m.phase, num: m.num })) || m.label || `${m.phase} ${m.num}`);
   const matchEntries = fieldLog.filter((e) => e.matchId === m.id).sort((a, b) => b.createdAt - a.createdAt);
   const replayEntry = matchEntries.find((e) => e.kind === "replay");
   const awpEntry = matchEntries.find((e) => e.kind === "awp");
@@ -7635,7 +7635,7 @@ function AllianceSelection({ tmActivity, onOpenMatch, matches, finalsBestOf = 1,
   return (
     <section className="refos-alliances min-w-0" aria-label="Alliances and elimination bracket">
       <TmFieldActivity value={tmActivity} />
-      {currentMatches.map(m => <button key={m.id} type="button" onClick={() => onOpenMatch(m.id)} className="min-h-[44px] px-3 py-2 mb-3 mr-2 rounded-lg border border-emerald-500 bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 text-sm font-semibold">Jump to current match · {fmtMatch(m)}</button>)}
+      {currentMatches.map(m => <button key={m.id} type="button" onClick={() => onOpenMatch(m.id)} className="min-h-[44px] px-3 py-2 mb-3 mr-2 rounded-lg border border-emerald-500 bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200 text-sm font-semibold">Jump to current match · {(eliminationGameLabel(m, matches) || fmtMatch(m))}</button>)}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 mb-4">
         <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><GitBranch size={18} className="text-[#D7212B]" /> Import alliances</h2>
         <ol className="list-decimal pl-5 mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
@@ -7676,7 +7676,7 @@ function AllianceSelection({ tmActivity, onOpenMatch, matches, finalsBestOf = 1,
                         <h4 className="text-sm font-semibold px-3 pt-3">{phase==='final'?'Final':`${{r16:'R16',qf:'QF',sf:'SF'}[phase]}-${slot+1}`}</h4>
                         {games.length ? games.map(m => <div key={m.id} className={`refos-ladder-game p-3 ${liveHighlights[m.id] === 'current' ? 'ring-2 ring-inset ring-emerald-500' : liveHighlights[m.id] === 'upcoming' ? 'ring-2 ring-inset ring-amber-500' : ''}`}>
                           {liveHighlights[m.id] && <p className="text-xs font-semibold mb-2">{liveHighlights[m.id] === 'current' ? 'Playing now' : 'Up next'}</p>}
-                          <span className="block text-xs text-slate-500 dark:text-slate-400 mb-2">{phase==='final'?`Final ${m.num}`:fmtMatch(m)}</span>
+                          <span className="block text-xs text-slate-500 dark:text-slate-400 mb-2">{phase==='final'?`Final ${m.num}`:(eliminationGameLabel(m, matches) || fmtMatch(m))}</span>
                           <div className="refos-ladder-sides"><Side m={m} side="red"/><Side m={m} side="blue"/></div>
                           <p className="text-xs font-mono mt-2">{m.redScore != null && m.blueScore != null ? `Score ${m.redScore} – ${m.blueScore}${eliminationResultLabel(m) ? ' · '+eliminationResultLabel(m) : ''}` : 'Awaiting score'}</p>
                           {canEditBracket && m.redScore != null && m.blueScore != null && <button type="button" className="mt-2 min-h-[44px] rounded-lg border px-3 text-sm" onClick={()=>onSetWinner(m,'double_dq')}>{m.winner==='double_dq'?'Clear double DQ':'Mark double DQ'}</button>}

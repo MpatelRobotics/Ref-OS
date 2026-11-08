@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 const source=readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8');
 const component=source.slice(source.indexOf('function MatchList('),source.indexOf('\nfunction AwpStep('));
 for(const iq of [false,true])test(`Practice is separate from qualifications and eliminations (${iq?'IQ':'V5'})`,async({page})=>{
- const fixture=transformSync(`import React from '/node_modules/.vite/deps/react.js';import DOM from '/node_modules/.vite/deps/react-dom_client.js';
+ const fixture=transformSync(`import React from '/node_modules/.vite/deps/react.js';import {eliminationGameLabel} from '/src/tmReplayGrouping.js';import DOM from '/node_modules/.vite/deps/react-dom_client.js';
 const {useState,useEffect}=React;const DEFAULT_FIELD_NAMES={},tmMatchHighlights=()=>({}),tmMatchOrder=(a,b)=>a.num-b.num,fmtMatch=m=>m.phase==='practice'?'P'+m.num:'Final'+m.num,eliminationPairingKey=m=>m.phase,eliminationPairingLabel=m=>m.phase,fieldDisplayName=x=>x,iqTeams=m=>m.red,iqStartingPosition=()=>({}),eliminationResultLabel=()=>'',isEliminationMatch=m=>m.phase==='final';
 const Icon=()=>null,ScheduledMatchTime=Icon,Search=Icon,Plus=Icon,RefreshCw=Icon,ChevronRight=Icon,Empty=({title})=>React.createElement('p',null,title);
 ${component}

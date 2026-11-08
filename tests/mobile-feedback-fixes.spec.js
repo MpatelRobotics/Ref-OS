@@ -4,7 +4,7 @@ import {transformSync} from 'esbuild';
 const source=readFileSync(new URL('../src/App.jsx',import.meta.url),'utf8');
 const nomination=source.slice(source.indexOf('function NominateModal('),source.indexOf('function ActivityFeed('));
 const alliance=source.slice(source.indexOf('function AllianceSelection('),source.indexOf('function AddMatchModal('));
-const moduleCode=transformSync(`import React from '/node_modules/.vite/deps/react.js'; const {useState,useEffect,useMemo}=React;
+const moduleCode=transformSync(`import React from '/node_modules/.vite/deps/react.js';import {eliminationGameLabel} from '/src/tmReplayGrouping.js'; const {useState,useEffect,useMemo}=React;
 import ReactDOM from '/node_modules/.vite/deps/react-dom.js'; const {createPortal}=ReactDOM;
 import {tmMatchOrder} from '/src/tmMatchIdentity.js';
 import {eliminationPairingKey,eliminationPairingLabel,eliminationResultLabel} from '/src/tmReplayGrouping.js';

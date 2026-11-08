@@ -4,7 +4,7 @@ import { transformSync } from 'esbuild';
 const source = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
 const start = source.indexOf('function AllianceSelection(');
 const component = source.slice(start, source.indexOf('function AddMatchModal(', start));
-const compiled = transformSync(`import React from '/node_modules/.vite/deps/react.js';
+const compiled = transformSync(`import React from '/node_modules/.vite/deps/react.js';import {eliminationGameLabel} from '/src/tmReplayGrouping.js';
 const {useState,useEffect}=React;
 import {tmMatchOrder} from '/src/tmMatchIdentity.js';
 import {eliminationPairingKey,eliminationPairingLabel,eliminationResultLabel} from '/src/tmReplayGrouping.js';
@@ -84,13 +84,15 @@ test('elimination bracket highlights live match and only jumps on request', asyn
   await expect(page.getByText('Playing now',{exact:true})).toBeVisible();
   await expect(page.getByText('Playing now',{exact:true}).locator('..')).toHaveClass(/ring-emerald-500/);
   expect(await page.evaluate(()=>window.openedMatch)).toBeUndefined();
-  await page.getByRole('button',{name:'Jump to current match · qf 1'}).click();
+  await page.getByRole('button',{name:'Jump to current match · QF-1'}).click();
   expect(await page.evaluate(()=>window.openedMatch)).toBe('test');
 });
 
 test('replays share one pairing heading and preserve double DQ and tie labels',async({page})=>{
  await mount(page,{replay:true});
  await expect(page.getByRole('heading',{name:'QF-2',exact:true})).toHaveCount(1);
+ await expect(page.getByText('QF-2-1',{exact:true})).toBeVisible();
+ await expect(page.getByText('QF-2-2',{exact:true})).toBeVisible();
  await expect(page.getByText('Score 0 – 0 · Double DQ',{exact:true})).toBeVisible();
  await expect(page.getByText('Score 8 – 8 · Tie',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Clear double DQ',exact:true}).click();

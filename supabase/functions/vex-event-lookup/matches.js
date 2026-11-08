@@ -94,10 +94,11 @@ export function mapVexScores(rows, scoredOnly=true, program='v5'){
   if(scoredOnly&&!vexMatchIsScored(row))continue;
   const phase={1:'practice',2:'qual',3:'qf',4:'sf',5:'final',6:'r16'}[row.round];
   if(!phase)continue;
-  // The app represents non-final elimination pairings as a single match.
-  // Multi-game pairings cannot be safely collapsed to one score.
-  if(!['qual','practice','final'].includes(phase)&&(row.matchnum!==1||rows.some(other=>other.round===row.round&&other.instance===row.instance&&other.matchnum>1)))continue;
-  const num=['qual','practice','final'].includes(phase)?row.matchnum:row.instance;
+  // MatchNum is the game, Instance is the pairing. Use the same identity as TM
+  // so a tied game and its replay never overwrite or hide one another.
+  const pairing=['r16','qf','sf'].includes(phase);
+  if(!Number.isSafeInteger(row.matchnum)||row.matchnum<1||pairing&&(!Number.isSafeInteger(row.instance)||row.instance<1||row.instance>=1000||row.matchnum>1000))continue;
+  const num=pairing?(row.matchnum-1)*1000+row.instance:row.matchnum;
   const red=row.alliances?.find(a=>a.color==='red'),blue=row.alliances?.find(a=>a.color==='blue');
   const teams=a=>(a?.teams||[]).map(t=>String(t.team?.name||'').trim().toUpperCase());
   const r=teams(red),b=teams(blue);

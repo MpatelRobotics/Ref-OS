@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {matchTmDivision} from '../src/tmDivisionMapping.js';
-import {eliminationPairingKey,eliminationResultLabel} from '../src/tmReplayGrouping.js';
+import {eliminationPairingKey,eliminationResultLabel,eliminationGameLabel} from '../src/tmReplayGrouping.js';
 test('unique division names map across different source IDs; ambiguous names and IDs are never guessed',()=>{
  const local=[{id:1,name:'Science'},{id:2,name:'Technology'}],remote=[{id:20,name:' SCIENCE '},{id:10,name:'Technology'}];
  assert.equal(matchTmDivision(remote,local,1).id,20);assert.equal(matchTmDivision(remote,local,2).id,10);
@@ -19,4 +19,11 @@ test('replay games share a pairing while rounds and pairings remain distinct; fi
  assert.equal(eliminationResultLabel({winner:'double_dq',redScore:0,blueScore:0}),'Double DQ');
  assert.equal(eliminationResultLabel({winner:'tie',redScore:12,blueScore:12}),'Tie');
  assert.match(eliminationResultLabel({winner:'tie',redScore:0,blueScore:0}),/unconfirmed/);
+});
+
+test('first and replay labels identify their game only when a replay exists',()=>{
+ const first={phase:'r16',num:6},replay={phase:'r16',num:1006};
+ assert.equal(eliminationGameLabel(first,[first]),'R16-6');
+ assert.equal(eliminationGameLabel(first,[first,replay]),'R16-6-1');
+ assert.equal(eliminationGameLabel(replay,[first,replay]),'R16-6-2');
 });
