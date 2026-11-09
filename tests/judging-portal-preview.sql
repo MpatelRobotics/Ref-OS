@@ -35,10 +35,11 @@ begin
  begin perform public.judge_group_dashboard(e.id);exception when raise_exception then rejected=true;end;
  if not rejected then raise exception 'Disabled code session retained access';end if;
  perform set_config('request.jwt.claim.sub',v::text,true);
+ if jsonb_array_length(public.list_judging_interview_notes(e.id,true))<>1 then raise exception 'Event admin cannot review judging notes';end if;
+ delete from public.event_members where event_id=e.id and user_id=v;
  rejected=false;
  begin perform public.list_judging_interview_notes(e.id,true);exception when insufficient_privilege then rejected=true;end;
- if not rejected then raise exception 'Non-developer accessed preview';end if;
- delete from public.event_members where event_id=e.id and user_id=v;
+ if not rejected then raise exception 'Unauthorized user accessed advisor notes';end if;
  r=public.login_judging_portal_code(e.id,a->>'code');
  if not (r->>'ok')::boolean then raise exception 'Valid judge code login failed';end if;
  perform public.judging_portal_dashboard(e.id);

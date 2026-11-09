@@ -2,7 +2,7 @@ import * as api from './api';
 import {supabase} from './supabaseClient';
 
 export async function loadJudgingWorkspace(eventId) {
- await api.openDeveloperEvent(eventId);
+ if(await api.getMyEventRole(eventId)!=='admin')throw Error('Event admin access is required for judging setup.');
  const [event,teams,settings,matches,sessions,nominations]=await Promise.all([
   api.getEvent(eventId,{strict:true}),
   supabase.from('teams').select('number,name').eq('event_id',eventId),

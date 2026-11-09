@@ -9,7 +9,7 @@ export default function JudgingPortalPreview({eventId,eventName,api=portalApi}) 
  useEffect(()=>{load();},[eventId]);
  const create=async e=>{e.preventDefault();if(busy)return;setBusy(true);setError('');try{const result=await api.createJudgingPortalCode(eventId,label,mode,group);setIssued({...result,label});setLabel('');await load();}catch(e){setError(e.message);}finally{setBusy(false);}};
  return <section className="space-y-4 rounded-2xl border border-indigo-300 p-4 dark:border-indigo-700">
-  <h2 className="text-xl font-bold">Judging portal · Developer preview</h2><p>Testing only. Regular event users cannot open this portal yet.</p>
+  <h2 className="text-xl font-bold">Judge access & interview notes</h2><p>Issue individual judge codes and review private interview notes for this event.</p>
   <div className="flex flex-wrap gap-2" aria-label="Judging preview views"><button aria-pressed={tab==='advisor'} className="min-h-[44px] rounded border px-4 aria-pressed:bg-indigo-700 aria-pressed:text-white" onClick={()=>{if(tab==='group'&&!confirm('Return to the advisor view? Save interview notes before leaving.'))return;setTab('advisor');load();}}>Judge Advisor setup</button><button aria-pressed={tab==='group'} className="min-h-[44px] rounded border px-4 aria-pressed:bg-indigo-700 aria-pressed:text-white" onClick={()=>setTab('group')}>Test judge-group portal</button></div>
   {error&&<p role="alert" className="text-red-700 dark:text-red-300">{error}</p>}
   {tab==='group'?<JudgeGroupPortal eventId={eventId} eventName={eventName} preview onClose={()=>{setTab('advisor');load();}}/>:<>
