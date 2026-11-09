@@ -1719,7 +1719,6 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
       {!developerPage && <a href="/?page=developer" className="sm:hidden mx-auto mt-1 flex w-fit min-h-[44px] items-center justify-center rounded px-2 text-xs font-medium text-slate-500 dark:text-slate-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600">Developer login</a>}
       </>}
       </>}
-      {!developerPage && selectorSection === "about" && <a href="/?page=judge" className="mx-auto mt-5 flex min-h-[44px] w-fit items-center rounded-xl border px-5 font-semibold">Judge login</a>}
       {!developerPage && selectorSection === "about" && <footer className="mt-8 pb-4 text-center text-sm text-slate-600 dark:text-slate-300">Created by Maharshi Patel · <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="underline">@mpatel_ref</a> · v{APP_VERSION}</footer>}
       {deleteTarget && (
         <DeleteEventModal event={deleteTarget} profile={resolveEventBranding(deleteTarget.id, deleteTarget, deleteTarget.branding)}
