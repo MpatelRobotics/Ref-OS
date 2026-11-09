@@ -1,3 +1,4 @@
+import CountryTimezoneSelect from "../CountryTimezoneSelect.jsx";
 import EventProgramChoice from "../EventProgramChoice.jsx";
 import React, { useEffect, useMemo, useState } from "react";
 import { ROBOT_PHOTO_SLOTS, normalizeRequiredRobotPhotos } from "../../robotPhotoRequirements";
@@ -29,7 +30,7 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
   const [setup,setSetup]=useState(initialSetup);
   const setSetupField=(key,value)=>setSetup(current=>({...current,[key]:value}));
 
-  const timezones=useMemo(()=>[...new Set(['UTC',eventTimezone,...(Intl.supportedValuesOf?.('timeZone')||['America/New_York','America/Chicago','America/Denver','America/Los_Angeles','Europe/London','Asia/Kolkata','Australia/Sydney'])])].filter(Boolean).sort(),[eventTimezone]);
+
   const initialCount = fieldCount || (eventFormat === "league" ? 1 : 3);
   const [count,setCount] = useState(initialCount);
   const visibleFields = FIELD_KEYS.slice(0,count);
@@ -207,7 +208,7 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Used where the full name is too long, such as the phone header.</p>
               <FieldError>{errors.shortName}</FieldError>
             </label>
-            <div><label className="block"><span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Event timezone</span><select aria-label="Event timezone" value={timezone} onChange={e=>setTimezone(e.target.value)} className={`${inputClass} ${inputBorder(errors.timezone)}`}><option value="" disabled>Choose event timezone</option>{timezones.map(zone=><option key={zone} value={zone}>{zone.replaceAll('_',' ')}</option>)}</select></label><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Used for event clocks, scheduled match times and judging interviews. Applies across all divisions. Existing saved times keep the same instant.</p><button type="button" className="mt-2 min-h-[44px] rounded-lg border px-3" onClick={()=>setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)}>Use this device’s timezone</button><FieldError>{errors.timezone}</FieldError></div>
+            <div><CountryTimezoneSelect value={timezone} onChange={setTimezone}/><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Used for event clocks, scheduled match times and judging interviews. Applies across all divisions. Existing saved times keep the same instant.</p><button type="button" className="mt-2 min-h-[44px] rounded-lg border px-3" onClick={()=>setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)}>Use this device’s timezone</button><FieldError>{errors.timezone}</FieldError></div>
             <label className="block">
               <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Event logo URL</span>
               <input value={logoUrl} disabled={readingLogo || saving} onChange={(e) => { setLogoUrl(e.target.value); setUploadedLogo(null); }} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}

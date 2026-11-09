@@ -13,17 +13,17 @@ test('USA search uses region/date filters and excludes foreign states/workshops'
 test('search has a continuation instead of silently dropping later pages',async()=>{
  const response=await searchEvents(filters,'fixture-token',async()=>new Response(JSON.stringify({meta:{last_page:7},data:[]}),{status:200}));
  expect(response.events).toEqual([]);expect(response.nextPage).toBe(6);
- await expect(searchEvents({...filters,country:'CA'},'fixture-token')).rejects.toThrow('Enter a country');
+ await expect(searchEvents({...filters,country:'XX'},'fixture-token')).rejects.toThrow('Enter a country');
 });
 async function mount(page){
  await page.route('**/event-finder-test',r=>r.fulfill({contentType:'text/html',body:`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
- import '/@vite/client';import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;
+ import '/src/index.css';import '/@vite/client';import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;
  const React=(await import('/node_modules/.vite/deps/react.js')).default;const ReactDOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default;
  const Finder=(await import('/src/components/VexEventFinder.jsx')).default;window.selectedCode=null;window.searchFilters=null;
  ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Finder,{onSelect:v=>window.selectedCode=v,onSearch:async filters=>{window.searchFilters=filters;return {events:[{code:filters.page===1?'RE-V5RC-26-4270':'RE-V5RC-26-4271',name:filters.page===1?'Test event':'Next event',start:'2026-10-04',city:'Flushing'}],nextPage:filters.page===1?2:null};}}));
  </script></body></html>`}));await page.goto('/event-finder-test');
 }
-test('state search, continuation and selected event work without country picker',async({page})=>{
+test('USA state search, continuation and selected event work',async({page})=>{
  await mount(page);await expect(page.getByLabel('Country',{exact:true})).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Find events',exact:true})).toBeDisabled();
  await page.getByLabel('State or territory').selectOption('New York');await page.getByRole('button',{name:'Find events',exact:true}).click();
@@ -51,4 +51,31 @@ test('program and signature filters select the right events across RE and VE cod
  ]}),{status:200}));
  expect(result.events.map(e=>e.code)).toEqual(['VE-V5-27-12345']);
  expect(result.events[0].program).toBe('V5RC');expect(result.events[0].eventCategory).toBe('signature');
+});
+
+test('international country search sends country, clears state, and filters country options',async({page})=>{
+ await page.setViewportSize({width:390,height:844});await mount(page);await page.getByLabel('State or territory').selectOption('New York');
+ await page.getByLabel('Search region',{exact:true}).selectOption('international');
+ await expect(page.getByLabel('State or territory')).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Find events',exact:true})).toBeDisabled();
+ await page.getByLabel('Search countries',{exact:true}).fill('Canada');
+ await expect(page.getByLabel('Country',{exact:true}).locator('option')).toHaveCount(2);
+ await page.getByLabel('Country',{exact:true}).selectOption('CA');
+ await page.getByRole('button',{name:'Find events',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>window.searchFilters?.country)).toBe('CA');
+ expect((await page.evaluate(()=>window.searchFilters)).state).toBe('');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ await page.screenshot({path:test.info().outputPath('international-search-mobile.png'),fullPage:true});
+ await page.getByLabel('Search region',{exact:true}).selectOption('US');
+ await expect(page.getByLabel('Country',{exact:true})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Find events',exact:true})).toBeDisabled();
+});
+
+test('international backend supports IQ, V5 and VEX U and excludes other countries',async()=>{
+ const events=[['VE-IQ-27-12345','IQ Canada','VEX IQ Robotics Competition','Canada'],['VE-V5-27-12346','V5 Canada','V5RC','CA'],['RE-VURC-26-12347','U Canada','VEX U Robotics Competition','Canada'],['VE-V5-27-12348','USA event','V5RC','United States']].map(([sku,name,program,country])=>({sku,name,program:{name:program},event_type:'Tournament',start:'2026-11-10',location:{country,region:'Ontario'}}));
+ const fetcher=async()=>new Response(JSON.stringify({meta:{last_page:1},data:events}));
+ for(const [program,name] of [['VIQRC','IQ Canada'],['V5RC','V5 Canada'],['VURC','U Canada']]){
+ const result=await searchEvents({...filters,country:'CA',state:'',program},'fixture-token',fetcher);
+ expect(result.events.map(e=>e.name)).toEqual([name]);
+ }
 });

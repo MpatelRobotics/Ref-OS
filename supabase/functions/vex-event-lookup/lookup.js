@@ -1,3 +1,4 @@
+import { WORLD_GEOGRAPHY } from '../_shared/worldGeography.js';
 const BASE = 'https://events.vex.com/api/v2/';
 export function normalizeCode(value) {
   const code = String(value || '').trim().toUpperCase();
@@ -56,17 +57,19 @@ export async function searchEvents(filters, token, fetcher = fetch) {
   const page = Number(filters.page || 1);
   const start = String(filters.start || ''), end = String(filters.end || '');
   const date = value => /^\d{4}-\d{2}-\d{2}$/.test(value) && new Date(value+'T00:00:00Z').toISOString().slice(0,10) === value;
-  if (country !== 'US' || !date(start) || !date(end) || end < start || (Date.parse(end)-Date.parse(start)) > 366*86400000 || !Number.isInteger(page) || page<1 || page>500 || (country==='US' && (!state || state.length>50))) throw new Error('Enter a country, US state where needed, and a date range of up to one year.');
+  if (!WORLD_GEOGRAPHY.some(c=>c.code===country) || !date(start) || !date(end) || end < start || (Date.parse(end)-Date.parse(start)) > 366*86400000 || !Number.isInteger(page) || page<1 || page>500 || (country==='US' && (!state || state.length>50))) throw new Error('Enter a country, US state where needed, and a date range of up to one year.');
   if (!token) throw new Error('VEX event lookup is not configured yet. Contact the app developer.');
   const name = new Intl.DisplayNames(['en'],{type:'region'}).of(country);
   if (!name || name===country) throw new Error('Enter a valid country.');
-  const accepted = new Set([normalized(name),normalized(country)]);
+  const entry=WORLD_GEOGRAPHY.find(c=>c.code===country);
+  const aliases={GB:['United Kingdom','Great Britain','UK','Britain'],KR:['Republic of Korea','South Korea','Korea South'],KP:['North Korea','Korea North'],CN:['Mainland China','China Mainland'],TW:['Chinese Taipei','Taiwan China'],HK:['Hong Kong China'],MO:['Macao','Macau China']};
+  const accepted = new Set([name,country,entry.name,...(aliases[country]||[])].map(normalized));
   if(country==='US') ['United States of America','USA'].forEach(v=>accepted.add(normalized(v)));
   if(country==='GB') ['UK','Great Britain'].forEach(v=>accepted.add(normalized(v)));
   const stateNames='Alabama|AL,Alaska|AK,Arizona|AZ,Arkansas|AR,California|CA,Colorado|CO,Connecticut|CT,Delaware|DE,District of Columbia|DC,Florida|FL,Georgia|GA,Hawaii|HI,Idaho|ID,Illinois|IL,Indiana|IN,Iowa|IA,Kansas|KS,Kentucky|KY,Louisiana|LA,Maine|ME,Maryland|MD,Massachusetts|MA,Michigan|MI,Minnesota|MN,Mississippi|MS,Missouri|MO,Montana|MT,Nebraska|NE,Nevada|NV,New Hampshire|NH,New Jersey|NJ,New Mexico|NM,New York|NY,North Carolina|NC,North Dakota|ND,Ohio|OH,Oklahoma|OK,Oregon|OR,Pennsylvania|PA,Rhode Island|RI,South Carolina|SC,South Dakota|SD,Tennessee|TN,Texas|TX,Utah|UT,Vermont|VT,Virginia|VA,Washington|WA,West Virginia|WV,Wisconsin|WI,Wyoming|WY,Puerto Rico|PR,Guam|GU,US Virgin Islands|VI';
   const pair=stateNames.split(',').map(v=>v.split('|')).find(pair=>pair.some(v=>normalized(v)===normalized(state)));
-  if(!pair)throw new Error('Enter a valid US state or territory.');
-  const stateAliases=new Set(pair.map(normalized));
+  if(country==='US'&&!pair)throw new Error('Enter a valid US state or territory.');
+  const stateAliases=new Set((pair||[]).map(normalized));
   const locationValue=value=>typeof value==='string'?value:value?.name||value?.code||'';
   const controller = new AbortController(); const timer=setTimeout(()=>controller.abort(),25000);
   const events=[];let nextPage=null;
@@ -81,7 +84,7 @@ export async function searchEvents(filters, token, fetcher = fetch) {
       if(!Array.isArray(body.data)||!Number.isInteger(last)||last<current||last>500)throw new Error('VEX returned incomplete event search results.');
       for(const event of body.data) {
         const locations=[event.location,...(Array.isArray(event.locations)?event.locations:[])].filter(Boolean);
-        if(!locations.some(location=>accepted.has(normalized(locationValue(location.country))) && stateAliases.has(normalized(locationValue(location.region)))))continue;
+        if(!locations.some(location=>accepted.has(normalized(locationValue(location.country))) && (country!=='US'||stateAliases.has(normalized(locationValue(location.region))))))continue;
         if(typeName(event.event_type) && !eventType(event.event_type) && !/signature/i.test(typeName(event.event_type)))continue;
         if(!text(event.name)||!text(event.sku))continue;
         const programValue=[text(event.program?.name),text(event.sku)].join(' ').toUpperCase();
