@@ -1,3 +1,4 @@
+import InitialAdminSetup from './InitialAdminSetup.jsx';
 import { isDemoEvent } from '../demoEvents.js';
 import { REFEREE_PORTAL_ENABLED, JUDGE_GROUP_LOGIN_ENABLED } from "../featureAvailability.js";
 import RefereePortal from "../components/RefereePortal";
@@ -15,7 +16,7 @@ import { developerPasskey, passkeysSupported } from '../developerPasskey';
 // `remembered` ({ role, label }) is set when this device was locked with Lock This Device ->
 // Event Main Page. The label is display only: onUnlockRemembered asks the server to confirm the
 // device's session, event membership, and role before anything opens.
-export default function LoginScreen({ eventId, eventName, branding = null, onUnlock, onChooseEvent, onEventDeleted, remembered = null, onUnlockRemembered, notice = "" }) {
+function LoginScreenForm({ eventId, eventName, branding = null, onUnlock, onChooseEvent, onEventDeleted, remembered = null, onUnlockRemembered, notice = "" }) {
   const profile = resolveEventBranding(eventId, eventName ? { name: eventName } : null, branding);
   const highlander = profile.highlander;
   const accent = profile.accent;
@@ -296,3 +297,7 @@ export default function LoginScreen({ eventId, eventName, branding = null, onUnl
 }
 
 /* ---------------------- NAME (ref identity) ---------------------- */
+
+export default function LoginScreen(props) {
+  return <InitialAdminSetup key={props.eventId} eventId={props.eventId} onUnlock={props.onUnlock} onChooseEvent={props.onChooseEvent}><LoginScreenForm {...props}/></InitialAdminSetup>;
+}

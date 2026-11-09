@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Ref OS Developer (Super Admin) access.
 //
-// The browser calls this only after the event's normal access-code check has refused a code.
+// Handles developer sign-in, verified event creation and first-join admin setup.
 // The expected credential exists ONLY in the REFOS_SUPER_ADMIN_CODE secret of this function;
 // it is never returned, logged, stored, or compared in the browser or the database.
 //
@@ -32,12 +32,12 @@ Deno.serve(async (request) => {
     const authorization = request.headers.get("Authorization");
     if (!authorization) return json({ ok: false, reason: "invalid" }, 401);
 
-    let body: { eventId?: unknown; credential?: unknown; action?: unknown } = {};
+    let body: { eventId?: unknown; credential?: unknown; action?: unknown; name?: unknown; format?: unknown } = {};
     try { body = await request.json(); } catch { return json({ ok: false, reason: "invalid" }, 400); }
     const eventId = String(body.eventId ?? "").trim().toLowerCase();
-    if (body.action !== undefined && body.action !== "restore") return json({ ok: false, reason: "invalid" }, 400);
+    if (body.action !== undefined && !["restore", "create", "setup_admin"].includes(String(body.action))) return json({ ok: false, reason: "invalid" }, 400);
     const submitted = String(body.credential ?? "").trim().toUpperCase();
-    if (!UUID_RE.test(eventId)) return json({ ok: false, reason: "invalid" }, 400);
+    if (body.action !== "create" && !UUID_RE.test(eventId)) return json({ ok: false, reason: "invalid" }, 400);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -49,6 +49,21 @@ Deno.serve(async (request) => {
     const { data: userData, error: userError } = await userClient.auth.getUser();
     const userId = userData?.user?.id;
     if (userError || !userId) return json({ ok: false, reason: "invalid" }, 401);
+
+    // Creation always checks the developer secret before any code can be stored.
+    const secret = String(Deno.env.get("REFOS_SUPER_ADMIN_CODE") || "").trim().toUpperCase();
+    const valid = CODE_RE.test(submitted) && CODE_RE.test(secret) && await sameSecret(submitted, secret);
+    if (body.action === "create") {
+      if (!CODE_RE.test(secret)) return json({ok:false,error:"Event creation is temporarily unavailable."},503);
+      const name = String(body.name || "").trim();
+      const format = String(body.format || "tournament");
+      if (name.length < 3 || name.length > 300 || !CODE_RE.test(submitted) || !["tournament", "league"].includes(format)) return json({ok:false, error:"Check the event name, format and access code."},400);
+      const {data, error} = valid
+        ? await serviceClient.rpc("create_deferred_admin_event", {p_name:name,p_user:userId,p_format:format})
+        : await userClient.rpc("create_refos_vex_event_with_format", {p_name:name,p_admin_credential:submitted,p_format:format});
+      if (error) throw error;
+      return json({ok:true,event:Array.isArray(data)?data[0]:data});
+    }
 
     const { data: event, error: eventError } = await serviceClient
       .from("events")
@@ -63,8 +78,12 @@ Deno.serve(async (request) => {
     if (lockError) throw lockError;
     if (locked) return json({ ok: false, reason: "locked" });
 
-    const secret = String(Deno.env.get("REFOS_SUPER_ADMIN_CODE") || "").trim().toUpperCase();
-    const valid = CODE_RE.test(submitted) && CODE_RE.test(secret) && await sameSecret(submitted, secret);
+    if (body.action === "setup_admin") {
+      if (!CODE_RE.test(submitted) || valid) return json({ok:false,error:"Choose a new event admin code in number-letter-number-number format."},400);
+      const {error} = await serviceClient.rpc("complete_initial_admin_setup", {p_event:eventId,p_user:userId,p_code:submitted});
+      if (error) return json({ok:false,error:error.message},409);
+      return json({ok:true});
+    }
 
     // Restore is separate from login: verify either credential without granting membership.
     if (body.action === "restore") {

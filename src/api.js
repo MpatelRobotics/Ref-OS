@@ -622,24 +622,11 @@ export async function createVexEvent(name, adminCredential, format = "tournament
   await ensureAnonymousSession();
   const cleanName = String(name || "").trim();
   const cleanCredential = String(adminCredential || "").trim().toUpperCase();
-  if (format === "league") {
-    const { data, error } = await supabase.rpc("create_refos_vex_event_with_format", {
-      p_name: cleanName,
-      p_admin_credential: cleanCredential,
-      p_format: "league",
-    });
-    if (error) {
-      if (/create_refos_vex_event_with_format/i.test(error.message || "")) throw new Error("League events are not installed in Supabase yet. Run supabase/refos-2-league-events.sql.");
-      throw error;
-    }
-    return mapEvent(Array.isArray(data) ? data[0] : data);
-  }
-  const { data, error } = await supabase.rpc("create_refos_vex_event", {
-    p_name: cleanName,
-    p_admin_credential: cleanCredential,
+  const { data, error } = await supabase.functions.invoke("refos-developer-access", {
+    body: { action: "create", name: cleanName, credential: cleanCredential, format },
   });
-  if (error) throw error;
-  return mapEvent(Array.isArray(data) ? data[0] : data);
+  if (error || !data?.event) throw new Error(data?.error || "Could not create the event. Check your connection and try again.");
+  return mapEvent(data.event);
 }
 
 /* ================= League sessions (refos-2-league-events.sql) ================= */
@@ -2009,4 +1996,24 @@ export async function updateExistingVexScore(eventId,row){
  .contains('red',existing.red).containedBy('red',existing.red).contains('blue',existing.blue).containedBy('blue',existing.blue);
  const session=leagueSessionFor(eventId);query=session?query.eq('session_id',session):query.is('session_id',null);
  const {data,error}=await query.select('num');if(error)throw error;return (data||[]).length;
+}
+
+
+export async function eventRequiresAdminSetup(eventId) {
+  if (E2E_MOCK) return false;
+  await ensureAnonymousSession();
+  const {data,error}=await supabase.rpc("event_requires_admin_setup",{p_event:eventId});
+  if(error)throw error;
+  return data === true;
+}
+export async function completeInitialAdminSetup(eventId,code) {
+  await ensureAnonymousSession();
+  const {data,error}=await supabase.functions.invoke("refos-developer-access",{
+    body:{action:"setup_admin",eventId,credential:String(code).trim().toUpperCase()},
+  });
+  if(error || !data?.ok) {
+    let message=data?.error;
+    if(!message && error?.context){try{message=(await error.context.json())?.error;}catch{}}
+    throw new Error(message || "Could not save the admin code. Try again.");
+  }
 }
