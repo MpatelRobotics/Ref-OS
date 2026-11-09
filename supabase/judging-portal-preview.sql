@@ -44,6 +44,19 @@ alter table public.judging_portal_logins enable row level security;
 alter table public.judging_interview_notes enable row level security;
 revoke all on public.judging_portal_codes,public.judging_portal_logins,public.judging_interview_notes from anon,authenticated;
 
+create or replace function public.require_judging_group_access(p_event uuid)
+returns void language plpgsql security definer set search_path=public as $$
+begin
+ if auth.uid() is null or not exists(select 1 from public.events where id=p_event and archived_at is null)
+ or public.event_requires_admin_setup(p_event) then raise exception 'Event is unavailable or setup is incomplete';end if;
+ if not exists(select 1 from public.judging_portal_logins l join public.judging_portal_codes c on c.id=l.code_id and c.event_id=l.event_id and c.enabled
+ join public.judge_group_sessions s on s.event_id=l.event_id and s.user_id=l.user_id and s.group_name=c.group_name
+ join public.judge_group_credentials g on g.event_id=s.event_id and g.group_name=s.group_name and g.enabled and g.generation=s.generation
+ where l.event_id=p_event and l.user_id=auth.uid() and s.expires_at>now()) then raise exception 'Judge-group login expired or disabled';end if;
+end;$$;
+revoke all on function public.require_judging_group_access(uuid) from public,anon;
+grant execute on function public.require_judging_group_access(uuid) to authenticated;
+
 create or replace function public.create_judging_portal_code(p_event uuid,p_label text,p_mode text,p_group text default null)
 returns jsonb language plpgsql security definer set search_path=public,extensions as $$
 declare v_code text; v_id uuid;
@@ -78,7 +91,7 @@ create or replace function public.login_judging_portal_code(p_event uuid,p_code 
 returns jsonb language plpgsql security definer set search_path=public,extensions as $$
 declare c public.judging_portal_codes%rowtype; g text; gen uuid;
 begin
- perform public.require_judging_preview(p_event);
+ if auth.uid() is null or not exists(select 1 from public.events where id=p_event and archived_at is null) or public.event_requires_admin_setup(p_event) then raise exception 'Event is unavailable or setup is incomplete';end if;
  if public.refos_access_locked(p_event,auth.uid()) then return jsonb_build_object('ok',false,'message','Too many attempts. Try again later.');end if;
  -- Serialize assignments within this event so simultaneous first logins stay balanced.
  perform 1 from public.events where id=p_event for update;
@@ -109,7 +122,7 @@ create or replace function public.list_judging_interview_notes(p_event uuid,p_ad
 returns jsonb language plpgsql security definer set search_path=public as $$
 declare g text;
 begin
- perform public.require_judging_preview(p_event);
+ if coalesce(p_advisor,false) then perform public.require_judging_preview(p_event);else perform public.require_judging_group_access(p_event);end if;
  if not coalesce(p_advisor,false) then g=public.judge_group_dashboard(p_event)->>'group';end if;
  return coalesce((select jsonb_agg(jsonb_build_object('team',team,'group',group_name,'session_id',session_id,'notes',notes,'version',version,'updated_at',updated_at) order by team)
  from public.judging_interview_notes where event_id=p_event and (coalesce(p_advisor,false) or group_name=g)),'[]'::jsonb);
@@ -119,7 +132,7 @@ create or replace function public.save_judging_interview_notes(p_event uuid,p_se
 returns integer language plpgsql security definer set search_path=public as $$
 declare dashboard jsonb;g text;v integer;k uuid=coalesce(p_session,'00000000-0000-0000-0000-000000000000'::uuid);
 begin
- perform public.require_judging_preview(p_event);
+ perform public.require_judging_group_access(p_event);
  dashboard=public.judge_group_dashboard(p_event);g=dashboard->>'group';
  if not exists(select 1 from jsonb_array_elements(dashboard->'interviews') i where i->>'team'=p_team and (i->>'session_id')::uuid is not distinct from p_session) then raise exception 'Team is not assigned to this judge group';end if;
  if p_notes is null or length(p_notes)>20000 then raise exception 'Notes must be under 20,000 characters';end if;
@@ -133,4 +146,18 @@ begin
 end;$$;
 revoke all on function public.create_judging_portal_code(uuid,text,text,text),public.list_judging_portal_codes(uuid),public.disable_judging_portal_code(uuid,uuid),public.login_judging_portal_code(uuid,text),public.list_judging_interview_notes(uuid,boolean),public.save_judging_interview_notes(uuid,uuid,text,text,integer) from public,anon;
 grant execute on function public.create_judging_portal_code(uuid,text,text,text),public.list_judging_portal_codes(uuid),public.disable_judging_portal_code(uuid,uuid),public.login_judging_portal_code(uuid,text),public.list_judging_interview_notes(uuid,boolean),public.save_judging_interview_notes(uuid,uuid,text,text,integer) to authenticated;
+create or replace function public.judging_portal_dashboard(p_event uuid)
+returns jsonb language plpgsql security definer set search_path=public as $$
+begin
+ perform public.require_judging_group_access(p_event);
+ return public.judge_group_dashboard(p_event);
+end;$$;
+revoke all on function public.judging_portal_dashboard(uuid) from public,anon;
+grant execute on function public.judging_portal_dashboard(uuid) to authenticated;
+-- Schedule changes can reach the developer workspace immediately through Realtime.
+do $$ begin
+ if not exists(select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='judging_interview_schedules') then
+ alter publication supabase_realtime add table public.judging_interview_schedules;
+ end if;
+end;$$;
 commit;

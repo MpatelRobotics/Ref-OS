@@ -1,0 +1,30 @@
+name: Build Judging Portal Microsoft Store package
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  store:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      REFOS_JUDGING_VERSION: 1.0.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node scripts/build-judging-desktop.mjs --store
+      - name: Test standalone packaged app
+        shell: pwsh
+        run: |
+          $env:REFOS_JUDGING_PACKAGED_EXE = (Resolve-Path 'judging-desktop/release/win-unpacked/Ref-OS Judging Portal.exe').Path
+          node --test tests/judging-desktop.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Judging Portal package tests failed.' }
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: Ref-OS-Judging-Portal-Microsoft-Store
+          path: judging-desktop/release/*.appx
+          if-no-files-found: error

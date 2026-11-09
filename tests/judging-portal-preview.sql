@@ -6,6 +6,7 @@ begin
  select id into u from auth.users order by created_at limit 1;
  select id into v from auth.users where id<>u order by created_at limit 1;
  select * into e from public.create_deferred_admin_event('Judging portal transactional test',u,'tournament');
+ perform public.complete_initial_admin_setup(e.id,v,'3S23');
  perform set_config('request.jwt.claim.sub',u::text,true);
  perform public.create_judge_group_code(e.id,'North');perform public.create_judge_group_code(e.id,'South');
  perform public.save_judge_group_conflicts(e.id,'North','{}'::text[],'No affiliations',0);
@@ -33,14 +34,16 @@ begin
  rejected=false;
  begin perform public.judge_group_dashboard(e.id);exception when raise_exception then rejected=true;end;
  if not rejected then raise exception 'Disabled code session retained access';end if;
- perform public.complete_initial_admin_setup(e.id,v,'3S23');
  perform set_config('request.jwt.claim.sub',v::text,true);
  rejected=false;
  begin perform public.list_judging_interview_notes(e.id,true);exception when insufficient_privilege then rejected=true;end;
  if not rejected then raise exception 'Non-developer accessed preview';end if;
- rejected=false;
- begin perform public.login_judging_portal_code(e.id,a->>'code');exception when insufficient_privilege then rejected=true;end;
- if not rejected then raise exception 'Non-developer code login allowed';end if;
+ delete from public.event_members where event_id=e.id and user_id=v;
+ r=public.login_judging_portal_code(e.id,a->>'code');
+ if not (r->>'ok')::boolean then raise exception 'Valid judge code login failed';end if;
+ perform public.judging_portal_dashboard(e.id);
+ if public.has_event_role(e.id,array['admin','judge','ref']) then raise exception 'Judge login gained general event membership';end if;
+ if jsonb_array_length(public.list_judging_interview_notes(e.id,false))<>1 then raise exception 'Assigned judge cannot read notes';end if;
  perform set_config('request.jwt.claim.sub',u::text,true);
  perform set_config('refos.lifecycle_change','on',true);
  update public.events set archived_at=now() where id=e.id;

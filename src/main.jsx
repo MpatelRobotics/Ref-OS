@@ -1,7 +1,11 @@
 import { Capacitor } from '@capacitor/core';
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App.jsx";
+const App=React.lazy(()=>import('./App.jsx'));
+const JudgingConnector=React.lazy(()=>import('./components/JudgingConnector.jsx'));
+const MainJudgeLogin=React.lazy(()=>import('./components/MainJudgeLogin.jsx'));
+const params=new URLSearchParams(window.location.search);
+const Root=params.get('app')==='judging'?JudgingConnector:params.get('page')==='judge'?MainJudgeLogin:App;
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import UpdateBanner from "./components/UpdateBanner.jsx";
 import "./index.css";
@@ -9,7 +13,7 @@ import "./index.css";
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      <React.Suspense fallback={<p className="p-6">Opening Ref-OS…</p>}><Root /></React.Suspense>
       <UpdateBanner />
     </ErrorBoundary>
   </React.StrictMode>,

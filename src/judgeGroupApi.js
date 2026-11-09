@@ -31,3 +31,5 @@ export const disableJudgingPortalCode=(event,id)=>rpc('disable_judging_portal_co
 export const loginJudgingPortalCode=(event,code)=>rpc('login_judging_portal_code',{p_event:event,p_code:code});
 export const listJudgingInterviewNotes=(event,advisor=false)=>rpc('list_judging_interview_notes',{p_event:event,p_advisor:advisor});
 export const saveJudgingInterviewNotes=args=>rpc('save_judging_interview_notes',args);
+
+export const loadJudgingPortalDashboard=event=>rpc('judging_portal_dashboard',{p_event:event});

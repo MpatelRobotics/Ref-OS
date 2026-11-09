@@ -36,7 +36,7 @@ export default function JudgeInterviewNotes({eventId,entry,record=null,onSaved,s
 export function AdvisorInterviewNotes({eventId,loadNotes=portalApi.listJudgingInterviewNotes}) {
  const [rows,setRows]=useState([]),[query,setQuery]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const load=async()=>{setBusy(true);try{setRows(await loadNotes(eventId,true));setError('');}catch(e){setError(e.message);}finally{setBusy(false);}};
- useEffect(()=>{load();},[eventId]);
+ useEffect(()=>{load();const interval=setInterval(load,5000);return()=>clearInterval(interval);},[eventId]);
  return <section className="space-y-3 rounded-xl border p-4"><h3 className="text-xl font-bold">Judge Advisor · Interview notes</h3><p>Private notes across all groups. Deleted automatically when the event is deleted.</p>
   <button onClick={load} disabled={busy} className="min-h-[44px] rounded border px-4">Refresh interview notes</button>
   <label className="block">Find team or judge group<input value={query} onChange={e=>setQuery(e.target.value)} className="mt-1 min-h-[44px] w-full rounded border bg-transparent p-3"/></label>

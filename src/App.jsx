@@ -110,7 +110,7 @@ import DeveloperAccessManager from "./components/DeveloperAccessManager.jsx";
 import DeveloperTestEvents from "./components/DeveloperTestEvents.jsx";
 import useDeveloperSession from "./useDeveloperSession.js";
 import LostFoundBoard from "./components/LostFoundBoard.jsx";
-import JudgingInterviews from "./components/JudgingInterviews.jsx";
+
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
 import HelpRequestModal from "./components/modals/HelpRequestModal.jsx";
 import RULE_MANUAL_PAGES from "./manualRulePages.json";
@@ -1719,6 +1719,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
       {!developerPage && <a href="/?page=developer" className="sm:hidden mx-auto mt-1 flex w-fit min-h-[44px] items-center justify-center rounded px-2 text-xs font-medium text-slate-500 dark:text-slate-400 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600">Developer login</a>}
       </>}
       </>}
+      {!developerPage && selectorSection === "about" && <a href="/?page=judge" className="mx-auto mt-5 flex min-h-[44px] w-fit items-center rounded-xl border px-5 font-semibold">Judge login</a>}
       {!developerPage && selectorSection === "about" && <footer className="mt-8 pb-4 text-center text-sm text-slate-600 dark:text-slate-300">Created by Maharshi Patel · <a href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer" className="underline">@mpatel_ref</a> · v{APP_VERSION}</footer>}
       {deleteTarget && (
         <DeleteEventModal event={deleteTarget} profile={resolveEventBranding(deleteTarget.id, deleteTarget, deleteTarget.branding)}
@@ -4867,7 +4868,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             onExport={isEmcee ? undefined : () => (isJudge ? exportNominations() : requireAdmin(exportNominations))} />
           </>
         ) : view === "interviews" && isDeveloper ? (
-          <JudgingInterviews developerPreview={isDeveloper} division={divisionId} divisions={divisionCatalog} canManage={adminUnlocked&&!highlanderDemoLocked} canJudge={isJudge&&!highlanderDemoLocked} eventName={event?.name||'Event'} key={`${eventId}:${leagueSessionId || ""}`} eventId={eventId} sessionId={leagueSessionId || null} sessionName={league?.sessionName(leagueSessionId) || ""} teams={teams} matches={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone || 'UTC'} onSaveTimezone={adminUnlocked ? async zone => { const saved = await api.upsertEventSetting(eventId, 'event_timezone', {zone}); setEventSettings(prev=>({...prev,event_timezone:saved})); } : undefined}/>
+          <section className="rounded-xl border p-5"><h3 className="text-xl font-bold">Ref-OS Judging Portal</h3><p className="my-3">Judging setup, groups, interviews and nominations are managed in the standalone judging portal. Judges use Judge login on the Ref-OS main page.</p><a href="/?app=judging" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center rounded border px-4">Open Judging Portal</a></section>
         ) : view === "rulebook" ? (
           (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq" ? <IQRules /> : <RuleBook rules={rules} online={online} accent={brand.accent}
             qaUrl={officialResourcesFor(eventSettings?.rules_template?.value?.ruleset).qaUrl} />
