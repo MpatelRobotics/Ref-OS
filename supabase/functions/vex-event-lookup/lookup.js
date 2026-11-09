@@ -1,3 +1,4 @@
+import {assertEventCodeProgram,eventCodeProgram} from '../_shared/competitionProgram.js';
 import { detectVexTimezone } from '../_shared/eventTimezone.js';
 import { WORLD_GEOGRAPHY } from '../_shared/worldGeography.js';
 const BASE = 'https://events.vex.com/api/v2/';
@@ -9,8 +10,9 @@ export function normalizeCode(value) {
 const typeName = value => typeof value === 'string' ? value : value?.name || '';
 const eventType = value => /league/i.test(typeName(value)) ? 'league' : /tournament/i.test(typeName(value)) ? 'tournament' : '';
 const text = value => typeof value === 'string' ? value.trim().slice(0, 300) : '';
-export async function lookupEvent(code, token, fetcher = fetch) {
+export async function lookupEvent(code, token, fetcher = fetch, expectedProgram) {
   code = normalizeCode(code);
+  assertEventCodeProgram(code,expectedProgram);
   if (!token) throw new Error('VEX event lookup is not configured yet. Contact the app developer.');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 25000);
@@ -91,6 +93,7 @@ export async function searchEvents(filters, token, fetcher = fetch) {
         const programValue=[text(event.program?.name),text(event.sku)].join(' ').toUpperCase();
         const program=/VIQ|IQRC|IQC|VEX IQ/.test(programValue)?'VIQRC':/VURC|VEX U|VEXU|(?:RE|VE)-U(?:-|RC)/.test(programValue)?'VURC':/V5|VRC/.test(programValue)?'V5RC':'';
         const category=/signature/i.test([typeName(event.level),typeName(event.event_type),event.name].join(' '))?'signature':eventType(event.event_type);
+        if(programFilter==='VURC'&&eventCodeProgram(event.sku)!=='vexu')continue;
         if(programFilter!=='all'&&program!==programFilter||typeFilter!=='all'&&category!==typeFilter)continue;
         events.push({code:text(event.sku),name:text(event.name),start:text(event.start),city:text(event.location?.city),program,eventType:eventType(event.event_type),eventCategory:category});
       }

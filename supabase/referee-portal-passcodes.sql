@@ -103,7 +103,7 @@ begin
   insert into public.events(name,join_code,created_by) values(v_plan.name,gen_random_uuid()::text,auth.uid()) returning id into v_event;
   insert into public.event_settings(event_id,key,value) values
    (v_event,'vex_event',jsonb_build_object('code',v_code,'name',v_plan.name,'location',v_plan.location,'start',v_plan.start_date)),
-   (v_event,'competition_program',jsonb_build_object('program',case when v_code ~ '(IQ|VIQ)' then 'iq' else 'v5' end));
+   (v_event,'competition_program',jsonb_build_object('program',case when v_code ~ '^(RE|VE)-(U|VURC|VEXU)-' then 'vexu' when v_code ~ '(IQ|VIQ)' then 'iq' else 'v5' end));
  end if;
  insert into public.referee_event_plans values(auth.uid(),v_event,v_plan.attendance)
  on conflict(user_id,event_id) do update set attendance=excluded.attendance;

@@ -349,7 +349,7 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
  --ref-accent:#1d4ed8; --ref-border:#bfdbfe; --ref-nav-border:#bfdbfe;
  --ref-active:#eff6ff; --ref-program-text:#1e40af;
 }
-.refos-shell[data-program='v5'] {
+.refos-shell[data-program='v5'], .refos-shell[data-program='vexu'] {
  --ref-accent:#c43d3d; --ref-border:#b91c1c; --ref-nav-border:#b91c1c;
  --ref-active:#f1f3f5; --ref-program-text:#c43d3d;
 }
@@ -357,7 +357,7 @@ body { font-family: 'Segoe UI',system-ui,sans-serif; background:var(--ref-bg); }
  --ref-accent:#93c5fd; --ref-border:#334f73; --ref-nav-border:#334f73;
  --ref-active:#172e4c; --ref-program-text:#93c5fd;
 }
-.dark .refos-shell[data-program='v5'] {
+.dark .refos-shell[data-program='v5'], .dark .refos-shell[data-program='vexu'] {
  --ref-accent:#f87171; --ref-border:#b91c1c; --ref-nav-border:#b91c1c;
  --ref-active:#222d3d; --ref-program-text:#f87171;
 }

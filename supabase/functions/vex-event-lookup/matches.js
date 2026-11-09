@@ -1,5 +1,7 @@
+import {detectCompetitionProgram,assertEventCodeProgram} from '../_shared/competitionProgram.js';
 const BASE='https://events.vex.com/api/v2/';
-export async function fetchVexStandings(code, division, token, fetcher=fetch, kind='rankings') {
+export async function fetchVexStandings(code, division, token, fetcher=fetch, kind='rankings', expectedProgram) {
+ assertEventCodeProgram(code,expectedProgram);
  if(!['rankings','skills','scores'].includes(kind))throw new Error('VEX API sync supports qualification rankings, Skills and scores only.');
  if(!token)throw new Error('VEX standings sync is not configured. Contact the developer.');
  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),25000);
@@ -8,7 +10,7 @@ export async function fetchVexStandings(code, division, token, fetcher=fetch, ki
   const events=await get('events',{'sku[]':code});const found=events.data?.filter(e=>e.sku?.toUpperCase()===code);
   if(found?.length!==1||!Number.isSafeInteger(found[0].id))throw new Error('No unique event found for that code.');
   const event=await get('events/'+found[0].id);
-  const program=/\bIQ\b|VIQRC|VIQC|(?:RE|VE)-IQ/i.test(String(event.program?.name||'')+' '+code)?'iq':'v5';
+  const program=detectCompetitionProgram({...event,code})||'v5';
   const divisions=(event.divisions||[]).filter(d=>Number.isSafeInteger(d.id)).map(d=>({id:d.id,name:String(d.name||'Division '+d.id)}));
   if(kind!=='skills'&&!division)return {code,program,divisions,rankings:[],skills:[]};
   if(kind!=='skills'&&!divisions.some(d=>d.id===Number(division)))throw new Error('VEX division is not available for this event.');
@@ -105,7 +107,7 @@ export function mapVexScores(rows, scoredOnly=true, program='v5'){
   const red=row.alliances?.find(a=>a.color==='red'),blue=row.alliances?.find(a=>a.color==='blue');
   const teams=a=>(a?.teams||[]).map(t=>String(t.team?.name||'').trim().toUpperCase());
   const r=teams(red),b=teams(blue);
-  if(!Number.isInteger(num)||num<1||!red||!blue||scoredOnly&&(!Number.isInteger(red.score)||red.score<0||!Number.isInteger(blue.score)||blue.score<0)||r.length!==2||b.length!==2||new Set([...r,...b]).size!==4||![...r,...b].every(n=>/^[A-Z0-9-]+$/.test(n)))continue;
+  if(!Number.isInteger(num)||num<1||!red||!blue||scoredOnly&&(!Number.isInteger(red.score)||red.score<0||!Number.isInteger(blue.score)||blue.score<0)||r.length!==(program==='vexu'?1:2)||b.length!==(program==='vexu'?1:2)||new Set([...r,...b]).size!==(program==='vexu'?2:4)||![...r,...b].every(n=>/^[A-Z0-9-]+$/.test(n)))continue;
   result.push({phase,num,red:r,blue:b,...(scoredOnly?{redScore:red.score,blueScore:blue.score}:{})});
  }
  return result;

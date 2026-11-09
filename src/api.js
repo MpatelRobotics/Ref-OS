@@ -1,3 +1,4 @@
+import {assertEventCodeProgram} from '../supabase/functions/_shared/competitionProgram.js';
 import {createSessionEnsurer} from "./anonymousSession.js";
 import {sampleRobotPhoto} from './sampleRobotPhotos.js';
 import { createSettingsReadCache } from './settingsReadCache.js';
@@ -1248,7 +1249,7 @@ export async function getEventCompetitionProgram(eventId) {
   try {
     const {data,error} = await supabase.rpc("get_event_competition_program", {p_event:eventId});
     if (error) throw error;
-    if (!["iq","v5"].includes(data)) throw new Error("Competition program is unavailable.");
+    if (!["iq","v5","vexu"].includes(data)) throw new Error("Competition program is unavailable.");
     const row = {key:"competition_program",value:{program:data},updatedAt:0,updatedBy:""};
     saveReadCache(eventId,"competition_program",[row]);
     return row;
@@ -1909,9 +1910,10 @@ function venueDeviceKey() {
 }
 
 // Token stays in the server-side VEX_EVENTS_API_TOKEN secret.
-export async function lookupVexEvent(code) {
+export async function lookupVexEvent(code, expectedProgram) {
+  assertEventCodeProgram(code,expectedProgram);
   await ensureAnonymousSession();
-  const { data, error } = await supabase.functions.invoke("vex-event-lookup", { body: { code: String(code || "").trim().toUpperCase() } });
+  const { data, error } = await supabase.functions.invoke("vex-event-lookup", { body: { code: String(code || "").trim().toUpperCase(), expectedProgram } });
   if (error) {
     let message = "VEX lookup is unavailable. Check the connection and ask the developer to configure it.";
     try { const body = await error.context?.json(); if (typeof body?.error === "string") message = body.error; } catch {}
@@ -1933,9 +1935,10 @@ export async function searchVexEvents(filters) {
   return data;
 }
 
-export async function getVexStandings(code, division = null, kind = "rankings") {
+export async function getVexStandings(code, division = null, kind = "rankings", expectedProgram) {
+  assertEventCodeProgram(code,expectedProgram);
   await ensureAnonymousSession();
-  const { data, error } = await supabase.functions.invoke("vex-event-lookup", { body: { action: "standings", code, division, kind } });
+  const { data, error } = await supabase.functions.invoke("vex-event-lookup", { body: { action: "standings", code, division, kind, expectedProgram } });
   if (error) {
     let message = "VEX standings lookup is unavailable.";
     try { const body = await error.context?.json(); if (typeof body?.error === "string") message = body.error; } catch {}

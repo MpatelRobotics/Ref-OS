@@ -1,12 +1,15 @@
+import {eventCodeProgram} from '../supabase/functions/_shared/competitionProgram.js';
 import { tmMatchIdentity } from './tmMatchIdentity.js';
-const number = value => (typeof value === 'string' || Number.isSafeInteger(value)) && /^[0-9]+[A-Z]*$/i.test(String(value).trim()) ? String(value).trim().toUpperCase() : null;
+const teamNumber = (value,program) => (typeof value === 'string' || Number.isSafeInteger(value)) && (program==='vexu'?/^[A-Z0-9-]{1,30}$/i:/^[0-9]+[A-Z]*$/i).test(String(value).trim()) ? String(value).trim().toUpperCase() : null;
 const integer = value => Number.isSafeInteger(value) && value >= 0;
 const positive = value => integer(value) && value > 0;
 function list(value, label) { if (!Array.isArray(value)) throw Error(`TM returned an invalid ${label} list.`); return value; }
 export function normalizeTmSnapshot(data, session, program = 'v5') {
   if (!data.event || typeof data.event.name !== 'string' || data.event.code != null && typeof data.event.code !== 'string') throw Error('TM returned invalid event information.');
   const iq = program === 'iq';
-  const sourceProgram = /(?:RE|VE)-(?:IQ|VIQ)/i.test(data.event.code || '') ? 'iq' : /(?:RE|VE)-(?:V5|VRC|VURC|U)-/i.test(data.event.code || '') ? 'v5' : null;
+  const number = value => teamNumber(value,program);
+  const sourceProgram = eventCodeProgram(data.event.code);
+  if(program==='vexu'&&sourceProgram!=='vexu')throw Error('VEX U events require a VEX U TM event code. V5 and IQ codes are not accepted.');
   if (sourceProgram && sourceProgram !== program) throw Error('TM event program does not match this Ref OS event.');
   const warnings = [];
   const teams = list(data.teams, 'teams').map(t => ({ number: number(t.number), name: typeof t.name === 'string' ? t.name : '' })).filter(t => t.number);
@@ -28,7 +31,7 @@ export function normalizeTmSnapshot(data, session, program = 'v5') {
     const red = (alliances[0].teams || []).map(t => number(t.number));
     const blue = (alliances[1]?.teams || []).map(t => number(t.number));
     const partners = [...red,...blue];
-    if (iq ? (!['practice','qual','final'].includes(identity.phase) || partners.length < 1 || partners.length > 2 || partners.some(t=>!t) || new Set(partners).size !== partners.length) : (red.length !== 2 || blue.length !== 2 || partners.some(t=>!t) || new Set(partners).size !== 4)) return [];
+    if (iq ? (!['practice','qual','final'].includes(identity.phase) || partners.length < 1 || partners.length > 2 || partners.some(t=>!t) || new Set(partners).size !== partners.length) : (red.length !== (program==='vexu'?1:2) || blue.length !== (program==='vexu'?1:2) || partners.some(t=>!t) || new Set(partners).size !== (program==='vexu'?2:4))) return [];
     const row = { ...identity, red: iq ? partners : red, blue: iq ? [] : blue, ...(iq ? {program:'iq'} : {}) };
     if(Number.isSafeInteger(info.timeScheduled)&&info.timeScheduled>0&&Number.isFinite(new Date(info.timeScheduled*1000).getTime()))row.scheduledAt=new Date(info.timeScheduled*1000).toISOString();
     if (iq && info.state === 'SCORED') {

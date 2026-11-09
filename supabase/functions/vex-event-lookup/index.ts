@@ -1,3 +1,4 @@
+import { assertEventCodeProgram } from '../_shared/competitionProgram.js';
 import { lookupTeamEvents } from "./team-events.js";
 import { fetchVexStandings } from "./matches.js";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -29,7 +30,8 @@ Deno.serve(async request => {
     if (body?.action === "team-events") return json(await lookupTeamEvents(body.number, Deno.env.get("VEX_EVENTS_API_TOKEN") || ""));
     if (body?.action === "matches") return json({ error: "VEX match sync has been removed. Use Tournament Manager for matches." }, 400);
     if (body?.action === "standings") {
-      return json(await fetchVexStandings(normalizeCode(body.code), body.division, Deno.env.get("VEX_EVENTS_API_TOKEN") || "", fetch, body.kind || "rankings"));
+      assertEventCodeProgram(body.code,body.expectedProgram);
+      return json(await fetchVexStandings(normalizeCode(body.code), body.division, Deno.env.get("VEX_EVENTS_API_TOKEN") || "", fetch, body.kind || "rankings",body.expectedProgram));
     }
     if (body?.action === "search") {
       const results = await searchEvents(body, Deno.env.get("VEX_EVENTS_API_TOKEN") || "");
@@ -38,16 +40,17 @@ Deno.serve(async request => {
     let code;
     try { code = normalizeCode(body?.code); } catch (e) { return json({ error: e instanceof Error ? e.message : "Invalid event code." }, 400); }
     for (const [key,value] of cache) if (value.until < now) cache.delete(key);
+    assertEventCodeProgram(code,body.expectedProgram);
     const cached = cache.get(code);
     if (cached) return json({ event: cached.event });
     const token = Deno.env.get("VEX_EVENTS_API_TOKEN") || "";
-    const event = await lookupEvent(code, token);
+    const event = await lookupEvent(code, token,fetch,body.expectedProgram);
     if (cache.size >= 300) cache.delete(cache.keys().next().value);
     cache.set(code, { event, until: now + 300000 });
     return json({ event });
   } catch (error) {
     // No raw upstream responses, headers, tokens or stack traces reach the client/logs.
-    const message = error instanceof Error && /^(VEX|Enter|Could not retrieve|No unique|Too many|Sign in)/.test(error.message) ? error.message : "Event lookup failed or timed out. Try again.";
+    const message = error instanceof Error && /^(VEX|Use|Choose|Enter|Could not retrieve|No unique|Too many|Sign in)/.test(error.message) ? error.message : "Event lookup failed or timed out. Try again.";
     return json({ error: message }, 502);
   }
 });

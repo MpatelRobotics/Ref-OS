@@ -5,9 +5,11 @@ returns text
 language sql stable security definer
 set search_path = public
 as $$
-  select case when s.value->>'program' = 'iq' then 'iq' else 'v5' end
+  select case when s.value->>'program' in ('iq','vexu') then s.value->>'program'
+    when v.value->>'code' ~* '^(RE|VE)-(U|VURC|VEXU)-' then 'vexu' else 'v5' end
   from public.events e
   left join public.event_settings s on s.event_id = e.id and s.key = 'competition_program'
+  left join public.event_settings v on v.event_id = e.id and v.key = 'vex_event'
   where e.id = p_event
     and public.has_event_role(p_event, array['ref','judge','emcee','inspection','admin']);
 $$;

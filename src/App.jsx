@@ -1,3 +1,4 @@
+import {eventCodeProgram,assertEventCodeProgram} from '../supabase/functions/_shared/competitionProgram.js';
 import AutoEventTimezone from './components/AutoEventTimezone.jsx';
 import { saveDetectedEventTimezone } from './detectedEventTimezone.js';
 import {planBracketCorrection} from './bracketCorrection.js';
@@ -1489,7 +1490,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
     if (vexLookupBusy || saving) return;
     const cleanName = name.trim();
     const cleanCode = adminCode.trim().toUpperCase();
-    if (!["iq","v5"].includes(competitionProgram)) return setCreateError("Choose VEX IQ or V5RC / VEX U.");
+    if (!["iq","v5","vexu"].includes(competitionProgram)) return setCreateError("Choose VEX IQ, V5RC or VEX U.");
     if (vexEvent && detectEventProgram(vexEvent) && detectEventProgram(vexEvent) !== competitionProgram) return setCreateError("The selected program does not match the VEX event lookup. Choose the matching program or clear the lookup.");
     if (cleanName.length < 3) return setCreateError("Enter an event name.");
     if (!/^\d[A-Z]\d\d$/.test(cleanCode)) return setCreateError("Admin code must use the Ref OS 4 character format, for example 3S23.");
@@ -1669,7 +1670,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
             <h2 className="font-bold text-slate-900 dark:text-white">Create VEX Event</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">Create the event shell now. Use TM Sync Center after login to import teams, schedules, rankings, skills, and alliances.</p>
             <EventProgramChoice value={competitionProgram} onChange={setCompetitionProgram} disabled={saving || vexLookupBusy} />
-            <VexEventLookup onLookup={api.lookupVexEvent} onSearch={api.searchVexEvents} onResult={receiveVexEvent} disabled={saving} onBusy={setVexLookupBusy} />
+            <VexEventLookup expectedProgram={competitionProgram||undefined} onLookup={api.lookupVexEvent} onSearch={api.searchVexEvents} onResult={receiveVexEvent} disabled={saving} onBusy={setVexLookupBusy} />
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Event name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Example: NJ State Championship"
               className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-3 text-slate-900 dark:text-white mb-3" />
@@ -1926,7 +1927,9 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
 
 
   const [programLookupError, setProgramLookupError] = useState("");
-  const isIQ = (eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram) === "iq";
+  const storedProgram = eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram || 'v5';
+  const competitionProgram = storedProgram==='v5'&&eventCodeProgram(eventSettings?.vex_event?.value?.code)==='vexu'?'vexu':storedProgram;
+  const isIQ = competitionProgram === 'iq';
   const requiredRobotPhotos = normalizeRequiredRobotPhotos(eventSettings?.robot_photo_requirements?.value?.required);
   const [photoRequirementsError, setPhotoRequirementsError] = useState("");
 
@@ -2871,6 +2874,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   // alliances, nominations, and access credentials are never touched.
   const saveEventSettings = async ({ setup, timezone, name, branding, fieldNames: nextFieldNames, requiredRobotPhotos: nextPhotoRequirements, fieldCount: nextFieldCount }) => {
     if (!adminUnlocked) throw new Error("Only this event's Admin can change event settings.");
+    if(setup?.competitionProgram&&eventSettings?.vex_event?.value?.code)assertEventCodeProgram(eventSettings.vex_event.value.code,setup.competitionProgram);
     try {
       if (timezone) {
         new Intl.DateTimeFormat('en-US',{timeZone:timezone}).format();
@@ -3654,6 +3658,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     const map = {}; for (const x of list) map[x.id] = x; setMatches(map); return map;
   };
   const applyVexSnapshot = async (data, kind) => {
+    assertEventCodeProgram(data.code,competitionProgram);
     if (!adminUnlocked || highlanderDemoLocked || isVenueMode()) throw new Error("Cloud administrator access is required.");
     const targetApi = data.division && data.divisions?.length>1 ? createDivisionApi(eventApi,eventId,Number(data.division)) : api;
     if (kind === "scores") {
@@ -3675,7 +3680,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       assertSession();
       if(targetApi.claimMatchingSchedule)await targetApi.claimMatchingSchedule(scoreRows);
       let fresh=await targetApi.listMatches(eventId, {strict:true});
-      const missing=planMissingVexMatches(fresh,scheduleRows,isIQ?'iq':'v5');
+      const missing=planMissingVexMatches(fresh,scheduleRows,competitionProgram);
       const numbers=[...new Set(missing.flatMap(m=>[...m.red,...m.blue]))];
       if(numbers.length){const known=await api.listTeams(eventId);const absent=numbers.filter(number=>!known.some(t=>t.number===number));if(absent.length)await api.bulkUpsertTeams(eventId,absent.map(number=>({number,name:""})));}
       let added=0;
@@ -3713,6 +3718,8 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     if ((missing.length || kind === "rankings") && (!divisionId || Number(data.division)===divisionId)) setTeams(await api.listTeams(eventId));
   };
   const applyTmApiSnapshot = async (snapshot, options) => {
+    if(snapshot.program&&snapshot.program!==competitionProgram)throw Error('TM event program changed. Stop and review the matching event.');
+    if(competitionProgram==='vexu')assertEventCodeProgram(snapshot.event?.code,competitionProgram);
     if (!adminUnlocked || highlanderDemoLocked || isVenueMode()) throw Error('Cloud administrator access is required.');
     const targetDivision=options.refosDivisionId ?? divisionId;
     if(targetDivision && !divisionCatalog.some(d=>Number(d.id)===targetDivision))throw Error('Choose a valid Ref OS division.');
@@ -4422,7 +4429,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true, sensitivity: "base" }));
 
   return (
-    <div data-settings-open={menu ? "true" : "false"} data-program={isIQ ? "iq" : "v5"} className="refos-shell min-h-screen font-sans antialiased">
+    <div data-settings-open={menu ? "true" : "false"} data-program={competitionProgram} className="refos-shell min-h-screen font-sans antialiased">
       <a className="refos-skip" href="#workspace">Skip to workspace</a>
       <header className="refos-header sticky top-0 z-20" style={brand.accentSource === "saved" ? {"--ref-header-accent":brand.accent} : undefined}>
         <div className="refos-header-inner mx-auto px-4 py-3 flex items-center gap-3">
@@ -4963,12 +4970,12 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         onClose={() => setShowTeamScanner(false)}
       />}
       {logFor !== null && (
-        <LogModal requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={{...event,competitionProgram:isIQ?"iq":"v5"}} matches={matches} presetMatch={logMatch} rules={workflowRules} onOpenPhoto={setLightbox} fieldNames={fieldNames}
+        <LogModal requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} viols={viols} presetTeam={logFor || null} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={{...event,competitionProgram}} matches={matches} presetMatch={logMatch} rules={workflowRules} onOpenPhoto={setLightbox} fieldNames={fieldNames}
           onSetName={() => openIdentityEditor()} onClose={() => { setLogFor(null); setLogMatch(null); }}
           onSave={async (form) => { const team = await upsertTeam(form.team || form.newNumber, form.newName); await saveViolation({ ...form, team }); setLogFor(null); setLogMatch(null); }} />
       )}
       {editing && (
-        <LogModal requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} viols={viols} presetTeam={editing.team} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={{...event,competitionProgram:isIQ?"iq":"v5"}} matches={matches} rules={workflowRules} onOpenPhoto={setLightbox} edit={editing} fieldNames={fieldNames}
+        <LogModal requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={teams} viols={viols} presetTeam={editing.team} knownRules={knownRules} me={{ name: meName }} lastMatch={lastMatch} event={{...event,competitionProgram}} matches={matches} rules={workflowRules} onOpenPhoto={setLightbox} edit={editing} fieldNames={fieldNames}
           onSetName={() => openIdentityEditor()} onClose={() => setEditing(null)}
           onSave={async (form) => {
             const team = await upsertTeam(form.team || form.newNumber, form.newName);
@@ -5068,8 +5075,8 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           syncStatus={tmSyncStatus}
         />
       )}
-      <AutoEventTimezone api={eventApi} eventId={eventId} details={eventSettings?.vex_event?.value} saved={eventSettings?.event_timezone} enabled={adminUnlocked&&!isVenueMode()} by={meName} onSaved={row=>{rememberSettingWrite(row);setEventSettings(previous=>({...previous,event_timezone:row}));}}/>
-      <EventTmSyncRegistration config={{program:isIQ?'iq':'v5',enabled:adminUnlocked && !highlanderDemoLocked && !isVenueMode(),
+      <AutoEventTimezone expectedProgram={competitionProgram} api={eventApi} eventId={eventId} details={eventSettings?.vex_event?.value} saved={eventSettings?.event_timezone} enabled={adminUnlocked&&!isVenueMode()} by={meName} onSaved={row=>{rememberSettingWrite(row);setEventSettings(previous=>({...previous,event_timezone:row}));}}/>
+      <EventTmSyncRegistration config={{program:competitionProgram,enabled:adminUnlocked && !highlanderDemoLocked && !isVenueMode(),
 target:`${event?.name || 'Current event'}${league ? ' · ' + league.sessionName(leagueSessionId) : ''}`,
 robotsActive:view === 'robots',
 expectedCode:eventSettings?.vex_event?.value?.code || '',
@@ -5078,7 +5085,7 @@ refosDivisions:divisionCatalog,
 refosDivisionId:divisionId,
 savedDivisionMappings:eventSettings?.tm_division_mappings?.value || {},
 onSaveDivisionMapping:async(id,name)=>{if(!divisionId||!name)return;if(Object.entries(eventSettings?.tm_division_mappings?.value||{}).some(([local,mapping])=>Number(local)!==divisionId&&Number(mapping.id)===id))throw Error('This TM division is already mapped to another Ref OS division.');const saved=await api.upsertEventSetting(eventId,'tm_division_mappings',{...(eventSettings?.tm_division_mappings?.value||{}),[divisionId]:{id,name}},meName);setEventSettings(prev=>({...prev,tm_division_mappings:saved}));},
-onFetch:settings => api.getTmSnapshot(eventId, settings),
+onFetch:async settings => {const data=await api.getTmSnapshot(eventId, settings);if(competitionProgram==='vexu')assertEventCodeProgram(data.event?.code,competitionProgram);return data;},
 onApply:applyTmApiSnapshot,
 onActivity:api.getTmFieldActivity,
 onDisconnect:(id, pairing) => api.getTmFieldActivity(id, pairing, true),
@@ -5168,7 +5175,7 @@ const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', com
       {showEventManagement && adminUnlocked && <EventManagementModal event={event} eventId={eventId} brand={brand} roleLabel={myRole} isProtected={eventProtected}
         onArchive={archiveCurrentEvent}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEventManagement(false)} />}
-      {showEventSettings && adminUnlocked && <EventSettingsModal competitionProgram={eventSettings?.competition_program?.value?.program || initialEvent.competitionProgram || "v5"} eventTimezone={eventSettings?.event_timezone?.value?.zone||''} fieldCount={configuredFieldCount} event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
+      {showEventSettings && adminUnlocked && <EventSettingsModal competitionProgram={competitionProgram} eventTimezone={eventSettings?.event_timezone?.value?.zone||''} fieldCount={configuredFieldCount} event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
         eventFormat={league || event?.format === "league" ? "league" : "tournament"}
         canConvertToLeague={!league && !isHighlander && event?.format !== "league"}
         onConvertToLeague={() => setShowConvertLeague(true)}
@@ -5274,7 +5281,7 @@ const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', com
           </div>
         </div>
       )}
-      {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexSyncManager program={isIQ?'iq':'v5'} onDiscoverDivisions={async divisions=>{await eventApi.upsertEventSetting(eventId,"vex_divisions",{divisions},meName);}} autoStart initialDivision={eventSettings?.vex_event?.value?.division} showLaunch={false} setupOpen={showVexSyncSetup} onSetupClose={()=>commandCenterChildOpen ? returnToCommandCenter() : setShowVexSyncSetup(false)} showStatus={showCommandCenter || showVexSyncSetup} visible={{rankings:showVexLiveSync,skills:showVexSkillsSync,scores:showVexScoresSync}} onOpen={category=>{setShowVexLiveSync(category==='rankings');setShowVexSkillsSync(category==='skills');setShowVexScoresSync(category==='scores');}} key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || event?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onSaveCode={async (code, division) => { if (eventSettings?.vex_event?.value?.code === code && (division == null || eventSettings?.vex_event?.value?.division === division)) return; const saved = await api.upsertEventSetting(eventId, "vex_event", { ...(eventSettings?.vex_event?.value || {}), code, ...(division != null ? {division} : {}) }); setEventSettings(prev => ({ ...prev, vex_event:saved })); }} onFetch={async(...args)=>{const data=await api.getVexStandings(...args);if(data.program!==(isIQ?'iq':'v5'))throw Error('VEX event program does not match this Ref OS event.');return data;}} onApply={applyVexSnapshot} onClose={category=>{if(category==='rankings')setShowVexLiveSync(false);if(category==='skills')setShowVexSkillsSync(false);if(category==='scores')setShowVexScoresSync(false);}} />}
+      {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexSyncManager program={competitionProgram} onDiscoverDivisions={async divisions=>{await eventApi.upsertEventSetting(eventId,"vex_divisions",{divisions},meName);}} autoStart initialDivision={eventSettings?.vex_event?.value?.division} showLaunch={false} setupOpen={showVexSyncSetup} onSetupClose={()=>commandCenterChildOpen ? returnToCommandCenter() : setShowVexSyncSetup(false)} showStatus={showCommandCenter || showVexSyncSetup} visible={{rankings:showVexLiveSync,skills:showVexSkillsSync,scores:showVexScoresSync}} onOpen={category=>{setShowVexLiveSync(category==='rankings');setShowVexSkillsSync(category==='skills');setShowVexScoresSync(category==='scores');}} key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || event?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onSaveCode={async (code, division) => { assertEventCodeProgram(code,competitionProgram);if (eventSettings?.vex_event?.value?.code === code && (division == null || eventSettings?.vex_event?.value?.division === division)) return; const saved = await api.upsertEventSetting(eventId, "vex_event", { ...(eventSettings?.vex_event?.value || {}), code, ...(division != null ? {division} : {}) }); setEventSettings(prev => ({ ...prev, vex_event:saved })); }} onFetch={async(...args)=>{const data=await api.getVexStandings(...args,competitionProgram);if(data.program!==competitionProgram)throw Error('VEX event program does not match this Ref OS event.');return data;}} onApply={applyVexSnapshot} onClose={category=>{if(category==='rankings')setShowVexLiveSync(false);if(category==='skills')setShowVexSkillsSync(false);if(category==='scores')setShowVexScoresSync(false);}} />}
       {showFeedback && <FeedbackModal meName={meName} myRole={myRole} onSubmit={async (entry, screenshots) => { if (!screenshots?.length) return addFieldLog(entry); await submitFeedbackScreenshots({eventId, id:entry.id, note:entry.note, by:meName, sessionId:leagueSessionId || null, screenshots}); setFieldLog(await api.listFieldLog(eventId)); }} onClose={() => setShowFeedback(false)} />}
       {showOnboarding && <QuickStartModal step={onboardingStep} setStep={setOnboardingStep} onClose={closeOnboarding} />}
       {undoPrompt && (
