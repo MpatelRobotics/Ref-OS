@@ -1,8 +1,9 @@
+import { detectVexTimezone } from '../_shared/eventTimezone.js';
 import { WORLD_GEOGRAPHY } from '../_shared/worldGeography.js';
 const BASE = 'https://events.vex.com/api/v2/';
 export function normalizeCode(value) {
   const code = String(value || '').trim().toUpperCase();
-  if (!/^(?:RE|VE)-[A-Z0-9]{2,12}-\d{2}-\d{3,8}$/.test(code)) throw new Error('Enter a full VEX event code, for example RE-V5RC-26-4270 or VE-V5-27-65868.');
+  if (!/^(?:RE|VE)-[A-Z0-9]{1,12}-\d{2}-\d{3,8}$/.test(code)) throw new Error('Enter a full VEX event code, for example RE-V5RC-26-4270 or VE-V5-27-65868.');
   return code;
 }
 const typeName = value => typeof value === 'string' ? value : value?.name || '';
@@ -41,7 +42,7 @@ export async function lookupEvent(code, token, fetcher = fetch) {
       if (page === last) break;
     }
     const location = event.location || {};
-    return { code, name: text(event.name), start: text(event.start), end: text(event.end),
+    return { code, ...detectVexTimezone(event), timezoneCode:code, name: text(event.name), start: text(event.start), end: text(event.end),
       location: ['venue','address_1','address_2','city','region','postcode','country'].map(key => text(location[key])).filter(Boolean).join(', '),
       program: text(event.program?.name), eventType: eventType(event.event_type), eventCategory:/signature/i.test([typeName(event.level),typeName(event.event_type),event.name].join(' '))?'signature':eventType(event.event_type),
       teams: [...teams.values()].sort((a,b) => a.number.localeCompare(b.number,'en',{numeric:true})) };

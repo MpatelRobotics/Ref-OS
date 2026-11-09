@@ -27,12 +27,12 @@ async function mount(page,fail=false){
  import '/@vite/client';import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;
  const React=(await import('/node_modules/.vite/deps/react.js')).default;const ReactDOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default;
  const Lookup=(await import('/src/components/VexEventLookup.jsx')).default;window.lookupResult=null;
- ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Lookup,{onResult:v=>window.lookupResult=v,onLookup:async()=>{${fail?"throw new Error('Lookup unavailable');":"return {code:'RE-V5RC-26-4270',name:'Test event',program:'V5RC',location:'Flushing',teams:[{number:'2A',name:'Two'}]};"}}}));
+ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Lookup,{onResult:v=>window.lookupResult=v,onLookup:async()=>{${fail?"throw new Error('Lookup unavailable');":"return {code:'RE-V5RC-26-4270',name:'Test event',program:'V5RC',location:'Flushing',timezone:'America/New_York',timezoneSource:'Venue coordinates',teams:[{number:'2A',name:'Two'}]};"}}}));
  </script></body></html>`}));await page.goto('/vex-autofill-test');
 }
 test('autofill previews teams and clears old results when code changes',async({page})=>{
  await mount(page);await page.getByLabel('Autofill from VEX Events (optional)').fill('RE-V5RC-26-4270');await page.getByRole('button',{name:'Look up',exact:true}).click();
- await expect(page.getByRole('status')).toContainText('1 registered teams');expect((await page.evaluate(()=>window.lookupResult)).name).toBe('Test event');
+ await expect(page.getByRole('status')).toContainText('1 registered teams');await expect(page.getByRole('status')).toContainText('Detected timezone: America/New York');expect((await page.evaluate(()=>window.lookupResult)).name).toBe('Test event');
  await page.getByLabel('Autofill from VEX Events (optional)').fill('RE-V5RC-26-9999');await expect(page.getByRole('status')).toHaveCount(0);expect(await page.evaluate(()=>window.lookupResult)).toBeNull();
 });
 test('lookup failure explains manual fallback',async({page})=>{
@@ -49,4 +49,12 @@ test('both RE and VE event codes normalize and VE lookup keeps the exact SKU',as
  });
  expect(result.code).toBe('VE-V5-27-65868');
  expect(()=>normalizeCode('VE-V5-27-65868/../../')).toThrow();
+});
+
+test('single-letter VEX U program codes are accepted and looked up exactly',async()=>{
+ for(const code of ['VE-U-26-66279','RE-U-26-66279']){
+ expect(normalizeCode(code.toLowerCase())).toBe(code);
+ const result=await lookupEvent(code,'fixture-token',async url=>url.pathname.endsWith('/events')?response({data:[{...event,sku:code,program:{name:'VEX U Robotics Competition'},location:{country:'Canada',coordinates:{lat:45.205,lon:-72.745}}}]}):response({data:[],meta:{last_page:1}}));
+ expect(result.code).toBe(code);expect(result.timezone).toBe('America/Toronto');
+ }
 });

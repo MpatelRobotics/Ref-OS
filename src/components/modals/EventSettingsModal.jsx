@@ -1,6 +1,6 @@
 import CountryTimezoneSelect from "../CountryTimezoneSelect.jsx";
 import EventProgramChoice from "../EventProgramChoice.jsx";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { ROBOT_PHOTO_SLOTS, normalizeRequiredRobotPhotos } from "../../robotPhotoRequirements";
 import { CalendarDays, ImageOff, MapPin, Palette, RotateCcw, Save, Settings, X } from "lucide-react";
 import { HEX_COLOR_RE, isHttpUrl, normalizeHexColor } from "../../eventProfiles.js";
@@ -26,6 +26,9 @@ function FieldError({ children }) {
 
 export default function EventSettingsModal({ event, brand, eventTimezone = "", fieldNames = {}, requiredRobotPhotos, onSave, onClose, eventFormat = "tournament", competitionProgram = "v5", fieldCount, canConvertToLeague = false, onConvertToLeague }) {
   const [timezone,setTimezone]=useState(eventTimezone);
+  const timezoneEdited=useRef(false);
+  const changeTimezone=zone=>{timezoneEdited.current=true;setTimezone(zone);};
+  useEffect(()=>{if(!timezoneEdited.current)setTimezone(eventTimezone);},[eventTimezone]);
   const initialSetup = {quals:Number(event?.quals)||0,practice:Number(event?.practice)||0,bracket:Number(event?.bracket ?? 16),finalsBestOf:Number(event?.finalsBestOf ?? 3),competitionProgram};
   const [setup,setSetup]=useState(initialSetup);
   const setSetupField=(key,value)=>setSetup(current=>({...current,[key]:value}));
@@ -208,7 +211,7 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Used where the full name is too long, such as the phone header.</p>
               <FieldError>{errors.shortName}</FieldError>
             </label>
-            <div><CountryTimezoneSelect value={timezone} onChange={setTimezone}/><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Used for event clocks, scheduled match times and judging interviews. Applies across all divisions. Existing saved times keep the same instant.</p><button type="button" className="mt-2 min-h-[44px] rounded-lg border px-3" onClick={()=>setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)}>Use this device’s timezone</button><FieldError>{errors.timezone}</FieldError></div>
+            <div><CountryTimezoneSelect value={timezone} onChange={changeTimezone}/><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Used for event clocks, scheduled match times and judging interviews. Applies across all divisions. Existing saved times keep the same instant.</p><button type="button" className="mt-2 min-h-[44px] rounded-lg border px-3" onClick={()=>changeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)}>Use this device’s timezone</button><FieldError>{errors.timezone}</FieldError></div>
             <label className="block">
               <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Event logo URL</span>
               <input value={logoUrl} disabled={readingLogo || saving} onChange={(e) => { setLogoUrl(e.target.value); setUploadedLogo(null); }} inputMode="url" autoCapitalize="off" autoCorrect="off" spellCheck={false}

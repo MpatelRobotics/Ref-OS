@@ -1,3 +1,5 @@
+import AutoEventTimezone from './components/AutoEventTimezone.jsx';
+import { saveDetectedEventTimezone } from './detectedEventTimezone.js';
 import {planBracketCorrection} from './bracketCorrection.js';
 import {loadWorkspaceEvent} from "./loadWorkspaceEvent.js";
 import EliminationBracketIcon from "./components/EliminationBracketIcon.jsx";
@@ -1515,6 +1517,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
           alert("The event was created, but its VEX details or roster could not be fully saved. Open this existing event and import the teams from Tournament Manager; do not create a duplicate event.");
         }
       }
+      if(vexEvent?.timezone){try{await saveDetectedEventTimezone({api,eventId:ev.id,details:vexEvent});}catch{alert('The event was created, but its detected timezone could not be saved. Set it in Event Setup & Settings.');}}
       onCreated({ ...ev, format, competitionProgram });
     } catch (e) {
       setCreateError(e?.message || "Could not create the event.");
@@ -5065,6 +5068,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           syncStatus={tmSyncStatus}
         />
       )}
+      <AutoEventTimezone api={eventApi} eventId={eventId} details={eventSettings?.vex_event?.value} saved={eventSettings?.event_timezone} enabled={adminUnlocked&&!isVenueMode()} by={meName} onSaved={row=>{rememberSettingWrite(row);setEventSettings(previous=>({...previous,event_timezone:row}));}}/>
       <EventTmSyncRegistration config={{program:isIQ?'iq':'v5',enabled:adminUnlocked && !highlanderDemoLocked && !isVenueMode(),
 target:`${event?.name || 'Current event'}${league ? ' · ' + league.sessionName(leagueSessionId) : ''}`,
 robotsActive:view === 'robots',

@@ -24,6 +24,7 @@
   "dependencies": {
     "@capacitor/android": "^8.5.3",
     "@capacitor/core": "^8.5.3",
+    "@photostructure/tz-lookup": "11.8.0",
     "@refos/tm-sockets": "file:mobile/tm-sockets",
     "@simplewebauthn/browser": "^14.0.0",
     "@supabase/supabase-js": "^2.45.4",
