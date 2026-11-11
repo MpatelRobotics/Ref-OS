@@ -9,8 +9,19 @@ export default function JudgingPortalPreview({eventId,eventName,groupRevision=0,
  useEffect(()=>{load();},[eventId,groupRevision,api]);
  const assignedGroup=groups.some(g=>g.name===group)?group:groups.length===1?groups[0].name:'';
  const create=async e=>{e.preventDefault();if(busy||!assignedGroup)return;setBusy(true);setError('');try{const result=await api.createJudgingPortalCode(eventId,label,'manual',assignedGroup);setIssued({...result,label});setLabel('');await load();}catch(e){setError(e.message);}finally{setBusy(false);}};
+ const replace=async code=>{
+  if(!confirm('Replace this judge code? The old code and its signed-in sessions will stop working.'))return;
+  setBusy(true);
+  setError('');
+  try {
+   const result=await api.replaceJudgingPortalCode(eventId,code.id);
+   setIssued({...result,label:code.label});
+   await load();
+  }catch(e){setError(e.message);}
+  finally{setBusy(false);}
+ };
  return <section className="space-y-4 rounded-2xl border border-indigo-300 p-4 dark:border-indigo-700">
-  <h2 className="text-xl font-bold">Judge access & interview notes</h2><p>Issue individual judge codes and review private interview notes for this event.</p>
+  <h2 className="text-xl font-bold">Judge access & interview notes</h2><p>Issue individual judge codes and review private interview notes for this event. Older codes can be replaced to show them here.</p>
   {error&&<p role="alert" className="text-red-700 dark:text-red-300">{error}</p>}
   {tab==='group'?<JudgeGroupPortal eventId={eventId} eventName={eventName} preview onClose={()=>{setTab('advisor');load();}}/>:<>
    <form onSubmit={create} className="grid gap-3 sm:grid-cols-2">
@@ -19,8 +30,12 @@ export default function JudgingPortalPreview({eventId,eventName,groupRevision=0,
     <button disabled={busy||!assignedGroup} className="min-h-[44px] self-end rounded bg-indigo-700 p-3 font-semibold text-white disabled:opacity-50">{busy?'Creating code…':'Create individual judge code'}</button>
    </form>
    {!groups.length&&<p>Create a judge group above to issue individual codes.</p>}
-   {issued&&<div role="status" className="rounded border border-indigo-400 p-3"><p>{issued.label} · Judge code: <code className="select-all font-mono font-bold">{issued.code}</code></p><p>Shown only now. Copy this code before creating another one.</p></div>}
-   {codes.map(c=><div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-3"><p><b>{c.label}</b> · {c.group||'Group assigned at first login'} · {c.mode==='random'?'Random':'JA assigned'}</p><button disabled={busy} className="min-h-[44px] rounded border px-3" onClick={async()=>{setBusy(true);try{await api.disableJudgingPortalCode(eventId,c.id);setIssued(previous=>previous?.id===c.id?null:previous);await load();}catch(e){setError(e.message);}finally{setBusy(false);}}}>Disable code for {c.label}</button></div>)}
+   {issued&&<div role="status" className="rounded border border-indigo-400 p-3"><p>{issued.label} · Judge code: <code className="select-all font-mono font-bold">{issued.code}</code></p><p>Share this code with the assigned judge.</p></div>}
+   {codes.map(c=><div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-3"><p><b>{c.label}</b> · {c.group||'Group assigned at first login'} · {c.mode==='random'?'Random':'JA assigned'}
+    {c.code&&<> · Code <code className="select-all font-mono font-bold">{c.code}</code></>}
+   </p><div className="flex flex-wrap gap-2">
+    {!c.code&&<button type="button" disabled={busy} onClick={()=>replace(c)} className="min-h-[44px] rounded border px-3">Replace code for {c.label}</button>}
+    <button disabled={busy} className="min-h-[44px] rounded border px-3" onClick={async()=>{setBusy(true);try{await api.disableJudgingPortalCode(eventId,c.id);setIssued(previous=>previous?.id===c.id?null:previous);await load();}catch(e){setError(e.message);}finally{setBusy(false);}}}>Disable code for {c.label}</button></div></div>)}
    <details className="rounded border p-3">
     <summary className="min-h-[44px] cursor-pointer py-2 font-semibold">Review interview notes</summary>
     <AdvisorInterviewNotes eventId={eventId}/>

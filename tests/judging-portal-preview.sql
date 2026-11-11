@@ -15,6 +15,8 @@ begin
  perform public.save_judging_interview_schedule(e.id,null,'{"duration":10,"entries":[],"groups":[{"name":"North","teams":["119A"]},{"name":"South","teams":["255B"]}]}',0);
  a=public.create_judging_portal_code(e.id,'Manual Judge','manual','North');
  if (a->>'code') !~ '^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{5}$' then raise exception 'Expected five-character judge code'; end if;
+ if not exists(select 1 from jsonb_array_elements(public.list_judging_portal_codes(e.id)) item
+  where item->>'id'=a->>'id' and item->>'code'=a->>'code') then raise exception 'Advisor could not see the issued code'; end if;
  r=public.login_judging_portal_code(e.id,a->>'code');
  if r->>'group'<>'North' then raise exception 'Manual assignment failed';end if;
  perform public.save_judging_interview_notes(e.id,null,'119A','Private interview observation',0);
@@ -47,6 +49,11 @@ begin
  if public.has_event_role(e.id,array['admin','judge','ref']) then raise exception 'Judge login gained general event membership';end if;
  if jsonb_array_length(public.list_judging_interview_notes(e.id,false))<>1 then raise exception 'Assigned judge cannot read notes';end if;
  perform set_config('request.jwt.claim.sub',u::text,true);
+ update public.judging_portal_codes set display_cipher=null where id=(a->>'id')::uuid;
+ r=public.replace_judging_portal_code(e.id,(a->>'id')::uuid);
+ if (r->>'code') !~ '^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{5}$' then raise exception 'Replacement code was not issued'; end if;
+ if (public.login_judging_portal_code(e.id,a->>'code')->>'ok')::boolean then raise exception 'Old code still works after replacement'; end if;
+ if not (public.login_judging_portal_code(e.id,r->>'code')->>'ok')::boolean then raise exception 'Replacement code does not work'; end if;
  perform set_config('refos.lifecycle_change','on',true);
  update public.events set archived_at=now() where id=e.id;
  delete from public.events where id=e.id;

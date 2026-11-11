@@ -27,6 +27,7 @@ export const chooseSharedJudgeGroup=(event,group)=>rpc('choose_shared_judge_grou
 // Developer-only judging preview. Authorization is enforced by each server function.
 export const createJudgingPortalCode=(event,label,mode,group)=>rpc('create_judging_portal_code',{p_event:event,p_label:label,p_mode:mode,p_group:group||null});
 export const listJudgingPortalCodes=event=>rpc('list_judging_portal_codes',{p_event:event});
+export const replaceJudgingPortalCode=(event,id)=>rpc('replace_judging_portal_code',{p_event:event,p_id:id});
 export const disableJudgingPortalCode=(event,id)=>rpc('disable_judging_portal_code',{p_event:event,p_id:id});
 export const loginJudgingPortalCode=(event,code)=>rpc('login_judging_portal_code',{p_event:event,p_code:code});
 export const listJudgingInterviewNotes=(event,advisor=false)=>rpc('list_judging_interview_notes',{p_event:event,p_advisor:advisor});
