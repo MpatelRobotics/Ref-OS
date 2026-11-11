@@ -14,6 +14,7 @@ begin
  insert into public.teams(event_id,number,name) values(e.id,'119A','Test One'),(e.id,'255B','Test Two');
  perform public.save_judging_interview_schedule(e.id,null,'{"duration":10,"entries":[],"groups":[{"name":"North","teams":["119A"]},{"name":"South","teams":["255B"]}]}',0);
  a=public.create_judging_portal_code(e.id,'Manual Judge','manual','North');
+ if (a->>'code') !~ '^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{5}$' then raise exception 'Expected five-character judge code'; end if;
  r=public.login_judging_portal_code(e.id,a->>'code');
  if r->>'group'<>'North' then raise exception 'Manual assignment failed';end if;
  perform public.save_judging_interview_notes(e.id,null,'119A','Private interview observation',0);
