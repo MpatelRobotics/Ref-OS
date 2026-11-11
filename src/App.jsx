@@ -8119,6 +8119,14 @@ function FeaturesGuide({ isHighlander = true }) {
         <p>After login, create a profile with a <b>nickname</b> plus required first and last name. Ref OS uses the nickname throughout the live app. The full name appears in the Event Contact Directory and on official violation and judging exports.</p>
       </Section>
 
+      <Section icon={Download} title="Microsoft Store apps">
+        <p>In Admin mode, open <b>Event Command Center → Event Setup &amp; Management → Microsoft Store</b> to find both Windows apps.</p>
+        <ul className="space-y-1.5">
+          <Li><b>Ref-OS Connect</b> syncs Tournament Manager and hosts the local Venue Server. Keep it running while syncing TM.</Li>
+          <Li><b>Ref-OS Judging Portal</b> manages judge groups, individual codes, conflicts, interviews, private notes and live nominations. Judges sign in using <b>Judge login</b> in the Ref-OS main sidebar.</Li>
+        </ul>
+      </Section>
+
       <Section icon={Contact} title="Volunteer profiles & contact directory">
         <ul className="space-y-1.5">
           <Li><b>Nickname</b> — the short name shown throughout matches, teams, activity, presence, and normal event workflows.</Li>

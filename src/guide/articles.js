@@ -10,12 +10,12 @@ const articles = [];
 function add(id, category, title, roles, summary, when, steps, seen, important, related = [], keywords = '') {
   articles.push({ id, category, title, roles, summary, when, steps, seen, important, related, keywords });
 }
-add('interviews', 'Judging', 'Experimental Interview Scheduler', ['Admin','Developer','Judge Advisor'],
-  'Plan a shared team interview schedule from the Judging tab. This feature is experimental.',
-  'Before interviews begin or when adjusting interview times.',
-  ['Open Judging and find Interview Scheduler — Experimental.', 'Set an interview length from 1 to 120 minutes, the first interview time, and panel/location. Times use the shared event timezone selected by Admin/Developer in the scheduler. Unconfigured events use UTC.', 'Select unscheduled teams and choose Add selected interviews. Teams are placed in numerical order, one after another.', 'Review each slot. Adjust its start, length, or panel/location, then select Save interview schedule.', 'Use Reload saved schedule to see another organizer’s saved changes. Reload asks before discarding an unsaved draft.'],
-  'Overlapping times for the same panel/location block saving. Another organizer’s changes also block a stale save so they are not overwritten. A League schedule belongs to the session currently open.',
-  'Internet is required. Save before leaving Judging. This experimental tool does not check match-time conflicts, send notifications, or change judging nominations. It is not included in existing backups, clear-judging actions, or Local Venue Server sync.', ['judging'], 'interview schedule duration panel experimental');
+add('interviews', 'Judging', 'Set up judging and publish interviews', ADMIN,
+  'Use the standalone Judging Portal to organize groups, schedule interviews and review private notes.',
+  'Before judges sign in and when planning interviews.',
+  ['Open Event Command Center → Event Setup & Management → Microsoft Store and choose Ref-OS Judging Portal.', 'Open the app, select the event and enter its admin code.', 'Add judge groups, then assign each judge to a group and create an individual code.', 'Declare each group’s conflicts or select Confirm no conflicts.', 'In Plan interviews, enter the event time window and generate a proposal. Review it, then select Publish interview schedule.', 'Have judges open Judge login in the Ref-OS main sidebar and enter their individual codes.'],
+  'The scheduler uses enabled groups and unscheduled teams by default. Judges see their assigned teams and published interview times.',
+  'The Judging Portal uses Ref-OS Cloud. Share each individual code privately with its assigned judge.', ['judging', 'microsoft-store'], 'interview schedule judge groups conflicts individual codes');
 add('lost-found', 'Event Tools', 'Lost & Found board', ALL,
   'Record found items, an optional picture, and the pickup location for event staff.',
   'When an item is handed in or returned to its owner.',
@@ -61,7 +61,7 @@ add('emcee-start', 'Quick Starts', 'Emcee quick start', ['Emcee', ...ADMIN],
 add('admin-start', 'Quick Starts', 'Admin and Developer quick start', ADMIN,
   'Prepare an event and verify volunteer devices before operations begin.', 'Before opening the event to volunteers.',
   ['Confirm the correct event and Admin mode, then open Event Command Center.', 'Review Event Setup and Event Settings.', 'Import roster and schedules through TM Sync Center; review each change preview.', 'For a League, create sessions and start the intended one.', 'Prepare volunteer access cards and the contact directory.', 'Run Pre Event System Test and Two Device Sync Test, prepare offline devices, and download a backup.'],
-  'Command Center groups tools into Event Setup & Management, Event Operations, System & Devices, Exports & Backups, and Danger Zone.',
+  'Command Center groups tools into Event Setup & Management, Event Operations, and Danger Zone.',
   'Developer access does not remove protected event restrictions. Check the selected event before any management operation.', ['command', 'tm', 'tests', 'backup']);
 add('teams', 'Referee', 'Teams, watch notes, and team scanner', VIEW,
   'Find a team and review the information available to your role.', 'When identifying a robot or reviewing team context.',
@@ -165,9 +165,15 @@ add('conversion', 'League Events', 'Convert a Tournament to a League', ADMIN,
   'Conversion is one-way; a League cannot become a Tournament. Protected events cannot be converted. Resolve pending uploads before conversion; held writes may need manual re-entry into the correct session.', ['league-manage', 'backup', 'offline']);
 add('command', 'Admin', 'Event Command Center tool map', ADMIN,
   'The Command Center is the Admin operations overview.', 'For event setup, support, and reporting.',
-  ['Open Settings → Event Command Center in Admin mode.', 'Use Event Setup & Management for TM Sync Center, Event Setup, Event Settings, Volunteer Access Codes, Event Management, and League Sessions when applicable.', 'Use Event Operations for contacts, Rankings, Activity Feed, and AWP History and Analytics.', 'Use System & Devices for Sync & Venue Server, Pre Event System Test, Two Device Sync Test, and Admin Diagnostics.', 'Use Exports & Backups for violations, nominations, event report, and Backup All JSON.', 'Read the separate Danger Zone before Clear Event Data or Reset Volunteer Sign Ins.'],
+  ['Open Settings → Event Command Center in Admin mode.', 'Use Event Setup & Management for TM Sync Center, Event Setup & Settings, Volunteer Access, Event Data & Sync, Event Management, and League Sessions when applicable. Open Microsoft Store there to find both Windows apps.', 'Use Event Operations for contacts, Rankings, Activity Feed, and AWP History and Analytics.', 'Use Event Data & Sync for Sync & Venue Server, and Event Readiness for the pre-event and two-device tests.', 'Use Backups & Reports for diagnostics, exports and backups.', 'Use Danger Zone to clear event data, or Volunteer Access to reset volunteer sign-ins.'],
   'Overview counts summarize matches, violations, replays, field faults, activity, and volunteer status. Announcement, countdown, and assignment controls support coordination.',
   'Optional tools appear only when enabled. Do not assume every deployment has alert delivery available.', ['setup', 'settings', 'tests', 'clear']);
+add('microsoft-store', 'Admin', 'Find the Ref-OS Windows apps', ADMIN,
+  'Find Ref-OS Connect and Ref-OS Judging Portal together in the Microsoft Store section.',
+  'When setting up a Windows device for Tournament Manager sync, venue hosting or judging.',
+  ['Open Event Command Center in Admin mode.', 'Under Event Setup & Management, select Microsoft Store.', 'Choose Ref-OS Connect for Tournament Manager sync or local Venue Server hosting.', 'Choose Ref-OS Judging Portal for judge setup, interviews, private notes and live nominations.'],
+  'Each app link opens its Microsoft Store listing.',
+  'Keep Connect running on the Tournament Manager network during live TM sync. The Judging Portal is a separate app and uses Ref-OS Cloud.', ['command', 'interviews'], 'Microsoft Store Windows download Connect Judging Portal');
 add('setup', 'Admin', 'Event Setup and field names', ADMIN,
   'Set match-count and elimination options used in the workspace.', 'Before loading schedules or adjusting event configuration.',
   ['Open Command Center → Event Setup.', 'Review the name, qualification and practice match counts.', 'Choose the supported elimination bracket and single or best-of-three finals setting.', 'Save and verify the offered match choices.', 'Use Event Settings or the offered Field Name Configurator to set unique display names for the competition fields.'],

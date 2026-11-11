@@ -1,8 +1,21 @@
 import React, {useState} from "react";
-import { AlertTriangle, Archive, BarChart3, Bell, CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, Clock, CloudOff, Contact, Download, Flag, KeyRound, ListOrdered, Mail, MapPin, RefreshCw, Radio, Server, Settings, ShieldCheck, Trash2, Trophy, Users, Wifi, X } from "lucide-react";
+import { AlertTriangle, Archive, BarChart3, Bell, CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, Clock, CloudOff, Contact, Download, Flag, KeyRound, ListOrdered, Mail, MapPin, RefreshCw, Radio, Server, Settings, ShieldCheck, ShoppingBag, Trash2, Trophy, Users, Wifi, X } from "lucide-react";
 import TmTimingReport from "./TmTimingReport.jsx";
 import RadioManagement from "./RadioManagement.jsx";
 import EventLogo from "./EventLogo.jsx";
+
+const microsoftStoreApps = [
+  {
+    name: 'Ref-OS Connect',
+    description: 'Tournament Manager sync and local Venue Server hosting.',
+    url: 'https://apps.microsoft.com/detail/9PBVDZJLG8SP',
+  },
+  {
+    name: 'Ref-OS Judging Portal',
+    description: 'Judge groups, interview schedules, private notes and live nominations.',
+    url: 'https://apps.microsoft.com/detail/9PNQ758JLCCJ',
+  },
+];
 
 const fmtTime = (ms) => ms ? new Date(ms).toLocaleString() : "—";
 
@@ -118,6 +131,7 @@ export default function CommandCenter({ extraTools, readinessTools, tmActivity, 
     sync:{title:'Event Data & Sync',icon:RefreshCw,hint:'VEX sync, Tournament Manager, imports and venue connections'},
     readiness:{title:'Event Readiness',icon:ClipboardCheck,hint:'Check this device, test syncing and prepare for the event'},
     reports:{title:'Backups & Reports',icon:Download,hint:'Download reports, save backups and view diagnostics'},
+    microsoftStore:{title:'Microsoft Store',icon:ShoppingBag,hint:'Windows apps for event syncing and judging'},
   };
   const action=(handler,label,Icon=ChevronRight,hint='')=>handler&&<button onClick={handler} className={tool}><Icon size={18} className="shrink-0"/><span className="flex-1"><span className="block">{label}</span>{hint&&<span className="mt-1 block text-xs font-normal text-slate-500 dark:text-slate-400">{hint}</span>}</span></button>;
   if(groups[group])return <div className="fixed inset-0 z-[65] bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 flex flex-col" role="dialog" aria-modal="true" aria-label={groups[group].title}>
@@ -147,6 +161,16 @@ export default function CommandCenter({ extraTools, readinessTools, tmActivity, 
         </ol>
         {readinessTools}
       </>}
+      {group==='microsoftStore'&&microsoftStoreApps.map(app=>(
+        <a key={app.name} href={app.url} target="_blank" rel="noopener noreferrer" className={tool}>
+          <ShoppingBag size={18} className="shrink-0" aria-hidden="true"/>
+          <span className="flex-1">
+            <span className="block">{app.name}</span>
+            <span className="mt-1 block text-xs font-normal text-slate-500 dark:text-slate-400">{app.description}</span>
+          </span>
+          <ChevronRight size={18} className="shrink-0" aria-hidden="true"/>
+        </a>
+      ))}
       {group==='reports'&&<>
         <section className="space-y-3"><h3 className="font-bold">Reports</h3>
           {action(onExportViolations,'Export Violations',Download)}

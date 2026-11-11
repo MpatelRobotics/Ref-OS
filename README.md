@@ -263,6 +263,7 @@ The Event Command Center is the Admin-only hub for event administration. Current
 | Area | Tools |
 |---|---|
 | **Event configuration** | Event Settings, Event Management, Event setup (competition program, match counts and bracket format), TM Sync Center, VEX API Sync (qualification rankings) |
+| **Microsoft Store** | Windows downloads for Ref-OS Connect and Ref-OS Judging Portal |
 | **Access** | Volunteer Access Codes, Key Volunteer Status (including granting Admin to an online volunteer), Reset Volunteer Sign Ins |
 | **Communication** | Key volunteer announcements, countdown management, Event Contact Directory, event alert counter |
 | **Readiness and health** | Pre Event System Test, Two Device Sync Test, offline readiness test, Admin Diagnostics, failed sync items (retry or discard) |
@@ -477,13 +478,14 @@ The board is shared across League sessions and refreshes every 30 seconds while 
 Robot picture cards show the detected failure and a next step: offline/uncached, unreachable service, request timeout, rejected access or expired link, server-reported missing file, storage server error, request limiting, empty download, or an image the device cannot display. Retry requests a new signed link and replaces only that downloaded cache entry. Cloud photos and pending uploads are preserved.
 
 Lost & Found pictures also explain signing failures and offer retry. Browser image errors there cannot reveal an HTTP status, so they use an unknown-cause message rather than blame storage or the app. No raw server messages, storage paths, credentials, or signed URLs are displayed in failure explanations. These are local explanations, not an event monitoring or developer alert system. No SQL or Edge Function redeployment is needed.
-## Experimental Judging Interview Scheduler
+## Ref-OS Windows apps
 
-Admin, Developer, and Judge Advisor can use **Judging → Interview Scheduler — Experimental**. Choose a 1–120 minute interview length, first time, and panel/location; select teams and add sequential slots in numerical team order. Edit individual start times, durations and panels before saving. Times use the shared event timezone. Admin/Developer can select Event timezone in the scheduler; unconfigured events use UTC. Changing the timezone preserves saved interview instants. Only one interview per team is allowed in the current schedule, and overlapping interviews on the same panel are rejected.
+In Admin mode, open **Event Command Center → Event Setup & Management → Microsoft Store**.
 
-Run `supabase/interview-scheduler.sql` in Supabase SQL Editor after the base schema and League migrations. The shared schedule is restricted to Admin/Judge Advisor server roles (Developer uses Admin). League sessions have separate schedules. Version checks reject stale saves rather than overwrite another organizer's work. Reload saved schedule asks before discarding unsaved changes. No Edge Function redeployment is needed.
+- [Ref-OS Connect](https://apps.microsoft.com/detail/9PBVDZJLG8SP) syncs Tournament Manager and hosts a local Venue Server. Keep Connect running on a device that can reach the TM server while syncing.
+- [Ref-OS Judging Portal](https://apps.microsoft.com/detail/9PNQ758JLCCJ) is a standalone app for judge groups, interview scheduling, private notes and live nominations. It uses Ref-OS Cloud and does not require Connect.
 
-This feature is experimental. Internet is required, and drafts must be saved before navigating away. Current match imports have no scheduled timestamps, so match-time conflicts cannot be checked. No invitations or notifications are sent. Schedules are not included in existing backups, clear-judging actions, or Local Venue Server sync. Deleting an event/session removes its schedule through database foreign keys. Live database permissions and migrations remain to be verified after setup.
+In the Judging Portal, select your event and enter its admin code. Add judge groups, issue an individual code for each judge, and declare conflicts for each group. Under **Plan interviews**, enter the interview window, generate a proposal, review it, and publish the schedule. Judges open **Judge login** in the Ref-OS main sidebar and use their individual codes to access their assigned groups.
 
 ## Skills violation logging
 
