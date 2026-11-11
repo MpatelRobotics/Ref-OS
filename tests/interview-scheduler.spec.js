@@ -8,7 +8,7 @@ test('admin cannot see the developer-only Judging tab',async({page,isMobile})=>{
 });
 async function mount(page,fail=false,streamlined=false){
  if(streamlined)await page.route(/JudgingPortalPreview\.jsx(?:\?.*)?$/,r=>r.fulfill({contentType:'text/javascript',body:'export default function(){return null}'}));
- await page.route(/\/src\/judgeGroupApi(?:\.js)?(?:\?.*)?$/,r=>r.fulfill({contentType:'text/javascript',body:`export async function sharedJudgeCodeStatus(){return false};export async function manageSharedJudgeCode(){return '1A2B3'};export async function chooseSharedJudgeGroup(){signed=true;return {ok:true}};export async function listJudgingOperations(){return []};export async function saveJudgingOperation(){return 1};export async function listJudgeAssignmentHistory(){return []};export async function listJudgeGroupConflicts(){return (${streamlined}?['North','South']:['North','South','Judge group 1']).map(name=>({name,enabled:true,conflict_teams:[],affiliations:'',version:1}))};export async function listJudgeGroupCodes(){return window.deleted?[]:(window.manyGroups||[{name:'North',enabled:true},{name:'South',enabled:true}])} ;export async function createJudgeGroupCode(){return '1A2B3'};export async function disableJudgeGroupCode(){};export async function deleteJudgeGroups(event,names){window.deleted=names};export async function saveJudgeGroupConflicts(args){window.conflictSaved=args};export async function reassignJudgeTeam(){};`}));
+ await page.route(/\/src\/judgeGroupApi(?:\.js)?(?:\?.*)?$/,r=>r.fulfill({contentType:'text/javascript',body:`export async function sharedJudgeCodeStatus(){return false};export async function manageSharedJudgeCode(){return '1A2B3'};export async function chooseSharedJudgeGroup(){signed=true;return {ok:true}};export async function listJudgingOperations(){return []};export async function saveJudgingOperation(){return 1};export async function listJudgeAssignmentHistory(){return []};export async function listJudgeGroupConflicts(){return (${streamlined}?['North','South']:['North','South','Judge group 1']).map(name=>({name,enabled:true,conflict_teams:[],affiliations:'',version:1})).concat(window.addedGroup?[{name:window.addedGroup,enabled:true,conflict_teams:[],affiliations:'',version:window.conflictSaved?.p_group===window.addedGroup?1:0}]:[])};export async function listJudgeGroupCodes(){return window.deleted?[]:(window.manyGroups||[{name:'North',enabled:true},{name:'South',enabled:true}]).concat(window.addedGroup?[{name:window.addedGroup,enabled:true}]:[])} ;export async function createJudgeGroupCode(event,name){window.addedGroup=name;return '1A2B3'};export async function disableJudgeGroupCode(){};export async function deleteJudgeGroups(event,names){window.deleted=names};export async function saveJudgeGroupConflicts(args){window.conflictSaved=args};export async function reassignJudgeTeam(){};`}));
  await page.route('**/src/interviewScheduleApi*',r=>r.fulfill({contentType:'text/javascript',body:'export const loadInterviewSchedule=async()=>({value:{duration:10,entries:[]},version:0});export const saveInterviewSchedule=async()=>({version:1});'}));
  await page.route('**/interview-test',r=>r.fulfill({contentType:'text/html',body:`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
  import '/src/index.css';import '/@vite/client';import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;
@@ -45,4 +45,16 @@ test('portal uses enabled groups and publishes a reviewed proposal in one step',
  expect(saves).toHaveLength(1);
  expect(saves[0].next.entries.map(entry=>entry.team).sort()).toEqual(['10A','2A']);
  expect(saves[0].next.entries.map(entry=>entry.group).sort()).toEqual(['North','South']);
+});
+
+test('portal declares no conflicts directly on the new group card',async({page})=>{
+ await mount(page,false,true);
+ await page.getByRole('textbox',{name:'Group name or judges’ names'}).fill('Group C');
+ await page.getByRole('button',{name:'Add group',exact:true}).click();
+ const group=page.getByRole('article').filter({has:page.getByRole('heading',{name:'Group C',exact:true})});
+ await group.getByRole('button',{name:'Confirm no conflicts',exact:true}).click();
+ await expect(group.getByText('Conflicts declared',{exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>window.conflictSaved)).toEqual({
+  p_event:'event-one',p_group:'Group C',p_teams:[],p_affiliations:'',p_version:0
+ });
 });

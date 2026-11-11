@@ -1,7 +1,7 @@
 import ConflictTeamSelect from './ConflictTeamSelect';
 import React,{useEffect,useState} from 'react';
 import {listJudgeGroupConflicts,saveJudgeGroupConflicts} from '../judgeGroupApi';
-function ConflictEditor({eventId,profile,onSaved,roster}){
+export function ConflictEditor({eventId,profile,onSaved,roster}){
  const [teams,setTeams]=useState(profile.conflict_teams),[notes,setNotes]=useState(profile.affiliations),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const save=async()=>{setBusy(true);try{await saveJudgeGroupConflicts({p_event:eventId,p_group:profile.name,p_teams:teams,p_affiliations:notes.trim(),p_version:profile.version});await onSaved();}catch(e){setError(e.message);}finally{setBusy(false);}};
  return <section className="my-3 rounded border p-3"><h3 className="font-bold">{profile.name} · {profile.version>0?'Declared':'Not yet declared'}</h3><ConflictTeamSelect label={`Conflicting / affiliated teams for ${profile.name}`} teams={roster} value={teams} onChange={setTeams} disabled={busy}/><label className="block mt-2">Affiliations and notes for {profile.name}<textarea maxLength={2000} value={notes} onChange={e=>setNotes(e.target.value)} className="block w-full min-h-[44px] rounded border bg-transparent p-2"/></label><p className="text-sm my-2">Select all teams to exclude. Leave the selection empty if this group has no conflicts.</p>{error&&<p role="alert" className="text-red-700">{error}</p>}<button disabled={busy} className="min-h-[44px] rounded border px-3" onClick={save}>Save conflicts for {profile.name}</button></section>;
