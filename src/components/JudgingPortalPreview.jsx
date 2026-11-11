@@ -5,7 +5,7 @@ import {AdvisorInterviewNotes} from './JudgeInterviewNotes';
 
 export default function JudgingPortalPreview({eventId,eventName,groupRevision=0,api=portalApi}) {
  const [tab,setTab]=useState('advisor'),[groups,setGroups]=useState([]),[codes,setCodes]=useState([]),[label,setLabel]=useState(''),[mode,setMode]=useState('manual'),[group,setGroup]=useState(''),[issued,setIssued]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
- const load=async()=>{try{const[g,c]=await Promise.all([api.listJudgeGroupCodes(eventId),api.listJudgingPortalCodes(eventId)]);setGroups(g.filter(x=>x.enabled));setCodes(c);setError('');}catch(e){setError(e.message);}};
+ const load=async()=>{try{const[g,c]=await Promise.all([api.listJudgeGroupCodes(eventId),api.listJudgingPortalCodes(eventId)]);setGroups(g.filter(x=>x.enabled));setCodes(c.filter(code=>code.enabled));setError('');}catch(e){setError(e.message);}};
  useEffect(()=>{load();},[eventId,groupRevision,api]);
  const assignedGroup=groups.some(g=>g.name===group)?group:groups.length===1?groups[0].name:'';
  const create=async e=>{e.preventDefault();if(busy)return;setBusy(true);setError('');try{const result=await api.createJudgingPortalCode(eventId,label,mode,assignedGroup);setIssued({...result,label});setLabel('');await load();}catch(e){setError(e.message);}finally{setBusy(false);}};
@@ -21,7 +21,7 @@ export default function JudgingPortalPreview({eventId,eventName,groupRevision=0,
    </form>
    {!groups.length&&<p>Create a judge group above to issue individual codes.</p>}
    {issued&&<div role="status" className="rounded border border-indigo-400 p-3"><p>{issued.label} · Judge code: <code className="select-all font-mono font-bold">{issued.code}</code></p><p>Shown only now. Copy this code before creating another one.</p></div>}
-   {codes.map(c=><div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-3"><p><b>{c.label}</b> · {c.group||'Group assigned at first login'} · {c.mode==='random'?'Random':'JA assigned'} · {c.enabled?'Enabled':'Disabled'}</p><button disabled={busy||!c.enabled} className="min-h-[44px] rounded border px-3" onClick={async()=>{setBusy(true);try{await api.disableJudgingPortalCode(eventId,c.id);await load();}catch(e){setError(e.message);}finally{setBusy(false);}}}>Disable code for {c.label}</button></div>)}
+   {codes.map(c=><div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-3"><p><b>{c.label}</b> · {c.group||'Group assigned at first login'} · {c.mode==='random'?'Random':'JA assigned'}</p><button disabled={busy} className="min-h-[44px] rounded border px-3" onClick={async()=>{setBusy(true);try{await api.disableJudgingPortalCode(eventId,c.id);setIssued(previous=>previous?.id===c.id?null:previous);await load();}catch(e){setError(e.message);}finally{setBusy(false);}}}>Disable code for {c.label}</button></div>)}
    <details className="rounded border p-3">
     <summary className="min-h-[44px] cursor-pointer py-2 font-semibold">Review interview notes</summary>
     <AdvisorInterviewNotes eventId={eventId}/>
