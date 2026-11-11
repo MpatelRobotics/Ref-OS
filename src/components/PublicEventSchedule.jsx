@@ -75,7 +75,7 @@ export default function PublicEventSchedule({ eventId, eventName, onBack, fetchS
         <h1 className="text-2xl font-bold">{eventName || "Event schedule"}</h1>
         {error && <p role="alert">{error} <button type="button" className={control} onClick={() => setRetry(value => value + 1)}>Retry</button></p>}
         {!data && !error && <p role="status">Loading schedule…</p>}
-        {data && !data.available && <p>No public match schedule is available for this event.</p>}
+        {data && !data.available && <p>Waiting for match schedule to be uploaded.</p>}
         {scope && <>
           {schedules.length > 1 && <label className="block font-semibold">Session and division
             <select className={control + " mt-1 block w-full"} value={scopeKey(scope)} onChange={e => setScopeId(e.target.value)}>

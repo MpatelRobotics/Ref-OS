@@ -1,4 +1,4 @@
-import PublicEventSchedule, { fetchPublicSchedule } from '../components/PublicEventSchedule.jsx';
+import PublicEventSchedule from '../components/PublicEventSchedule.jsx';
 import InitialAdminSetup from './InitialAdminSetup.jsx';
 import { isDemoEvent } from '../demoEvents.js';
 import { REFEREE_PORTAL_ENABLED, JUDGE_GROUP_LOGIN_ENABLED } from "../featureAvailability.js";
@@ -302,18 +302,10 @@ function LoginScreenForm({ eventId, eventName, branding = null, onUnlock, onChoo
 
 function EventAccessChoice(props) {
   const { eventId, eventName, branding, onChooseEvent } = props;
-  const [available, setAvailable] = useState(null);
   const [view, setView] = useState('choice');
-  useEffect(() => {
-    let active = true;
-    fetchPublicSchedule(eventId, true)
-      .then(result => { if (active) setAvailable(Boolean(result?.available)); })
-      .catch(() => { if (active) setAvailable(false); });
-    return () => { active = false; };
-  }, [eventId]);
 
   if (view === 'schedule') return <PublicEventSchedule eventId={eventId} eventName={eventName} onBack={() => setView('choice')} />;
-  if (view === 'staff' || available === false) return <LoginScreenForm {...props} onBackToAccess={available ? () => setView('choice') : undefined} />;
+  if (view === 'staff') return <LoginScreenForm {...props} onBackToAccess={() => setView('choice')} />;
   const profile = resolveEventBranding(eventId, eventName ? { name: eventName } : null, branding);
   return (
     <main className="refos-safe-login grid min-h-screen place-items-center bg-slate-100 p-4 text-slate-900 dark:bg-slate-900 dark:text-slate-100">
@@ -321,8 +313,8 @@ function EventAccessChoice(props) {
         <EventLogo src={profile.logo} fallback="/refos-logo.svg" alt="" className="mx-auto h-20 w-20 rounded-lg object-contain" />
         <h1 className="text-2xl font-bold">{profile.name}</h1>
         <button type="button" onClick={() => setView('staff')} className="min-h-[48px] w-full rounded-xl border border-slate-300 px-4 font-semibold dark:border-slate-600">Staff login</button>
-        {available && <button type="button" onClick={() => setView('schedule')} className="min-h-[48px] w-full rounded-xl bg-indigo-700 px-4 font-semibold text-white">Access schedule</button>}
-        {available && <p className="text-sm text-slate-600 dark:text-slate-300">Matches, scores and rankings for teams and spectators. No code needed.</p>}
+        <button type="button" onClick={() => setView('schedule')} className="min-h-[48px] w-full rounded-xl bg-indigo-700 px-4 font-semibold text-white">Access schedule</button>
+        <p className="text-sm text-slate-600 dark:text-slate-300">Matches, scores and rankings for teams and spectators. No code needed.</p>
         <button type="button" onClick={onChooseEvent} className="min-h-[44px] px-3 underline">Choose another event</button>
       </div>
     </main>

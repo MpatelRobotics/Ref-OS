@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 async function openEvent(page){
  await page.route('https://example.supabase.co/**',r=>r.fulfill({contentType:'application/json',body:'[]'}));
  await page.route(/\/src\/api(?:\.js)?(?:\?.*)?$/,async r=>{const res=await r.fetch();let source=await res.text();source=source.replace('export async function getMyEventRole(eventId) {','export async function getMyEventRole(eventId) { return window.fixtureRole||null;').replace('const value = String(credential || "");','const value = String(credential || ""); window.fixtureRole=["1A23","test-admin"].includes(value)?"admin":"ref";').replace('if (String(row.rule_desc || "").includes("PERMANENT_FAIL"))','if (String(row.notes || "").includes("PERMANENT_FAIL"))');await r.fulfill({response:res,body:source});});
- await page.goto('/?page=events');await page.getByRole('button',{name:'Expand all',exact:true}).click();await page.getByRole('button',{name:/Highlander Summit/}).first().click();
+ await page.goto('/?page=events');await page.getByRole('button',{name:'Expand all',exact:true}).click();await page.getByRole('button',{name:/Highlander Summit/}).first().click();await page.getByRole('button',{name:'Staff login',exact:true}).click();
 }
 async function keypadLogin(page,code='1A23'){await openEvent(page);await page.getByRole('textbox',{name:'Event access code',exact:true}).fill(code);}
 async function passwordLogin(page,credential){await openEvent(page);await page.getByRole('button',{name:'Admin login',exact:true}).click();await page.getByPlaceholder('Admin password').fill(credential);await page.getByRole('button',{name:'Enter',exact:true}).click();}

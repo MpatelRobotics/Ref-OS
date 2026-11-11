@@ -30,3 +30,10 @@ test("audience opens and searches schedules and rankings without staff login", a
   await page.getByRole("button", { name: "Staff login", exact: true }).click();
   await expect(page.getByText(/Enter the 4 character access code/)).toBeVisible();
 });
+
+test("audience can open the schedule before matches are uploaded", async ({ page }) => {
+  await page.route("**/rest/v1/rpc/get_public_event_schedule", route => route.fulfill({ json: { available: false } }));
+  await page.goto("/?event=11111111-1111-4111-8111-111111111111");
+  await page.getByRole("button", { name: "Access schedule", exact: true }).click();
+  await expect(page.getByText("Waiting for match schedule to be uploaded.", { exact: true })).toBeVisible();
+});

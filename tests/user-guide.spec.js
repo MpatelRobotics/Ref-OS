@@ -57,6 +57,7 @@ test('Features & Help and contextual help open the guide in the real workspace',
   await page.goto('/?page=events');
   await page.getByRole('button',{name:'Expand all',exact:true}).click();
   await page.getByRole('button', { name: /Highlander Summit/ }).first().click();
+  await page.getByRole('button', { name: 'Staff login', exact: true }).click();
   await page.getByRole('button', { name: 'Admin login', exact: true }).click();
   await page.getByPlaceholder('Admin password').fill('test-admin');
   await page.getByRole('button', { name: 'Enter', exact: true }).click();
