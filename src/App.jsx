@@ -113,9 +113,6 @@ import LostFoundBoard from "./components/LostFoundBoard.jsx";
 
 import QuadrantFieldReset from "./features/field-reset/QuadrantFieldReset.jsx";
 import HelpRequestModal from "./components/modals/HelpRequestModal.jsx";
-import RULE_MANUAL_PAGES from "./manualRulePages.json";
-import manualQuickLinks from "./manualQuickLinks.json";
-import manualSearchIndex from "./manualSearchIndex.json";
 import { HIGHLANDER_EVENT_ID, getEventProfile, resolveEventBranding } from "./eventProfiles.js";
 
 /* Ref OS 2.0 Phase 1: event behavior is resolved through an event profile.
@@ -8107,7 +8104,7 @@ function FeaturesGuide({ isHighlander = true }) {
   return (
     <>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-        Ref OS is an operations app for VEX robotics events. {isHighlander ? `This v${APP_VERSION} Official Release includes the Override rules and manual.` : "This event has its own roster, matches, roles, rules, and settings. An Admin can import rules and Tournament Manager data. The bundled Override manual is only available in the Highlander event."}
+        Ref OS is an operations app for VEX robotics events. {isHighlander ? `This v${APP_VERSION} release includes the Override quick reference and links to the official manual.` : "This event has its own roster, matches, roles, rules, and settings. An Admin can import rules and Tournament Manager data."}
       </p>
 
       <Section icon={KeyRound} title="Login, access codes & roles">
@@ -8236,7 +8233,7 @@ function FeaturesGuide({ isHighlander = true }) {
           <Li><b>Recently used</b> — recently selected rules are shown automatically for faster repeat access.</Li>
           <Li><b>Offline rule index</b> — the event rule index is bundled with Ref-OS, so rule codes, descriptions, categories, favorites, recent rules, and referee notes remain available when Supabase or Wi-Fi is unavailable.</Li>
           <Li><b>Referee guidance</b> — rules with supplemental guidance can be opened for violation notes, escalation guidance, and event-specific interpretation.</Li>
-          <Li><b>Offline Game Manual</b> — open the complete manual with Back, Jump to Table of Contents, and Jump to Quick Reference Guide controls on desktop and mobile.</Li>
+          <Li><b>Official VEX game manuals</b> — read and search the current manuals on manuals.vex.com.</Li>
           <Li><b>Quick Reference links</b> — select a rule inside the manual's Quick Reference Guide to jump directly to that rule in the manual.</Li>
         </ul>
         <p>Favorites and recently used rules are stored on the local browser or device.</p>
@@ -8336,41 +8333,10 @@ const RULE_NOTES = {
   "GG17": "No holding an opponent longer than a 3-count in driver control. Head refs count out loud; the count pauses/ends when the robots separate (~2 ft / one tile), when the held robot gets trapped or pinned by a different robot, or when an escape route opens. After a count ends you can't immediately re-hold the same robot \u2014 that resumes at a 5-count.\nWhen judging if a hold was match-affecting, weigh the full context: the first 3 seconds are legal, so only the extra time counts; how much extra time; how far/long they separated before returning; and what both robots were doing overall. Holding is inherently defensive, so GG15 may also apply on judgment calls.",
 };
 
-// showGameManual: the bundled offline Game Manual viewer (unchanged). hasBundledManual still gates
 // the Highlander-specific referee notes only. qaUrl comes from officialResources.js.
 export function RuleBook({ rules, hasBundledManual = false, showGameManual = true, qaUrl = "", online = true, accent = "" }) {
   const [query, setQuery] = useState("");
-  const [manualQuery, setManualQuery] = useState("");
-  const [selected, setSelected] = useState(null); // rule object shown in the notes popup
-  const [manualOpen, setManualOpen] = useState(false);
-  const [manualPage, setManualPage] = useState(1);
-  const [manualNavigation, setManualNavigation] = useState(0);
-  const goToManualPage = (page) => {
-    setManualPage(page);
-    setManualNavigation((navigation) => navigation + 1);
-  };
-  const openManualAt = (page = 1) => {
-    goToManualPage(page);
-    setManualOpen(true);
-  };
-  const manualImage = `/manual-pages/page-${String(manualPage).padStart(3, "0")}.jpg`;
-  const manualPageLinks = manualQuickLinks[String(manualPage)] || [];
-  const manualSearchResults = useMemo(() => {
-    const cleanQuery = manualQuery.trim().toLowerCase();
-    const terms = cleanQuery.split(/\s+/).filter(Boolean);
-    if (!terms.length) return [];
-    const cleanRuleCode = cleanQuery.replace(/[<>]/g, "").toUpperCase();
-    const directRulePage = RULE_MANUAL_PAGES[cleanRuleCode];
-    return manualSearchIndex.flatMap(({ page, text }) => {
-      const lower = text.toLowerCase();
-      if (!terms.every((term) => lower.includes(term))) return [];
-      const firstMatch = Math.max(0, lower.indexOf(terms[0]));
-      const start = Math.max(0, firstMatch - 75);
-      const end = Math.min(text.length, firstMatch + terms[0].length + 145);
-      const exactRule = /^<?[a-z]{1,3}\d{1,2}>?$/.test(cleanQuery) && lower.includes(`<${cleanQuery.replace(/[<>]/g, "")}>`);
-      return [{ page, directRule: page === directRulePage, exactRule, firstMatch, snippet: `${start > 0 ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}` }];
-    }).sort((a, b) => Number(b.directRule) - Number(a.directRule) || Number(b.exactRule) - Number(a.exactRule) || a.firstMatch - b.firstMatch || a.page - b.page).slice(0, 40);
-  }, [manualQuery]);
+  const [selected, setSelected] = useState(null);
   const noRules = !rules.length;
   const q = query.trim().toUpperCase();
   const filtered = q ? rules.filter((r) => r.code.toUpperCase().includes(q) || (r.desc || "").toUpperCase().includes(q)) : rules;
@@ -8383,17 +8349,7 @@ export function RuleBook({ rules, hasBundledManual = false, showGameManual = tru
   return (
     <>
       {showGameManual&&<div className="mb-3"><OfficialManualsLink/></div>}
-      {(showGameManual || qaUrl) && <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {showGameManual && <button onClick={() => openManualAt(1)} className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
-          <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#0D0F32] text-white dark:bg-slate-950"><BookOpen size={21} /></span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-bold text-slate-900 dark:text-slate-100">Game Manual</span>
-              <span className="block text-xs text-slate-500 dark:text-slate-400">Override 2.1 is saved for offline event access</span>
-            </span>
-            <ChevronRight size={20} className="shrink-0 text-slate-400" />
-          </div>
-        </button>}
+      {qaUrl && <div className="mb-4">
         {qaUrl && (online ? (
           <a href={qaUrl} target="_blank" rel="noopener noreferrer" className="block w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
             <div className="flex items-center gap-3">
@@ -8467,71 +8423,6 @@ export function RuleBook({ rules, hasBundledManual = false, showGameManual = tru
               )}
             </div>
           </div>
-        </div>,
-        document.body
-      )}
-      {manualOpen && createPortal(
-        <div className="fixed inset-0 z-[70] flex flex-col bg-slate-100 dark:bg-slate-950">
-          <div className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-3 py-3 dark:border-slate-800 dark:bg-slate-900">
-            <button onClick={() => setManualOpen(false)} className="refos-back-button shrink-0" aria-label="Back to Rules"><ChevronLeft size={21} /> Back</button>
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-bold text-slate-900 dark:text-white">Override 2.1 Game Manual</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400">Available offline after the app updates</div>
-            </div>
-            <a href={`/manuals/override-2.1.pdf#page=${manualPage}`} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:text-slate-100">Open separately</a>
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
-            <button onClick={() => goToManualPage(3)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">Jump to Table of Contents</button>
-            <button onClick={() => goToManualPage(8)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">Jump to Quick Reference Guide</button>
-            <span className="self-center text-xs text-slate-500 dark:text-slate-400">Page {manualPage}</span>
-          </div>
-          <div className="relative shrink-0 border-b border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
-            <Search size={17} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              value={manualQuery}
-              onChange={(event) => setManualQuery(event.target.value)}
-              placeholder="Search the game manual"
-              aria-label="Search the game manual"
-              className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-9 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            />
-            {manualQuery && <button type="button" onClick={() => setManualQuery("")} aria-label="Clear manual search" className="absolute right-5 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:text-slate-700 dark:hover:text-slate-100"><X size={17} /></button>}
-            {manualQuery.trim() && (
-              <div className="absolute left-3 right-3 top-full z-20 max-h-[45vh] overflow-y-auto rounded-b-xl border border-t-0 border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                {manualSearchResults.length ? manualSearchResults.map((result) => (
-                  <button
-                    key={result.page}
-                    type="button"
-                    onClick={() => { goToManualPage(result.page); setManualQuery(""); }}
-                    className="block w-full border-b border-slate-100 px-4 py-3 text-left last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800"
-                  >
-                    <span className="mb-1 block text-xs font-bold text-[#C53437]">Page {result.page}</span>
-                    <span className="block text-xs leading-relaxed text-slate-600 dark:text-slate-300">{result.snippet}</span>
-                  </button>
-                )) : <div className="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">No matches found in the manual.</div>}
-              </div>
-            )}
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto bg-slate-200 p-2 md:hidden dark:bg-slate-950">
-            <div className="relative mx-auto max-w-3xl bg-white shadow-lg">
-              <img src={manualImage} alt={`Override 2.1 Game Manual page ${manualPage}`} className="block h-auto w-full" />
-              {manualPageLinks.map((link, index) => (
-                <button
-                  key={`${manualPage}-${index}`}
-                  type="button"
-                  onClick={() => goToManualPage(link.page)}
-                  aria-label={`Jump to manual page ${link.page}`}
-                  className="absolute rounded-sm bg-transparent hover:bg-blue-400/15 focus:bg-blue-400/20 focus:outline-none"
-                  style={{ left: `${link.x}%`, top: `${link.y}%`, width: `${link.w}%`, height: `${link.h}%` }}
-                />
-              ))}
-            </div>
-          </div>
-          <div className="shrink-0 items-center justify-between gap-2 border-t border-slate-200 bg-white px-3 py-2 md:hidden dark:border-slate-800 dark:bg-slate-900 flex">
-            <button type="button" onClick={() => goToManualPage(Math.max(1, manualPage - 1))} disabled={manualPage <= 1} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold disabled:opacity-40 dark:border-slate-700">Previous</button>
-            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">Page {manualPage} of 148</span>
-            <button type="button" onClick={() => goToManualPage(Math.min(148, manualPage + 1))} disabled={manualPage >= 148} className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold disabled:opacity-40 dark:border-slate-700">Next</button>
-          </div>
-          <iframe key={manualNavigation} src={`/manuals/override-2.1.pdf?navigation=${manualNavigation}#page=${manualPage}&view=FitH`} title={`Override 2.1 Game Manual page ${manualPage}`} className="hidden min-h-0 w-full flex-1 bg-white md:block" />
         </div>,
         document.body
       )}

@@ -80,8 +80,7 @@ During **Create VEX Event**, choose **VEX IQ** or **V5RC / VEX U**, as well as *
 For IQ events, the Rules tab provides:
 
 - **78 searchable rule references** grouped by category, with rule codes and brief descriptions from the Level Up manual's quick-reference list. These summaries help locate a rule; use the full manual for conditions, exceptions, and rulings.
-- The bundled **VEX IQ Level Up 2026–2027 Game Manual, version 2.0 (September 3, 2026)**. **Read IQ manual** and **Open PDF** open an in-app viewer with **Back to Ref OS**, including on mobile. **Download manual** saves a separate copy.
-- Offline manual access after the updated app finishes downloading its offline files. The bundled edition does not automatically track later official revisions.
+- The official **VEX IQ Level Up Game Manual** opens on manuals.vex.com.
 
 IQ workflows now include **two-partner teamwork matches**, **one shared score**, a **Level Up bag-count scoring aid**, **ranked partner finals**, IQ violation rule choices, imported qualification averages/skills, and inspection preparation. IQ Event Setup and match screens omit the V5 elimination bracket, best-of-three finals, AWP, and opposing-alliance timeout controls.
 
@@ -230,7 +229,7 @@ Developer login also supports passkeys after server setup. See [Developer passke
 
 **Rules**
 - **V5RC / VEX U:** searchable event rule library, initially copied from the V5RC Override 2026–2027 default template. Each event's library is independent and can be imported from CSV. **VEX IQ:** the Rules tab shows the bundled Level Up quick-reference list instead; see [VEX IQ events](#vex-iq-events).
-- **Game Manual** for V5 events opens the bundled Override 2.1 manual (October 8, 2026; 148 pages). IQ events link to the [official Level Up 2.1 online manual](https://manuals.vex.com/iq/level-up/v2.1/prefix/) and offer the older 2.0 PDF as an offline copy.
+- **Official VEX game manuals** opens [manuals.vex.com](https://manuals.vex.com/). The IQ Rules page links directly to the [Level Up manual](https://manuals.vex.com/iq/level-up/v2.1/prefix/).
 - **Official Q&A** opens the official VEX Q&A for the season in a new browser tab. It needs an internet connection; offline, Ref OS says so instead of opening it. The link is set per season in `src/officialResources.js`, not in individual components. Ref OS only links to the Q&A; it does not copy or download it.
 
 **Coordination**
@@ -332,7 +331,7 @@ Ref OS is built for venues with unreliable Wi-Fi and cellular service.
 
 - **Installable app.** Ref OS can be added to the home screen and works as an installed app, with update notifications when a new version is available.
 - **Durable outbox.** New violations and robot photos are saved on the device immediately and upload automatically when the connection returns. The interface shows connection health, pending items, and the last successful sync.
-- **Cached reads.** Recently loaded teams, matches, and rules, previously viewed robot photos, and the app shell remain available offline. The bundled Override and IQ Level Up manuals are available offline after the offline files finish downloading.
+- **Cached reads.** Recently loaded teams, matches, and rules, previously viewed robot photos, and the app shell remain available offline.
 - **Live updates** arrive through Supabase Realtime when connected.
 
 Offline support protects work created on that device. Seeing new information entered by other volunteers, signing in, imports, exports, and administrative changes all require a connection, unless the event uses the optional Local Venue Server described next.
@@ -368,7 +367,7 @@ Share access codes only with volunteers assigned to the corresponding role at th
 
 ## Highlander Summit
 
-Highlander Summit was Ref OS's original production event. It keeps a built-in event profile (name, logo, and branding), its bundled Override 2.0 Game Manual and rules, and its existing historical data.
+Highlander Summit was Ref OS's original production event. It keeps a built-in event profile (name, logo, and branding), its Override quick-reference rules, and its existing historical data.
 
 Highlander Summit is a protected event: it cannot be archived or permanently deleted.
 

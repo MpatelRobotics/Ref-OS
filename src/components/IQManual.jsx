@@ -1,28 +1,10 @@
+import React from "react";
 import OfficialManualsLink from "./OfficialManualsLink";
-import React,{useEffect,useRef,useState} from 'react';
-import {createPortal} from 'react-dom';
-export default function IQManual(){
- const [open,setOpen]=useState(false),back=useRef(null),opener=useRef(null);
- useEffect(()=>{
-  if(!open)return;
-  const previous=document.body.style.overflow;document.body.style.overflow='hidden';back.current?.focus();
-  const escape=e=>{if(e.key==='Escape')setOpen(false);};window.addEventListener('keydown',escape);
-  return()=>{document.body.style.overflow=previous;window.removeEventListener('keydown',escape);opener.current?.focus();};
- },[open]);
- const show=e=>{opener.current=e.currentTarget;setOpen(true);};
- return <section aria-label="VEX IQ manual" className="mb-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 space-y-3">
- <OfficialManualsLink/>
- <h2 className="font-bold text-lg">VEX IQ · Level Up</h2><p className="text-sm">Official manual · Version 2.1 · October 8, 2026</p>
- <p className="text-sm text-slate-500">Use Matches for partner teamwork and shared scores, Finals for ranked partnerships, and Rankings for imported qualification averages and skills. Tournament Manager records official results and resolves tiebreakers.</p>
- <a href="https://manuals.vex.com/iq/level-up/v2.1/prefix/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-[44px] items-center rounded-lg bg-indigo-700 px-4 py-2 font-semibold text-white">Read IQ manual v2.1 online</a>
- <details className="rounded-lg border p-3">
-  <summary className="min-h-[44px] cursor-pointer py-2 font-semibold">Older offline copy · v2.0</summary>
-  <p className="mb-2 text-sm">Use the official online manual for current rulings. The older PDF is available offline after the app downloads its offline files.</p>
-  <div className="flex flex-wrap gap-2"><button type="button" onClick={show} className="min-h-[44px] border rounded-lg px-3 py-2">Open offline PDF v2.0</button><a href="/manuals/levelup-2.0.pdf" download className="min-h-[44px] border rounded-lg px-3 py-2">Download offline PDF v2.0</a></div>
- </details>
- {open&&createPortal(<div role="dialog" aria-modal="true" aria-label="IQ game manual" className="fixed inset-0 z-[100] flex flex-col bg-white dark:bg-slate-900" style={{height:'100dvh',paddingTop:'env(safe-area-inset-top)',paddingBottom:'env(safe-area-inset-bottom)'}}>
- <header className="shrink-0 flex flex-wrap items-center gap-3 border-b border-slate-200 dark:border-slate-700 p-3"><button ref={back} type="button" onClick={()=>setOpen(false)} className="min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 font-semibold">← Back to Ref OS</button><span className="font-semibold text-sm">IQ Level Up · Manual v2.0</span></header>
- <iframe title="VEX IQ Level Up game manual version 2.0" src="/manuals/levelup-2.0.pdf" className="w-full flex-1 min-h-0 border-0" style={{height:'100%'}}/>
- </div>,document.body)}
- </section>;
+
+export default function IQManual() {
+  return (
+    <section aria-label="VEX IQ manual" className="mb-4">
+      <OfficialManualsLink href="https://manuals.vex.com/iq/level-up/v2.1/prefix/" title="Official VEX IQ Level Up manual" />
+    </section>
+  );
 }

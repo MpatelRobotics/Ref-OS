@@ -1,6 +1,5 @@
-const CACHE = "refos-v111-override-2.1";
-const MANUAL_PAGES = Array.from({ length: 148 }, (_, index) => `/manual-pages/page-${String(index + 1).padStart(3, "0")}.jpg`);
-const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/refos-logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png", "/manuals/override-2.1.pdf", "/manuals/levelup-2.0.pdf", ...MANUAL_PAGES];
+const CACHE = "refos-v112-online-manuals";
+const APP_SHELL = ["/", "/manifest.webmanifest", "/logo.svg", "/refos-logo.svg", "/icon-180.png", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(APP_SHELL)));
