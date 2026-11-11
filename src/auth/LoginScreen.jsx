@@ -1,3 +1,4 @@
+import PublicEventSchedule, { fetchPublicSchedule } from '../components/PublicEventSchedule.jsx';
 import InitialAdminSetup from './InitialAdminSetup.jsx';
 import { isDemoEvent } from '../demoEvents.js';
 import { REFEREE_PORTAL_ENABLED, JUDGE_GROUP_LOGIN_ENABLED } from "../featureAvailability.js";
@@ -16,7 +17,7 @@ import { developerPasskey, passkeysSupported } from '../developerPasskey';
 // `remembered` ({ role, label }) is set when this device was locked with Lock This Device ->
 // Event Main Page. The label is display only: onUnlockRemembered asks the server to confirm the
 // device's session, event membership, and role before anything opens.
-function LoginScreenForm({ eventId, eventName, branding = null, onUnlock, onChooseEvent, onEventDeleted, remembered = null, onUnlockRemembered, notice = "" }) {
+function LoginScreenForm({ eventId, eventName, branding = null, onUnlock, onChooseEvent, onEventDeleted, remembered = null, onUnlockRemembered, onBackToAccess, notice = "" }) {
   const profile = resolveEventBranding(eventId, eventName ? { name: eventName } : null, branding);
   const highlander = profile.highlander;
   const accent = profile.accent;
@@ -167,6 +168,7 @@ function LoginScreenForm({ eventId, eventName, branding = null, onUnlock, onChoo
           <span className="mt-2 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-700">Official Release</span>
         </div>
 
+        {onBackToAccess && <button type="button" onClick={onBackToAccess} className="mb-4 min-h-[44px] w-full rounded-xl border border-slate-300 px-4 py-2 font-semibold">Back to event options</button>}
         {REFEREE_PORTAL_ENABLED && <button type="button" onClick={()=>setRefPortal(true)} className="mb-4 min-h-[44px] w-full rounded-xl border border-slate-300 px-4 py-3 font-semibold">Sign in with referee account</button>}
         {REFEREE_PORTAL_ENABLED && <button type="button" onClick={()=>{setMode("personal");setUseDifferentCode(true);setPw("");setErr("");}} className="mb-4 min-h-[44px] w-full rounded-xl border px-4 py-3 font-semibold">Use personal referee passcode</button>}
         {notice && !showRemembered && (
@@ -298,6 +300,39 @@ function LoginScreenForm({ eventId, eventName, branding = null, onUnlock, onChoo
 
 /* ---------------------- NAME (ref identity) ---------------------- */
 
+function EventAccessChoice(props) {
+  const { eventId, eventName, branding, onChooseEvent } = props;
+  const [available, setAvailable] = useState(null);
+  const [view, setView] = useState('choice');
+  useEffect(() => {
+    let active = true;
+    fetchPublicSchedule(eventId, true)
+      .then(result => { if (active) setAvailable(Boolean(result?.available)); })
+      .catch(() => { if (active) setAvailable(false); });
+    return () => { active = false; };
+  }, [eventId]);
+
+  if (view === 'schedule') return <PublicEventSchedule eventId={eventId} eventName={eventName} onBack={() => setView('choice')} />;
+  if (view === 'staff' || available === false) return <LoginScreenForm {...props} onBackToAccess={available ? () => setView('choice') : undefined} />;
+  const profile = resolveEventBranding(eventId, eventName ? { name: eventName } : null, branding);
+  return (
+    <main className="refos-safe-login grid min-h-screen place-items-center bg-slate-100 p-4 text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+      <div className="w-full max-w-md space-y-4 rounded-3xl border border-slate-200 bg-white p-6 text-center dark:border-slate-700 dark:bg-slate-800">
+        <EventLogo src={profile.logo} fallback="/refos-logo.svg" alt="" className="mx-auto h-20 w-20 rounded-lg object-contain" />
+        <h1 className="text-2xl font-bold">{profile.name}</h1>
+        <button type="button" onClick={() => setView('staff')} className="min-h-[48px] w-full rounded-xl border border-slate-300 px-4 font-semibold dark:border-slate-600">Staff login</button>
+        {available && <button type="button" onClick={() => setView('schedule')} className="min-h-[48px] w-full rounded-xl bg-indigo-700 px-4 font-semibold text-white">Access schedule</button>}
+        {available && <p className="text-sm text-slate-600 dark:text-slate-300">Matches, scores and rankings for teams and spectators. No code needed.</p>}
+        <button type="button" onClick={onChooseEvent} className="min-h-[44px] px-3 underline">Choose another event</button>
+      </div>
+    </main>
+  );
+}
+
 export default function LoginScreen(props) {
-  return <InitialAdminSetup key={props.eventId} eventId={props.eventId} onUnlock={props.onUnlock} onChooseEvent={props.onChooseEvent}><LoginScreenForm {...props}/></InitialAdminSetup>;
+  return (
+    <InitialAdminSetup key={props.eventId} eventId={props.eventId} onUnlock={props.onUnlock} onChooseEvent={props.onChooseEvent}>
+      <EventAccessChoice {...props} />
+    </InitialAdminSetup>
+  );
 }
