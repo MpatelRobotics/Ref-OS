@@ -35,7 +35,7 @@ add('roles', 'Getting Started', 'Roles and access', ALL,
   'A guide article does not grant access. Event protections, archived state, and server permissions still apply.', ['navigation', 'codes']);
 add('navigation', 'Navigation', 'Find sections, settings, and help', ALL,
   'Desktop navigation and the phone section picker lead to the same role-specific workspace.', 'Whenever you need to switch tasks.',
-  ['Use the desktop navigation or the mobile Sections menu to select a section.', 'Open a team, match, or robot; use Back to return to its list.', 'Open the Settings menu for your role’s help, display, access, and event actions.', 'Choose Features & Help, then User Guide. Search locally or browse a category.', 'Use View Quick Start or Guided Tour for an introduction to the live interface.'],
+  ['Use the desktop navigation or the mobile Sections menu to select a section.', 'Open a team, match, or robot; use Back to return to its list.', 'Open the Settings menu for your role’s help, display, access, and event actions.', 'Choose Features & Help, then User Guide. Search locally or browse a category.', 'Use Guided Tour for an introduction to the live interface.'],
   'Light/Dark Mode and Text Size are device preferences. The header shows the selected event and connection status.',
   'Unavailable sections may be hidden because of your role or missing imported data. Check those before reporting a fault.', ['roles', 'connection', 'trouble']);
 add('ref-start', 'Quick Starts', 'Referee quick start', REF,

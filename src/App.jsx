@@ -5246,11 +5246,6 @@ const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', com
           </div>
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-2xl mx-auto px-4 py-4">
-              <button onClick={() => { setOnboardingStep(0); setShowOnboarding(true); }} className="w-full mb-4 rounded-xl border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/30 p-4 flex items-center gap-3 text-left">
-                <div className="w-10 h-10 rounded-xl bg-sky-100 dark:bg-sky-900/60 text-sky-700 dark:text-sky-300 flex items-center justify-center shrink-0"><Info size={19}/></div>
-                <div className="flex-1 min-w-0"><div className="font-bold text-slate-900 dark:text-slate-100">View Quick Start</div><div className="text-xs text-slate-500 dark:text-slate-400">Assignments, help requests, and offline saving in three short screens.</div></div>
-                <ChevronRight size={18} className="text-sky-600 shrink-0"/>
-              </button>
               <div className="mb-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-950/30 text-[#D7212B] flex items-center justify-center shrink-0"><Mail size={18} /></div>
                 <div className="flex-1 min-w-0">
