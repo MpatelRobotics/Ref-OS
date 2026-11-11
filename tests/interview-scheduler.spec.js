@@ -6,15 +6,16 @@ test('admin cannot see the developer-only Judging tab',async({page,isMobile})=>{
  const nav=page.getByRole('navigation',{name:isMobile?'Mobile navigation':'Main navigation',exact:true});await expect(nav.getByRole('button',{name:'Judging',exact:true})).toHaveCount(0);await nav.getByRole('button',{name:'Nominations',exact:true}).click();await expect(page.getByText('Interview Optimizer',{exact:true})).toHaveCount(0);
 
 });
-async function mount(page,fail=false){
- await page.route(/\/src\/judgeGroupApi(?:\.js)?(?:\?.*)?$/,r=>r.fulfill({contentType:'text/javascript',body:`export async function sharedJudgeCodeStatus(){return false};export async function manageSharedJudgeCode(){return '1A2B3'};export async function chooseSharedJudgeGroup(){signed=true;return {ok:true}};export async function listJudgingOperations(){return []};export async function saveJudgingOperation(){return 1};export async function listJudgeAssignmentHistory(){return []};export async function listJudgeGroupConflicts(){return ['North','South','Judge group 1'].map(name=>({name,enabled:true,conflict_teams:[],affiliations:'',version:1}))};export async function listJudgeGroupCodes(){return window.deleted?[]:(window.manyGroups||[{name:'North',enabled:true},{name:'South',enabled:true}])} ;export async function createJudgeGroupCode(){return '1A2B3'};export async function disableJudgeGroupCode(){};export async function deleteJudgeGroups(event,names){window.deleted=names};export async function saveJudgeGroupConflicts(args){window.conflictSaved=args};export async function reassignJudgeTeam(){};`}));
+async function mount(page,fail=false,streamlined=false){
+ if(streamlined)await page.route(/JudgingPortalPreview\.jsx(?:\?.*)?$/,r=>r.fulfill({contentType:'text/javascript',body:'export default function(){return null}'}));
+ await page.route(/\/src\/judgeGroupApi(?:\.js)?(?:\?.*)?$/,r=>r.fulfill({contentType:'text/javascript',body:`export async function sharedJudgeCodeStatus(){return false};export async function manageSharedJudgeCode(){return '1A2B3'};export async function chooseSharedJudgeGroup(){signed=true;return {ok:true}};export async function listJudgingOperations(){return []};export async function saveJudgingOperation(){return 1};export async function listJudgeAssignmentHistory(){return []};export async function listJudgeGroupConflicts(){return (${streamlined}?['North','South']:['North','South','Judge group 1']).map(name=>({name,enabled:true,conflict_teams:[],affiliations:'',version:1}))};export async function listJudgeGroupCodes(){return window.deleted?[]:(window.manyGroups||[{name:'North',enabled:true},{name:'South',enabled:true}])} ;export async function createJudgeGroupCode(){return '1A2B3'};export async function disableJudgeGroupCode(){};export async function deleteJudgeGroups(event,names){window.deleted=names};export async function saveJudgeGroupConflicts(args){window.conflictSaved=args};export async function reassignJudgeTeam(){};`}));
  await page.route('**/src/interviewScheduleApi*',r=>r.fulfill({contentType:'text/javascript',body:'export const loadInterviewSchedule=async()=>({value:{duration:10,entries:[]},version:0});export const saveInterviewSchedule=async()=>({version:1});'}));
  await page.route('**/interview-test',r=>r.fulfill({contentType:'text/html',body:`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">
  import '/src/index.css';import '/@vite/client';import RefreshRuntime from '/@react-refresh';RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(type)=>type;window.__vite_plugin_react_preamble_installed__=true;
  const React=(await import('/node_modules/.vite/deps/react.js')).default;const ReactDOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default;const Scheduler=(await import('/src/components/JudgingInterviews.jsx')).default;
  window.saved=[];let value={duration:10,entries:[]};let version=0;const api={loadInterviewSchedule:async()=>({value:structuredClone(value),version}),saveInterviewSchedule:async(event,session,next,expected)=>{window.saved.push({event,session,next,expected});if(${fail})throw Error('Another organizer changed this schedule. Reload saved schedule before making more changes. Your draft is still here.');value=next;version++;return {value,version};}};
- ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Scheduler,{eventId:'event-one',sessionId:'session-one',sessionName:'Session 1',canManage:true,teams:[{number:'10A',name:'Ten'},{number:'2A',name:'Two'}],api}));
- </script></body></html>`}));await page.goto('/interview-test');await expect(page.getByRole('button',{name:'Choose all available teams'})).toBeEnabled();
+ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Scheduler,{eventId:'event-one',sessionId:'session-one',sessionName:'Session 1',canManage:true,developerPreview:${streamlined},teams:[{number:'10A',name:'Ten'},{number:'2A',name:'Two'}],api}));
+ </script></body></html>`}));await page.goto('/interview-test');await expect(page.getByRole('button',{name:streamlined?'Generate interview proposal':'Choose all available teams'})).toBeEnabled();
 }
 
 test('optimizer still saves named group interviews after removing manual scheduler',async({page})=>{
@@ -30,3 +31,18 @@ test('judging setup is visible in order without nested dropdowns',async({page})=
 test('staff enter group conflicts and delete selected logins',async({page})=>{await mount(page);const picker=page.locator('section').filter({has:page.getByRole('heading',{name:'North · Declared',exact:true})}).last();await picker.locator('summary').click();await picker.getByRole('checkbox',{name:'10A · Ten',exact:true}).check();await picker.getByRole('checkbox',{name:'2A · Two',exact:true}).check();await page.getByLabel('Affiliations and notes for North').fill('School A');await page.getByRole('button',{name:'Save conflicts for North',exact:true}).click();expect(await page.evaluate(()=>window.conflictSaved.p_teams)).toEqual(['10A','2A']);await page.getByLabel('Select group North',{exact:true}).check();page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'Delete selected groups & logins',exact:true}).click();await expect(page.getByLabel('Select group North',{exact:true})).toHaveCount(0);expect(await page.evaluate(()=>window.deleted)).toEqual(['North']);});
 
 test('setup imports more than ten groups without a cap',async({page})=>{await mount(page);await page.evaluate(()=>window.manyGroups=Array.from({length:12},(_,i)=>({name:'Judges '+(i+1),enabled:true})));await page.getByRole('button',{name:'Use groups from setup'}).click();await expect(page.getByLabel('Number of judge groups')).toHaveValue('12');await expect(page.getByLabel('Judge group 12 name',{exact:true})).toHaveValue('Judges 12');});
+
+test('portal uses enabled groups and publishes a reviewed proposal in one step',async({page})=>{
+ await mount(page,false,true);
+ await expect(page.getByRole('button',{name:'Use groups from setup'})).toHaveCount(0);
+ await page.getByLabel('Optimizer first interview time').fill('2026-10-13T09:00');
+ await page.getByLabel('Finish interviews by').fill('2026-10-13T11:00');
+ await page.getByRole('button',{name:'Generate interview proposal'}).click();
+ await expect(page.getByText('2 interviews proposed',{exact:false})).toBeVisible();
+ await page.getByRole('button',{name:'Publish interview schedule'}).click();
+ await expect(page.getByText('Interview schedule shared with judge groups.')).toBeVisible();
+ const saves=await page.evaluate(()=>window.saved);
+ expect(saves).toHaveLength(1);
+ expect(saves[0].next.entries.map(entry=>entry.team).sort()).toEqual(['10A','2A']);
+ expect(saves[0].next.entries.map(entry=>entry.group).sort()).toEqual(['North','South']);
+});
