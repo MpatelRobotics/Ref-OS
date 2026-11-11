@@ -1501,7 +1501,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
     setCreateError("");
     try {
       const ev = await api.createVexEvent(cleanName, cleanCode, format);
-      try { await api.upsertEventSetting(ev.id, "competition_program", { program:competitionProgram, label:programLabel(competitionProgram), manual:competitionProgram === "iq" ? "levelup-2.0" : null }); } catch { alert("The event was created, but its competition program could not be saved. Ask an Admin to set the program in Event Setup & Settings; do not create a duplicate event."); }
+      try { await api.upsertEventSetting(ev.id, "competition_program", { program:competitionProgram, label:programLabel(competitionProgram), manual:competitionProgram === "iq" ? "levelup-2.1" : null }); } catch { alert("The event was created, but its competition program could not be saved. Ask an Admin to set the program in Event Setup & Settings; do not create a duplicate event."); }
       // League: optionally create (and start) the first session now. Later sessions are added
       // from the League Overview; they are never required up front.
       if (format === "league" && firstSession.name.trim()) {
@@ -2911,7 +2911,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         setEventSettings((cur) => ({ ...cur, field_names: savedFields }));
       }
       if (setup?.competitionProgram) {
-        const saved=await api.upsertEventSetting(eventId,"competition_program",{program:setup.competitionProgram,label:programLabel(setup.competitionProgram),manual:setup.competitionProgram==="iq"?"levelup-2.0":null},meName);
+        const saved=await api.upsertEventSetting(eventId,"competition_program",{program:setup.competitionProgram,label:programLabel(setup.competitionProgram),manual:setup.competitionProgram==="iq"?"levelup-2.1":null},meName);
         rememberSettingWrite(saved);
         setEventSettings(current=>({...current,competition_program:saved}));
       }
