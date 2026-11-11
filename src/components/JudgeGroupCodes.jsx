@@ -1,32 +1,16 @@
-import {ConflictEditor} from './JudgeConflictOverview';
 import React,{useEffect,useState} from 'react';
-import {createJudgeGroupCode,listJudgeGroupCodes,disableJudgeGroupCode,deleteJudgeGroups,listJudgeGroupConflicts,saveJudgeGroupConflicts} from '../judgeGroupApi';
-export default function JudgeGroupCodes({eventId,entries,groups=[],inline=false,onChanged,onDeleted,quickSetup=false,teams=[]}){
+import {createJudgeGroupCode,listJudgeGroupCodes,disableJudgeGroupCode,deleteJudgeGroups} from '../judgeGroupApi';
+export default function JudgeGroupCodes({eventId,entries,groups=[],inline=false,onChanged,onDeleted,quickSetup=false}){
  const [rows,setRows]=useState([]),[codes,setCodes]=useState({}),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const [newName,setNewName]=useState(''),[selected,setSelected]=useState([]);
  const [copied,setCopied]=useState('');
- const [profiles,setProfiles]=useState([]);
  const [loading,setLoading]=useState(true);
  const reload=async()=>{
-  try {
-   const [groups,conflicts]=await Promise.all([
-    listJudgeGroupCodes(eventId),
-    quickSetup?listJudgeGroupConflicts(eventId):[]
-   ]);
-   setRows(groups);
-   setProfiles(conflicts);
-  }catch(e){setError(e.message);}
+  try {setRows(await listJudgeGroupCodes(eventId));}
+  catch(e){setError(e.message);}
   finally{setLoading(false);}
  };
- useEffect(()=>{void reload();},[eventId,quickSetup]);
- const declareNoConflicts=async name=>{
-  setBusy(true);
-  setError('');
-  try {
-   await saveJudgeGroupConflicts({p_event:eventId,p_group:name,p_teams:[],p_affiliations:'',p_version:0});
-  }catch(e){setError(e.message);}
-  finally{await reload();setBusy(false);}
- };
+ useEffect(()=>{void reload();},[eventId]);
  const names=[...new Set(rows.map(r=>r.name))].sort();
  const canAdd=!loading&&!busy&&Boolean(newName.trim())&&!names.some(name=>name.toLowerCase()===newName.trim().toLowerCase());
  const run=async(name,disable=false)=>{if(!disable&&rows.some(r=>r.name===name)&&!confirm('Replace this group code? Existing group logins will be revoked.'))return;setBusy(true);setCopied('');try{if(disable){await disableJudgeGroupCode(eventId,name);setCodes(old=>({...old,[name]:null}));}else setCodes(old=>({...old,[name]:null}));if(!disable){const code=await createJudgeGroupCode(eventId,name);setCodes(old=>({...old,[name]:code}));if(quickSetup)setNewName('');}setError('');await reload();onChanged?.();}catch(e){setError(e.message);}finally{setBusy(false);}};
@@ -43,16 +27,10 @@ export default function JudgeGroupCodes({eventId,entries,groups=[],inline=false,
   {loading&&<p role="status">Loading groups…</p>}
   {!loading&&!names.length&&<p>Add your first group to start planning interviews.</p>}
   {rows.map(row=>{
-   const profile=profiles.find(item=>item.name===row.name);
    return <article key={row.name} className="space-y-2 rounded border p-3">
     <h3 className="font-semibold">{row.name}</h3>
-    <p>{!row.enabled?'Sign-in disabled':profile?.version>0?'Conflicts declared':'Conflict declaration needed'}</p>
+    {!row.enabled&&<p>Sign-in disabled</p>}
     {codes[row.name]&&<p>Event group login code <code className="select-all font-mono font-bold">{codes[row.name]}</code></p>}
-    {row.enabled&&profile?.version===0&&<button disabled={busy} onClick={()=>declareNoConflicts(row.name)} className="min-h-[44px] rounded border px-3">Confirm no conflicts</button>}
-    {row.enabled&&profile&&<details>
-     <summary className="min-h-[44px] cursor-pointer py-2">{profile.version>0?'Edit conflicts':'Enter conflicts'}</summary>
-     <ConflictEditor key={profile.version} eventId={eventId} profile={profile} roster={teams} onSaved={reload}/>
-    </details>}
     <details>
      <summary className="min-h-[44px] cursor-pointer py-2">Group settings</summary>
      <div className="flex flex-wrap gap-2">
@@ -65,7 +43,7 @@ export default function JudgeGroupCodes({eventId,entries,groups=[],inline=false,
   })}
   {names.length>0&&<details>
    <summary className="min-h-[44px] cursor-pointer py-2">Manage all groups</summary>
-   <button onClick={reload} disabled={busy} className="min-h-[44px] rounded border px-3">Refresh groups and conflicts</button>
+   <button onClick={reload} disabled={busy} className="min-h-[44px] rounded border px-3">Refresh groups</button>
    <button disabled={busy} onClick={()=>remove(names)} className="min-h-[44px] rounded border px-3 text-red-700 dark:text-red-300">Delete all groups &amp; logins</button>
   </details>}
  </section>;

@@ -47,7 +47,7 @@ test('portal uses enabled groups and publishes a reviewed proposal in one step',
  expect(saves[0].next.entries.map(entry=>entry.group).sort()).toEqual(['North','South']);
 });
 
-test('portal declares no conflicts directly on the new group card',async({page})=>{
+test('portal declares no conflicts in the conflict section after group setup',async({page})=>{
  await mount(page,false,true);
  await page.getByRole('textbox',{name:'Group name or judges’ names'}).fill('Group C');
  await page.getByRole('button',{name:'Add group',exact:true}).click();
