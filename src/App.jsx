@@ -1422,9 +1422,15 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
   const [archivedNotice, setArchivedNotice] = useState("");
   const activeEvents = events.filter((ev) => !ev.archivedAt && !deletedIds.has(ev.id) && !isDemoEvent(ev.id) && ev.id !== RETIRED_IQ_DEMO_ID);
   const selectorEvents = developerPage ? events.filter(ev => !deletedIds.has(ev.id)) : activeEvents;
-  const selectorGroups = groupEventsByState(selectorEvents);
+  const programs = ["iq", "v5", "vexu"].map(program => ({
+    program,
+    groups: groupEventsByState(selectorEvents.filter(event => (event.competitionProgram || "v5") === program)),
+  })).filter(section => section.groups.length);
+  const selectorGroups = programs.flatMap(({ program, groups }) =>
+    groups.map(group => ({ ...group, key: program + ":" + group.name }))
+  );
   const [expandedStates,setExpandedStates]=useState({});
-  const allStatesExpanded=selectorGroups.filter(group=>group.name).every(group=>expandedStates[group.name]);
+  const allStatesExpanded=selectorGroups.filter(group=>group.name).every(group=>expandedStates[group.key]);
 
   const archivedEvents = events.filter((ev) => ev.archivedAt && !deletedIds.has(ev.id))
     .sort((a, b) => new Date(b.archivedAt).getTime() - new Date(a.archivedAt).getTime());
@@ -1631,8 +1637,11 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
         {!loading && !error && selectorEvents.length === 0 && (
           <p className="text-center text-slate-500 py-8">No active Ref OS events are available.</p>
         )}
-        {!loading && !error && selectorGroups.some(group=>group.name) && <button type="button" className="refos-expand-events min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700" onClick={()=>setExpandedStates(Object.fromEntries(selectorGroups.filter(group=>group.name).map(group=>[group.name,!allStatesExpanded])))}>{allStatesExpanded ? "Collapse all" : "Expand all"}</button>}
-        {!loading && !error && selectorGroups.filter(group=>group.events.length).map(group=>{
+        {!loading && !error && selectorGroups.some(group=>group.name) && <button type="button" className="refos-expand-events min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700" onClick={()=>setExpandedStates(Object.fromEntries(selectorGroups.filter(group=>group.name).map(group=>[group.key,!allStatesExpanded])))}>{allStatesExpanded ? "Collapse all" : "Expand all"}</button>}
+        {!loading && !error && programs.map(({program, groups})=><React.Fragment key={program}>
+          <h3 className="col-span-full text-lg font-bold text-slate-900 dark:text-white">{programLabel(program)}</h3>
+          {groups.map(group=>{
+          const groupKey=program+":"+group.name;
           const cards=group.events.map((ev) => {
           const profile = resolveEventBranding(ev.id, ev, ev.branding);
           const showShort = profile.hasSavedShortName && profile.shortName.toLowerCase() !== profile.name.toLowerCase();
@@ -1654,11 +1663,12 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
             </button>
           );
         });
-          return group.name ? <details key={group.name} open={!!expandedStates[group.name]} onToggle={event=>{const open=event.currentTarget.open;setExpandedStates(previous=>previous[group.name]===open?previous:{...previous,[group.name]:open});}} className="rounded-xl border border-slate-200 dark:border-slate-700">
+          return group.name ? <details key={groupKey} open={!!expandedStates[groupKey]} onToggle={event=>{const open=event.currentTarget.open;setExpandedStates(previous=>previous[groupKey]===open?previous:{...previous,[groupKey]:open});}} className="rounded-xl border border-slate-200 dark:border-slate-700">
             <summary className="min-h-[48px] cursor-pointer rounded-xl px-4 py-3 font-semibold text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600">{group.name} ({group.events.length})</summary>
             <div className="space-y-3 p-3 pt-0">{cards}</div>
           </details> : <React.Fragment key="main-events">{cards}</React.Fragment>;
         })}
+        </React.Fragment>)}
       </div>
         {!creating ? (
           <button type="button" onClick={() => setCreating(true)}
