@@ -1,3 +1,5 @@
+import EventLocationFields from '../EventLocationFields.jsx';
+import { eventDirectoryLocation, eventLocationError } from '../../eventStateGroups.js';
 import CountryTimezoneSelect from "../CountryTimezoneSelect.jsx";
 import EventProgramChoice from "../EventProgramChoice.jsx";
 import React, { useEffect, useMemo, useState, useRef } from "react";
@@ -24,7 +26,13 @@ function FieldError({ children }) {
   return <p className="mt-1 text-xs font-semibold text-red-700 dark:text-red-300">{children}</p>;
 }
 
-export default function EventSettingsModal({ event, brand, eventTimezone = "", fieldNames = {}, requiredRobotPhotos, onSave, onClose, eventFormat = "tournament", competitionProgram = "v5", fieldCount, canConvertToLeague = false, onConvertToLeague }) {
+export default function EventSettingsModal({ event, brand, eventTimezone = "", savedLocation, importedLocation, fieldNames = {}, requiredRobotPhotos, onSave, onClose, eventFormat = "tournament", competitionProgram = "v5", fieldCount, canConvertToLeague = false, onConvertToLeague }) {
+  const locationBaseline = savedLocation || eventDirectoryLocation({id:event?.id,...importedLocation});
+  const [locationDraft, setLocationDraft] = useState(null);
+  const location = locationDraft || locationBaseline;
+  const locationChanged = Boolean(locationDraft) && (
+    location.country !== locationBaseline.country || location.state.trim() !== locationBaseline.state
+  );
   const [timezone,setTimezone]=useState(eventTimezone);
   const timezoneEdited=useRef(false);
   const changeTimezone=zone=>{timezoneEdited.current=true;setTimezone(zone);};
@@ -110,6 +118,8 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
 
   const validate = () => {
     const next = {};
+    if(locationChanged) next.location=eventLocationError(location) || undefined;
+    if(!next.location) delete next.location;
     if(timezone)try{new Intl.DateTimeFormat('en-US',{timeZone:timezone}).format();}catch{next.timezone="Choose a valid event timezone.";}
     const cleanName = name.trim();
     const cleanShort = shortName.trim();
@@ -144,11 +154,12 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
     const cleanSetup={...setup,quals:Number(setup.quals)||0,practice:Number(setup.practice)||0,bracket:setup.competitionProgram==='iq'?0:Number(setup.bracket),finalsBestOf:setup.competitionProgram==='iq'?1:Number(setup.finalsBestOf)};
     const setupChanged=Object.keys(initialSetup).some(key=>cleanSetup[key]!==initialSetup[key]);
     const photoRequirementsChanged = JSON.stringify(photoRequirements) !== JSON.stringify(initialPhotoRequirements);
-    if (!setupChanged && timezone===eventTimezone && count === initialCount && !nameChanged && !fieldsChanged && !photoRequirementsChanged && !Object.values(identityChanged).some(Boolean)) { onClose(); return; }
+    if (!locationChanged && !setupChanged && timezone===eventTimezone && count === initialCount && !nameChanged && !fieldsChanged && !photoRequirementsChanged && !Object.values(identityChanged).some(Boolean)) { onClose(); return; }
     setSaving(true);
     try {
       await onSave({
         setup:setupChanged?cleanSetup:null,
+        location:locationChanged?{country:location.country,state:location.state.trim()}:null,
         timezone: timezone!==eventTimezone?timezone:null,
         name: nameChanged ? cleanName : null,
         branding: Object.values(identityChanged).some(Boolean) ? {
@@ -211,6 +222,7 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", f
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Used where the full name is too long, such as the phone header.</p>
               <FieldError>{errors.shortName}</FieldError>
             </label>
+            <div><EventLocationFields value={location} onChange={setLocationDraft} disabled={saving} /><FieldError>{errors.location}</FieldError></div>
             <div><CountryTimezoneSelect value={timezone} onChange={changeTimezone}/><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Used for event clocks, scheduled match times and judging interviews. Applies across all divisions. Existing saved times keep the same instant.</p><button type="button" className="mt-2 min-h-[44px] rounded-lg border px-3" onClick={()=>changeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)}>Use this device’s timezone</button><FieldError>{errors.timezone}</FieldError></div>
             <label className="block">
               <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Event logo URL</span>

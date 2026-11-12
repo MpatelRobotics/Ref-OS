@@ -531,15 +531,17 @@ export async function listSelectableEvents() {
     const [lifecycle, formats, locations, programs] = await Promise.all([
       listEventLifecycle(),
       listEventFormats(),
-      supabase.rpc("list_refos_event_locations").then(r=>r.error?[]:r.data||[]).catch(()=>[]),
+      supabase.rpc("list_refos_event_directory_locations").then(r=>r.error?supabase.rpc("list_refos_event_locations"):r).then(r=>r.error?[]:r.data||[]).catch(()=>[]),
       supabase.rpc("list_refos_event_programs").then(r=>r.error?[]:r.data||[]).catch(()=>[]),
     ]);
     const programById = new Map(programs.map(row=>[row.event_id,row.program]));
+    const locationById = new Map(locations.map(row=>[row.event_id,row]));
     return choices.map((choice) => ({
       ...choice,
       competitionProgram: programById.get(choice.id),
-      location: locations.find(row=>row.event_id===choice.id)?.location || "",
-      state: locations.find(row=>row.event_id===choice.id)?.state || "",
+      location: locationById.get(choice.id)?.location || "",
+      state: locationById.get(choice.id)?.state || "",
+      country: locationById.get(choice.id)?.country || "",
       archivedAt: lifecycle?.get(choice.id)?.archivedAt || null,
       createdAt: lifecycle?.get(choice.id)?.createdAt || null,
       format: formats?.get(choice.id)?.format || "tournament",

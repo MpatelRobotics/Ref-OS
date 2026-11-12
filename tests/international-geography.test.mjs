@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {COUNTRIES,countryTimezones,timezoneCountry} from '../src/geography.js';
+import {groupEventsByState} from '../src/eventStateGroups.js';
 import {searchEvents} from '../supabase/functions/vex-event-lookup/lookup.js';
 test('country timezone groups include US, international zones, aliases and explicit UTC',()=>{
  assert.ok(COUNTRIES.length>=240);
@@ -19,4 +20,17 @@ test('international matching accepts country aliases and ignores unrelated state
  assert.equal(result.events.length,4);
  await assert.rejects(searchEvents({...filters,country:'XX'},'fixture-token'),/Enter a country/);
  await assert.rejects(searchEvents({...filters,country:'US',state:''},'fixture-token'),/US state/);
+});
+
+test('event directory honors the selected country and groups regions without confusing US abbreviations',()=>{
+ const events=[
+  {id:'1',country:'CA',state:'ON'},
+  {id:'2',country:'US',state:'CO'},
+  {id:'3',country:'US',state:'Colorado'},
+  {id:'4',location:'Venue, Newark, NJ, United States'},
+  {id:'5'},
+ ];
+ assert.deepEqual(groupEventsByState(events).map(group=>[group.name,group.events.map(event=>event.id)]),[
+  ['Other Events',['5']],['Canada · ON Events',['1']],['CO Events',['2','3']],['NJ Events',['4']],
+ ]);
 });

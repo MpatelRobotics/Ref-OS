@@ -14,7 +14,8 @@ import {sampleRobotPhoto} from './sampleRobotPhotos.js';
 import DemoLauncher from './components/DemoLauncher.jsx';
 import { isDemoEvent, DEMO_IDENTITY, RETIRED_IQ_DEMO_ID } from './demoEvents.js';
 import ExcellenceEligibility from './components/ExcellenceEligibility.jsx';
-import { groupEventsByState } from './eventStateGroups.js';
+import EventLocationFields from './components/EventLocationFields.jsx';
+import { groupEventsByState, eventDirectoryLocation, eventLocationError } from './eventStateGroups.js';
 import { partitionScheduledTeams } from "./scheduledTeams.js";
 import UnscheduledTeams from "./components/UnscheduledTeams.jsx";
 import { REFEREE_PORTAL_ENABLED } from "./featureAvailability.js";
@@ -1477,11 +1478,14 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
   const [format, setFormat] = useState("tournament");
   const [firstSession, setFirstSession] = useState({ name: "Session 1", date: "" });
   const [vexEvent, setVexEvent] = useState(null);
+  const [directoryLocation, setDirectoryLocation] = useState({country:'',state:''});
   const [vexLookupBusy, setVexLookupBusy] = useState(false);
   const receiveVexEvent = (details) => {
     setVexEvent(details);
     if (!details) return;
     setName(details.name);
+    const detectedLocation = eventDirectoryLocation(details);
+    if(detectedLocation.country) setDirectoryLocation(detectedLocation);
     const detectedProgram = detectEventProgram(details); if (detectedProgram) setCompetitionProgram(detectedProgram);
     if (details.eventType === "league" || details.eventType === "tournament") setFormat(details.eventType);
     if (details.eventType === "league" && details.start) setFirstSession(current => ({ ...current, date: details.start.slice(0,10) }));
@@ -1495,6 +1499,8 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
     const cleanCode = adminCode.trim().toUpperCase();
     if (!["iq","v5","vexu"].includes(competitionProgram)) return setCreateError("Choose VEX IQ, V5RC or VEX U.");
     if (vexEvent && detectEventProgram(vexEvent) && detectEventProgram(vexEvent) !== competitionProgram) return setCreateError("The selected program does not match the VEX event lookup. Choose the matching program or clear the lookup.");
+    const locationError=eventLocationError(directoryLocation);
+    if(locationError) return setCreateError(locationError);
     if (cleanName.length < 3) return setCreateError("Enter an event name.");
     if (!/^\d[A-Z]\d\d$/.test(cleanCode)) return setCreateError("Admin code must use the Ref OS 4 character format, for example 3S23.");
     setSaving(true);
@@ -1502,6 +1508,11 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
     try {
       const ev = await api.createVexEvent(cleanName, cleanCode, format);
       try { await api.upsertEventSetting(ev.id, "competition_program", { program:competitionProgram, label:programLabel(competitionProgram), manual:competitionProgram === "iq" ? "levelup-2.1" : null }); } catch { alert("The event was created, but its competition program could not be saved. Ask an Admin to set the program in Event Setup & Settings; do not create a duplicate event."); }
+      try {
+        await api.upsertEventSetting(ev.id, "event_location", {...directoryLocation,state:directoryLocation.state.trim()});
+      } catch {
+        alert("The event was created, but its location could not be saved. Set it in Event Setup & Settings.");
+      }
       // League: optionally create (and start) the first session now. Later sessions are added
       // from the League Overview; they are never required up front.
       if (format === "league" && firstSession.name.trim()) {
@@ -1522,7 +1533,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
         }
       }
       if(vexEvent?.timezone){try{await saveDetectedEventTimezone({api,eventId:ev.id,details:vexEvent});}catch{alert('The event was created, but its detected timezone could not be saved. Set it in Event Setup & Settings.');}}
-      onCreated({ ...ev, format, competitionProgram });
+      onCreated({ ...ev, format, competitionProgram, ...directoryLocation });
     } catch (e) {
       setCreateError(e?.message || "Could not create the event.");
     } finally {
@@ -1681,6 +1692,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Event name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Example: NJ State Championship"
               className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-3 text-slate-900 dark:text-white mb-3" />
+            <div className="mb-3"><EventLocationFields value={directoryLocation} onChange={setDirectoryLocation} disabled={saving || vexLookupBusy} /></div>
             <fieldset className="mb-3">
               <legend className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">Event Format</legend>
               <div className="grid grid-cols-2 gap-2">
@@ -2880,10 +2892,15 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   //   event metadata and shared setup, branding, field and inspection settings.
   // Only the parts the Admin changed are written. Teams, matches, rankings, violations,
   // alliances, nominations, and access credentials are never touched.
-  const saveEventSettings = async ({ setup, timezone, name, branding, fieldNames: nextFieldNames, requiredRobotPhotos: nextPhotoRequirements, fieldCount: nextFieldCount }) => {
+  const saveEventSettings = async ({ setup, timezone, location, name, branding, fieldNames: nextFieldNames, requiredRobotPhotos: nextPhotoRequirements, fieldCount: nextFieldCount }) => {
     if (!adminUnlocked) throw new Error("Only this event's Admin can change event settings.");
     if(setup?.competitionProgram&&eventSettings?.vex_event?.value?.code)assertEventCodeProgram(eventSettings.vex_event.value.code,setup.competitionProgram);
     try {
+      if (location) {
+        const saved=await api.upsertEventSetting(eventId,"event_location",location,meName);
+        rememberSettingWrite(saved);
+        setEventSettings(current=>({...current,event_location:saved}));
+      }
       if (timezone) {
         new Intl.DateTimeFormat('en-US',{timeZone:timezone}).format();
         const savedTimezone=await eventApi.upsertEventSetting(eventId,'event_timezone',{zone:timezone},meName);
@@ -5183,7 +5200,7 @@ const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', com
       {showEventManagement && adminUnlocked && <EventManagementModal event={event} eventId={eventId} brand={brand} roleLabel={myRole} isProtected={eventProtected}
         onArchive={archiveCurrentEvent}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEventManagement(false)} />}
-      {showEventSettings && adminUnlocked && <EventSettingsModal competitionProgram={competitionProgram} eventTimezone={eventSettings?.event_timezone?.value?.zone||''} fieldCount={configuredFieldCount} event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
+      {showEventSettings && adminUnlocked && <EventSettingsModal savedLocation={eventSettings?.event_location?.value} importedLocation={eventSettings?.vex_event?.value} competitionProgram={competitionProgram} eventTimezone={eventSettings?.event_timezone?.value?.zone||''} fieldCount={configuredFieldCount} event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
         eventFormat={league || event?.format === "league" ? "league" : "tournament"}
         canConvertToLeague={!league && !isHighlander && event?.format !== "league"}
         onConvertToLeague={() => setShowConvertLeague(true)}
