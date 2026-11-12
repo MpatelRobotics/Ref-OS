@@ -11,5 +11,5 @@ language sql stable security definer set search_path=public as $$
  left join public.event_settings s on s.event_id=visible.event_id and s.key='competition_program'
  left join public.event_settings v on v.event_id=visible.event_id and v.key='vex_event';
 $$;
-revoke all on function public.list_refos_event_programs() from public, anon;
-grant execute on function public.list_refos_event_programs() to authenticated;
+revoke all on function public.list_refos_event_programs() from public;
+grant execute on function public.list_refos_event_programs() to anon, authenticated;

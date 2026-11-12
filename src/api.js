@@ -526,19 +526,32 @@ export async function listSelectableEvents() {
       accent: r.accent_color || "",
     },
   });
+  async function loadPrograms(choices) {
+    if (!choices.length) return new Map();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { data, error } = await supabase.rpc("list_refos_event_programs");
+        if (error) throw error;
+        const programs = new Map((data || []).map(row => [row.event_id, row.program]));
+        if (choices.every(choice => programs.has(choice.id))) return programs;
+      } catch {
+        // Retry once if the metadata request failed during session startup.
+      }
+    }
+    throw new Error("Could not load the event categories. Try again.");
+  }
   // Phase 7: archive status and creation date, merged onto every event (active and archived).
   const withLifecycle = async (choices) => {
     const [lifecycle, formats, locations, programs] = await Promise.all([
       listEventLifecycle(),
       listEventFormats(),
       supabase.rpc("list_refos_event_directory_locations").then(r=>r.error?supabase.rpc("list_refos_event_locations"):r).then(r=>r.error?[]:r.data||[]).catch(()=>[]),
-      supabase.rpc("list_refos_event_programs").then(r=>r.error?[]:r.data||[]).catch(()=>[]),
+      loadPrograms(choices),
     ]);
-    const programById = new Map(programs.map(row=>[row.event_id,row.program]));
     const locationById = new Map(locations.map(row=>[row.event_id,row]));
     return choices.map((choice) => ({
       ...choice,
-      competitionProgram: programById.get(choice.id),
+      competitionProgram: programs.get(choice.id),
       location: locationById.get(choice.id)?.location || "",
       state: locationById.get(choice.id)?.state || "",
       country: locationById.get(choice.id)?.country || "",

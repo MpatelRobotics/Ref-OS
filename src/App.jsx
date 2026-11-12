@@ -1579,7 +1579,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
           )}
           <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 space-y-3">
             {loading && <p className="text-center text-slate-500 py-8">Loading events…</p>}
-            {!loading && error && <p className="text-center text-red-600 py-5">{error}</p>}
+            {!loading && error && <p role="alert" className="text-center text-red-600 py-5">{error} <button type="button" className="min-h-[44px] px-3 underline" onClick={onReload}>Reload events</button></p>}
             {!loading && !error && archivedEvents.length === 0 && (
               <p className="text-center text-slate-500 py-8">No events are archived.</p>
             )}
