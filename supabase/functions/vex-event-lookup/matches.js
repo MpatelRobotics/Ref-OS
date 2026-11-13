@@ -79,6 +79,8 @@ export function describeVexScores(rows,scores){
 export function mapVexScores(rows, scoredOnly=true, program='v5'){
  const result=[];
  for(const row of rows){
+  const field = [row.field_name, row.field?.name, row.field].find(value => typeof value === 'string' && value.trim() || Number.isSafeInteger(value) && value > 0);
+  const fieldData = field == null ? {} : {field:String(field).trim()};
   if(program==='iq'){
    const phase={1:'practice',2:'qual',5:'final'}[row.round];
    const alliances=row.alliances;
@@ -92,7 +94,7 @@ export function mapVexScores(rows, scoredOnly=true, program='v5'){
    if(scoredOnly&&(!valid||!complete))continue;
    if(row.matchnum>=1000000||row.instance!=null&&(!Number.isSafeInteger(row.instance)||row.instance<0||row.instance>1000))continue;
    const num=(Math.max(1,row.instance??1)-1)*1000000+row.matchnum;
-   result.push({program:'iq',phase,num,red:partners,blue:[],...(scoredOnly?{redScore:scores[0],blueScore:null,winner:null}:{})});
+   result.push({program:'iq',phase,num,red:partners,blue:[],...fieldData,...(scoredOnly?{redScore:scores[0],blueScore:null,winner:null}:{})});
    continue;
   }
   if(scoredOnly&&!vexMatchIsScored(row))continue;
@@ -108,7 +110,7 @@ export function mapVexScores(rows, scoredOnly=true, program='v5'){
   const teams=a=>(a?.teams||[]).map(t=>String(t.team?.name||'').trim().toUpperCase());
   const r=teams(red),b=teams(blue);
   if(!Number.isInteger(num)||num<1||!red||!blue||scoredOnly&&(!Number.isInteger(red.score)||red.score<0||!Number.isInteger(blue.score)||blue.score<0)||r.length!==(program==='vexu'?1:2)||b.length!==(program==='vexu'?1:2)||new Set([...r,...b]).size!==(program==='vexu'?2:4)||![...r,...b].every(n=>/^[A-Z0-9-]+$/.test(n)))continue;
-  result.push({phase,num,red:r,blue:b,...(scoredOnly?{redScore:red.score,blueScore:blue.score}:{})});
+  result.push({phase,num,red:r,blue:b,...fieldData,...(scoredOnly?{redScore:red.score,blueScore:blue.score}:{})});
  }
  return result;
 }

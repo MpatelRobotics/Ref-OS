@@ -1159,7 +1159,7 @@ export async function addMatch(eventId, m) {
 }
 // Insert-only: a concurrent schedule edit must never be overwritten by TM sync.
 export async function insertTmMatch(eventId, m) {
-  const row = { event_id: eventId, phase: m.phase, num: m.num, red: m.red, blue: m.blue };
+  const row = { event_id: eventId, phase: m.phase, num: m.num, red: m.red, blue: m.blue, field: m.field || null };
   const sessionId = leagueSessionFor(eventId);
   if (sessionId) row.session_id = sessionId;
   const { error } = await supabase.from('matches').insert(row);
@@ -2009,6 +2009,17 @@ export async function getEventRobotPhotoRequirements(eventId) {
   const row={key:'robot_photo_requirements',value:data,updatedAt:0,updatedBy:''};
   saveReadCache(eventId,'robot_photo_requirements',[row]);return row;
  }catch(error){const cached=loadReadCache(eventId,'robot_photo_requirements')?.[0];if(cached)return cached;throw error;}
+}
+
+export async function updateSyncedMatchField(eventId, { phase, num, field, existing }, divisionId = 0, sessionId = leagueSessionFor(eventId)) {
+  let query = supabase.from('matches').update({ field })
+    .eq('event_id', eventId).eq('division_id', divisionId).eq('phase', phase).eq('num', Number(num))
+    .contains('red', existing.red).containedBy('red', existing.red)
+    .contains('blue', existing.blue).containedBy('blue', existing.blue);
+  query = sessionId ? query.eq('session_id', sessionId) : query.is('session_id', null);
+  query = existing.field ? query.eq('field', existing.field) : query.or('field.is.null,field.eq.');
+  const { error } = await query;
+  if (error) throw error;
 }
 
 export async function updateExistingVexScore(eventId,row){

@@ -33,6 +33,8 @@ export function normalizeTmSnapshot(data, session, program = 'v5') {
     const partners = [...red,...blue];
     if (iq ? (!['practice','qual','final'].includes(identity.phase) || partners.length < 1 || partners.length > 2 || partners.some(t=>!t) || new Set(partners).size !== partners.length) : (red.length !== (program==='vexu'?1:2) || blue.length !== (program==='vexu'?1:2) || partners.some(t=>!t) || new Set(partners).size !== (program==='vexu'?2:4))) return [];
     const row = { ...identity, red: iq ? partners : red, blue: iq ? [] : blue, ...(iq ? {program:'iq'} : {}) };
+    const field = [info.fieldName, info.field?.name, info.field].find(value => typeof value === 'string' && value.trim() || Number.isSafeInteger(value) && value > 0);
+    if (field != null) row.field = String(field).trim();
     if(Number.isSafeInteger(info.timeScheduled)&&info.timeScheduled>0&&Number.isFinite(new Date(info.timeScheduled*1000).getTime()))row.scheduledAt=new Date(info.timeScheduled*1000).toISOString();
     if (iq && info.state === 'SCORED') {
       const scores = m.finalScore;

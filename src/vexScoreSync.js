@@ -35,3 +35,25 @@ export function excludeHistoricalLeagueMatches(rows,history){
  const sameMatch=(a,b)=>a.phase===b.phase&&Number(a.num)===Number(b.num)&&sameTeams(a.red,b.red)&&sameTeams(a.blue,b.blue);
  return rows.filter(row=>!history.some(prior=>sameMatch(row,prior)));
 }
+
+// A field change applies only to an unambiguous match with the same teams.
+export function planMatchFieldUpdates(matches, rows) {
+ const existing = new Map();
+ for (const match of matches) {
+  const key = `${match.phase}:${match.num}`;
+  existing.set(key, existing.has(key) ? null : match);
+ }
+ const counts = new Map();
+ for (const row of rows) {
+  const key = `${row.phase}:${row.num}`;
+  counts.set(key, (counts.get(key) || 0) + 1);
+ }
+ return rows.flatMap(row => {
+  const key = `${row.phase}:${row.num}`;
+  const match = existing.get(key);
+  const field = typeof row.field === 'string' ? row.field.trim() : '';
+  if (!field || counts.get(key) !== 1 || !match || field === match.field ||
+      !sameTeams(match.red, row.red) || !sameTeams(match.blue, row.blue)) return [];
+  return [{ ...row, field, existing: match }];
+ });
+}

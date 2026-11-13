@@ -228,3 +228,18 @@ test('tied elimination game and replay remain distinct and both scores sync', ()
   assert.deepEqual(snapshot.scores.map(m=>[m.redScore,m.blueScore]), [[0,0],[10,20]]);
   assert.deepEqual(snapshot.warnings, []);
 });
+
+test('TM sync updates the field for an existing matching schedule without changing its score', async () => {
+  const data = fixture(), api = mockApi(), hashes = {};
+  const snapshot = normalizeTmSnapshot(data);
+  api.matches.push({ ...snapshot.matches[0], field: 'Old Field' });
+  api.updateSyncedMatchField = async (_event, row) => { row.existing.field = row.field; };
+  data.matches[0].matchInfo.field = { name: 'Competition Field 4' };
+  await applyTmSnapshot(normalizeTmSnapshot(data), { api, eventId: 'event', hashes, current: () => true });
+  assert.equal(api.matches[0].field, 'Competition Field 4');
+  assert.equal(api.matches[0].redScore, snapshot.matches[0].redScore);
+  assert.equal(api.calls.some(([kind]) => kind === 'scores'), false);
+  data.matches[0].matchInfo.field = '';
+  await applyTmSnapshot(normalizeTmSnapshot(data), { api, eventId: 'event', hashes, current: () => true });
+  assert.equal(api.matches[0].field, 'Competition Field 4');
+});

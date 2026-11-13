@@ -1,4 +1,4 @@
-import { planScoreUpdates } from './vexScoreSync.js';
+import { planMatchFieldUpdates, planScoreUpdates } from './vexScoreSync.js';
 
 // All writes use the app's authenticated API and selected league session.
 export async function applyTmSnapshot(snapshot, { api, eventId, by, includeSchedule, includeSkills=true, checkInOnly=false, hashes, current }) {
@@ -34,11 +34,16 @@ export async function applyTmSnapshot(snapshot, { api, eventId, by, includeSched
       if (!current()) return;
       if (existingMatches.some(m => m.phase === row.phase && m.num === row.num)) continue;
       // Result application stays separate so scores use matching-team checks.
-      if (await api.insertTmMatch(eventId, { phase: row.phase, num: row.num, red: row.red, blue: row.blue })) added++;
+      if (await api.insertTmMatch(eventId, { phase: row.phase, num: row.num, red: row.red, blue: row.blue, ...(row.field ? { field: row.field } : {}) })) added++;
     }
     remember('matches', snapshot.matches);
     if (!current()) return;
     existingMatches = await api.listMatches(eventId, { strict: true });
+  }
+  if (!current()) return;
+  for (const row of planMatchFieldUpdates(existingMatches, snapshot.matches)) {
+    if (!current()) return;
+    await api.updateSyncedMatchField(eventId, row);
   }
   if (!current()) return;
   const plan = planScoreUpdates(existingMatches, snapshot.scores);

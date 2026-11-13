@@ -27,7 +27,7 @@ import {parseManualScheduledTime,mergeManualMatchTimes,isTmTimesOnlyTable,parseT
 import ScheduledMatchTime from './components/ScheduledMatchTime';
 import { eliminationPairingKey, eliminationPairingLabel, eliminationResultLabel, eliminationGameLabel } from './tmReplayGrouping.js';
 import { latestTmAttempts, tmMatchIdentity, tmPairingNumber, tmGameNumber, tmMatchOrder } from './tmMatchIdentity.js';
-import {planScoreUpdates,planMissingVexMatches,planVexRosterUpdates,excludeHistoricalLeagueMatches} from "./vexScoreSync.js";
+import {planScoreUpdates,planMatchFieldUpdates,planMissingVexMatches,planVexRosterUpdates,excludeHistoricalLeagueMatches} from "./vexScoreSync.js";
 import {parseViolationRuleNotes,validViolationRuleDetails,formatViolationRuleNotes} from "./violationRuleNotes.js";
 import DeveloperLiveActivity from "./components/DeveloperLiveActivity.jsx";
 import useLiveActivity from "./useLiveActivity.js";
@@ -132,11 +132,10 @@ const DEFAULT_FIELD_NAMES = { "Field 1": "Field 1", "Field 2": "Field 2", "Field
 // "Field #1", "Field-1", "field_1", "#1", and a bare "1".
 const canonicalFieldKey = (field) => {
   const raw = String(field ?? "").trim();
-  const match = raw.match(/^(?:field|f)?\s*[#_-]?\s*([123])$/i);
+  const match = raw.match(/^(?:field|f)?\s*[#_-]?\s*([1-9][0-9]*)$/i);
   return match ? `Field ${match[1]}` : raw;
 };
-// Fields beyond the three named ones (a TM export can use any number) read as "Field N".
-const fieldDisplayName = (field, fieldNames = DEFAULT_FIELD_NAMES) => fieldNames?.[canonicalFieldKey(field)] || (/^\d+$/.test(String(field ?? "").trim()) ? `Field ${String(field).trim()}` : field) || "";
+const fieldDisplayName = (field, fieldNames = DEFAULT_FIELD_NAMES) => (Object.hasOwn(fieldNames, canonicalFieldKey(field)) ? fieldNames[canonicalFieldKey(field)] : canonicalFieldKey(field));
 const initials = (name) =>
   (name || "").trim().split(/\s+/).map((w) => w[0]).join("").slice(0, 3).toUpperCase() || "?";
 
@@ -1976,9 +1975,25 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const explainDemoLock = () => alert("Highlander Summit matches, alliances, and violations are read only for the demo.");
   const configuredFieldCount = Math.max(1, Math.min(3, Number(eventSettings?.field_configuration?.value?.count) || (event?.format === 'league' || league ? 1 : 3)));
   const savedFieldNames = eventSettings?.field_names?.value;
+  const tmFieldSets = eventSettings?.tm_field_activity?.value?.fieldSets;
+  const scheduleFields = useMemo(() => {
+    const scheduledMatches = Object.values(matches);
+    const names = scheduledMatches.map(match => canonicalFieldKey(match.field)).filter(Boolean);
+    if (!names.length && scheduledMatches.length) {
+      for (const set of tmFieldSets || []) {
+        for (const field of set.fields || []) {
+          const name = canonicalFieldKey(field.name);
+          if (name) names.push(name);
+        }
+      }
+    }
+    return [...new Set(names)].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  }, [matches, tmFieldSets]);
+  const fieldLocations = scheduleFields.length ? scheduleFields : Object.keys(DEFAULT_FIELD_NAMES).slice(0, configuredFieldCount);
   // Same field_names setting used by Event Settings and the Field Name Configurator:
   // { "Field 1": "...", "Field 2": "...", "Field 3": "..." }. Blank or invalid entries keep the default.
   const fieldNames = useMemo(() => {
+    if (scheduleFields.length) return {};
     const names = { ...DEFAULT_FIELD_NAMES };
     if (savedFieldNames && typeof savedFieldNames === "object") {
       for (const key of Object.keys(DEFAULT_FIELD_NAMES)) {
@@ -1987,7 +2002,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       }
     }
     return names;
-  }, [savedFieldNames]);
+  }, [savedFieldNames, scheduleFields]);
   const volunteerAssignments = eventSettings?.volunteer_assignments?.value || {};
   const myAssignment = volunteerLocation(volunteerAssignments, currentUserId, meName);
   const [failedSyncItems, setFailedSyncItems] = useState([]);
@@ -3711,6 +3726,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       let added=0;
       for(const row of missing){assertSession();if(await targetApi.insertTmMatch(eventId,row))added++;}
       if(missing.length)fresh=await targetApi.listMatches(eventId,{strict:true});
+      for(const row of planMatchFieldUpdates(fresh,scheduleRows)){assertSession();await targetApi.updateSyncedMatchField(eventId,row);}
       const plan=planScoreUpdates(fresh,scoreRows);
       let updated=0;for(const row of plan.updates){assertSession();updated+=await targetApi.updateExistingVexScore(eventId,row);}
       const isCurrentDivision=!data.division || Number(data.division)===divisionId || !divisionId;
@@ -5017,7 +5033,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       )}
       {addTeam && <AddTeamModal onClose={() => setAddTeam(false)} onSave={async (num, name) => { await upsertTeam(num, name); setAddTeam(false); }} />}
       {showIdentity && <IdentityModal me={{ nickname: meName, fullName: meFullName, phone: mePhone }} onSave={async (identity) => { await onEditName(identity); setShowIdentity(false); }} onClose={() => setShowIdentity(false)} />}
-      {showHelpRequest && <HelpRequestModal fieldCount={configuredFieldCount} fieldNames={fieldNames} onSend={sendHelpRequest} onClose={() => setShowHelpRequest(false)} />}
+      {showHelpRequest && <HelpRequestModal fieldLocations={fieldLocations} fieldNames={fieldNames} onSend={sendHelpRequest} onClose={() => setShowHelpRequest(false)} />}
       {showNotificationPreferences && createPortal(
         <div className="fixed inset-0 z-[90] bg-black/45 flex items-end sm:items-center justify-center" onClick={() => setShowNotificationPreferences(false)}>
           <div className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-white dark:bg-slate-800 shadow-2xl overflow-hidden" onClick={(event) => event.stopPropagation()}>
@@ -5046,7 +5062,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
               <h2 id="volunteer-status-title" className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><Users size={18} /> Key Volunteer Status</h2>
               <button type="button" aria-label="Close volunteer status" onClick={() => setShowOnline(false)} className="min-h-[44px] min-w-[44px] grid place-items-center rounded-lg text-slate-600 dark:text-slate-300"><X size={22} /></button>
             </div>
-            <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y"><OnlineList isDeveloper={isDeveloper} fieldCount={configuredFieldCount} presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} eventMembers={eventMembers} onSetAdmin={adminUnlocked ? setVolunteerAdmin : undefined} assignments={volunteerAssignments} onSetAssignment={adminUnlocked ? setVolunteerAssignment : undefined} fieldNames={fieldNames} /></div>
+            <div className="p-4 flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y"><OnlineList isDeveloper={isDeveloper} fieldLocations={fieldLocations} presence={presence} roster={refRoster} meName={meName} onRemove={adminUnlocked ? removeRef : undefined} eventMembers={eventMembers} onSetAdmin={adminUnlocked ? setVolunteerAdmin : undefined} assignments={volunteerAssignments} onSetAssignment={adminUnlocked ? setVolunteerAssignment : undefined} fieldNames={fieldNames} /></div>
             <div className="shrink-0 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
               <button type="button" onClick={() => setShowOnline(false)} className="w-full min-h-[44px] rounded-xl bg-[#0D0F32] px-4 py-3 font-semibold text-white">Close</button>
             </div>
@@ -5200,7 +5216,7 @@ const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', com
       {showEventManagement && adminUnlocked && <EventManagementModal event={event} eventId={eventId} brand={brand} roleLabel={myRole} isProtected={eventProtected}
         onArchive={archiveCurrentEvent}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEventManagement(false)} />}
-      {showEventSettings && adminUnlocked && <EventSettingsModal savedLocation={eventSettings?.event_location?.value} importedLocation={eventSettings?.vex_event?.value} competitionProgram={competitionProgram} eventTimezone={eventSettings?.event_timezone?.value?.zone||''} fieldCount={configuredFieldCount} event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
+      {showEventSettings && adminUnlocked && <EventSettingsModal savedLocation={eventSettings?.event_location?.value} importedLocation={eventSettings?.vex_event?.value} competitionProgram={competitionProgram} eventTimezone={eventSettings?.event_timezone?.value?.zone||''} fieldCount={configuredFieldCount} scheduleFields={scheduleFields} event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
         eventFormat={league || event?.format === "league" ? "league" : "tournament"}
         canConvertToLeague={!league && !isHighlander && event?.format !== "league"}
         onConvertToLeague={() => setShowConvertLeague(true)}
@@ -6027,7 +6043,7 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
   const inTab = all.filter(m => tab === "practice" ? m.phase === "practice" : tab === "elim" ? m.phase && m.phase !== "qual" && m.phase !== "practice" : m.phase !== "practice" && (isIQ || (m.phase || "qual") === "qual"));
   const PHASE_ORDER = { qual: 0, practice: 1, r16: 2, qf: 3, sf: 4, final: 5 };
   const list = inTab.sort((a, b) => (PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase]) || tmMatchOrder(a,b));
-  const fields = [...new Set(list.map((m) => m.field).filter(Boolean))].sort();
+  const fields = [...new Set(list.map((m) => canonicalFieldKey(m.field)).filter(Boolean))].sort();
   const vcount = {};
   for (const v of viols) {
     if (!v.match || !v.match.phase || v.match.phase === "none" || v.match.num == null) continue;
@@ -6035,7 +6051,7 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
     vcount[id] = (vcount[id] || 0) + 1;
   }
   const q = query.trim().toUpperCase();
-  const base = field === "all" ? list : list.filter((m) => m.field === field);
+  const base = field === "all" || !fields.includes(field) ? list : list.filter((m) => canonicalFieldKey(m.field) === field);
   const filtered = q
     ? base.filter((m) => String(m.num) === q || String(m.num).startsWith(q) || (m.label || "").toUpperCase().includes(q) || m.red.some((t) => t.includes(q)) || m.blue.some((t) => t.includes(q)))
     : base;
@@ -6923,9 +6939,9 @@ function roleChip(role) {
   }
 }
 
-const VOLUNTEER_LOCATIONS = ["Field 1", "Field 2", "Field 3", "Pit Floor", "Competition Floor", "Skills", "Judging"];
+const VOLUNTEER_LOCATIONS = ["Pit Floor", "Competition Floor", "Skills", "Judging"];
 
-function OnlineList({ isDeveloper=false, fieldCount=3, presence, roster, meName, onRemove, eventMembers = [], onSetAdmin, assignments = {}, onSetAssignment, fieldNames = DEFAULT_FIELD_NAMES }) {
+function OnlineList({ isDeveloper=false, fieldLocations=Object.keys(DEFAULT_FIELD_NAMES), presence, roster, meName, onRemove, eventMembers = [], onSetAdmin, assignments = {}, onSetAssignment, fieldNames = DEFAULT_FIELD_NAMES }) {
   const onlineCounts = {};
   const roleByName = {};
   const userIdByName = {};
@@ -6985,7 +7001,7 @@ function OnlineList({ isDeveloper=false, fieldCount=3, presence, roster, meName,
                   <span className="text-xs font-semibold text-slate-500 dark:text-slate-300 shrink-0">Assignment</span>
                   <select value={assignment} onChange={(event) => onSetAssignment(member, event.target.value)} className="ml-auto min-w-0 flex-1 max-w-[190px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-100">
                     <option value="">Unassigned</option>
-                    {VOLUNTEER_LOCATIONS.filter(location=>!/^Field [123]$/.test(location)||Number(location.slice(-1))<=fieldCount||Object.values(assignments).some(a=>a?.location===location)).map((location) => <option key={location} value={location}>{fieldDisplayName(location, fieldNames)}</option>)}
+                    {[...new Set([...fieldLocations, ...VOLUNTEER_LOCATIONS, ...(assignment ? [assignment] : [])])].map((location) => <option key={location} value={location}>{fieldDisplayName(location, fieldNames)}</option>)}
                   </select>
                 </label>
               )}
