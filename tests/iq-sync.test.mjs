@@ -42,10 +42,15 @@ test('VEX IQ snapshot selects program and fetches roster, schedule and scores',a
   if(u.pathname.endsWith('/events'))data={data:[{id:1,sku:'VE-IQ-27-12345'}]};
   else if(u.pathname.endsWith('/events/1'))data={program:{name:'VEX IQ Robotics Competition'},divisions:[{id:1,name:'IQ'}]};
   else if(u.pathname.endsWith('/teams'))data={data:[{number:'7',team_name:'Seven'}],meta:{last_page:1}};
-  else data={data:[publicMatch],meta:{last_page:1}};
+  else data={data:[publicMatch,
+    {...publicMatch,round:15,matchnum:5,alliances:[{color:'red',score:116,teams:[{team:{name:'8128Z'}}]},{color:'blue',score:116,teams:[{team:{name:'1555A'}}]}]},
+  ],meta:{last_page:1}};
   return new Response(JSON.stringify(data));
  };
  const data=await fetchVexStandings('VE-IQ-27-12345',1,'test-token',fetcher,'scores');
- assert.equal(data.program,'iq');assert.equal(data.scores.length,1);assert.equal(data.matches.length,1);assert.equal(data.scoreSummary.unsupported,0);
+ assert.equal(data.program,'iq');assert.equal(data.scores.length,2);assert.equal(data.matches.length,2);assert.equal(data.scoreSummary.unsupported,0);
+ const publishedFinal = data.scores[1];
+ assert.deepEqual(publishedFinal, {program:'iq',phase:'final',num:5,red:['8128Z','1555A'],blue:[],redScore:116,blueScore:null,winner:null});
+ assert.equal(planScoreUpdates([{...data.matches[1],red:['1555A','8128Z']}], [publishedFinal]).updates.length, 1);
  assert.deepEqual(data.teams,[{number:'7',name:'Seven'}]);
 });

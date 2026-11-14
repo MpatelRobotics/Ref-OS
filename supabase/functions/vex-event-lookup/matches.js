@@ -82,7 +82,7 @@ export function mapVexScores(rows, scoredOnly=true, program='v5'){
   const field = [row.field_name, row.field?.name, row.field].find(value => typeof value === 'string' && value.trim() || Number.isSafeInteger(value) && value > 0);
   const fieldData = field == null ? {} : {field:String(field).trim()};
   if(program==='iq'){
-   const phase={1:'practice',2:'qual',5:'final'}[row.round];
+   const phase={1:'practice',2:'qual',5:'final',15:'final'}[row.round];
    const alliances=row.alliances;
    if(!phase||!Number.isSafeInteger(row.matchnum)||row.matchnum<1||!Array.isArray(alliances)||![1,2].includes(alliances.length))continue;
    const ordered=[...alliances].sort((a,b)=>(a.color==='blue')-(b.color==='blue'));
