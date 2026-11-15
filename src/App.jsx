@@ -1559,7 +1559,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
             <p>Reach out for help setting up an event, to report a problem, or to share feedback.</p>
             <ul className="mt-2">
               <li><a className="inline-flex min-h-11 items-center underline" href="mailto:refos.app@gmail.com">Email refos.app@gmail.com</a></li>
-              <li><a className="inline-flex min-h-11 items-center underline" href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer">Instagram @mpatel_ref</a></li>
+              <li><a className="inline-flex min-h-11 items-center underline" href="https://www.instagram.com/refos.fyi/" target="_blank" rel="noopener noreferrer">Instagram @refos.fyi</a></li>
               <li className="flex min-h-11 items-center">Discord mpatel_ref</li>
             </ul>
           </section>
