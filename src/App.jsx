@@ -1553,10 +1553,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
       </div>
       {!developerPage && selectorSection === "creator" ? (
         <main className="refos-welcome space-y-6" aria-label="About & Contact">
-          <section className="refos-welcome-start">
-            <h2 className="text-xl font-bold">Maharshi Patel</h2>
-            <p>I’m a VEX head referee and the creator of Ref-OS. I built it to help referee crews keep track of matches, violations, and team notes in one place.</p>
-          </section>
+          <AboutFounder />
           <section className="refos-welcome-start">
             <h2 className="text-xl font-bold">Get in touch</h2>
             <p>Reach out for help setting up an event, to report a problem, or to share feedback.</p>
