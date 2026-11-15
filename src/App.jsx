@@ -1548,10 +1548,26 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
     <div className="refos-event-selector-content w-full max-w-xl">
       <div className="text-center mb-6">
         <img src="/refos-logo.svg" alt="Ref OS" className="h-20 mx-auto mb-3" />
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{!developerPage && selectorSection === "about" ? "Ref-OS - Referee Operating System" : !developerPage && selectorSection === "venue" ? "Venue Server" : !developerPage && selectorSection === "demo" ? "Try the Ref-OS demo" : view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{!developerPage && selectorSection === "about" ? "Tools for the volunteers who keep VEX events moving." : !developerPage && selectorSection === "venue" ? "Set up local sharing for your event." : !developerPage && selectorSection === "demo" ? "Explore V5 Override with 32 fictional teams. Use demo code DEMOV5." : view === "archived" ? "Archived events keep all of their data. Use the event’s Admin code or the Developer code to restore one." : "Select the event this device is working at."}</p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{!developerPage && selectorSection === "about" ? "Ref-OS - Referee Operating System" : !developerPage && selectorSection === "creator" ? "About & Contact" : !developerPage && selectorSection === "venue" ? "Venue Server" : !developerPage && selectorSection === "demo" ? "Try the Ref-OS demo" : view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{!developerPage && selectorSection === "about" ? "Tools for the volunteers who keep VEX events moving." : !developerPage && selectorSection === "creator" ? null : !developerPage && selectorSection === "venue" ? "Set up local sharing for your event." : !developerPage && selectorSection === "demo" ? "Explore V5 Override with 32 fictional teams. Use demo code DEMOV5." : view === "archived" ? "Archived events keep all of their data. Use the event’s Admin code or the Developer code to restore one." : "Select the event this device is working at."}</p>
       </div>
-      {!developerPage && selectorSection === "venue" ? <VenueServerAccess/> : !developerPage && selectorSection === "about" ? <RefOsWelcome onEvents={()=>{setSelectorSection("active");window.scrollTo({top:0,left:0,behavior:'instant'});}} onDemo={()=>{setSelectorSection("demo");setDemoRequest(value=>value+1);window.scrollTo({top:0,left:0,behavior:'instant'});}}/> : !developerPage && selectorSection === "demo" ? <DemoLauncher key={demoRequest} openRequest={demoRequest} onChoose={onChoose}/> : <>
+      {!developerPage && selectorSection === "creator" ? (
+        <main className="refos-welcome space-y-6" aria-label="About & Contact">
+          <section className="refos-welcome-start">
+            <h2 className="text-xl font-bold">Maharshi Patel</h2>
+            <p>I’m a VEX head referee and the creator of Ref-OS. I built it to help referee crews keep track of matches, violations, and team notes in one place.</p>
+          </section>
+          <section className="refos-welcome-start">
+            <h2 className="text-xl font-bold">Get in touch</h2>
+            <p>Reach out for help setting up an event, to report a problem, or to share feedback.</p>
+            <ul className="mt-2">
+              <li><a className="inline-flex min-h-11 items-center underline" href="mailto:refos.app@gmail.com">Email refos.app@gmail.com</a></li>
+              <li><a className="inline-flex min-h-11 items-center underline" href="https://www.instagram.com/mpatel_ref/" target="_blank" rel="noopener noreferrer">Instagram @mpatel_ref</a></li>
+              <li className="flex min-h-11 items-center">Discord mpatel_ref</li>
+            </ul>
+          </section>
+        </main>
+      ) : !developerPage && selectorSection === "venue" ? <VenueServerAccess/> : !developerPage && selectorSection === "about" ? <RefOsWelcome onEvents={()=>{setSelectorSection("active");window.scrollTo({top:0,left:0,behavior:'instant'});}} onDemo={()=>{setSelectorSection("demo");setDemoRequest(value=>value+1);window.scrollTo({top:0,left:0,behavior:'instant'});}}/> : !developerPage && selectorSection === "demo" ? <DemoLauncher key={demoRequest} openRequest={demoRequest} onChoose={onChoose}/> : <>
       {REFEREE_PORTAL_ENABLED && !developerPage && <button type="button" onClick={()=>setRefPortal(true)} className="mb-4 min-h-[44px] w-full rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white">Referee portal · Sign in or create account</button>}
       {developerPage && developerSession.error && <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-300">{developerSession.error}</p>}
       {developerPage && developerSession.checking ? <p className="py-4 text-center">Checking developer sign-in...</p> : developerPage && !developerPageUnlocked ? <DeveloperPageLock events={events} onUnlock={developerSession.unlock}/> : <>
