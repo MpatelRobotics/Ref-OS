@@ -4963,6 +4963,10 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           <div className="px-3 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 flex items-center gap-2 shrink-0">
             <button onClick={() => setShowByRule(false)} className="refos-back-button"><ChevronLeft size={22} /> Back</button>
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><BarChart3 size={18} /> Violations by rule</h2>
+            <button type="button" onClick={exportViolations} disabled={!viols.length}
+              className="ml-auto inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm font-semibold text-slate-900 disabled:opacity-50 dark:border-slate-600 dark:text-slate-100">
+              <Download size={16} aria-hidden="true" /> Export PDF
+            </button>
           </div>
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-4xl mx-auto px-4 py-5">
