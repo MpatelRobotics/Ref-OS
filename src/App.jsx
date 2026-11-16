@@ -45,6 +45,7 @@ import {EventTmSync,EventTmSyncRegistration,useEventTmSync} from "./components/E
 import EventOperations from './components/EventOperations';
 import EventArchiveTools from './components/EventArchiveTools';
 import OfflineEventTools from './components/OfflineEventTools';
+import { buildMatchAnomalyLog } from "./matchAnomalyLog.js";
 import {collectArchive,downloadFile} from './eventArchive';
 import TmFieldActivity from "./components/TmFieldActivity.jsx";
 import RobotCheckIn from "./components/RobotCheckIn.jsx";
@@ -75,7 +76,7 @@ import * as eventApi from "./api";
 const api = eventApi;
 import { createDivisionApi } from "./divisionApi.js";
 import * as outbox from "./outbox";
-import { PDFDocument, StandardFonts, breakTextIntoLines, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { APP_VERSION } from "./appVersion";
 import { ROBOT_PHOTO_SLOTS, normalizeRequiredRobotPhotos, robotPhotoSlots } from "./robotPhotoRequirements";
 import { compressRobotPhoto } from "./photoCompression";
@@ -4297,34 +4298,24 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     }
 
     try {
-      const pdf = await PDFDocument.create();
-      const font = await pdf.embedFont(StandardFonts.Helvetica);
-      const supported = new Set(font.getCharacterSet());
-      const clean = value => Array.from(String(value ?? "").replace(/\s+/g, " ").trim())
-        .map(character => supported.has(character.codePointAt(0)) ? character : "?").join("");
-      let page;
-      let y;
-      const draw = (value, size = 10) => {
-        for (const line of breakTextIntoLines(clean(value), [" "], 528, text => font.widthOfTextAtSize(text, size))) {
-          if (!page || y < 48) {
-            page = pdf.addPage([612, 792]);
-            y = 744;
-          }
-          page.drawText(line.trim(), { x: 42, y, font, size });
-          y -= size + 6;
-        }
-      };
-      draw(event.name || "Current event", 16);
-      draw(league ? `Match Anomaly Log - ${league.session.name}` : "Match Anomaly Log", 13);
-      const rows = [...viols].sort((a, b) => String(a.team).localeCompare(String(b.team), undefined, { numeric: true }) || a.createdAt - b.createdAt);
-      for (const violation of rows) {
-        const { team, match, type, code, notes, desc, byFullName, by } = violation;
-        draw([team, fmtMatch(match) || "No match", TYPES[type]?.label || type, code && fmtRule(code)].filter(Boolean).join(" | "));
-        draw(notes || desc);
-        draw(`Logged by ${byFullName || by || "Unknown"}`);
-        y -= 8;
-      }
-      downloadFile(await pdf.save(), `${(event.name || "ref-os").replace(/[^a-z0-9]+/gi, "-")}-match-anomaly-log.pdf`, "application/pdf");
+      const response = await fetch("/forms/match-anomaly-log-blank.pdf");
+      if (!response.ok) throw new Error("Match Anomaly Log template could not be loaded.");
+      const rows = [...viols].sort((a, b) => a.createdAt - b.createdAt).map(violation => ({
+        team: String(violation.team || "Unknown team"),
+        match: fmtMatch(violation.match) || "No match recorded",
+        rules: splitRuleCodes(violation.code),
+        type: violation.type,
+        result: TYPES[violation.type]?.label || violation.type,
+        notes: violation.notes || violation.desc,
+        by: violation.byFullName || violation.by || "Unknown",
+      }));
+      const eventName = event.name || "Current event";
+      const bytes = await buildMatchAnomalyLog({
+        template: await response.arrayBuffer(),
+        eventName: league?.session ? `${eventName} - ${league.session.name}` : eventName,
+        rows,
+      });
+      downloadFile(bytes, `${eventName.replace(/[^a-z0-9]+/gi, "-")}-match-anomaly-log.pdf`, "application/pdf");
       setMenu(false);
     } catch (e) {
       console.error(e);
