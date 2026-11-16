@@ -279,9 +279,9 @@ add('reset-signins', 'Admin', 'Reset Volunteer Sign Ins', ADMIN,
   ['Confirm the correct event and inform the crew.', 'Open Command Center → Reset Volunteer Sign Ins.', 'Read the event-wide confirmation and proceed only if intended.', 'Have volunteers use the appropriate role access and enter nickname, first name, and last name again.', 'Review assignments and contact/profile information after the reset.'],
   'Volunteers are signed out; profiles and stale assignments are cleared. Teams, matches, violations, and pictures remain.',
   'This affects the whole event, including a League’s volunteers. It is different from locking one device or disabling one code.', ['lock', 'codes']);
-add('lock', 'Navigation', 'Lock This Device and change events', ALL,
+add('lock', 'Navigation', 'Log out or change events', ALL,
   'Choose where this device returns when leaving the workspace.', 'At the end of a shift or before handing the device to someone else.',
-  ['Check pending work before leaving.', 'Open Settings → Lock This Device.', 'Choose Main Screen to sign out and return to Choose VEX Event.', 'Choose Event Main Page to lock the device at this event’s login page while remembering the sign-in.', 'Choose Cancel to stay in the workspace.'],
+  ['Check pending work before leaving.', 'Open Settings → LOGOUT.', 'Choose Main Screen to sign out and return to Choose VEX Event.', 'Choose Event Main Page to lock the device at this event’s login page while remembering the sign-in.', 'Choose Cancel to stay in the workspace.'],
   'Event Main Page offers the remembered-role unlock; the server rechecks it. Main Screen requires the appropriate new sign-in.',
   'Locking this device does not sign out all volunteers or delete event records. Unlocking needs server access.', ['start', 'offline']);
 add('photo-trouble', 'Troubleshooting', 'Camera, scanner, or picture upload problems', PHOTO,

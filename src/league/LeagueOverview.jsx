@@ -262,7 +262,7 @@ export default function LeagueOverview({
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-2 mb-4">
             {onChooseEvent && <button type="button" onClick={onChooseEvent} className="inline-flex items-center gap-1 text-sm font-semibold text-slate-600 dark:text-slate-300"><ChevronLeft size={18} /> Events</button>}
-            {onLock && <button type="button" onClick={onLock} className="ml-auto inline-flex items-center gap-1 text-sm font-semibold text-slate-600 dark:text-slate-300"><LogOut size={16} /> Lock This Device</button>}
+            {onLock && <button type="button" onClick={onLock} className="ml-auto inline-flex min-h-11 items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-bold text-red-800 hover:bg-red-100 dark:border-red-900 dark:bg-red-950/50 dark:text-red-200"><LogOut size={16} /> LOGOUT</button>}
           </div>
           <div className="mb-4">
             <span className="rounded-full bg-[#0D0F32] text-white text-[10px] font-bold uppercase tracking-wide px-2 py-0.5">League</span>

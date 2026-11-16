@@ -21,7 +21,7 @@ export default function LockDeviceModal({ eventName, busy = false, onMainScreen,
       <div role="dialog" aria-modal="true" aria-labelledby="lock-device-title"
         className="bg-white dark:bg-slate-800 max-h-[100dvh] overflow-y-auto w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
         onClick={(e) => e.stopPropagation()}>
-        <h2 id="lock-device-title" className="font-bold text-slate-900 dark:text-slate-100 text-lg flex items-center gap-2"><LogOut size={18} /> Lock This Device</h2>
+        <h2 id="lock-device-title" className="font-bold text-slate-900 dark:text-slate-100 text-lg flex items-center gap-2"><LogOut size={18} /> LOGOUT</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Where would you like to go?</p>
 
         <div className="mt-4 space-y-2.5">
