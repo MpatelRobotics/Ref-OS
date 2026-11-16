@@ -2054,7 +2054,6 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const [editing, setEditing] = useState(null); // violation being edited
   const [logMatch, setLogMatch] = useState(null);
   const [addTeam, setAddTeam] = useState(false);
-  const [expandRule, setExpandRule] = useState(null);
   const [showShare, setShowShare] = useState(false);
   const [showIdentity, setShowIdentity] = useState(false);
   const [showClear, setShowClear] = useState(false);
@@ -4965,7 +4964,12 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             <button onClick={() => setShowByRule(false)} className="refos-back-button"><ChevronLeft size={22} /> Back</button>
             <h2 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"><BarChart3 size={18} /> Violations by rule</h2>
           </div>
-          <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto px-4 py-4"><ByRule viols={viols} expandRule={expandRule} setExpandRule={setExpandRule} /></div></div>
+          <div className="flex-1 overflow-y-auto">
+            <div className="max-w-4xl mx-auto px-4 py-5">
+              <p className="mb-4 text-sm text-slate-600 dark:text-slate-300">{event.name}{league?.session ? ` · ${league.session.name}` : ""}</p>
+              <ByRule viols={viols} rulebook={workflowRules} />
+            </div>
+          </div>
         </div>
       )}
       {showTMSync && (
@@ -5471,55 +5475,52 @@ function ViolationCard({ v, onDelete, onOpenPhoto, onEdit, showTeam, canManage =
 }
 
 /* ============================ BY RULE ============================ */
-function ByRule({ viols, expandRule, setExpandRule }) {
-  const rules = useMemo(() => {
-    const m = {};
-    for (const v of viols) {
-      for (const entry of ruleEntries(v)) {
-        const key = entry.code || "—";
-        m[key] = m[key] || { code: entry.code, desc: entry.desc, count: 0, types: {}, teams: {} };
-        m[key].count++; m[key].types[v.type] = (m[key].types[v.type] || 0) + 1;
-        m[key].teams[v.team] = (m[key].teams[v.team] || 0) + 1;
-        if (!m[key].desc && entry.desc) m[key].desc = entry.desc;
+function ByRule({ viols, rulebook }) {
+  const report = useMemo(() => {
+    const descriptions = new Map();
+    for (const rule of rulebook) {
+      const code = splitRuleCodes(rule.code)[0];
+      if (code && rule.desc?.trim()) descriptions.set(code, rule.desc.trim());
+    }
+    const byRule = new Map();
+    for (const violation of [...viols].sort((a, b) => a.createdAt - b.createdAt)) {
+      const match = fmtMatch(violation.match) || "No match recorded";
+      const team = violation.team || "Unknown team";
+      const seen = new Set();
+      for (const { code, desc } of ruleEntries(violation)) {
+        if (seen.has(code)) continue;
+        seen.add(code);
+        if (!byRule.has(code)) byRule.set(code, { code, description: descriptions.get(code) || desc, teams: new Map() });
+        const group = byRule.get(code);
+        if (!group.description && desc) group.description = desc;
+        if (!group.teams.has(team)) group.teams.set(team, { total: 0, matches: new Map() });
+        const totals = group.teams.get(team);
+        totals.total++;
+        totals.matches.set(match, (totals.matches.get(match) || 0) + 1);
       }
     }
-    return Object.values(m).sort((a, b) => b.count - a.count);
-  }, [viols]);
-  const max = rules[0]?.count || 1;
-  if (rules.length === 0) return <Empty title="Nothing logged yet" sub="Rule totals across all teams will appear here." />;
+    return [...byRule.values()].sort((a, b) => !a.code - !b.code || a.code.localeCompare(b.code, "en", { numeric: true }));
+  }, [viols, rulebook]);
+
+  if (!report.length) return <Empty title="Nothing logged yet" sub="Rule totals across all teams will appear here." />;
   return (
-    <ul className="space-y-2">
-      {rules.map((r) => {
-        const teamCount = Object.keys(r.teams).length;
-        const open = expandRule === (r.code || "—");
-        return (
-          <li key={r.code || "none"} className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-            <button onClick={() => setExpandRule(open ? null : (r.code || "—"))} className="w-full text-left px-4 py-3">
-              <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{fmtRule(r.code)}</span>
-                <span className="text-xs text-slate-400">{teamCount} team{teamCount !== 1 ? "s" : ""}</span>
-                <span className="ml-auto font-bold text-lg text-slate-900 dark:text-slate-100 tabular-nums">{r.count}</span>
-                <ChevronRight size={16} className={`text-slate-300 transition-transform ${open ? "rotate-90" : ""}`} />
-              </div>
-              {r.desc && <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{r.desc}</p>}
-              <div className="flex h-1.5 rounded-full overflow-hidden mt-2 bg-slate-100 dark:bg-slate-700" style={{ width: `${Math.max(12, (r.count / max) * 100)}%` }}>
-                {ORDER.map((ty) => r.types[ty] ? <div key={ty} className={TYPES[ty].solid} style={{ flex: r.types[ty] }} /> : null)}
-              </div>
-            </button>
-            {open && (
-              <div className="px-4 pb-3 pt-1 border-t border-slate-100">
-                {Object.entries(r.teams).sort((a, b) => b[1] - a[1]).map(([num, n]) => (
-                  <div key={num} className="flex items-center justify-between py-1 text-sm">
-                    <span className="font-mono font-medium text-slate-700 dark:text-slate-200">{num}</span>
-                    <span className="text-slate-500 dark:text-slate-400 tabular-nums">×{n}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+    <div className="space-y-3">
+      {report.map(({ code, description, teams }) => (
+        <section key={code} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
+          <h3 className="font-mono font-bold text-slate-900 dark:text-slate-100">{code ? fmtRule(code) : "No rule code"}</h3>
+          {description && <p className="mt-1 break-words text-sm text-slate-600 dark:text-slate-300">{description}</p>}
+          <ul className="mt-3 space-y-2 border-t border-slate-200 pt-3 text-sm dark:border-slate-700">
+            {[...teams].sort(([a], [b]) => a.localeCompare(b, "en", { numeric: true })).map(([team, { total, matches }]) => (
+              <li key={team} className="grid gap-x-4 gap-y-0.5 sm:grid-cols-[7rem_8rem_minmax(0,1fr)]">
+                <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">{team}</span>
+                <span className="tabular-nums text-slate-600 dark:text-slate-300">{total} {total === 1 ? "violation" : "violations"}</span>
+                <span className="break-words text-slate-700 dark:text-slate-200">{[...matches].map(([match, count]) => count > 1 ? `${match} (x${count})` : match).join(", ")}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
   );
 }
 
