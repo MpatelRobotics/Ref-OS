@@ -1,7 +1,7 @@
 
 import {useEffect} from 'react';
 
-// Gear menus close after three seconds without interaction on every device.
+// Gear menus close after ten seconds without interaction on every device.
 export default function useMenuIdle(menuRef,open,setOpen){
  useEffect(()=>{
   if(!open)return;
@@ -9,7 +9,7 @@ export default function useMenuIdle(menuRef,open,setOpen){
   let timer;
   const restart=()=>{
    clearTimeout(timer);
-   timer=setTimeout(()=>setOpen(false),3000);
+   timer=setTimeout(()=>setOpen(false),10000);
   };
   const events=['pointerdown','keydown','input','scroll','touchmove'];
   events.forEach(event=>menu?.addEventListener(event,restart,{passive:true,capture:true}));

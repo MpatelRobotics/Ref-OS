@@ -4,10 +4,10 @@ const preamble=`import '/@vite/client';import RefreshRuntime from '/@react-refre
 async function mount(page,body){await page.route('**/iq-workflow-test',r=>r.fulfill({contentType:'text/html',body:`<html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div><script type="module">${preamble}const React=(await import('/node_modules/.vite/deps/react.js')).default;const ReactDOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default;const IQ=await import('/src/iq/IQWorkflows.jsx');await import('/src/index.css');${body}</script></body></html>`}));await page.goto('/iq-workflow-test');}
 test('ranked finals preview can cancel and then apply with no elimination winners',async({page})=>{
  await mount(page,`window.rows=[];ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(IQ.default,{finals:true,teams:[1,2,3,4].map(n=>({number:n+'A',rank:n})),canEdit:true,onCreateFinals:rows=>window.rows=rows,onOpen:()=>{}}));`);
- await page.getByLabel('Number of finals matches').fill('2');await page.getByRole('button',{name:'Preview ranked finals pairings'}).click();
+ await page.getByLabel('Number of finals matches').fill('2');await page.getByRole('button',{name:'Preview finals from qualification ranks'}).click();
  await expect(page.getByRole('region',{name:'IQ import preview'})).toContainText('F1 · 3A + 4A');
  await page.getByRole('button',{name:'Cancel preview'}).click();expect(await page.evaluate(()=>window.rows)).toEqual([]);
- await page.getByRole('button',{name:'Preview ranked finals pairings'}).click();await page.getByRole('button',{name:'Apply IQ matches'}).click();
+ await page.getByRole('button',{name:'Preview finals from qualification ranks'}).click();await page.getByRole('button',{name:'Apply IQ matches'}).click();
  await expect.poll(()=>page.evaluate(()=>window.rows.map(m=>m.red))).toEqual([['3A','4A'],['1A','2A']]);
  await expect(page.getByRole('button',{name:/Set winner|Advance/})).toHaveCount(0);
 });

@@ -1,16 +1,35 @@
 import {tmMatchOrder,latestTmAttempts} from '../tmMatchIdentity.js';
 import React,{useState} from 'react';
-import {iqTeams,iqMatchName,iqFinalPairs,parseIQMatches} from './iqWorkflows.js';
+import {iqTeams,iqMatchName,iqFinalPairs,parseIQMatches,iqFinalsLeader} from './iqWorkflows.js';
 const button='min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 font-semibold text-sm';
 const input='w-full min-h-[44px] rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2';
 
-export default function IQMatches({target='Current event / session',matches={},teams=[],finals=false,query='',setQuery=()=>{},onOpen,canEdit=false,onImport,onCreateFinals,parseCSV,renderMatches}){
- const [preview,setPreview]=useState(null),[count,setCount]=useState('5'),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+export default function IQMatches({target='Current event / session',matches={},teams=[],finals=false,query='',setQuery=()=>{},onOpen,canEdit=false,onImport,onCreateFinals,parseCSV,renderMatches,tiebreaks={},onSaveTiebreak}){
+ const [preview,setPreview]=useState(null),[count,setCount]=useState('10'),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const all=Object.values(matches),rows=all.filter(m=>finals?m.phase==='final':m.phase!=='final').filter(m=>(iqMatchName(m)+' '+iqTeams(m).join(' ')+' '+(m.field||'')).toLowerCase().includes(query.toLowerCase())).sort((a,b)=>({practice:0,qual:1,final:2}[a.phase]-{practice:0,qual:1,final:2}[b.phase])||tmMatchOrder(a,b));
  async function read(file){if(!file)return;setPreview(null);setError('');try{const parsed=parseIQMatches(await file.text(),file.name,parseCSV);setPreview({rows:parsed,kind:'import'});}catch(e){setError(e.message);}}
  function pair(){setPreview(null);setError('');try{const pairs=iqFinalPairs(teams,count);if(all.some(m=>m.phase==='final'))throw new Error('Finals already exist. Import the reviewed TM finals schedule to update them.');setPreview({rows:pairs,kind:'finals'});}catch(e){setError(e.message);}}
  async function apply(){setBusy(true);setError('');try{if(preview.kind==='finals')await onCreateFinals(preview.rows);else await onImport(preview.rows);setPreview(null);}catch(e){setError((e.message||'Could not save.')+' Some rows may have saved. Review and retry.');}finally{setBusy(false);}}
  const scoredFinals=latestTmAttempts(all).filter(m=>m.phase==='final'&&m.redScore!=null).sort((a,b)=>Number(b.redScore)-Number(a.redScore));
+ const leader=finals ? iqFinalsLeader(all, tiebreaks, teams) : null;
+ const [selectedFinal,setSelectedFinal]=useState('');
+ const [round,setRound]=useState('1');
+ const [stopTime,setStopTime]=useState('');
+ const selectFinal = value => {
+  setSelectedFinal(value);
+  setRound(String(tiebreaks[value]?.round || 1));
+  setStopTime(String(tiebreaks[value]?.stopTime ?? ''));
+ };
+ async function saveTiebreak(event) {
+  event.preventDefault();
+  const match=all.find(m=>m.phase==='final'&&String(m.num)===selectedFinal);
+  if (!match || !onSaveTiebreak) return;
+  setBusy(true);
+  setError('');
+  try { await onSaveTiebreak(match, Number(round), stopTime==='' ? null : Number(stopTime)); }
+  catch (error) { setError(error.message); }
+  finally { setBusy(false); }
+ }
  return <section className="space-y-4">
   {!renderMatches && <>
   <p className="text-sm">{finals?'Finals pair adjacent official ranks: 1 + 2, 3 + 4, and so on (T12). Lowest seed plays first; each partnership plays one finals match. Highest score wins, with T14 tiebreakers resolved in Tournament Manager.':'IQ teamwork has two partner teams and one shared score. Import the official schedule and results from Tournament Manager.'}</p>
@@ -20,7 +39,18 @@ export default function IQMatches({target='Current event / session',matches={},t
   {finals&&canEdit&&<div className="flex flex-wrap gap-2 items-end"><label className="block text-sm">Number of finals matches<input className={input} type="number" min="1" step="1" value={count} onChange={e=>setCount(e.target.value)}/></label><button className={button} disabled={busy} onClick={pair}>Preview finals from qualification ranks</button></div>}
   {error&&<p role="alert" className="text-red-700 dark:text-red-300">{error}</p>}
   {preview&&<section aria-label="IQ import preview" className="rounded-xl border p-4 space-y-3"><h3 className="font-bold">Review {preview.rows.length} IQ matches</h3><p className="text-sm">Target: {target}. Matching match numbers are updated; omitted matches remain. Review partner teams before saving. Finals previews are provisional until confirmed by the Event Partner in TM.</p><ul>{preview.rows.map(m=><li key={m.phase+':'+m.num}>{iqMatchName(m)} · {iqTeams(m).join(' + ')} · {m.label} · {m.redScore==null?'score unchanged':`score ${m.redScore}`}</li>)}</ul><button className={button} disabled={busy} onClick={apply}>{busy?'Saving…':'Apply IQ matches'}</button><button className={button} disabled={busy} onClick={()=>setPreview(null)}>Cancel preview</button></section>}
-  {finals&&scoredFinals.length>0&&<section className="rounded-xl border p-4"><h3 className="font-bold">Recorded finals scores</h3><p className="text-sm">Listed by score, not a declaration of the champion. Resolve first-place ties through tiebreaker matches, stop times, and seeds under T14. Import each tiebreaker with a distinct finals match number.</p><ol>{scoredFinals.map(m=><li key={m.id}>{iqTeams(m).join(' + ')} · {m.redScore} · {iqMatchName(m)} · {m.label}</li>)}</ol></section>}
+  {finals&&scoredFinals.length>0&&<section className="rounded-xl border p-4 space-y-3">
+    <h3 className="font-bold">Recorded finals scores</h3>
+    {leader && <p className="text-sm">{leader}</p>}
+    <p className="text-sm">For a first-place tie, record the tiebreaker matches below. If their scores tie, the higher Match Stop Time wins.</p>
+    <ol>{scoredFinals.map(m=><li key={m.id}>{iqMatchName(m)} · {iqTeams(m).join(' + ')} · {m.redScore}{tiebreaks[m.num]?.stopTime!=null ? ` · Stop time ${tiebreaks[m.num].stopTime}s` : ''}</li>)}</ol>
+    {canEdit&&onSaveTiebreak&&<form onSubmit={saveTiebreak} className="flex flex-wrap gap-2 items-end">
+      <label>Finals match<select required className={input} value={selectedFinal} onChange={e=>selectFinal(e.target.value)}><option value="">Select a match</option>{all.filter(m=>m.phase==='final'&&m.redScore!=null).sort(tmMatchOrder).map(m=><option key={m.num} value={m.num}>{iqMatchName(m)} · {iqTeams(m).join(' + ')}</option>)}</select></label>
+      <label>Tiebreaker round<select className={input} value={round} onChange={e=>setRound(e.target.value)}><option value="1">First</option><option value="2">Second</option><option value="0">Regular finals match</option></select></label>
+      {round!=='0'&&<label>Match Stop Time (seconds)<input className={input} type="number" min="0" max="60" step="1" value={stopTime} onChange={e=>setStopTime(e.target.value)}/></label>}
+      <button className={button} disabled={busy||!selectedFinal}>Save match details</button>
+    </form>}
+  </section>}
   {renderMatches?renderMatches(rows):!rows.length?<p>No IQ matches loaded. Import the schedule to begin.</p>:<ul className="space-y-2">{rows.map(m=><li key={m.id}><button className="w-full min-h-[60px] text-left rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4" onClick={()=>onOpen(m.id)}><span className="font-bold">{iqMatchName(m)} · {iqTeams(m).join(' + ')}</span><span className="block text-sm">{m.field} {m.label} · Shared score: {m.redScore==null?'Not scored':m.redScore}</span></button></li>)}</ul>}
  </section>;
 }

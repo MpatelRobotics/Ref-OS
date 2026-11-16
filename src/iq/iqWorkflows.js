@@ -47,3 +47,38 @@ export function parseIQMatches(text, filename, parseCSV) {
   if(!rows.length)throw new Error('No IQ matches found. Export Match List and Results from TM, or include Round, Match, Team1, Team2 and optional Score columns.');
   return rows;
 }
+
+export function iqFinalsLeader(matches, tiebreaks, teams) {
+  const pair = match => iqTeams(match).sort().join('|');
+  const finals = matches.filter(match => match.phase === 'final');
+  const metadata = match => {
+    const entry = tiebreaks[match.num];
+    return entry?.teams?.join('|') === pair(match) ? entry : null;
+  };
+  const regular = finals.filter(match => !metadata(match)?.round);
+  if (!regular.length || regular.some(match => match.redScore == null)) return null;
+  const best = Math.max(...regular.map(match => match.redScore));
+  const originalLeaders = new Map(regular.filter(match => match.redScore === best).map(match => [pair(match), match]));
+  if (originalLeaders.size < 2) return null;
+
+  let contenders = [...originalLeaders.keys()];
+  for (const round of [1, 2]) {
+    const results = finals.filter(match => contenders.includes(pair(match)) && metadata(match)?.round === round);
+    if (results.length !== contenders.length || new Set(results.map(pair)).size !== contenders.length || results.some(match => match.redScore == null)) {
+      return `First place tied · Awaiting tiebreaker round ${round}`;
+    }
+    const highScore = Math.max(...results.map(match => match.redScore));
+    const leaders = results.filter(match => match.redScore === highScore);
+    if (leaders.length === 1) return `First-place tiebreak leader · ${iqTeams(leaders[0]).join(' + ')}`;
+    if (leaders.some(match => metadata(match).stopTime == null)) return 'First place tied · Enter both alliances’ Match Stop Times.';
+    const highTime = Math.max(...leaders.map(match => metadata(match).stopTime));
+    contenders = leaders.filter(match => metadata(match).stopTime === highTime).map(pair);
+    if (contenders.length === 1) return `First-place tiebreak leader · ${contenders[0].split('|').join(' + ')}`;
+  }
+  const ranks = new Map(teams.map(team => [team.number, Number(team.rank) || Infinity]));
+  const seeds = contenders.map(key => ({ key, rank: Math.min(...key.split('|').map(team => ranks.get(team) ?? Infinity)) }))
+    .sort((a,b) => a.rank - b.rank);
+  return seeds[0].rank < seeds[1].rank
+    ? `First-place tiebreak leader by seed · ${seeds[0].key.split('|').join(' + ')}`
+    : 'First place tied · Confirm alliance seeds in Tournament Manager.';
+}

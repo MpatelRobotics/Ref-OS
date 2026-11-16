@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {iqScore,iqFinalPairs,parseIQMatches,iqStartingPosition} from '../src/iq/iqWorkflows.js';
+import {iqScore,iqFinalPairs,parseIQMatches,iqStartingPosition,iqFinalsLeader} from '../src/iq/iqWorkflows.js';
 const csv=text=>text.trim().split(/\r?\n/).map(line=>line.split(','));
 test('Level Up scoring counts each bag at one level, validates quantities and preserves zero',()=>{
  assert.equal(iqScore({floor:1,l1:2,l2:3,l3:4,l4:5}),153);
@@ -51,4 +51,22 @@ test('IQ team colors follow TM order while starting goals use the opposite color
  const match=parseIQMatches(text,'IQMatches.csv',csv)[0];
  assert.deepEqual(match.red,['7','9']);
  assert.equal(iqStartingPosition(0).color,'red');assert.equal(iqStartingPosition(1).color,'blue');
+});
+
+test('first-place finals ties use tiebreak scores, then stop time, then a second round', () => {
+  const match = (num, red, redScore) => ({ num, phase: 'final', red, blue: [], redScore });
+  const a = ['1A', '2A'], b = ['3A', '4A'], c = ['5A', '6A'];
+  const original = [match(1, a, 100), match(2, b, 100), match(3, c, 30)];
+  assert.match(iqFinalsLeader(original, {}, []), /Awaiting tiebreaker round 1/);
+  const finals = [...original, match(4, a, 75), match(5, b, 75)];
+  const details = {4: {round:1, teams:a, stopTime:10}, 5: {round:1, teams:b, stopTime:12}};
+  assert.match(iqFinalsLeader(finals, details, []), /3A \+ 4A/);
+  details[5].stopTime = null;
+  assert.match(iqFinalsLeader(finals, details, []), /Match Stop Times/);
+  details[5].stopTime = 10;
+  assert.match(iqFinalsLeader(finals, details, []), /Awaiting tiebreaker round 2/);
+  finals.push(match(6, a, 72), match(7, b, 72));
+  details[6] = {round:2, teams:a, stopTime:9};
+  details[7] = {round:2, teams:b, stopTime:9};
+  assert.match(iqFinalsLeader(finals, details, [{number:'1A',rank:1},{number:'3A',rank:3}]), /by seed · 1A \+ 2A/);
 });

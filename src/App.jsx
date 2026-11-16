@@ -75,7 +75,7 @@ import * as eventApi from "./api";
 const api = eventApi;
 import { createDivisionApi } from "./divisionApi.js";
 import * as outbox from "./outbox";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, breakTextIntoLines, rgb } from "pdf-lib";
 import { APP_VERSION } from "./appVersion";
 import { ROBOT_PHOTO_SLOTS, normalizeRequiredRobotPhotos, robotPhotoSlots } from "./robotPhotoRequirements";
 import { compressRobotPhoto } from "./photoCompression";
@@ -1902,6 +1902,24 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const [openTeam, setOpenTeam] = useState(null);
   const [openMatch, setOpenMatch] = useState(null);
   const [openRobot, setOpenRobot] = useState(null);
+  const [iqPhase, setIqPhase] = useState("qual");
+  const matchListState = useRef({});
+  const listScroll = useRef(null);
+  const hasListDetail = Boolean(openTeam || openMatch);
+  const openListDetail = (setDetail, id) => {
+    if (!hasListDetail) listScroll.current = { view, top: window.scrollY };
+    setDetail(id);
+  };
+  const openTeamFromList = id => openListDetail(setOpenTeam, id);
+  const openMatchFromList = id => openListDetail(setOpenMatch, id);
+  useLayoutEffect(() => {
+    const previous = listScroll.current;
+    if (!previous) return;
+    if (previous.view === view) {
+      window.scrollTo({ top: hasListDetail ? 0 : previous.top, behavior: "instant" });
+    }
+    if (!hasListDetail || previous.view !== view) listScroll.current = null;
+  }, [hasListDetail, view]);
   const [query, setQuery] = useState("");
   const [showTeamScanner, setShowTeamScanner] = useState(false);
   const [lightbox, setLightbox] = useState(null);
@@ -3496,6 +3514,20 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       alert("Could not read that file: " + (e.message || e) + "\n\nExport match results from Tournament Manager as CSV and try again.");
     } finally { setImporting(null); }
   };
+  const iqTiebreakPrefix = `division:${divisionId}:iq_tiebreak:${leagueSessionId || "tournament"}:`;
+  const iqTiebreaks = Object.fromEntries(Object.entries(eventSettings)
+    .filter(([key]) => key.startsWith(iqTiebreakPrefix))
+    .map(([key, row]) => [key.slice(iqTiebreakPrefix.length), row.value]));
+  const saveIqTiebreak = async (match, round, stopTime) => {
+    if (!adminUnlocked || !isIQ || match.phase !== "final") throw new Error("Event admin access is required.");
+    if (![0, 1, 2].includes(round) || stopTime != null && (!Number.isInteger(stopTime) || stopTime < 0 || stopTime > 60)) {
+      throw new Error("Enter a Match Stop Time from 0 to 60 seconds.");
+    }
+    const key = iqTiebreakPrefix + match.num;
+    const saved = await api.upsertEventSetting(eventId, key, { round, stopTime: round ? stopTime : null, teams: iqTeams(match).sort() }, meName);
+    rememberSettingWrite(saved);
+    setEventSettings(current => ({ ...current, [key]: saved }));
+  };
   const importIQRows = async (rows) => {
     if (!adminUnlocked || !isIQ || highlanderDemoLocked) throw new Error("IQ match imports require Admin access to this IQ event.");
     const targetSession = api.leagueSessionFor(eventId);
@@ -4258,204 +4290,42 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     }
   };
 
-  const exportCSV = async () => {
+  const exportViolations = async () => {
     if (!viols.length) {
       alert("There are no violations to export.");
       return;
     }
 
     try {
-      const templateBytes = await fetch("/forms/match-anomaly-log.pdf").then((r) => {
-        if (!r.ok) throw new Error("Match Anomaly Log PDF template could not be loaded.");
-        return r.arrayBuffer();
-      });
-
-      const pdf = await PDFDocument.load(templateBytes);
+      const pdf = await PDFDocument.create();
       const font = await pdf.embedFont(StandardFonts.Helvetica);
-      const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-
-      // Team placement is fixed by the supplied 12-page Match Anomaly Log.
-      const pageTeams = [
-        ["37S","88S","96Z","119B","119P","119X","169A","169C","169R"],
-        ["169X","197E","197G","255H","293Z","295A","295Y","1028A","1281A"],
-        ["1523A","1584A","1698A","1755N","1769A","1862A","1862X","2145V","2145X"],
-        ["2145Y","2145Z","2429A","2498B","2502A","2502V","2523A","2523V","2627E"],
-        ["2702R","2982A","2982B","2982X","2982Z","3150Z","3151X","3760X","3866F"],
-        ["4478N","4610J","4610P","4610S","4610T","4610W","4610Z","5150D","5249Z"],
-        ["7405A","7405B","7405C","7405M","8737M","9039J","9364E","9909D","9909M"],
-        ["10702X","11753A","11753B","12125A","12914X","12914Y","16099A","16099B","16099C"],
-        ["16099D","16099E","16689A","16689G","20850G","20850T","20850V","20850W","20850X"],
-        ["20850Z","25335A","26767P","48730A","59218C","62880A","62880C","62880D","62880E"],
-        ["66300A","66556Z","81390E","88288A","90110X","91725A","93375B","96138A","96138E"],
-        ["96138X","99209X"],
-      ];
-
-      const teamLocation = new Map();
-      pageTeams.forEach((teamsOnPage, pageIndex) => {
-        teamsOnPage.forEach((team, rowIndex) => teamLocation.set(team, { pageIndex, rowIndex }));
-      });
-
-      const byTeam = {};
-      for (const v of [...viols].sort((a, b) => a.createdAt - b.createdAt)) {
-        (byTeam[v.team] = byTeam[v.team] || []).push(v);
+      const supported = new Set(font.getCharacterSet());
+      const clean = value => Array.from(String(value ?? "").replace(/\s+/g, " ").trim())
+        .map(character => supported.has(character.codePointAt(0)) ? character : "?").join("");
+      let page;
+      let y;
+      const draw = (value, size = 10) => {
+        for (const line of breakTextIntoLines(clean(value), [" "], 528, text => font.widthOfTextAtSize(text, size))) {
+          if (!page || y < 48) {
+            page = pdf.addPage([612, 792]);
+            y = 744;
+          }
+          page.drawText(line.trim(), { x: 42, y, font, size });
+          y -= size + 6;
+        }
+      };
+      draw(event.name || "Current event", 16);
+      draw(league ? `Match Anomaly Log - ${league.session.name}` : "Match Anomaly Log", 13);
+      const rows = [...viols].sort((a, b) => String(a.team).localeCompare(String(b.team), undefined, { numeric: true }) || a.createdAt - b.createdAt);
+      for (const violation of rows) {
+        const { team, match, type, code, notes, desc, byFullName, by } = violation;
+        draw([team, fmtMatch(match) || "No match", TYPES[type]?.label || type, code && fmtRule(code)].filter(Boolean).join(" | "));
+        draw(notes || desc);
+        draw(`Logged by ${byFullName || by || "Unknown"}`);
+        y -= 8;
       }
-
-      const fitText = (text, maxWidth, maxLines, startSize = 6.2, minSize = 4.3) => {
-        const clean = String(text || "").replace(/\s+/g, " ").trim();
-        if (!clean) return { size: startSize, lines: [] };
-
-        const wrapAt = (size) => {
-          const words = clean.split(" ");
-          const lines = [];
-          let line = "";
-          for (const word of words) {
-            const test = line ? `${line} ${word}` : word;
-            if (font.widthOfTextAtSize(test, size) <= maxWidth) {
-              line = test;
-            } else {
-              if (line) lines.push(line);
-              line = word;
-            }
-          }
-          if (line) lines.push(line);
-          return lines;
-        };
-
-        for (let size = startSize; size >= minSize; size -= 0.25) {
-          const lines = wrapAt(size);
-          if (lines.length <= maxLines) return { size, lines };
-        }
-
-        const size = minSize;
-        const lines = wrapAt(size);
-        if (lines.length <= maxLines) return { size, lines };
-
-        const kept = lines.slice(0, maxLines);
-        let last = kept[maxLines - 1] || "";
-        while (last && font.widthOfTextAtSize(last + "...", size) > maxWidth) {
-          last = last.slice(0, -1);
-        }
-        kept[maxLines - 1] = last + "...";
-        return { size, lines: kept };
-      };
-
-      const drawBlock = (page, text, x, topY, width, maxLines = 4, startSize = 6.2) => {
-        const fitted = fitText(text, width, maxLines, startSize);
-        const gap = 11.9;
-        fitted.lines.forEach((line, i) => {
-          page.drawText(line, {
-            x,
-            y: topY - i * gap,
-            size: fitted.size,
-            font,
-            color: rgb(0, 0, 0),
-          });
-        });
-      };
-
-      const violationResult = (v) => {
-        if (v.type === "major") return "Major";
-        if (v.type === "minor") return "Minor";
-        if (v.type === "inspection") return "Inspection";
-        return TYPES[v.type]?.label || v.type || "";
-      };
-
-      const detailFor = (v) => {
-        const matchLabel = fmtMatch(v.match) || "No match";
-        const rule = v.code ? fmtRule(v.code) : "";
-        const note = (v.notes || v.desc || "").replace(/\s+/g, " ").trim();
-        return [matchLabel, rule, note, violationResult(v), `Logged by ${v.byFullName || v.by || "Unknown"}`].filter(Boolean).join(" | ");
-      };
-
-      const pages = pdf.getPages();
-
-      const fitSingleLine = (text, maxWidth, startSize = 6.4, minSize = 4.4) => {
-        const clean = String(text || "").replace(/\s+/g, " ").trim();
-        if (!clean) return { text: "", size: startSize };
-
-        for (let size = startSize; size >= minSize; size -= 0.2) {
-          if (font.widthOfTextAtSize(clean, size) <= maxWidth) return { text: clean, size };
-        }
-
-        let clipped = clean;
-        while (clipped.length > 1 && font.widthOfTextAtSize(clipped + "...", minSize) > maxWidth) {
-          clipped = clipped.slice(0, -1);
-        }
-        return { text: clipped + "...", size: minSize };
-      };
-
-      const drawCentered = (page, text, left, right, y, startSize = 6.4) => {
-        const fitted = fitSingleLine(text, right - left - 6, startSize, 4.8);
-        if (!fitted.text) return;
-        const width = font.widthOfTextAtSize(fitted.text, fitted.size);
-        page.drawText(fitted.text, {
-          x: left + ((right - left) - width) / 2,
-          y,
-          size: fitted.size,
-          font,
-          color: rgb(0, 0, 0),
-        });
-      };
-
-      for (const [team, entries] of Object.entries(byTeam)) {
-        const loc = teamLocation.get(team);
-        if (!loc || !pages[loc.pageIndex]) continue;
-
-        const page = pages[loc.pageIndex];
-
-        // The supplied form has four ruled lines per team.
-        // PDF coordinates are calibrated to the printed grid:
-        // Major(s) 105.29-214.30, Minor(s) 214.30-323.33,
-        // details begin just inside the 323.33 divider.
-        const firstLineY = 535.2 - loc.rowIndex * 48.22;
-        const lineGap = 12.05;
-        const visible = entries.slice(0, 4);
-
-        visible.forEach((v, entryIndex) => {
-          const y = firstLineY - entryIndex * lineGap;
-          const ruleText = v.code ? fmtRule(v.code) : "";
-
-          if (v.type === "major") {
-            drawCentered(page, ruleText || "Major", 105.29, 214.30, y, 6.3);
-          } else if (v.type === "minor") {
-            drawCentered(page, ruleText || "Minor", 214.30, 323.33, y, 6.3);
-          }
-
-          let detail = detailFor(v);
-          if (entryIndex === 3 && entries.length > 4) {
-            detail += ` | +${entries.length - 4} more`;
-          }
-
-          const fitted = fitSingleLine(detail, 759.39 - 327.5 - 5, 6.15, 4.35);
-          if (fitted.text) {
-            page.drawText(fitted.text, {
-              x: 327.5,
-              y,
-              size: fitted.size,
-              font,
-              color: rgb(0, 0, 0),
-            });
-          }
-        });
-      }
-
-      // Warn if Ref-OS contains a team that is not present on this specific template.
-      const missingTeams = Object.keys(byTeam).filter((team) => !teamLocation.has(team));
-
-      const bytes = await pdf.save();
-      const blob = new Blob([bytes], { type: "application/pdf" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `${(event.name || "vex").replace(/\W+/g, "-").toLowerCase()}-match-anomaly-log.pdf`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      downloadFile(await pdf.save(), `${(event.name || "ref-os").replace(/[^a-z0-9]+/gi, "-")}-match-anomaly-log.pdf`, "application/pdf");
       setMenu(false);
-
-      if (missingTeams.length) {
-        alert(
-          `The PDF was exported, but ${missingTeams.length} team${missingTeams.length === 1 ? "" : "s"} are not printed on this Match Anomaly Log template: ${missingTeams.join(", ")}`
-        );
-      }
     } catch (e) {
       console.error(e);
       alert("Could not export Match Anomaly Log PDF: " + (e.message || e));
@@ -4650,7 +4520,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             { k: "teams", label: "Teams", Icon: Users },
             ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
             { k: "robots", label: "Robots", Icon: Camera },
-            { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: EliminationBracketIcon },
+            ...(!isIQ ? [{ k: "alliances", label: "Alliances", Icon: EliminationBracketIcon }] : []),
             { k: "judging", label: "Nominations", Icon: Trophy },
             ...(isDeveloper ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
             ...(adminUnlocked ? [{ k: "rankings", label: "Rankings", Icon: BarChart3 }] : [])
@@ -4730,7 +4600,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           { k: "matches", label: "Matches", Icon: ListOrdered },
           ...((isIQ || rules.length > 0) ? [{ k: "rulebook", label: "Rules", Icon: BookOpen }] : []),
           { k: "robots", label: "Robots", Icon: Camera },
-          { k: "alliances", label: isIQ ? "Finals" : "Alliances", Icon: EliminationBracketIcon },
+          ...(!isIQ ? [{ k: "alliances", label: "Alliances", Icon: EliminationBracketIcon }] : []),
           { k: "judging", label: "Nominations", Icon: Trophy },
             ...(isDeveloper ? [{ k: "interviews", label: "Judging", Icon: Trophy }] : []),
           ...(adminUnlocked ? [{ k: "rankings", label: "Rankings", Icon: BarChart3 }] : [])
@@ -4908,7 +4778,12 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         ) : view === "lost-found" ? (
           <LostFoundBoard embedded key={eventId} eventId={eventId} eventName={event?.name || "Current event"} meName={meName} canManage={adminUnlocked}/>
         ) : view === "matches" ? (
-          isIQ ? <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} renderMatches={rows=><MatchList isIQ matches={Object.fromEntries(rows.map(row=>[row.id,row]))} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={false} emcee={isEmcee} fieldNames={fieldNames} />} parseCSV={parseCSV} /> : <MatchList tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
+          isIQ ? <>
+            <div className="flex flex-wrap gap-2 mb-4" aria-label="IQ match categories">
+              {[["qual", "Qualifications"], ["practice", "Practice"], ["final", "Finals"]].map(([phase, label]) => <button key={phase} type="button" aria-pressed={iqPhase === phase} onClick={() => setIqPhase(phase)} className={`min-h-11 flex-1 rounded-lg border px-2 text-sm font-semibold ${iqPhase === phase ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900" : "bg-white dark:bg-slate-800"}`}>{label}</button>)}
+            </div>
+            <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals={iqPhase === "final"} tiebreaks={iqTiebreaks} onSaveTiebreak={saveIqTiebreak} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={openMatchFromList} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} renderMatches={rows=><MatchList isIQ fixedTab={iqPhase} remembered={matchListState} matches={Object.fromEntries(rows.map(row=>[row.id,row]))} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={openMatchFromList} canAdd={false} emcee={isEmcee} fieldNames={fieldNames} />} parseCSV={parseCSV} />
+          </> : <MatchList remembered={matchListState} tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={openMatchFromList} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
           <><RobotCheckIn teams={scheduleTeams.scheduled} checkIn={eventSettings?.tm_check_in?.value} onOpen={setOpenRobot} /><RobotList followups={operationRows.filter(r=>r.kind==='inspection-followup'&&r.payload.status==='open'&&(r.session_id||null)===(leagueSessionId||null)&&(r.division_id===0||r.division_id===divisionId))} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={scheduleTeams.scheduled} query={query} setQuery={setQuery} onOpen={setOpenRobot} /><UnscheduledTeams teams={scheduleTeams.unscheduled} query={query} onOpen={setOpenRobot} robots /></>
         ) : view === "judging" ? (
@@ -4951,7 +4826,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         ) : view === "awp" ? (
           isIQ ? <p>AWP is a V5 tool. IQ teamwork has no autonomous win point.</p> : <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} fieldNames={fieldNames} />
         ) : view === "alliances" ? (
-          isIQ ? <IQMatches key={`iq-finals-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={setOpenMatch} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} renderMatches={rows=><MatchList isIQ matches={Object.fromEntries(rows.map(row=>[row.id,row]))} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={setOpenMatch} canAdd={false} emcee={isEmcee} fieldNames={fieldNames} />} parseCSV={parseCSV} /> : <AllianceSelection tmActivity={eventSettings?.tm_field_activity?.value} onOpenMatch={id => { setOpenMatch(id); setView("matches"); }} matches={matches} finalsBestOf={event?.finalsBestOf} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!bracketSaving && !isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
+          isIQ ? <IQMatches key={`iq-finals-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={openMatchFromList} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} renderMatches={rows=><MatchList isIQ matches={Object.fromEntries(rows.map(row=>[row.id,row]))} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={openMatchFromList} canAdd={false} emcee={isEmcee} fieldNames={fieldNames} />} parseCSV={parseCSV} /> : <AllianceSelection tmActivity={eventSettings?.tm_field_activity?.value} onOpenMatch={id => { setOpenMatch(id); setView("matches"); }} matches={matches} finalsBestOf={event?.finalsBestOf} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!bracketSaving && !isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
         ) : (
           <>
             {!!event?.quals && (
@@ -4979,7 +4854,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
                   const c = countsByTeam[t.number] || { total: 0 };
                   return (
                     <li key={t.number}>
-                      <button onClick={() => setOpenTeam(t.number)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
+                      <button onClick={() => openTeamFromList(t.number)} className="w-full text-left bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center gap-3 hover:border-slate-300 dark:border-slate-600 hover:shadow-sm transition">
                         <span className="font-mono font-bold text-lg text-slate-900 dark:text-slate-100">{t.number}</span>
                         {divisionCatalog.filter(d=>(eventSettings?.tm_team_divisions?.value?.[d.id]||[]).includes(t.number)).map(d=><span key={d.id} className="rounded border px-2 py-0.5 text-xs">{d.name}</span>)}
                         {t.rank != null && <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-200 dark:border-indigo-800 text-xs font-bold shrink-0">Rank {t.rank}</span>}
@@ -5002,7 +4877,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             )}
           </>
         )}
-        {view === "teams" && !openTeam && !openMatch && !openRobot && <UnscheduledTeams teams={scheduleTeams.unscheduled} query={query} onOpen={setOpenTeam} />}
+        {view === "teams" && !openTeam && !openMatch && !openRobot && <UnscheduledTeams teams={scheduleTeams.unscheduled} query={query} onOpen={openTeamFromList} />}
         <div ref={workspaceFooterRef} className="flex flex-col items-center gap-2 mt-10 pb-2">
           <img src={isHighlander ? "/logo.svg" : "/refos-logo.svg"} alt={isHighlander ? "Highlander Summit" : "Ref OS"} className="h-10 w-10 object-contain opacity-90" />
           <p className="text-center text-xs text-slate-400">
@@ -5020,7 +4895,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
 
       {showTeamScanner && <TeamScanner
         teams={teams}
-        onDetected={(number) => { setShowTeamScanner(false); setOpenTeam(number); }}
+        onDetected={(number) => { setShowTeamScanner(false); openTeamFromList(number); }}
         onClose={() => setShowTeamScanner(false)}
       />}
       {logFor !== null && (
@@ -5273,7 +5148,7 @@ const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', com
         onDiagnosticReport={() => openCommandCenterTool(() => setShowDiagnosticReport(true))}
         onVexSync={!highlanderDemoLocked && !isVenueMode() ? () => openCommandCenterTool(() => setShowVexSyncSetup(true)) : undefined}
         onTMSync={() => openCommandCenterTool(() => setShowTMSync(true))}
-        onExportViolations={exportCSV}
+        onExportViolations={exportViolations}
         onExportNominations={exportNominations}
         onExportEventReport={exportEventReport}
         onBackupAll={backupAll}
@@ -6026,8 +5901,12 @@ function RulePicker({ ruleDetails, onSetRuleDetails, rules, knownRules, eventId,
 
 /* ============================ ADD TEAM MODAL ============================ */
 
-function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
-  const [field, setField] = useState("all");
+function MatchList({ fixedTab, remembered, isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
+  const [field, updateField] = useState(() => remembered?.current.field ?? "all");
+  const setField = value => {
+    if (remembered) remembered.current.field = value;
+    updateField(value);
+  };
   const [liveNow, setLiveNow] = useState(Date.now);
   useEffect(() => { const timer = setInterval(() => setLiveNow(Date.now()), 5000); return () => clearInterval(timer); }, []);
   const liveHighlights = tmMatchHighlights(matches, tmActivity, liveNow);
@@ -6035,25 +5914,32 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
   const all = Object.values(matches);
   const hasPractice = all.some(m => m.phase === "practice");
   const hasElims = !isIQ && all.some((m) => m.phase && m.phase !== "qual" && m.phase !== "practice");
-  const [tab, setTab] = useState(() => hasElims ? "elim" : "qual"); // "qual" | "practice" | "elim"
+  const [selectedTab, updateTab] = useState(() => remembered?.current.tab ?? (hasElims ? "elim" : "qual"));
+  const tab = fixedTab ?? selectedTab;
+  const setTab = value => {
+    if (remembered) remembered.current.tab = value;
+    updateTab(value);
+  };
 
   // Elimination matches take priority once they exist. This also handles the
   // normal async load where MatchList first renders before matches arrive.
   useEffect(() => {
+    if (fixedTab || remembered?.current.hasElims === hasElims) return;
+    if (remembered) remembered.current.hasElims = hasElims;
     if (hasElims) {
       setTab("elim");
       setField("all");
     } else {
       setTab("qual");
     }
-  }, [hasElims]);
+  }, [hasElims, fixedTab, remembered]);
 
   const replayEntries = fieldLog.filter((e) => e.kind === "replay" && e.matchId);
   const replaySet = new Set(replayEntries.map((e) => e.matchId));
   const replayByMatch = Object.fromEntries(replayEntries.map((entry) => [entry.matchId, entry]));
   const timeoutSet = new Set(fieldLog.filter((e) => e.kind === "timeout" && e.matchId).map((e) => e.matchId));
   const faultSet = new Set(fieldLog.filter((e) => e.kind === "field_fault" && e.matchId).map((e) => e.matchId));
-  const inTab = all.filter(m => tab === "practice" ? m.phase === "practice" : tab === "elim" ? m.phase && m.phase !== "qual" && m.phase !== "practice" : m.phase !== "practice" && (isIQ || (m.phase || "qual") === "qual"));
+  const inTab = all.filter(m => fixedTab ? m.phase === fixedTab : tab === "practice" ? m.phase === "practice" : tab === "elim" ? m.phase && m.phase !== "qual" && m.phase !== "practice" : m.phase !== "practice" && (isIQ || (m.phase || "qual") === "qual"));
   const PHASE_ORDER = { qual: 0, practice: 1, r16: 2, qf: 3, sf: 4, final: 5 };
   const list = inTab.sort((a, b) => (PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase]) || tmMatchOrder(a,b));
   const fields = [...new Set(list.map((m) => canonicalFieldKey(m.field)).filter(Boolean))].sort();
@@ -6086,7 +5972,7 @@ function MatchList({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, ma
           </div>
         </div>
       )}
-      {(hasPractice || (!isIQ && (hasElims || canAdd))) && (
+      {!fixedTab && (hasPractice || (!isIQ && (hasElims || canAdd))) && (
         <div className="flex gap-1.5 mb-3">
           {[["qual", "Qualifications"], ...(hasPractice ? [["practice", "Practice"]] : []), ...(!isIQ ? [["elim", "Eliminations"]] : [])].map(([k, lbl]) => (
             <button key={k} aria-pressed={tab === k} onClick={() => { setTab(k); setField("all"); }}
