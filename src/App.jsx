@@ -4310,10 +4310,21 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         by: violation.byFullName || violation.by || "Unknown",
       }));
       const eventName = event.name || "Current event";
+      const ruleDescriptions = new Map();
+      for (const violation of viols) {
+        for (const { code, desc } of ruleEntries(violation)) {
+          if (code && desc && !ruleDescriptions.has(code)) ruleDescriptions.set(code, desc);
+        }
+      }
+      for (const rule of workflowRules) {
+        const code = splitRuleCodes(rule.code)[0];
+        if (code && rule.desc?.trim()) ruleDescriptions.set(code, rule.desc.trim());
+      }
       const bytes = await buildMatchAnomalyLog({
         template: await response.arrayBuffer(),
         eventName: league?.session ? `${eventName} - ${league.session.name}` : eventName,
         rows,
+        ruleDescriptions,
       });
       downloadFile(bytes, `${eventName.replace(/[^a-z0-9]+/gi, "-")}-match-anomaly-log.pdf`, "application/pdf");
       setMenu(false);

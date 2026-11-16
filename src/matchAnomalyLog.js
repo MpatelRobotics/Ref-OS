@@ -2,7 +2,7 @@ import { PDFDocument, StandardFonts, breakTextIntoLines } from "pdf-lib";
 
 const numericOrder = (a, b) => a.localeCompare(b, "en", { numeric: true });
 
-export async function buildMatchAnomalyLog({ template, eventName, rows }) {
+export async function buildMatchAnomalyLog({ template, eventName, rows, ruleDescriptions = new Map() }) {
   const blank = await PDFDocument.load(template);
   const pdf = await PDFDocument.create();
   const [original] = await pdf.copyPages(blank, [0]);
@@ -83,8 +83,11 @@ export async function buildMatchAnomalyLog({ template, eventName, rows }) {
   newSummaryPage();
   if (!rules.size) summaryLine("No rule codes were recorded.");
   for (const [code, byTeam] of [...rules].sort(([a], [b]) => numericOrder(a, b))) {
-    if (y < 68) newSummaryPage();
+    const description = ruleDescriptions.get(code);
+    const descriptionHeight = description ? wrap(description, 724, 10).length * 15 : 0;
+    if (y < Math.min(526, 68 + descriptionHeight)) newSummaryPage();
     summaryLine(`<${code}>`, bold, 12);
+    if (description) summaryLine(description);
     for (const [team, matches] of [...byTeam].sort(([a], [b]) => numericOrder(a, b))) {
       const counts = new Map();
       for (const match of matches) counts.set(match, (counts.get(match) || 0) + 1);
