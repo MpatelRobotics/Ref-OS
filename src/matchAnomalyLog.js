@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, breakTextIntoLines } from "pdf-lib";
 
 const numericOrder = (a, b) => a.localeCompare(b, "en", { numeric: true });
 
+// PDF export: populate the blank event form and append a rule summary.
 export async function buildMatchAnomalyLog({ template, eventName, rows, ruleDescriptions = new Map() }) {
   const blank = await PDFDocument.load(template);
   const pdf = await PDFDocument.create();
@@ -9,6 +10,7 @@ export async function buildMatchAnomalyLog({ template, eventName, rows, ruleDesc
   pdf.addPage(original);
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  // PDF text: handle unsupported characters and wrap lines to the available column width.
   const characters = new Set(regular.getCharacterSet());
   const clean = value => Array.from(String(value ?? "").replace(/\s+/g, " ").trim())
     .map(character => characters.has(character.codePointAt(0)) ? character : "?").join("");
@@ -21,6 +23,7 @@ export async function buildMatchAnomalyLog({ template, eventName, rows, ruleDesc
     page.drawText(text, { x, y, size: fittedSize, font });
   };
 
+  // Report grouping: collect team entries and count each rule once per violation record.
   const teams = new Map();
   const rules = new Map();
   for (const row of rows) {
@@ -34,6 +37,7 @@ export async function buildMatchAnomalyLog({ template, eventName, rows, ruleDesc
     }
   }
 
+  // Form pagination: place four detail lines in each team block and add continuation pages.
   let page = original;
   let slot = 0;
   const logPages = [original];
@@ -65,6 +69,7 @@ export async function buildMatchAnomalyLog({ template, eventName, rows, ruleDesc
     }
   }
 
+  // Summary pages: rule descriptions followed by team counts and match lists.
   let summaryPage;
   let y;
   const newSummaryPage = () => {
@@ -97,6 +102,7 @@ export async function buildMatchAnomalyLog({ template, eventName, rows, ruleDesc
     y -= 8;
   }
 
+  // Document labels: add the event name and page numbers to the completed report.
   logPages.forEach(logPage => fit(logPage, eventName, 33, 568, 720, 11, bold));
   pdf.getPages().forEach((outputPage, index) => fit(outputPage, `Page ${index + 1} of ${pdf.getPageCount()}`, 33, 22, 720, 8));
   pdf.setTitle(`Referee Match Anomaly Log - ${eventName}`);

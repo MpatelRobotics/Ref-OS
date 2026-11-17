@@ -1,7 +1,9 @@
 import { supabase } from './supabaseClient';
+// Setting identities: include division and optional league session in scoped setting names.
 export const divisionSettingKey = (division, key, session) => `division:${division}:${key}${session ? '@'+session : ''}`;
 const settingKeys = new Set(['vex_schedule_team_filter','qualification_records','rank_snapshot','tm_field_activity','tm_match_timing','division_alliances','tm_check_in','tm_match_times']);
 const sameTeams = (a,b) => [...a].sort().join('|') === [...b].sort().join('|');
+// Division adapter: constrain match operations and relevant settings to the selected division.
 export function createDivisionApi(base, eventId, division, client = supabase) {
  if (!division) return base;
  const sid = base.leagueSessionFor(eventId);
@@ -30,6 +32,7 @@ export function createDivisionApi(base, eventId, division, client = supabase) {
   const query=scoped(client.from('matches').update({red_score:m.redScore,blue_score:m.blueScore,winner:m.program==='iq'?null:m.redScore>m.blueScore?'red':m.blueScore>m.redScore?'blue':'tie'})).eq('phase',m.phase).eq('num',Number(m.num)).contains('red',m.existing.red).containedBy('red',m.existing.red).contains('blue',m.existing.blue).containedBy('blue',m.existing.blue).select('num');
   return (await checked(query)||[]).length;
  };
+ // Setting reads: expose this division’s saved values under the keys used by the workspace.
  api.listEventSettings=async()=>{
   const all=await base.listEventSettings(eventId);
   for(const key of settingKeys){const own=all[divisionSettingKey(division,key,sid)];if(own)all[key]={...own,key};else delete all[key];}

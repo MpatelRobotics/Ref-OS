@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import React from "react";
 import ReactDOM from "react-dom/client";
+// Entry routing: lazy-load the main app, Judging Portal, or judge login based on the URL.
 const App=React.lazy(()=>import('./App.jsx'));
 const JudgingConnector=React.lazy(()=>import('./components/JudgingConnector.jsx'));
 const MainJudgeLogin=React.lazy(()=>import('./components/MainJudgeLogin.jsx'));
@@ -10,6 +11,7 @@ import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import UpdateBanner from "./components/UpdateBanner.jsx";
 import "./index.css";
 
+// Root rendering: display loading feedback, rendering errors, and available updates.
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <ErrorBoundary>
@@ -19,6 +21,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   </React.StrictMode>,
 );
 
+// Browser updates: register the service worker and notify users when a new version is ready.
 if (!Capacitor.isNativePlatform() && "serviceWorker" in navigator && import.meta.env.VITE_E2E_MOCK !== "1") {
   window.addEventListener("load", async () => {
     try {

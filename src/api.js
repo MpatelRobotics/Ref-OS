@@ -16,6 +16,7 @@ import { normalizeTmAddress } from './tmAddress.js';
 import { createTmPortDiscovery } from './tmPortDiscovery.js';
 const discoverTmPort = createTmPortDiscovery();
 
+// TM connector access: authenticate and route requests through the installed connector.
 export async function getTmSnapshot(eventId, settings) {
   const { data, error } = await supabase.auth.getSession();
   if (error || !data.session?.access_token) throw Error('Sign in before connecting TM.');
@@ -1919,6 +1920,7 @@ function venueDeviceKey() {
 }
 
 // Token stays in the server-side VEX_EVENTS_API_TOKEN secret.
+// VEX Events lookup: request event metadata and standings through the backend.
 export async function lookupVexEvent(code, expectedProgram) {
   assertEventCodeProgram(code,expectedProgram);
   await ensureAnonymousSession();
@@ -2011,6 +2013,7 @@ export async function getEventRobotPhotoRequirements(eventId) {
  }catch(error){const cached=loadReadCache(eventId,'robot_photo_requirements')?.[0];if(cached)return cached;throw error;}
 }
 
+// Guarded sync writes: update the selected match only while its teams and previous field still match.
 export async function updateSyncedMatchField(eventId, { phase, num, field, existing }, divisionId = 0, sessionId = leagueSessionFor(eventId)) {
   let query = supabase.from('matches').update({ field })
     .eq('event_id', eventId).eq('division_id', divisionId).eq('phase', phase).eq('num', Number(num))
@@ -2032,6 +2035,7 @@ export async function updateExistingVexScore(eventId,row){
 }
 
 
+// Initial administration: check whether an event needs its first admin code.
 export async function eventRequiresAdminSetup(eventId) {
   if (E2E_MOCK) return false;
   await ensureAnonymousSession();

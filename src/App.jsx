@@ -766,6 +766,7 @@ function clearVerifiedAccess() {
 }
 
 /* ==================================================================== */
+// Application entry: restore access, select an event, and open the authorized workspace.
 export default function App() {
   // A browser refresh restores the selected event from a valid ?event= UUID, then from the
   // saved refosActiveEventId. Only "Choose or configure an event" and "Lock This Device ->
@@ -1396,6 +1397,7 @@ const formatEventDate = (value) => {
   return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 };
 
+// Public directory: event discovery, creation, demo access, and creator contact information.
 const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, theme="light", onToggleTheme, initialNotice = "" }) => {
   const [demoRequest,setDemoRequest]=useState(0);
   const [selectorSection,setSelectorSection]=useState(()=>new URLSearchParams(window.location.search).get("page")==="events"?"active":"about");
@@ -1776,6 +1778,7 @@ const ConfigError = () => (
 /* ==================================================================== */
 /*  TRACKER (the main app, scoped to one event)                        */
 /* ==================================================================== */
+// Division navigation: select a division and reset the page when switching main sections.
 function Tracker(props) {
   const eventId=props.initialEvent.id;
   const [view, setView] = useState(props.role === "judge" ? "judging" : props.role === "inspection" ? "robots" : "matches");
@@ -1795,6 +1798,7 @@ function Tracker(props) {
     <DivisionTracker key={`${eventId}:${divisionId}`} {...props} view={view} setView={setView} divisionId={divisionId} divisionCatalog={divisions} divisionSelector={divisions.length>1 && <div className="px-4 py-3 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700"><label className="flex flex-wrap items-center gap-3 font-semibold">Division<select aria-label="Event division" value={divisionId} onChange={e=>{const value=Number(e.target.value);setSelected(value);localStorage.setItem(storageKey,String(value));}} className="min-h-[44px] min-w-0 max-w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3">{divisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label></div>} onDiscoverTmDivisions={async rows=>{const saved=await eventApi.upsertEventSetting(eventId,'vex_divisions',{divisions:rows});setDivisions(rows);return rows;}}/>
   </EventTmSync>;
 }
+// Event workspace: state and actions belong to the selected event, division, and league session.
 function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divisionSelector=null, onDiscoverTmDivisions, league = null, initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf, onEventFormatChanged }) {
   // League events: this workspace is bound to ONE league session (league.session). Session-scoped
   // reads and writes are limited to it by api.js; null for Tournament events.
@@ -1862,6 +1866,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const [cloudReachable, setCloudReachable] = useState(null);
   const [queuedWrites, setQueuedWrites] = useState(0);
   const [lastCloudError, setLastCloudError] = useState("");
+  // Shared event records: load schedules, teams, violations, and supporting data.
   const [matches, setMatches] = useState({}); // { [num]: {red:[], blue:[]} }
   const [operationRows,setOperationRows]=useState([]);
   const [rules, setRules] = useState([]);      // [{ code, desc, category }]
@@ -1974,6 +1979,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const [watchNotes, setWatchNotes] = useState([]);
   const [fieldLog, setFieldLog] = useState([]);
   const [fieldResetChecks, setFieldResetChecks] = useState([]);
+  // Configuration: reconcile server settings with recent local writes.
   const [eventSettings, setEventSettings] = useState({});
 
 
@@ -2008,6 +2014,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const configuredFieldCount = Math.max(1, Math.min(3, Number(eventSettings?.field_configuration?.value?.count) || (event?.format === 'league' || league ? 1 : 3)));
   const savedFieldNames = eventSettings?.field_names?.value;
   const tmFieldSets = eventSettings?.tm_field_activity?.value?.fieldSets;
+  // Field names: use scheduled match fields or available Tournament Manager field activity.
   const scheduleFields = useMemo(() => {
     const scheduledMatches = Object.values(matches);
     const names = scheduledMatches.map(match => canonicalFieldKey(match.field)).filter(Boolean);
@@ -2278,6 +2285,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   useEffect(() => { document.title = "Ref-OS - Referee Operating System"; }, [brand.name]);
   // Email alerts are disabled for every event (the Edge Function no longer sends email).
   const notificationDeliveryLabel = "Push only";
+  // Notifications: read subscription status and manage alerts for this device.
   const refreshPushState = useCallback(async () => {
     if (!pushSupported) { setPushState("unsupported"); return; }
     if (Notification.permission === "denied") { setPushState("blocked"); return; }
@@ -2423,6 +2431,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     setShowInstallHelp(true);
   };
 
+  // Administrative actions: verify event permissions before opening restricted tools.
   const requireAdmin = useCallback((action) => {
     if (adminUnlocked) { action(); return; }
     pendingAdminAction.current = action;
@@ -2471,6 +2480,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     return () => { cancelled = true; clearInterval(iv); };
   }, [eventId, isJudge, isEmcee]);
 
+  // Volunteer management: membership, alert delivery, field assignments, and roles.
   const loadEventMembers = useCallback(async () => {
     if (!adminUnlocked) { setEventMembers([]); return; }
     try { setEventMembers(await api.listEventMembersForAdmin(eventId)); }
@@ -2552,6 +2562,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       return [...pend, ...visible];
     });
   }, []);
+  // Record refresh: load the working event and reconcile pending local changes.
   const refresh = useCallback(async () => {
     setSyncing(true);
     setAlliancesLoaded(false);
@@ -2614,6 +2625,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     }
   }, [eventId, isInspection, refreshQueueHealth, applyViolationList]);
 
+  // Offline writes: retry queued operations and track failures requiring attention.
   const doFlush = useCallback(async () => {
     await outbox.flush(eventId, {
       onSynced: (saved) => {
@@ -2744,6 +2756,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const liveAction = editing ? 'Editing violation' : logFor !== null ? 'Entering violation' : nominating ? 'Adding nomination' : showTMSync ? 'Importing event data' : openTeam ? 'Viewing team' : openMatch ? 'Viewing match' : openRobot ? 'Viewing robot photos' : 'Viewing';
   useLiveActivity({eventId,sessionId:leagueSessionId,name:meName,screen:activityScreen,activity:liveAction});
 
+  // Record editing: save teams and violations and update the workspace.
   const upsertTeam = async (number, name) => {
     const num = normNum(number);
     setTeams((cur) => {
@@ -2855,6 +2868,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     // League teams carry every session's photos in allPhotoKeys; only this session's are shown.
     photoCache.pruneEventRobotPhotos(eventId, teams.flatMap((team) => team.allPhotoKeys || team.photoKeys || []));
   }, [syncedAt, eventId]);
+  // Robot photos: upload reference images and manage pending or removed pictures.
   const addRobotPhoto = async (number, dataUrl, angle) => {
     const generation = await api.getRobotPhotoGeneration(eventId, true);
     const id = api.uid();
@@ -2886,6 +2900,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     setTeams((cur) => cur.map((team) => team.number === number ? { ...team, _pendingRobotPhotos: (team._pendingRobotPhotos || []).filter((photo) => photo.id !== id) } : team));
     refreshQueueHealth();
   };
+  // Event observations: nominations, field logs, radios, and contact information.
   const addNomination = async (form) => {
     try {
       const saved = await api.addNomination(eventId, { ...form, by: meName, byFullName: meFullName, byRole: myRole });
@@ -2938,6 +2953,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   //   event metadata and shared setup, branding, field and inspection settings.
   // Only the parts the Admin changed are written. Teams, matches, rankings, violations,
   // alliances, nominations, and access credentials are never touched.
+  // Event setup: persist program, location, timezone, branding, and field preferences.
   const saveEventSettings = async ({ setup, timezone, location, name, branding, fieldNames: nextFieldNames, requiredRobotPhotos: nextPhotoRequirements, fieldCount: nextFieldCount }) => {
     if (!adminUnlocked) throw new Error("Only this event's Admin can change event settings.");
     if(setup?.competitionProgram&&eventSettings?.vex_event?.value?.code)assertEventCodeProgram(eventSettings.vex_event.value.code,setup.competitionProgram);
@@ -3006,6 +3022,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     setCommandCenterChildOpen(false);
     await onArchivedBySelf?.();
   };
+  // Staff access: configure role codes and process replacement requests.
   const saveRoleAccessConfig = async (config) => {
     try {
       const changedRoles = ["ref", "judge", "emcee"].filter((key) => {
@@ -3062,6 +3079,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     }
     setAddMatchOpen(false);
   };
+  // Manual TM imports: validate roster, alliance, ranking, rule, and score files before applying them.
   const importTeamsFile = async (file) => {
     if (!file) return;
     try {
@@ -3514,6 +3532,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       alert("Could not read that file: " + (e.message || e) + "\n\nExport match results from Tournament Manager as CSV and try again.");
     } finally { setImporting(null); }
   };
+  // IQ finals: scope recorded tiebreak details to the working division and league session.
   const iqTiebreakPrefix = `division:${divisionId}:iq_tiebreak:${leagueSessionId || "tournament"}:`;
   const iqTiebreaks = Object.fromEntries(Object.entries(eventSettings)
     .filter(([key]) => key.startsWith(iqTiebreakPrefix))
@@ -3528,6 +3547,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     rememberSettingWrite(saved);
     setEventSettings(current => ({ ...current, [key]: saved }));
   };
+  // IQ imports: preserve shared scores and validate changes to scored partnerships.
   const importIQRows = async (rows) => {
     if (!adminUnlocked || !isIQ || highlanderDemoLocked) throw new Error("IQ match imports require Admin access to this IQ event.");
     const targetSession = api.leagueSessionFor(eventId);
@@ -3649,6 +3669,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   };
   tmSyncStatusRef.current = tmSyncStatus;
   const waitForTMStateRefresh = () => new Promise((resolve) => setTimeout(resolve, 80));
+  // Combined exports: classify Tournament Manager files and apply supported imports.
   const importTMSyncPackage = async (fileList) => {
     const files = Array.from(fileList || []);
     if (!files.length || tmPackageRunning) return;
@@ -3742,6 +3763,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     const list = await api.listMatches(eventId);
     const map = {}; for (const x of list) map[x.id] = x; setMatches(map); return map;
   };
+  // VEX Events sync: reconcile published schedules, scores, rankings, and Skills results.
   const applyVexSnapshot = async (data, kind) => {
     assertEventCodeProgram(data.code,competitionProgram);
     if (!adminUnlocked || highlanderDemoLocked || isVenueMode()) throw new Error("Cloud administrator access is required.");
@@ -3803,6 +3825,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     }
     if ((missing.length || kind === "rankings") && (!divisionId || Number(data.division)===divisionId)) setTeams(await api.listTeams(eventId));
   };
+  // Live TM sync: apply snapshots to the mapped division and refresh its records.
   const applyTmApiSnapshot = async (snapshot, options) => {
     if(snapshot.program&&snapshot.program!==competitionProgram)throw Error('TM event program changed. Stop and review the matching event.');
     if(competitionProgram==='vexu')assertEventCodeProgram(snapshot.event?.code,competitionProgram);
@@ -3826,6 +3849,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   };
   const [bracketSaving, setBracketSaving] = useState(false);
   const bracketSaveLock = useRef(false);
+  // Bracket corrections: invalidate dependent results when a recorded winner changes.
   const setMatchWinner = async (m, winner) => {
     if (bracketSaveLock.current) return;
     const next = m.winner === winner ? "" : winner;
@@ -3901,6 +3925,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       alert(`Could not save the ranking order: ${error?.message || error}`);
     }
   };
+  // Award export: fill nomination forms from the current event evidence.
   const exportNominations = async () => {
     if (!noms.length) { alert("There are no nominations to export."); return; }
 
@@ -4009,6 +4034,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     setFieldResetChecks((cur) => cur.filter((x) => x.matchId !== matchId));
   };
 
+  // Event cleanup: clear the record categories selected by the administrator.
   const clearSelected = async (sel) => {
     if (highlanderDemoLocked && (sel.violations || sel.teams || sel.schedule || sel.alliances)) { explainDemoLock(); return; }
     try {
@@ -4050,6 +4076,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     setMenu(false);
   };
 
+  // Derived views: compute counts, rule references, team records, and shared watch notes.
   const countsByTeam = useMemo(() => {
     const m = {};
     for (const v of viols) { m[v.team] = m[v.team] || { total: 0, minor: 0, major: 0, inspection: 0 }; m[v.team].total++; m[v.team][v.type]++; }
@@ -4147,6 +4174,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   }, [watchNotes]);
   const matchNums = useMemo(() => Object.keys(matches), [matches]);
 
+  // Reports and communication: backups, announcements, countdowns, and event diagnostics.
   const backupAll = async () => {
     try { const snapshot=await collectArchive(eventId,event?.name||'Event');downloadFile(JSON.stringify(snapshot,null,2),'ref-os-event-archive.json');setMenu(false); }
     catch(error){alert(error.message||'Could not export a complete backup.');}
@@ -4290,6 +4318,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     }
   };
 
+  // Violation PDF: fill the Match Anomaly Log and append rule descriptions and team summaries.
   const exportViolations = async () => {
     if (!viols.length) {
       alert("There are no violations to export.");
@@ -5481,6 +5510,7 @@ function ViolationCard({ v, onDelete, onOpenPhoto, onEdit, showTeam, canManage =
 }
 
 /* ============================ BY RULE ============================ */
+// Rule summary: group violations by rule and team, including counts and repeated match references.
 function ByRule({ viols, rulebook }) {
   const report = useMemo(() => {
     const descriptions = new Map();
@@ -5908,8 +5938,9 @@ function RulePicker({ ruleDetails, onSetRuleDetails, rules, knownRules, eventId,
   );
 }
 
-/* ============================ ADD TEAM MODAL ============================ */
+/* ============================ MATCH LIST ============================ */
 
+// Match browsing: preserve selected phase and field filters when returning from match details.
 function MatchList({ fixedTab, remembered, isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
   const [field, updateField] = useState(() => remembered?.current.field ?? "all");
   const setField = value => {
@@ -6141,6 +6172,7 @@ function AwpChecker({ onSave }) {
 
 const REPLAY_REASONS = ["Field fault", "Scoring or timer issue", "Match started incorrectly", "Safety interruption", "External interference", "Other"];
 
+// Match workspace: teams, scores, violations, and permitted field operations.
 function MatchDetail({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, canManageViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
   const league = useContext(LeagueUiContext);
   const [toOpen, setToOpen] = useState(false);
@@ -6428,10 +6460,11 @@ function MatchDetail({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, 
   );
 }
 
-/* ============================ CLEAR MODAL ============================ */
+/* ============================ EVENT READINESS ============================ */
 
 
 
+// Readiness checks: exercise event services and report configuration or connectivity failures.
 function PreEventSystemTest({ eventId, adminUnlocked, onClose, onComplete }) {
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState([]);
@@ -6570,6 +6603,7 @@ function PreEventSystemTest({ eventId, adminUnlocked, onClose, onComplete }) {
   );
 }
 
+// Shared sync check: exchange test records between devices through the event.
 function TwoDeviceSyncTest({ fieldLog, deviceId, meName, onAdd, onRemove, onClose }) {
   const parse = (e) => {
     try { return JSON.parse(e.note || "{}"); } catch { return {}; }
@@ -6669,6 +6703,7 @@ function TwoDeviceSyncTest({ fieldLog, deviceId, meName, onAdd, onRemove, onClos
   );
 }
 
+// Diagnostics: collect event and connection information for troubleshooting.
 function EventDiagnosticReport({ event, eventId, teams, matches, viols, rules, fieldLog, presence, roster, contacts, countdown, tmSyncStatus, online, pendingCount, queuedWrites = 0, failedSyncCount = 0, cloudReachable = null, lastCloudError = "", syncedAt = 0, syncing = false, lastSystemTest, onClose }) {
   const [runtime, setRuntime] = useState({ cacheCount: null, swControlled: false, swSupported: false });
   useEffect(() => {
@@ -6849,6 +6884,7 @@ function roleChip(role) {
 
 const VOLUNTEER_LOCATIONS = ["Pit Floor", "Competition Floor", "Skills", "Judging"];
 
+// Volunteer status: display connected staff, roles, and assigned locations.
 function OnlineList({ isDeveloper=false, fieldLocations=Object.keys(DEFAULT_FIELD_NAMES), presence, roster, meName, onRemove, eventMembers = [], onSetAdmin, assignments = {}, onSetAssignment, fieldNames = DEFAULT_FIELD_NAMES }) {
   const onlineCounts = {};
   const roleByName = {};
@@ -7005,6 +7041,7 @@ function LeagueEarlierRobotPhotos({ team, league, onOpenPhoto }) {
   );
 }
 
+// Robot reference: manage required angles, extra photos, and inspection follow-ups.
 function RobotDetail({ meName, canEditAttendance = false, requiredRobotPhotos, isIQ = false, team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, canTakePhotos = true, canDeletePhotos = true }) {
   const league = useContext(LeagueUiContext);
   const [busy, setBusy] = useState(false);
@@ -7241,6 +7278,7 @@ function JudgingView({ noms, viols, teamName, finalists, rankOrder = {}, canReor
   );
 }
 
+// Nomination form: collect award criteria, observations, and submitter information.
 function NominateModal({ teams, presetAward, me, lastMatch, event, matches, onSetName, onClose, onSave }) {
   const [award, setAward] = useState(presetAward || "sportsmanship");
   const sortedTeams = useMemo(() => [...teams].sort((a, b) => String(a.number).localeCompare(String(b.number), "en", { numeric: true, sensitivity: "base" })), [teams]);
@@ -7477,6 +7515,7 @@ function ImportPreviewModal({ preview, onImport, onCancel }) {
   );
 }
 
+// Sync dashboard: launch connector setup and review exported Tournament Manager data.
 function TMSyncCenter({ isIQ = false, onClose, onConnectApi, onImportTeams, onImportMatches, onImportRankings, onImportSkills, onImportAlliances, onImportScores, onImportPackage, packageRunning = false, stats, syncStatus, leagueImport = null }) {
   const items = [
     { key: "teams", title: "Teams", detail: `${stats.teams} teams loaded`, action: "Import teams", onClick: onImportTeams, Icon: Users },
