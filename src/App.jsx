@@ -1911,13 +1911,14 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const [iqPhase, setIqPhase] = useState("qual");
   const matchListState = useRef({});
   const listScroll = useRef(null);
-  const hasListDetail = Boolean(openTeam || openMatch);
+  const hasListDetail = Boolean(openTeam || openMatch || openRobot);
   const openListDetail = (setDetail, id) => {
     if (!hasListDetail) listScroll.current = { view, top: window.scrollY };
     setDetail(id);
   };
   const openTeamFromList = id => openListDetail(setOpenTeam, id);
   const openMatchFromList = id => openListDetail(setOpenMatch, id);
+  const openRobotFromList = id => openListDetail(setOpenRobot, id);
   useLayoutEffect(() => {
     const previous = listScroll.current;
     if (!previous) return;
@@ -4817,7 +4818,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals={iqPhase === "final"} tiebreaks={iqTiebreaks} onSaveTiebreak={saveIqTiebreak} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={openMatchFromList} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} renderMatches={rows=><MatchList isIQ fixedTab={iqPhase} remembered={matchListState} matches={Object.fromEntries(rows.map(row=>[row.id,row]))} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={openMatchFromList} canAdd={false} emcee={isEmcee} fieldNames={fieldNames} />} parseCSV={parseCSV} />
           </> : <MatchList remembered={matchListState} tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={openMatchFromList} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
-          <><RobotCheckIn teams={scheduleTeams.scheduled} checkIn={eventSettings?.tm_check_in?.value} onOpen={setOpenRobot} /><RobotList followups={operationRows.filter(r=>r.kind==='inspection-followup'&&r.payload.status==='open'&&(r.session_id||null)===(leagueSessionId||null)&&(r.division_id===0||r.division_id===divisionId))} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={scheduleTeams.scheduled} query={query} setQuery={setQuery} onOpen={setOpenRobot} /><UnscheduledTeams teams={scheduleTeams.unscheduled} query={query} onOpen={setOpenRobot} robots /></>
+          <><RobotCheckIn teams={scheduleTeams.scheduled} checkIn={eventSettings?.tm_check_in?.value} onOpen={openRobotFromList} /><RobotList followups={operationRows.filter(r=>r.kind==='inspection-followup'&&r.payload.status==='open'&&(r.session_id||null)===(leagueSessionId||null)&&(r.division_id===0||r.division_id===divisionId))} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={scheduleTeams.scheduled} query={query} setQuery={setQuery} onOpen={openRobotFromList} /><UnscheduledTeams teams={scheduleTeams.unscheduled} query={query} onOpen={openRobotFromList} robots /></>
         ) : view === "judging" ? (
           <>
           <ExcellenceEligibility teams={teams} skills={eventSettings?.skills_rankings?.value?.rows||[]}/>
