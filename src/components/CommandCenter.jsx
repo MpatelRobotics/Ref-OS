@@ -31,8 +31,26 @@ function ToolSection({ title, children, first = false, danger = false }) {
   );
 }
 
-export default function CommandCenter({ extraTools, readinessTools, tmActivity, tmTimes, eventTimezone, radioData, onSaveRadios, group:controlledGroup, onGroupChange, matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onTMSync, onVexSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, brand = null, onEventSettings, onEventManagement, onSyncStatus, syncModeLabel = "Cloud", league = null, onLeagueSessions, onClose }) {
+export default function CommandCenter({ extraTools, readinessTools, tmActivity, tmTimes, eventTimezone, radioData, onSaveRadios, group:controlledGroup, onGroupChange, matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onTMSync, onVexSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onExportAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, brand = null, onEventSettings, onEventManagement, onSyncStatus, syncModeLabel = "Cloud", league = null, onLeagueSessions, onClose }) {
   const [localGroup,setLocalGroup]=useState('');
+  const [exportingAll,setExportingAll]=useState(false);
+  const [exportProgress,setExportProgress]=useState('');
+  const [exportError,setExportError]=useState('');
+  const exportAll = async () => {
+    if (exportingAll || !onExportAll) return;
+    setExportingAll(true);
+    setExportError('');
+    setExportProgress('Loading event records…');
+    try {
+      await onExportAll((done, total, packing) => setExportProgress(packing ? 'Preparing download…' : `Pictures ${done} of ${total}`));
+      setExportProgress('Export downloaded.');
+    } catch (error) {
+      setExportError(error.message || 'Export failed. Try again.');
+      setExportProgress('');
+    } finally {
+      setExportingAll(false);
+    }
+  };
   const group=controlledGroup??localGroup;
   const setGroup=onGroupChange||setLocalGroup;
   const accent = brand?.accent || "#0D0F32";
@@ -179,6 +197,15 @@ export default function CommandCenter({ extraTools, readinessTools, tmActivity, 
           {action(onDiagnosticReport,'Admin Diagnostics',ShieldCheck,'Review device, connection and event diagnostics.')}
         </section>
         <section className="space-y-3"><h3 className="font-bold">Backups</h3>{action(onBackupAll,'Backup All JSON',Download)}</section>
+        {onExportAll && <section className="space-y-3">
+          <h3 className="font-bold">Developer export</h3>
+          <button type="button" onClick={exportAll} disabled={exportingAll} className={tool + " disabled:opacity-50"}>
+            <Download size={18} aria-hidden="true" />{exportingAll ? 'Exporting…' : 'Export all'}
+          </button>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Download all event records across divisions and league sessions, including each team’s robot pictures, as a ZIP file.</p>
+          {exportProgress && <p role="status" className="text-sm">{exportProgress}</p>}
+          {exportError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{exportError}</p>}
+        </section>}
         {extraTools}
       </>}
     </div></div>

@@ -5194,6 +5194,11 @@ const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', com
         onExportNominations={exportNominations}
         onExportEventReport={exportEventReport}
         onBackupAll={backupAll}
+        onExportAll={isDeveloper ? async onProgress => {
+          const { exportDeveloperEvent } = await import("./developerEventExport.js");
+          const [queued, failed] = await Promise.all([outbox.loadQueue(eventId), outbox.loadFailed(eventId)]);
+          await exportDeveloperEvent(eventId, [...queued, ...failed.map(item => item.op)], onProgress);
+        } : undefined}
         onActivityFeed={() => openCommandCenterTool(() => setShowActivity(true))}
         onRankings={() => openCommandCenterTool(() => setShowRankings(true))}
         onAwpHistory={isIQ ? null : () => openCommandCenterTool(() => { setView("awp"); setQuery(""); })}
