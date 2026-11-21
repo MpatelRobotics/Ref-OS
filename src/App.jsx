@@ -1,3 +1,4 @@
+import { vexEventLink } from "./vexEventLink.js";
 import {eventCodeProgram,assertEventCodeProgram} from '../supabase/functions/_shared/competitionProgram.js';
 import AutoEventTimezone from './components/AutoEventTimezone.jsx';
 import { saveDetectedEventTimezone } from './detectedEventTimezone.js';
@@ -1670,7 +1671,8 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
           const showShort = profile.hasSavedShortName && profile.shortName.toLowerCase() !== profile.name.toLowerCase();
           const branded = profile.accentSource !== "default";
           return (
-            <button key={ev.id} type="button" onClick={() => onChoose(ev.id)}
+            <div key={ev.id}>
+            <button type="button" onClick={() => onChoose(ev.id)}
               className="w-full flex items-center gap-4 rounded-xl border border-slate-200 dark:border-slate-700 p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-700 transition"
               style={branded ? { borderLeftWidth: 4, borderLeftColor: profile.accent } : undefined}>
               <EventLogo src={profile.logo} fallback={profile.highlander ? "/logo.svg" : "/refos-logo.svg"} className="w-12 h-12 object-contain rounded-lg shrink-0" />
@@ -1684,6 +1686,8 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
               </span>
               <ChevronRight size={20} className="text-slate-400" />
             </button>
+            {vexEventLink(ev.vexEventCode) && <a href={vexEventLink(ev.vexEventCode)} target="_blank" rel="noopener noreferrer" aria-label={`View ${profile.name} on VEX Events (opens in a new tab)`} className="inline-flex min-h-[44px] items-center gap-2 px-4 py-2 text-sm font-semibold text-blue-700 dark:text-blue-300 underline rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600"><ExternalLink size={16} aria-hidden="true" />View on VEX Events</a>}
+            </div>
           );
         });
           return group.name ? <details key={groupKey} open={!!expandedStates[groupKey]} onToggle={event=>{const open=event.currentTarget.open;setExpandedStates(previous=>previous[groupKey]===open?previous:{...previous,[groupKey]:open});}} className="rounded-xl border border-slate-200 dark:border-slate-700">
@@ -5164,7 +5168,7 @@ const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', com
           }} />
       )}
       {showOfflineTest && adminUnlocked && <OfflineReadinessModal onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowOfflineTest(false)} />}
-      {showCommandCenter && adminUnlocked && <CommandCenter tmActivity={{...eventSettings?.tm_field_activity?.value,timing:eventSettings?.tm_match_timing?.value?.rows || []}} tmTimes={eventSettings?.tm_match_times?.value?.rows || []} eventTimezone={eventSettings?.event_timezone?.value?.zone || "UTC"} radioData={eventSettings.event_radios?.value} onSaveRadios={saveRadios} group={commandCenterGroup} onGroupChange={setCommandCenterGroup} extraTools={<EventArchiveTools eventId={eventId} eventName={event?.name||'Event'} divisions={divisionCatalog} isLeague={Boolean(league)}/>} readinessTools={<OfflineEventTools eventId={eventId} sessionId={leagueSessionId} division={divisionId} teams={teams} matches={matches} failed={failedSyncItems} onRetry={retryFailedSync}/>} matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
+      {showCommandCenter && adminUnlocked && <CommandCenter vexEventCode={eventSettings?.vex_event?.value?.code || event?.vexEventCode} tmActivity={{...eventSettings?.tm_field_activity?.value,timing:eventSettings?.tm_match_timing?.value?.rows || []}} tmTimes={eventSettings?.tm_match_times?.value?.rows || []} eventTimezone={eventSettings?.event_timezone?.value?.zone || "UTC"} radioData={eventSettings.event_radios?.value} onSaveRadios={saveRadios} group={commandCenterGroup} onGroupChange={setCommandCenterGroup} extraTools={<EventArchiveTools eventId={eventId} eventName={event?.name||'Event'} divisions={divisionCatalog} isLeague={Boolean(league)}/>} readinessTools={<OfflineEventTools eventId={eventId} sessionId={leagueSessionId} division={divisionId} teams={teams} matches={matches} failed={failedSyncItems} onRetry={retryFailedSync}/>} matches={matches} viols={viols} fieldLog={fieldLog} presence={presence} roster={refRoster}
         eventMembers={eventMembers} meName={meName} onSetAdmin={setVolunteerAdmin}
         alertStats={alertStats} alertStatsLoading={alertStatsLoading} onRefreshAlertStats={loadAlertStats} onResetAlertStats={resetAlertStats}
         alertDeliveryLabel={notificationDeliveryLabel}

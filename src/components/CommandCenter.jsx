@@ -1,3 +1,4 @@
+import { vexEventLink } from "../vexEventLink.js";
 import React, {useState} from "react";
 import { AlertTriangle, Archive, BarChart3, Bell, CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, Clock, CloudOff, Contact, Download, Flag, KeyRound, ListOrdered, Mail, MapPin, RefreshCw, Radio, Server, Settings, ShieldCheck, ShoppingBag, Trash2, Trophy, Users, Wifi, X } from "lucide-react";
 import TmTimingReport from "./TmTimingReport.jsx";
@@ -31,7 +32,7 @@ function ToolSection({ title, children, first = false, danger = false }) {
   );
 }
 
-export default function CommandCenter({ extraTools, readinessTools, tmActivity, tmTimes, eventTimezone, radioData, onSaveRadios, group:controlledGroup, onGroupChange, matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onTMSync, onVexSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onExportAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, brand = null, onEventSettings, onEventManagement, onSyncStatus, syncModeLabel = "Cloud", league = null, onLeagueSessions, onClose }) {
+export default function CommandCenter({ vexEventCode, extraTools, readinessTools, tmActivity, tmTimes, eventTimezone, radioData, onSaveRadios, group:controlledGroup, onGroupChange, matches, viols, fieldLog, presence, roster, eventMembers = [], meName = "", onSetAdmin, alertStats, alertStatsLoading, onRefreshAlertStats, onResetAlertStats, onAlertDelivery, alertDeliveryLabel = "Push only", failedSyncItems = [], onRetryFailedSync, onDiscardFailedSync, countdown, countdownText, onCountdown, onClearCountdown, onOfflineTest, onAnnouncement, onDeleteAnnouncement, onClearAnnouncements, onContactDirectory, onRoleCodes, onPreEventTest, onTwoDeviceSyncTest, onDiagnosticReport, onTMSync, onVexSync, onExportViolations, onExportNominations, onExportEventReport, onBackupAll, onExportAll, onActivityFeed, onRankings, onAwpHistory, onClearData, onResetVolunteerSignIns, brand = null, onEventSettings, onEventManagement, onSyncStatus, syncModeLabel = "Cloud", league = null, onLeagueSessions, onClose }) {
   const [localGroup,setLocalGroup]=useState('');
   const [exportingAll,setExportingAll]=useState(false);
   const [exportProgress,setExportProgress]=useState('');
@@ -214,6 +215,7 @@ export default function CommandCenter({ extraTools, readinessTools, tmActivity, 
     <div className="fixed inset-0 z-[65] bg-slate-50 dark:bg-slate-900 flex flex-col">
       <div className="px-4 py-3 bg-[#0D0F32] text-white flex items-center gap-2"><BarChart3 size={20}/><div><h2 className="font-bold">Event Command Center</h2><p className="text-xs text-slate-400">Admin operations overview</p></div><button onClick={onClose} className="ml-auto"><X size={22}/></button></div>
       <div className="flex-1 overflow-y-auto"><div className="max-w-2xl mx-auto p-4 space-y-3">
+        {vexEventLink(vexEventCode) && <a href={vexEventLink(vexEventCode)} target="_blank" rel="noopener noreferrer" className="flex min-h-[44px] items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 font-semibold text-blue-700 dark:text-blue-300 underline">View on VEX Events<span className="sr-only"> (opens in a new tab)</span></a>}
         {brand && (
           <div className="bg-white dark:bg-slate-800 border rounded-xl overflow-hidden">
             <div className="h-1.5" style={{ backgroundColor: brand.accent }} />
