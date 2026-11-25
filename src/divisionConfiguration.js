@@ -16,7 +16,7 @@ export function validateDivisions(rows) {
   return rows.map(row => {
     const id = Number(row.id), name = String(row.name || '').trim();
     if (!Number.isSafeInteger(id) || id < 0 || ids.has(id)) throw Error('Each division needs a unique nonnegative ID.');
-    if (!name || name.length > 100 || names.has(name.toLowerCase())) throw Error('Give each division a different name, up to 100 characters.');
+    if (!name || name.length > 500 || names.has(name.toLowerCase())) throw Error('Give each division a different name, up to 500 characters.');
     ids.add(id); names.add(name.toLowerCase());
     const fieldCount = Number(row.fieldCount ?? 3);
     if (![1,2,3].includes(fieldCount)) throw Error('Choose one, two, or three fields per division.');

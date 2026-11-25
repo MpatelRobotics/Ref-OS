@@ -129,9 +129,9 @@ export default function EventSettingsModal({ divisions = [], divisionId = 0, eve
     const cleanName = name.trim();
     const cleanShort = shortName.trim();
     if (!cleanName) next.name = "Enter the event name.";
-    else if (cleanName.length > 100) next.name = "Keep the event name to 100 characters or fewer.";
+    else if (cleanName !== initial.name && cleanName.length > 100) next.name = "Keep the event name to 100 characters or fewer.";
     if (!cleanShort) next.shortName = "Enter a short name. It can match the event name.";
-    else if (cleanShort.length > 40) next.shortName = "Keep the short name to 40 characters or fewer.";
+    else if (cleanShort !== initial.shortName && cleanShort.length > 40) next.shortName = "Keep the short name to 40 characters or fewer.";
     if (cleanLogoUrl && !isHttpUrl(cleanLogoUrl)) next.logoUrl = "Enter a full image address starting with http:// or https://, or leave it blank.";
     if (!HEX_COLOR_RE.test(accent)) next.accent = "Enter a 6 digit hex color, for example #D7212B.";
     const cleanedFields = Object.fromEntries(FIELD_KEYS.map((key) => [key, String(fields[key] || "").trim()]));

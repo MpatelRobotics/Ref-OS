@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 async function mount(page){
- await page.route('**/division-setup-test',r=>r.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module">import '/src/index.css';import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(t)=>t;window.__vite_plugin_react_preamble_installed__=true;const React=(await import('/node_modules/.vite/deps/react.js')).default,DOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default,View=(await import('/src/components/modals/EventSettingsModal.jsx')).default;DOM.createRoot(document.getElementById('root')).render(React.createElement(View,{event:{name:'Slugger'},brand:{shortName:'Slugger'},divisionId:1,divisions:[{id:1,name:'Division 1'},{id:2,name:'Division 2'}],onSave:async value=>window.savedSettings=value,onClose:()=>{}}));</script>`}));
+ await page.route('**/division-setup-test',r=>r.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module">import '/src/index.css';import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(t)=>t;window.__vite_plugin_react_preamble_installed__=true;const React=(await import('/node_modules/.vite/deps/react.js')).default,DOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default,View=(await import('/src/components/modals/EventSettingsModal.jsx')).default;DOM.createRoot(document.getElementById('root')).render(React.createElement(View,{event:{name:'Slugger Signature Event High School - '+ 'Louisville '.repeat(10)},brand:{shortName:'Slugger Signature Event High School Division Staff'},divisionId:1,divisions:[{id:1,name:'Division 1'},{id:2,name:'Division 2'}],onSave:async value=>window.savedSettings=value,onClose:()=>{}}));</script>`}));
  await page.goto('/division-setup-test');
 }
 test('configure separate division names and fields, preserve drafts while switching, save only division changes',async({page})=>{
@@ -29,4 +29,12 @@ test('add a division and reject duplicate field names without submitting',async(
  await page.getByLabel('Field 2 name',{exact:true}).fill('United Rentals');
  await page.getByRole('button',{name:'Save Settings',exact:true}).click();
  await expect.poll(()=>page.evaluate(()=>window.savedSettings?.divisions?.[2]?.id)).toBe(3);
+});
+
+test('long division names save even when an existing imported event name exceeds the editor limit',async({page})=>{
+ await mount(page);
+ const longName='University of Louisville Speed School Division - '+ 'Extended division name '.repeat(8);
+ await page.getByLabel('Division name',{exact:true}).fill(longName);
+ await page.getByRole('button',{name:'Save Settings',exact:true}).click();
+ await expect.poll(()=>page.evaluate(()=>window.savedSettings?.divisions?.[0]?.name)).toBe(longName.trim());
 });
