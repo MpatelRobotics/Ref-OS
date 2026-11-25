@@ -1,3 +1,4 @@
+import {mergeDivisions, divisionFieldNames, validateDivisions} from "./divisionConfiguration.js";
 import { vexEventLink } from "./vexEventLink.js";
 import {eventCodeProgram,assertEventCodeProgram} from '../supabase/functions/_shared/competitionProgram.js';
 import AutoEventTimezone from './components/AutoEventTimezone.jsx';
@@ -1799,11 +1800,11 @@ function Tracker(props) {
   const divisionId=divisions.length>1?(divisions.some(d=>d.id===selected)?selected:divisions[0].id):0;
   return <EventTmSync>
 
-    <DivisionTracker key={`${eventId}:${divisionId}`} {...props} view={view} setView={setView} divisionId={divisionId} divisionCatalog={divisions} divisionSelector={divisions.length>1 && <div className="px-4 py-3 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700"><label className="flex flex-wrap items-center gap-3 font-semibold">Division<select aria-label="Event division" value={divisionId} onChange={e=>{const value=Number(e.target.value);setSelected(value);localStorage.setItem(storageKey,String(value));}} className="min-h-[44px] min-w-0 max-w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3">{divisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label></div>} onDiscoverTmDivisions={async rows=>{const saved=await eventApi.upsertEventSetting(eventId,'vex_divisions',{divisions:rows});setDivisions(rows);return rows;}}/>
+    <DivisionTracker key={`${eventId}:${divisionId}`} {...props} view={view} setView={setView} divisionId={divisionId} divisionCatalog={divisions} onSaveDivisions={async rows=>{const valid=validateDivisions(rows);await eventApi.upsertEventSetting(eventId,'vex_divisions',{divisions:valid});setDivisions(valid);}} divisionSelector={divisions.length>0 && <div className="px-4 py-3 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700"><label className="flex flex-wrap items-center gap-3 font-semibold">Division<select aria-label="Event division" value={divisions.length===1?divisions[0].id:divisionId} onChange={e=>{const value=Number(e.target.value);setSelected(value);localStorage.setItem(storageKey,String(value));}} className="min-h-[44px] min-w-0 max-w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3">{divisions.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select></label></div>} onDiscoverTmDivisions={async rows=>{const existing=await eventApi.getEventSetting(eventId,'vex_divisions');const merged=mergeDivisions(existing?.value?.divisions || [],rows);await eventApi.upsertEventSetting(eventId,'vex_divisions',{divisions:merged});setDivisions(merged);return merged;}}/>
   </EventTmSync>;
 }
 // Event workspace: state and actions belong to the selected event, division, and league session.
-function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divisionSelector=null, onDiscoverTmDivisions, league = null, initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf, onEventFormatChanged }) {
+function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divisionSelector=null, onSaveDivisions, onDiscoverTmDivisions, league = null, initialEvent, meName, meFullName, mePhone, isDeveloper = false, role, theme, onToggleTheme, textScale, onCycleTextSize, onEditName, onLock, onLockToEventLogin, onChooseEvent, onEventArchived, onArchivedBySelf, onEventFormatChanged }) {
   // League events: this workspace is bound to ONE league session (league.session). Session-scoped
   // reads and writes are limited to it by api.js; null for Tournament events.
   const leagueSessionId = league?.session?.id || null;
@@ -2016,7 +2017,8 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   // Highlander is a normal live event; the separate public demo owns demo behavior.
   const highlanderDemoLocked = false;
   const explainDemoLock = () => alert("Highlander Summit matches, alliances, and violations are read only for the demo.");
-  const configuredFieldCount = Math.max(1, Math.min(3, Number(eventSettings?.field_configuration?.value?.count) || (event?.format === 'league' || league ? 1 : 3)));
+  const divisionConfiguration = divisionCatalog.find(row=>Number(row.id)===divisionId) || (divisionCatalog.length===1?divisionCatalog[0]:null);
+  const configuredFieldCount = Math.max(1, Math.min(3, Number(divisionConfiguration?.fieldCount || eventSettings?.field_configuration?.value?.count) || (event?.format === 'league' || league ? 1 : 3)));
   const savedFieldNames = eventSettings?.field_names?.value;
   const tmFieldSets = eventSettings?.tm_field_activity?.value?.fieldSets;
   // Field names: use scheduled match fields or available Tournament Manager field activity.
@@ -2038,6 +2040,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   // { "Field 1": "...", "Field 2": "...", "Field 3": "..." }. Blank or invalid entries keep the default.
   const fieldNames = useMemo(() => {
     if (scheduleFields.length) return {};
+    if (divisionConfiguration?.fieldNames) return divisionFieldNames(divisionConfiguration,scheduleFields);
     const names = { ...DEFAULT_FIELD_NAMES };
     if (savedFieldNames && typeof savedFieldNames === "object") {
       for (const key of Object.keys(DEFAULT_FIELD_NAMES)) {
@@ -2046,7 +2049,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       }
     }
     return names;
-  }, [savedFieldNames, scheduleFields]);
+  }, [savedFieldNames, scheduleFields, divisionConfiguration]);
   const volunteerAssignments = eventSettings?.volunteer_assignments?.value || {};
   const myAssignment = volunteerLocation(volunteerAssignments, currentUserId, meName);
   const [failedSyncItems, setFailedSyncItems] = useState([]);
@@ -2959,7 +2962,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   // Only the parts the Admin changed are written. Teams, matches, rankings, violations,
   // alliances, nominations, and access credentials are never touched.
   // Event setup: persist program, location, timezone, branding, and field preferences.
-  const saveEventSettings = async ({ setup, timezone, location, name, branding, fieldNames: nextFieldNames, requiredRobotPhotos: nextPhotoRequirements, fieldCount: nextFieldCount }) => {
+  const saveEventSettings = async ({ divisions: nextDivisions, setup, timezone, location, name, branding, fieldNames: nextFieldNames, requiredRobotPhotos: nextPhotoRequirements, fieldCount: nextFieldCount }) => {
     if (!adminUnlocked) throw new Error("Only this event's Admin can change event settings.");
     if(setup?.competitionProgram&&eventSettings?.vex_event?.value?.code)assertEventCodeProgram(eventSettings.vex_event.value.code,setup.competitionProgram);
     try {
@@ -3008,6 +3011,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
       if (outbox.isOffline(error)) throw new Error("Reconnect before changing event settings.");
       throw error;
     }
+    if (nextDivisions) await onSaveDivisions(nextDivisions);
     if (commandCenterChildOpen) returnToCommandCenter();
     else setShowEventSettings(false);
   };
@@ -5150,7 +5154,7 @@ const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', com
       {showEventManagement && adminUnlocked && <EventManagementModal event={event} eventId={eventId} brand={brand} roleLabel={myRole} isProtected={eventProtected}
         onArchive={archiveCurrentEvent}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEventManagement(false)} />}
-      {showEventSettings && adminUnlocked && <EventSettingsModal savedLocation={eventSettings?.event_location?.value} importedLocation={eventSettings?.vex_event?.value} competitionProgram={competitionProgram} eventTimezone={eventSettings?.event_timezone?.value?.zone||''} fieldCount={configuredFieldCount} scheduleFields={scheduleFields} event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
+      {showEventSettings && adminUnlocked && <EventSettingsModal divisions={divisionCatalog} divisionId={divisionId} savedLocation={eventSettings?.event_location?.value} importedLocation={eventSettings?.vex_event?.value} competitionProgram={competitionProgram} eventTimezone={eventSettings?.event_timezone?.value?.zone||''} fieldCount={configuredFieldCount} scheduleFields={scheduleFields} event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
         eventFormat={league || event?.format === "league" ? "league" : "tournament"}
         canConvertToLeague={!league && !isHighlander && event?.format !== "league"}
         onConvertToLeague={() => setShowConvertLeague(true)}
@@ -5256,7 +5260,7 @@ const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', com
           </div>
         </div>
       )}
-      {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexSyncManager program={competitionProgram} onDiscoverDivisions={async divisions=>{await eventApi.upsertEventSetting(eventId,"vex_divisions",{divisions},meName);}} autoStart initialDivision={eventSettings?.vex_event?.value?.division} showLaunch={false} setupOpen={showVexSyncSetup} onSetupClose={()=>commandCenterChildOpen ? returnToCommandCenter() : setShowVexSyncSetup(false)} showStatus={showCommandCenter || showVexSyncSetup} visible={{rankings:showVexLiveSync,skills:showVexSkillsSync,scores:showVexScoresSync}} onOpen={category=>{setShowVexLiveSync(category==='rankings');setShowVexSkillsSync(category==='skills');setShowVexScoresSync(category==='scores');}} key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || event?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onSaveCode={async (code, division) => { assertEventCodeProgram(code,competitionProgram);if (eventSettings?.vex_event?.value?.code === code && (division == null || eventSettings?.vex_event?.value?.division === division)) return; const saved = await api.upsertEventSetting(eventId, "vex_event", { ...(eventSettings?.vex_event?.value || {}), code, ...(division != null ? {division} : {}) }); setEventSettings(prev => ({ ...prev, vex_event:saved })); }} onFetch={async(...args)=>{const data=await api.getVexStandings(...args,competitionProgram);if(data.program!==competitionProgram)throw Error('VEX event program does not match this Ref OS event.');return data;}} onApply={applyVexSnapshot} onClose={category=>{if(category==='rankings')setShowVexLiveSync(false);if(category==='skills')setShowVexSkillsSync(false);if(category==='scores')setShowVexScoresSync(false);}} />}
+      {adminUnlocked && !highlanderDemoLocked && !isVenueMode() && <VexSyncManager program={competitionProgram} onDiscoverDivisions={onDiscoverTmDivisions} autoStart initialDivision={eventSettings?.vex_event?.value?.division} showLaunch={false} setupOpen={showVexSyncSetup} onSetupClose={()=>commandCenterChildOpen ? returnToCommandCenter() : setShowVexSyncSetup(false)} showStatus={showCommandCenter || showVexSyncSetup} visible={{rankings:showVexLiveSync,skills:showVexSkillsSync,scores:showVexScoresSync}} onOpen={category=>{setShowVexLiveSync(category==='rankings');setShowVexSkillsSync(category==='skills');setShowVexScoresSync(category==='scores');}} key={`${eventId}-${leagueSessionId || ""}`} initialCode={eventSettings?.vex_event?.value?.code || event?.code || ""} target={`${event?.name || "Current event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} onSaveCode={async (code, division) => { assertEventCodeProgram(code,competitionProgram);if (eventSettings?.vex_event?.value?.code === code && (division == null || eventSettings?.vex_event?.value?.division === division)) return; const saved = await api.upsertEventSetting(eventId, "vex_event", { ...(eventSettings?.vex_event?.value || {}), code, ...(division != null ? {division} : {}) }); setEventSettings(prev => ({ ...prev, vex_event:saved })); }} onFetch={async(...args)=>{const data=await api.getVexStandings(...args,competitionProgram);if(data.program!==competitionProgram)throw Error('VEX event program does not match this Ref OS event.');return data;}} onApply={applyVexSnapshot} onClose={category=>{if(category==='rankings')setShowVexLiveSync(false);if(category==='skills')setShowVexSkillsSync(false);if(category==='scores')setShowVexScoresSync(false);}} />}
       {showFeedback && <FeedbackModal meName={meName} myRole={myRole} onSubmit={async (entry, screenshots) => { if (!screenshots?.length) return addFieldLog(entry); await submitFeedbackScreenshots({eventId, id:entry.id, note:entry.note, by:meName, sessionId:leagueSessionId || null, screenshots}); setFieldLog(await api.listFieldLog(eventId)); }} onClose={() => setShowFeedback(false)} />}
       {showOnboarding && <QuickStartModal step={onboardingStep} setStep={setOnboardingStep} onClose={closeOnboarding} />}
       {undoPrompt && (

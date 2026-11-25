@@ -1,3 +1,5 @@
+import DivisionSetup from "../DivisionSetup.jsx";
+import {validateDivisions} from "../../divisionConfiguration.js";
 import EventLocationFields from '../EventLocationFields.jsx';
 import { eventDirectoryLocation, eventLocationError } from '../../eventStateGroups.js';
 import CountryTimezoneSelect from "../CountryTimezoneSelect.jsx";
@@ -26,7 +28,7 @@ function FieldError({ children }) {
   return <p className="mt-1 text-xs font-semibold text-red-700 dark:text-red-300">{children}</p>;
 }
 
-export default function EventSettingsModal({ event, brand, eventTimezone = "", savedLocation, importedLocation, fieldNames = {}, requiredRobotPhotos, onSave, onClose, eventFormat = "tournament", competitionProgram = "v5", fieldCount, scheduleFields = [], canConvertToLeague = false, onConvertToLeague }) {
+export default function EventSettingsModal({ divisions = [], divisionId = 0, event, brand, eventTimezone = "", savedLocation, importedLocation, fieldNames = {}, requiredRobotPhotos, onSave, onClose, eventFormat = "tournament", competitionProgram = "v5", fieldCount, scheduleFields = [], canConvertToLeague = false, onConvertToLeague }) {
   const locationBaseline = savedLocation || eventDirectoryLocation({id:event?.id,...importedLocation});
   const [locationDraft, setLocationDraft] = useState(null);
   const location = locationDraft || locationBaseline;
@@ -44,6 +46,9 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", s
 
   const initialCount = fieldCount || (eventFormat === "league" ? 1 : 3);
   const [count,setCount] = useState(initialCount);
+  const initialDivisions = useRef((divisions.length ? divisions : [{id:0,name:'Division 1'}]).map(row=>({...row,fieldCount:row.fieldCount || initialCount,fieldNames:row.fieldNames || Object.fromEntries(FIELD_KEYS.map(key=>[key,(!divisions.length || row.id===divisionId || divisions.length===1) ? fieldNames[key] || key : key]))}))).current;
+  const [divisionDraft,setDivisionDraft] = useState(initialDivisions);
+
   const visibleFields = FIELD_KEYS.slice(0,count);
   const [photoRequirements, setPhotoRequirements] = useState(()=>normalizeRequiredRobotPhotos(requiredRobotPhotos));
   const initialPhotoRequirements = normalizeRequiredRobotPhotos(requiredRobotPhotos);
@@ -139,6 +144,10 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", s
   const save = async () => {
     if (readingLogo || saving) return;
     const { next, cleanName, cleanShort, cleanedFields } = validate();
+    let cleanedDivisions;
+    const divisionsChanged = JSON.stringify(divisionDraft)!==JSON.stringify(initialDivisions);
+    if (divisionsChanged) try { cleanedDivisions=validateDivisions(divisionDraft); } catch(error) {next.divisions=error.message;}
+
     setErrors(next);
     setSaveError("");
     if (Object.keys(next).length) return;
@@ -154,10 +163,11 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", s
     const cleanSetup={...setup,quals:Number(setup.quals)||0,practice:Number(setup.practice)||0,bracket:setup.competitionProgram==='iq'?0:Number(setup.bracket),finalsBestOf:setup.competitionProgram==='iq'?1:Number(setup.finalsBestOf)};
     const setupChanged=Object.keys(initialSetup).some(key=>cleanSetup[key]!==initialSetup[key]);
     const photoRequirementsChanged = JSON.stringify(photoRequirements) !== JSON.stringify(initialPhotoRequirements);
-    if (!locationChanged && !setupChanged && timezone===eventTimezone && count === initialCount && !nameChanged && !fieldsChanged && !photoRequirementsChanged && !Object.values(identityChanged).some(Boolean)) { onClose(); return; }
+    if (!divisionsChanged && !locationChanged && !setupChanged && timezone===eventTimezone && count === initialCount && !nameChanged && !fieldsChanged && !photoRequirementsChanged && !Object.values(identityChanged).some(Boolean)) { onClose(); return; }
     setSaving(true);
     try {
       await onSave({
+        divisions: divisionsChanged ? cleanedDivisions : null,
         setup:setupChanged?cleanSetup:null,
         location:locationChanged?{country:location.country,state:location.state.trim()}:null,
         timezone: timezone!==eventTimezone?timezone:null,
@@ -285,28 +295,8 @@ export default function EventSettingsModal({ event, brand, eventTimezone = "", s
           </section>
 
           <section className="space-y-4">
-            <SectionTitle icon={MapPin}>Field settings</SectionTitle>
-            {scheduleFields.length > 0 ? <>
-              <p className="text-sm text-slate-600 dark:text-slate-300">Using {scheduleFields.length} competition {scheduleFields.length === 1 ? "field" : "fields"} from the synced event data.</p>
-              <ul className="list-disc pl-5 text-sm">{scheduleFields.map(field => <li key={field}>{field}</li>)}</ul>
-            </> : <>
-              <p className="text-sm text-slate-600 dark:text-slate-300 -mt-1">Display names only. Matches, field logs, and AWP history stay connected to Field 1, Field 2, and Field 3.</p>
-              <label className="block text-sm font-semibold">Number of competition fields<select value={count} onChange={e=>setCount(Number(e.target.value))} className={inputClass}>{[1,2,3].map(n=><option key={n} value={n}>{n} {n===1?'field':'fields'}</option>)}</select></label>
-              <p className="text-sm text-slate-500">Leagues default to one field. Add more here later; existing match assignments and field history are preserved.</p>
-              {visibleFields.map((key) => (
-                <label key={key} className="block">
-                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{key} name</span>
-                  <input value={fields[key] || ""} maxLength={40} onChange={(e) => setFields((cur) => ({ ...cur, [key]: e.target.value }))} placeholder={key}
-                    className={`${inputClass} ${inputBorder(errors[key])}`} />
-                  <FieldError>{errors[key]}</FieldError>
-                </label>
-              ))}
-              <FieldError>{errors.fields}</FieldError>
-              <button type="button" onClick={() => { setFields(Object.fromEntries(FIELD_KEYS.map((key) => [key, key]))); setErrors((cur) => ({ ...cur, "Field 1": "", "Field 2": "", "Field 3": "", fields: "" })); }}
-                className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                <RotateCcw size={15} /> Restore Field 1, Field 2, and Field 3
-              </button>
-            </>}
+            <DivisionSetup rows={divisionDraft} onChange={setDivisionDraft} activeId={divisionId} disabled={saving}/>
+            <FieldError>{errors.divisions}</FieldError>
           </section>
 
           <section className="space-y-2">
