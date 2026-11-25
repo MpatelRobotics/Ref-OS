@@ -1,10 +1,11 @@
 // Imported IDs stay stable so renaming never moves match or incident records.
+const genericDivisionName = value => /^(?:default(?: division)?|division(?: \d+)?)$/i.test(String(value || '').trim());
 export function mergeDivisions(saved = [], discovered = []) {
   const rows = new Map(saved.map(row => [Number(row.id), row]));
   for (const source of discovered) {
     const old = rows.get(Number(source.id));
     rows.set(Number(source.id), {...old, ...source,
-      ...(source.name ? {name:source.name,customName:false} : {}),
+      ...(source.name && (!old?.name || !genericDivisionName(source.name)) ? {name:source.name,customName:false} : old?.name ? {name:old.name,customName:old.customName} : {}),
       ...(old?.fieldNames ? {fieldNames: old.fieldNames, fieldCount: old.fieldCount} : {}),
     });
   }
