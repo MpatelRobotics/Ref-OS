@@ -43,7 +43,7 @@ export default function CommandCenter({ vexEventCode, extraTools, readinessTools
     setExportError('');
     setExportProgress('Loading event records…');
     try {
-      await onExportAll((done, total, packing) => setExportProgress(packing ? 'Preparing download…' : `Pictures ${done} of ${total}`));
+      await onExportAll((done, total, packing) => setExportProgress(packing ? 'Preparing download…' : `Files ${done} of ${total}`));
       setExportProgress('Export downloaded.');
     } catch (error) {
       setExportError(error.message || 'Export failed. Try again.');
@@ -203,7 +203,7 @@ export default function CommandCenter({ vexEventCode, extraTools, readinessTools
           <button type="button" onClick={exportAll} disabled={exportingAll} className={tool + " disabled:opacity-50"}>
             <Download size={18} aria-hidden="true" />{exportingAll ? 'Exporting…' : 'Export all'}
           </button>
-          <p className="text-sm text-slate-600 dark:text-slate-300">Download all event records across divisions and league sessions, including each team’s robot pictures, as a ZIP file.</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Download an event archive across divisions and league sessions as a ZIP file.</p>
           {exportProgress && <p role="status" className="text-sm">{exportProgress}</p>}
           {exportError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{exportError}</p>}
         </section>}

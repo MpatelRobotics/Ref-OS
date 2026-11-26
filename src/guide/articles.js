@@ -370,14 +370,7 @@ add("robot-configurations", "Inspection", "Robot configuration flags and reminde
   "Check the actual robot before play. A flag or picture is a reference, not approval or an automatic violation.",
   ["photos", "matches"],
   "zip tie ziptie wall multiple configurations add-ons warning");
-add("developer-export", "Developer", "Export all records and robot pictures", ['Developer'],
-  "Download an event archive including each team’s robot pictures.",
-  "When a developer needs an event archive.",
-  ["Sign in with Developer access and open the intended event.", "Open Event Command Center → Backups & Reports.", "Choose Export all and wait for records and pictures to be collected and the ZIP prepared.", "Open the downloaded archive and verify its event, division and League session coverage before storing it securely."],
-  "The Export all button and description are developer-only. The archive covers divisions and League sessions and includes available robot pictures.",
-  "Protect private event records and images. Verify the download before relying on it; an export does not automatically restore data.",
-  ["backup", "violation-export"],
-  "export all zip archive pictures");
+
 export const GUIDE_ARTICLES = articles;
 export function visibleArticles(role) {
   return articles.filter((a) => a.roles.includes(role));
