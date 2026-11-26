@@ -69,10 +69,30 @@ test('Features & Help and contextual help open the guide in the real workspace',
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: /Features & Help/i }).click();
   await expect(page.getByRole('heading', { name: 'About the Founder' })).toBeVisible();
-  await expect(page.getByText(/test engineer at Lockheed Martin/)).toBeVisible();
+  await expect(page.getByText(/test engineer at Lockheed Martin/)).toHaveCount(0);
   await page.getByRole('button', { name: /^User Guide/ }).click();
   await expect(page.getByRole('heading', { name: 'Ref OS User Guide', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Back to Features & Help' }).click();
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Help with this section' })).toHaveCount(0);
+});
+
+test('main sidebar opens the public guide and supports role selection without event login', async ({page})=>{
+ await page.goto('/');
+ const nav=page.getByRole('navigation',{name:'Event selection navigation'});
+ await nav.getByRole('button',{name:'User Guide',exact:true}).click();
+ await expect(page.getByRole('main',{name:'User Guide'})).toBeVisible();
+ await expect(page.getByLabel('Read guidance for')).toHaveValue('Referee');
+ await page.getByLabel('Search the guide').fill('zip tie');
+ await page.getByRole('button',{name:/Robot configuration flags and reminders/}).click();
+ await expect(page.getByRole('heading',{name:'Robot configuration flags and reminders',exact:true})).toBeVisible();
+ await page.getByLabel('Read guidance for').selectOption('Developer');
+ await page.getByLabel('Search the guide').fill('Signature Event');
+ await page.getByRole('button',{name:/Mark an event as a Signature Event/}).click();
+ await expect(page.getByRole('heading',{name:'Mark an event as a Signature Event',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Back to User Guide',exact:true}).click();
+ await page.getByRole('button',{name:'Back to main page',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Ref-OS - Referee Operating System',exact:true})).toBeVisible();
+ await page.goto('/?page=guide');
+ await expect(page.getByLabel('Read guidance for')).toBeVisible();
 });

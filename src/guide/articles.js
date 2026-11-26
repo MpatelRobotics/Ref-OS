@@ -25,7 +25,7 @@ add('lost-found', 'Event Tools', 'Lost & Found board', ALL,
 add('start', 'Getting Started', 'Sign in and choose your event', ALL,
   'Ref OS is a shared workspace for VEX event volunteers. The event you select determines the data and access you receive.',
   'At the start of your shift or when changing events.',
-  ['Open Ref OS while connected to the internet and choose the intended VEX event.', 'Use the event role access code or QR card supplied by the event Admin. Follow the available sign-in prompts.', 'Enter your nickname, first name, and last name; add your phone number if you want it in the directory.', 'Check the event name, role, connection status, and, for a League, the session name before recording anything.'],
+  ['Open https://www.ref-os.fyi/ online. Choose Events in the sidebar, expand the competition program and state or region, select your event, then choose Login for volunteer tools.', 'Use the event role access code or QR card supplied by the event Admin. Follow the available sign-in prompts.', 'Enter your nickname, first name, and last name; add your phone number if you want it in the directory.', 'Check the event name, role, connection status, and, for a League, the session name before recording anything.'],
   'Your nickname appears in live activity. Your full name is used in the directory and official exports. A League with no Active session opens its overview.',
   'Keep access cards private. Signing in and unlocking require server verification; prepare devices before the connection is lost.', ['navigation', 'roles', 'offline', 'lock']);
 add('roles', 'Getting Started', 'Roles and access', ALL,
@@ -35,7 +35,7 @@ add('roles', 'Getting Started', 'Roles and access', ALL,
   'A guide article does not grant access. Event protections, archived state, and server permissions still apply.', ['navigation', 'codes']);
 add('navigation', 'Navigation', 'Find sections, settings, and help', ALL,
   'Desktop navigation and the phone section picker lead to the same role-specific workspace.', 'Whenever you need to switch tasks.',
-  ['Use the desktop navigation or the mobile Sections menu to select a section.', 'Open a team, match, or robot; use Back to return to its list.', 'Open the Settings menu for your role’s help, display, access, and event actions.', 'Choose Features & Help, then User Guide. Search locally or browse a category.', 'Use Guided Tour for an introduction to the live interface.'],
+  ['Use the desktop navigation or the mobile Sections menu to select a section.', 'Open a team, match, or robot; use its Back control to return to the remembered list position and filters.', 'Open the Settings menu for your role’s help, display, access, and event actions.', 'Choose Features & Help, then User Guide. Search locally or browse a category. The same guide is available from User Guide in the main-page sidebar before signing in.', 'Use Guided Tour for an introduction to the live interface.'],
   'Light/Dark Mode and Text Size are device preferences. The header shows the selected event and connection status.',
   'Unavailable sections may be hidden because of your role or missing imported data. Check those before reporting a fault.', ['roles', 'connection', 'trouble']);
 add('ref-start', 'Quick Starts', 'Referee quick start', REF,
@@ -50,17 +50,17 @@ add('inspection-start', 'Quick Starts', 'Inspection quick start', PHOTO,
   'Inspection role does not provide referee violation logging. In a League, robot pictures belong to the working session.', ['photos', 'rules', 'photo-trouble']);
 add('judge-start', 'Quick Starts', 'Judge Advisor quick start', ['Judge Advisor', ...ADMIN],
   'Review nomination evidence and award finalists.', 'Before judging review or preparing award recommendations.',
-  ['Open Judging and select an award.', 'Review nominations and their supporting examples.', 'Use the finalist controls where offered.', 'Export nominations when ready to share official forms.', 'Open Alliances to view the current bracket if needed.'],
+  ['Open Nominations and select an award.', 'Review nominations and their supporting examples.', 'Use the finalist controls where offered.', 'Export nominations when ready to share official forms.', 'Open Alliances to view the current bracket if needed.'],
   'Sportsmanship and Energy have separate nomination information. Judge Advisor alliance views are read only.',
   'Nomination counts do not automatically decide awards. League judging records and exports belong to the working session.', ['judging', 'nom-export']);
 add('emcee-start', 'Quick Starts', 'Emcee quick start', ['Emcee', ...ADMIN],
   'Use team, match, alliance, and award information to support announcing.', 'Before announcing a session.',
-  ['Confirm event and session in the header.', 'Open Matches to find the scheduled teams and imported results.', 'Open Teams for names and Robots for available identification photos.', 'View Alliances for picks and bracket progress.', 'Use Judging to record a supported nomination when appropriate.'],
+  ['Confirm event and session in the header.', 'Open Matches to find the scheduled teams and imported results.', 'Open Teams for names and Robots for available identification photos.', 'View Alliances for picks and bracket progress.', 'Use Nominations to record a supported nomination when appropriate.'],
   'The Emcee workspace omits disciplinary details and violation entry.',
   'Emcee cannot edit bracket winners. Imported results may lag Tournament Manager until an Admin updates them.', ['matches', 'alliances', 'judging']);
 add('admin-start', 'Quick Starts', 'Admin and Developer quick start', ADMIN,
   'Prepare an event and verify volunteer devices before operations begin.', 'Before opening the event to volunteers.',
-  ['Confirm the correct event and Admin mode, then open Event Command Center.', 'Review Event Setup and Event Settings.', 'Import roster and schedules through TM Sync Center; review each change preview.', 'For a League, create sessions and start the intended one.', 'Prepare volunteer access cards and the contact directory.', 'Run Pre Event System Test and Two Device Sync Test, prepare offline devices, and download a backup.'],
+  ['Confirm the correct event and Admin mode, then open Event Command Center.', 'Review Event Setup & Settings, including location, timezone, divisions and fields.', 'Import roster and schedules through TM Sync Center; review each change preview.', 'For a League, create sessions and start the intended one.', 'Prepare volunteer access cards and the contact directory.', 'Run Pre Event System Test and Two Device Sync Test, prepare offline devices, and download a backup.'],
   'Command Center groups tools into Event Setup & Management, Event Operations, and Danger Zone.',
   'Developer access does not remove protected event restrictions. Check the selected event before any management operation.', ['command', 'tm', 'tests', 'backup']);
 add('teams', 'Referee', 'Teams, watch notes, and team scanner', VIEW,
@@ -110,7 +110,7 @@ add('rules', 'Rules & Official Q&A', 'Search rules, manual, and Official Q&A', [
   'Official Q&A requires internet and is not an offline archive. Verify the game and resource version. This guide does not prescribe game-rule interpretations.', ['violation', 'offline'], 'rulebook manual favorites recent');
 add('judging', 'Judging', 'Nominations and finalists', JUDGE,
   'Record evidence for Sportsmanship and Energy award review.', 'When you observe a specific award-worthy example.',
-  ['Open Judging and choose the award.', 'Choose Nominate a team and confirm the team and match.', 'Select observed criteria, describe the example, and save.', 'Review nominations and use permitted delete/finalist actions when appropriate.', 'Judge Advisors or Admins can prepare official nomination exports.'],
+  ['Open Nominations and choose the award.', 'Choose Nominate a team and confirm the team and match.', 'Select observed criteria, describe the specific behavior, and save. For Sportsmanship, note fair play, respect or help given to others; for Energy, note positive enthusiasm and encouragement.', 'Review nominations and use permitted delete/finalist actions when appropriate.', 'Judge Advisors or Admins can prepare official nomination exports.'],
   'Award panels organize nomination evidence and finalists. Imported judging/ranking information supports review.',
   'Ref OS does not automatically select award winners. League nominations and finalists belong to the working session.', ['nom-export', 'judge-start']);
 add('alliances', 'Tournament Workflows', 'Import alliances and advance the elimination bracket', ['Referee', 'Judge Advisor', 'Emcee', ...ADMIN],
@@ -174,19 +174,25 @@ add('microsoft-store', 'Admin', 'Find the Ref-OS Windows apps', ADMIN,
   ['Open Event Command Center in Admin mode.', 'Under Event Setup & Management, select Microsoft Store.', 'Choose Ref-OS Connect for Tournament Manager sync or local Venue Server hosting.', 'Choose Ref-OS Judging Portal for judge setup, interviews, private notes and live nominations.'],
   'Each app link opens its Microsoft Store listing.',
   'Keep Connect running on the Tournament Manager network during live TM sync. The Judging Portal is a separate app and uses Ref-OS Cloud.', ['command', 'interviews'], 'Microsoft Store Windows download Connect Judging Portal');
-add('setup', 'Admin', 'Event Setup and field names', ADMIN,
-  'Set match-count and elimination options used in the workspace.', 'Before loading schedules or adjusting event configuration.',
-  ['Open Command Center → Event Setup.', 'Review the name, qualification and practice match counts.', 'Choose the supported elimination bracket and single or best-of-three finals setting.', 'Save and verify the offered match choices.', 'Use Event Settings or the offered Field Name Configurator to set unique display names for the competition fields.'],
-  'Setup values guide match dropdowns. Field display names change labels without rewriting the imported field identity.',
-  'These values do not import a real TM schedule. Bracket, best-of, and match-count setup is League-wide.', ['settings', 'tm']);
-add('settings', 'Admin', 'Event Settings and branding', ADMIN,
-  'Edit the event’s identity and field display labels.', 'When setting up a custom event or correcting its presentation.',
-  ['Open Command Center → Event Settings.', 'Enter the event name and short name.', 'Use an optional full image URL for the logo and a valid accent color.', 'Give each competition field a distinct name. Choose Required robot pictures (Front, Side, Back, Inspection Tag, Lexan Diagram); uncheck all if pictures should be optional.', 'Review the preview and validation messages, then Save.'],
-  'The short name, logo, and accent update the event presentation. Some protected event changes may be unavailable.',
-  'External logos may require internet. Event Settings is separate from Event Setup match options and Event Management lifecycle actions.', ['setup', 'management', 'conversion']);
+add("setup", "Admin", "Event Setup, divisions and field names", ADMIN,
+  "Configure the event and each division in one place.",
+  "Before importing schedules or correcting event details.",
+  ["Open Settings → Event Command Center → Event Setup & Management → Event Setup & Settings.", "Review the competition program, event name, country, state or region and timezone. Saved location determines the event directory group.", "In Divisions & fields, select a division, edit its name, choose the number of fields and name each field. Use Add division when needed.", "Switch between divisions to configure each one. Division names allow up to 500 characters; field names must be distinct within their division.", "Review the program’s match-count and elimination options, then select Save Settings. Verify the division selector and match field labels."],
+  "Division IDs stay stable when names change. Settings are shared across the event.",
+  "Descriptive VEX or TM division names override custom names; generic names such as Default preserve the custom name. Synced schedules determine field names and counts when available. Setup does not create an official schedule.",
+  ["settings", "vex-live-sync", "tm"],
+  "");
+add("settings", "Admin", "Event identity, branding and picture requirements", ADMIN,
+  "Update presentation and required robot views.",
+  "When preparing an event or adjusting its appearance.",
+  ["Open Event Command Center → Event Setup & Management → Event Setup & Settings.", "Enter the event name and short name, and review country, state or region and timezone.", "Upload a logo or enter a full image URL, choose an accent color and review the preview.", "Choose Required robot pictures. Uncheck all views if every picture should be optional.", "Select Save Settings and check the event header."],
+  "Developers also see the Signature Event setting in this screen.",
+  "Event Management handles archiving and deletion separately. Optional configuration pictures do not increase the required-picture count.",
+  ["setup", "photos", "management"],
+  "");
 add('creation', 'Admin', 'Create and choose events', ADMIN,
   'Create a separate workspace with its own roster and access.', 'When preparing a new event.',
-  ['Return to Choose VEX Event using the appropriate event-picker/lock action.', 'Choose Create VEX Event and complete its required event details.', 'Choose Tournament or League as the event format.', 'For a League, optionally create the first session.', 'Open the new event, review Admin access, and complete setup, imports, and volunteer access.'],
+  ['Return to Choose VEX Event using the appropriate event-picker/lock action.', 'Choose Create event, select the competition program and enter the name, country and state or region. Use the optional VEX lookup to link the official event.', 'Choose Tournament or League as the event format.', 'For a League, optionally create the first session.', 'Open the new event, review Admin access, and complete setup, imports, and volunteer access.'],
   'Events keep separate operational records. New events use their own roster, rules, settings, and resources.',
   'Creation needs internet and appropriate access. Format is fixed except the supported one-way Tournament-to-League conversion.', ['start', 'admin-start', 'conversion']);
 add('management', 'Admin', 'Archive, restore, and delete events', ADMIN,
@@ -249,14 +255,17 @@ add('tests', 'Admin', 'System tests and Admin Diagnostics', ADMIN,
   ['Open Command Center → Pre Event System Test and run its checks.', 'Read each pass/fail result; resolve failures before approving the device.', 'Open Two Device Sync Test on two devices in the same event/session and follow probe/acknowledgement instructions.', 'Open Admin Diagnostics to inspect app, event, network, queue, storage, and test status.', 'Copy/download a diagnostic report only to a trusted support destination.'],
   'Checks include supported storage/service-worker readiness, backend access, realtime, TM parsing, and PDF generation.',
   'A successful test describes the tested device and connection at that time. Review diagnostic reports for private event details before sharing.', ['connection', 'sync-fail']);
-add('violation-export', 'Reports & Exports', 'Export violations and Match Anomaly Log', ADMIN,
-  'Create supported violation reports from recorded observations.', 'When preparing official event records.',
-  ['Confirm event and working session, and wait for pending changes to resolve.', 'Open Command Center → Export Violations.', 'Choose the offered violation export or official Match Anomaly Log PDF.', 'Open the downloaded output and verify teams, matches, notes, and official names.'],
-  'Exports include the records available in the current workspace; official forms use volunteer full names.',
-  'League CSV/PDF exports cover the working session. Keep disciplinary records private and export venue data separately.', ['violation', 'backup', 'report']);
+add("violation-export", "Reports & Exports", "Export violations and Match Anomaly Log", ADMIN,
+  "Download observations and a summary by rule.",
+  "When preparing records for authorized staff.",
+  ["Confirm event, division and working session; wait for pending changes to finish.", "Open Event Command Center → Backups & Reports → Export Violations.", "Download and open the Match Anomaly Log PDF. Verify event name, teams, matches, notes and recorder names.", "At the end, review Violations by rule: rule descriptions, affected teams, counts and match references.", "The By rule screen also offers Export PDF for its rule-based report."],
+  "Reports use the current event’s records and rule descriptions.",
+  "Keep disciplinary reports private and check division and League scope before sharing. Export venue data separately.",
+  ["violation", "backup", "report"],
+  "");
 add('nom-export', 'Reports & Exports', 'Export official nomination forms', ['Judge Advisor', ...ADMIN],
   'Create the combined supported Sportsmanship and Energy nomination PDF.', 'Before sharing nomination evidence with authorized judges.',
-  ['Review Judging records and working session.', 'Use Export nominations from the Judge Advisor menu or Command Center.', 'Wait for PDF generation and download.', 'Open the PDF to verify criteria, examples, teams, matches, and full names.'],
+  ['Review Nominations and the working session.', 'Use Export nominations from the Judge Advisor menu or Command Center.', 'Wait for PDF generation and download.', 'Open the PDF to verify criteria, examples, teams, matches, and full names.'],
   'The export fills the supplied official nomination forms.',
   'An export is evidence for review, not an award decision. League exports cover the working session.', ['judging', 'backup']);
 add('report', 'Reports & Exports', 'Export Event Report', ADMIN,
@@ -306,11 +315,14 @@ add('view-feedback', 'Developer', 'View feedback submissions', ['Developer'],
   'The screen lists saved feedback messages, newest first. Developer can set New, In progress, or Resolved, search by sender/message, and filter by status. Existing submissions start as New. Changes require a cloud connection; Refresh statuses loads updates from other Developer devices. Original messages remain unchanged. New submissions appear as event data syncs. Other field log entries are excluded. View screenshots opens private attachments; Refresh screenshots renews expired links.',
   'This screen is available only to Developers. It shows the current event or session, not a combined inbox across events. Older submissions may contain only the message, sender, and date.', ['trouble']);
 
-add('vex-live-sync', 'Sync & Offline', 'Import VEX qualification rankings', ADMIN,
-  'Preview published VEX API data before importing it into the current event or League session.', 'When standings have been published on VEX Events.',
-  ['In cloud mode, open Rankings or the Event Command Center and select VEX API Sync. Confirm the target event and League session.', 'Enter the full event code, select Load divisions, and choose a division.', 'Only qualification rankings are available.', 'Check for updates, review the preview, then Start syncing. Overlapping standings are updated.', 'Start syncing imports the preview and enables automatic updates. Checks run once a minute while Ref OS stays open, visible and online, even after closing the dialog.', 'Close the dialog to use the app while syncing. Use Stop sync in the status bar to stop monitoring. '],
-  'Rankings retain official qualification ranks. Skills use Tournament Manager imports.',
-  'Published data may lag scoring. Empty snapshots preserve data; errors stop automatic updates. Imports can partially succeed if a write fails; retry the reviewed snapshot. Match schedules and scores use Tournament Manager imports. Only qualification rankings are synced.', [], 'api vex events skills scores rankings division automatic polling');
+add("vex-live-sync", "Sync & Offline", "VEX Events automatic sync", ADMIN,
+  "Load published teams, schedules, rankings, Skills and match scores.",
+  "When your event has a VEX event code and published data.",
+  ["Open the event online with Admin or Developer access. A saved VEX event code can start background sync automatically.", "Open the VEX sync controls in Event Command Center to check the code and status. In Sync everything, use Load divisions and select one division or All divisions.", "Choose Start all syncs when starting manually. Rankings, Skills and scores have separate management controls.", "Keep the app open, visible and online. Sync checks every three seconds; close the dialog to continue working.", "Check the imported data in the correct division and League session. Manage or stop each category separately as needed."],
+  "Published schedules add missing matches while existing match assignments are kept. Skills covers the whole event; rankings and scores use selected divisions.",
+  "Sync is experimental and VEX publication may lag. Review errors and compare results with TM. Categories that start successfully can keep running if another category fails.",
+  ["tm", "matches", "setup"],
+  "api vex automatic background scores skills schedules");
 add('team-events', 'Teams & Inspection', 'Registered and past team events', ['Referee','Emcee','Admin','Developer'],
  'View VEX-reported events alongside the team history.', 'When checking a team’s event schedule.',
  ['Open Teams, then select a team.', 'Find Registered & Past Events. The list loads online and shows upcoming events first, then past events.', 'Use Refresh events for a fresh lookup. V5 event links open the official event page.', 'Previously loaded lists remain available on this device offline. Check the Last checked time.'],
@@ -318,19 +330,54 @@ add('team-events', 'Teams & Inspection', 'Registered and past team events', ['Re
  'The API documents team event associations; this is not proof of registration status or attendance. Missing events may not be exposed by the API. No match or ranking data is changed.', [], 'registered registration upcoming team history vex api offline');
 add('iq-event', 'Getting Started', 'Create a VEX IQ event', ALL,
  'Choose a competition program before creating the event.', 'When creating an IQ, V5RC or VEX U event.',
- ['Choose Create VEX Event and select VEX IQ, V5RC or VEX U. VEX U accepts U / VURC event codes only.', 'Optional VEX lookup detects the program; confirm it matches your event.', 'Enter the name, choose Tournament or League, and finish event creation.', 'For IQ events, open Rules or Features & Help to open the official Level Up 2026–2027 manual version 2.1 online. The IQ Rules screen includes 78 searchable quick-reference descriptions grouped by category.', 'Admins can correct the saved program in Event Setup.'],
+ ['Choose Create VEX Event and select VEX IQ, V5RC or VEX U. VEX U accepts U / VURC event codes only.', 'Optional VEX lookup detects the program; confirm it matches your event.', 'Enter the name, choose Tournament or League, and finish event creation.', 'For IQ events, open Rules or Features & Help to open the official Level Up 2026–2027 manual version 2.1 online. The IQ Rules screen includes 78 searchable quick-reference descriptions grouped by category.', 'Admins can correct the program in Event Setup & Settings.'],
  'The competition program is saved with the event. VEX U is separate from V5RC. Linked VEX U codes identify older university events.',
- 'IQ now provides partner teamwork matches, shared scores, ranked finals, IQ violation rule choices and inspection preparation. Qualification averages and skills are imported from TM; official rankings and tiebreakers remain in TM. Open the official manual on manuals.vex.com for the current rules.', [], 'iq viqrc level up manual competition program');
+ 'IQ now provides partner teamwork matches, shared scores, ranked finals, IQ violation rule choices and inspection preparation. Load qualification rankings and Skills through the supported sync/import tools and verify official standings in TM. Open the official manual on manuals.vex.com for the current rules.', [], 'iq viqrc level up manual competition program');
 add('highlander-practice', 'Quick Starts', 'Practice logging at Highlander Summit', ['Referee','Admin','Developer','Judge Advisor'],
  'Demonstrate violations without saving changes to the protected Highlander event.', 'When showing Ref OS to volunteers.',
  ['Open the protected Highlander Summit demo.', 'In Practice violations, choose Log practice violation.', 'Select a team, match and rules, then add notes or example photos.', 'Choose Add practice entry to show a temporary card. Use Clear practice entries to reset your demonstration.'],
  'Practice cards appear in a separate area marked Not saved. The usual event form is used.',
  'Practice entries are held only in memory on this device. Leaving the event or reloading removes them. They do not change real teams, history, totals, exports or sync queues. Existing Highlander records remain protected.', [], 'highlander demo practice fake temporary violation');
-add('iq-workflows', 'Quick Starts', 'Run IQ teamwork and finals', ALL,
- 'Follow the partner-team workflow for Level Up.', 'Before operating an IQ event.',
- ['Choose VEX IQ in Event Setup. Import teams and official qualification rankings through TM Sync Center.', 'Open Matches and import the IQ schedule/results CSV: Round, Match, Team1, Team2, Field and optional Score. Review the preview before applying. In a League, confirm the working session first.', 'Open a match to see both partners, the shared score and referee checks. Admins can save a reviewed shared score or use the Level Up bag-count aid. Record the official score in TM as well.', 'Use Log violation for a partner to cite IQ rules. Record field observations or a replay ruling; IQ has no AWP or opposing-alliance timeout.', 'Open Finals, select the finals match count and preview adjacent-ranked partnerships. Lowest seed plays first. Import TM finals to update existing pairings; resolve first-place ties and stop times in TM.', 'Open Rankings for imported average scores and Skills Challenge results. In Robots, use the temporary IQ inspection checklist and capture robot reference pictures.'],
- 'Partner teamwork, shared-score results, ranked finals, and IQ rule choices replace V5 match controls.',
- 'Scoring eligibility still requires the full manual. Blank imported scores preserve saved results. Tiebreakers, no-shows, excluded qualification scores and League participation eligibility are managed in TM. The inspection checklist is temporary and does not certify a pass. IQ schedules/results use individual imports, not the V5 event-package classifier. IQ API rankings sync is not enabled; import TM standings.', ['iq-event'], 'iq teamwork score finals partners inspection skills average level up');
+add("iq-workflows", "Quick Starts", "Run IQ teamwork and finals", ALL,
+  "Use partner matches, shared scores and ranked finals.",
+  "Before operating an IQ event.",
+  ["Confirm VEX IQ in Event Setup & Settings, the division and League session. Load the official roster, schedule and rankings through supported sync/import tools.", "In Matches, choose Qualifications, Practice or Finals. Search for the match or team and open it to review both partners and the shared score.", "Log violations for the involved partner and field observations separately. IQ does not use V5 AWP or opposing-alliance timeout controls.", "Open Matches → Finals. Admins can preview finals from qualification ranks; the default is ten matches for twenty teams. Review against the official TM schedule before applying.", "Import official finals when available. Finalist rankings show results; equal final ranks alone cannot identify partnerships when several teams tie.", "For a first-place tie, Admins can record tiebreaker round and Match Stop Time in the Finals controls. Higher stop time is used when tiebreaker scores tie. Verify the official decision in TM.", "Use Rankings for qualification and Skills results and Robots for pictures and the temporary inspection checklist."],
+  "Finals is available within Matches and in event navigation.",
+  "Previewed partnerships are provisional until confirmed in TM. Use the official manual for eligibility and rulings. The temporary inspection checklist does not certify a pass.",
+  ["iq-event", "matches", "vex-live-sync"],
+  "iq finals tiebreak stop time twenty ten");
+add("signature-events", "Developer", "Mark an event as a Signature Event", ['Developer'],
+  "Show an event in Signature Events and its state group.",
+  "When a developer categorizes an event.",
+  ["Sign in with Developer access and open the event.", "Open Event Command Center → Event Setup & Management → Event Setup & Settings.", "Enable Signature Event and select Save Settings. Disable it and save to remove the extra listing.", "Return to Events and expand Signature Events under the competition program. The event also remains in its state or region group."],
+  "Only developers see the setting; the server restricts changes to developers.",
+  "The flag changes directory placement, not the official VEX designation or schedule.",
+  ["setup", "creation"],
+  "signature state dropdown");
+add("public-schedule", "Getting Started", "View schedules without a login code", ALL,
+  "Audience members and teams can view available schedules, scores and rankings.",
+  "When you need public event information.",
+  ["Open the main REF-OS page, choose Events and expand the correct program and state or region. Signature Events is an additional group for marked events.", "Choose the event, then Access Schedule instead of Login. No role code is needed.", "Select the available division or League session and use the schedule or rankings views.", "Search by team to find matches and results. If no schedule exists, the screen shows a waiting message until it is uploaded."],
+  "The public view shows available event data and refreshes while open.",
+  "Access Schedule is experimental and may not work or show current results. Staff must use Login with their assigned role code for volunteer tools.",
+  ["start", "matches"],
+  "audience public schedule no code");
+add("robot-configurations", "Inspection", "Robot configuration flags and reminders", PHOTO,
+  "Record starting configurations and optional pictures.",
+  "During inspection or when a robot has multiple configurations.",
+  ["Open Robots, find the team and open its record.", "Enable Starts with zip tie touching wall and Multiple configurations or add-ons when applicable.", "Add optional zip-tie or configuration pictures to the picture list. Pictures are not required to enable either flag.", "Check the saved status and working League session before moving on.", "Referees opening a match see one grouped Robot configuration reminders panel. Each affected team appears once with its applicable reminders together."],
+  "A saved flag or matching reference picture can trigger a reminder even when the other is missing. Reminders appear inside the opened match, not in the match list.",
+  "Check the actual robot before play. A flag or picture is a reference, not approval or an automatic violation.",
+  ["photos", "matches"],
+  "zip tie ziptie wall multiple configurations add-ons warning");
+add("developer-export", "Developer", "Export all records and robot pictures", ['Developer'],
+  "Download an event archive including each team’s robot pictures.",
+  "When a developer needs an event archive.",
+  ["Sign in with Developer access and open the intended event.", "Open Event Command Center → Backups & Reports.", "Choose Export all and wait for records and pictures to be collected and the ZIP prepared.", "Open the downloaded archive and verify its event, division and League session coverage before storing it securely."],
+  "The Export all button and description are developer-only. The archive covers divisions and League sessions and includes available robot pictures.",
+  "Protect private event records and images. Verify the download before relying on it; an export does not automatically restore data.",
+  ["backup", "violation-export"],
+  "export all zip archive pictures");
 export const GUIDE_ARTICLES = articles;
 export function visibleArticles(role) {
   return articles.filter((a) => a.roles.includes(role));
@@ -341,15 +388,3 @@ export function searchArticles(role, query = '', category = '') {
     [a.title, a.category, a.summary, a.when, ...a.steps, a.seen, a.important, a.keywords,
       'Available to When to use it How to use it What you will see Important Related guides'].join(' ').toLocaleLowerCase().includes(word)));
 }
-
-
-
-
-
-// Qualification API sync quick start: open Rankings or Event Command Center > VEX API Sync. Confirm the event code; divisions load automatically for a saved code and a single division is selected. Review the preview and click Start syncing to import and enable background updates. Import once performs only one import. Manage or Stop sync from the status bar. Skills and matches use Tournament Manager imports.
-
-
-
-
-
-

@@ -87,6 +87,7 @@ import { compressRobotPhoto } from "./photoCompression";
 import * as photoCache from "./photoCache";
 import CommandCenter from "./components/CommandCenter.jsx";
 import UserGuide from "./components/UserGuide.jsx";
+import MainUserGuide from "./components/MainUserGuide.jsx";
 import AboutFounder from "./components/AboutFounder.jsx";
 import EventContactDirectory from "./components/EventContactDirectory.jsx";
 import LoginScreen from "./auth/LoginScreen.jsx";
@@ -1404,7 +1405,7 @@ const formatEventDate = (value) => {
 // Public directory: event discovery, creation, demo access, and creator contact information.
 const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, theme="light", onToggleTheme, initialNotice = "" }) => {
   const [demoRequest,setDemoRequest]=useState(0);
-  const [selectorSection,setSelectorSection]=useState(()=>new URLSearchParams(window.location.search).get("page")==="events"?"active":"about");
+  const [selectorSection,setSelectorSection]=useState(()=>new URLSearchParams(window.location.search).get("page")==="guide"?"guide":new URLSearchParams(window.location.search).get("page")==="events"?"active":"about");
   const [refPortal,setRefPortal]=useState(()=>REFEREE_PORTAL_ENABLED && new URLSearchParams(window.location.search).has("refPortal"));
   const developerPage = new URLSearchParams(window.location.search).get('page') === 'developer' || new URLSearchParams(window.location.search).get('open') === 'universal-feedback';
   const developerSession=useDeveloperSession(developerPage);
@@ -1555,8 +1556,8 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
     <div className="refos-event-selector-content w-full max-w-xl">
       <div className="text-center mb-6">
         <img src="/refos-logo.svg" alt="Ref OS" className="h-20 mx-auto mb-3" />
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{!developerPage && selectorSection === "about" ? "Ref-OS - Referee Operating System" : !developerPage && selectorSection === "creator" ? "About & Contact" : !developerPage && selectorSection === "venue" ? "Venue Server" : !developerPage && selectorSection === "demo" ? "Try the Ref-OS demo" : view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{!developerPage && selectorSection === "about" ? "Tools for the volunteers who keep VEX events moving." : !developerPage && selectorSection === "creator" ? null : !developerPage && selectorSection === "venue" ? "Set up local sharing for your event." : !developerPage && selectorSection === "demo" ? "Explore V5 Override with 32 fictional teams. Use demo code DEMOV5." : view === "archived" ? "Archived events keep all of their data. Use the event’s Admin code or the Developer code to restore one." : "Select the event this device is working at."}</p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{!developerPage && selectorSection === "about" ? "Ref-OS - Referee Operating System" : !developerPage && selectorSection === "guide" ? "User Guide" : !developerPage && selectorSection === "creator" ? "About & Contact" : !developerPage && selectorSection === "venue" ? "Venue Server" : !developerPage && selectorSection === "demo" ? "Try the Ref-OS demo" : view === "archived" ? "Archived Events" : "Choose VEX Event"}</h1>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{!developerPage && selectorSection === "about" ? "Tools for the volunteers who keep VEX events moving." : !developerPage && selectorSection === "guide" ? "Learn how to use REF-OS before your event." : !developerPage && selectorSection === "creator" ? null : !developerPage && selectorSection === "venue" ? "Set up local sharing for your event." : !developerPage && selectorSection === "demo" ? "Explore V5 Override with 32 fictional teams. Use demo code DEMOV5." : view === "archived" ? "Archived events keep all of their data. Use the event’s Admin code or the Developer code to restore one." : "Select the event this device is working at."}</p>
       </div>
       {!developerPage && selectorSection === "creator" ? (
         <main className="refos-welcome space-y-6" aria-label="About & Contact">
@@ -1571,7 +1572,7 @@ const EventSelector = ({ events, loading, error, onChoose, onCreated, onReload, 
             </ul>
           </section>
         </main>
-      ) : !developerPage && selectorSection === "venue" ? <VenueServerAccess/> : !developerPage && selectorSection === "about" ? <RefOsWelcome onEvents={()=>{setSelectorSection("active");window.scrollTo({top:0,left:0,behavior:'instant'});}} onDemo={()=>{setSelectorSection("demo");setDemoRequest(value=>value+1);window.scrollTo({top:0,left:0,behavior:'instant'});}}/> : !developerPage && selectorSection === "demo" ? <DemoLauncher key={demoRequest} openRequest={demoRequest} onChoose={onChoose}/> : <>
+      ) : !developerPage && selectorSection === "guide" ? <MainUserGuide onClose={()=>setSelectorSection("about")}/> : !developerPage && selectorSection === "venue" ? <VenueServerAccess/> : !developerPage && selectorSection === "about" ? <RefOsWelcome onEvents={()=>{setSelectorSection("active");window.scrollTo({top:0,left:0,behavior:'instant'});}} onDemo={()=>{setSelectorSection("demo");setDemoRequest(value=>value+1);window.scrollTo({top:0,left:0,behavior:'instant'});}}/> : !developerPage && selectorSection === "demo" ? <DemoLauncher key={demoRequest} openRequest={demoRequest} onChoose={onChoose}/> : <>
       {REFEREE_PORTAL_ENABLED && !developerPage && <button type="button" onClick={()=>setRefPortal(true)} className="mb-4 min-h-[44px] w-full rounded-xl bg-indigo-700 px-4 py-3 font-semibold text-white">Referee portal · Sign in or create account</button>}
       {developerPage && developerSession.error && <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-300">{developerSession.error}</p>}
       {developerPage && developerSession.checking ? <p className="py-4 text-center">Checking developer sign-in...</p> : developerPage && !developerPageUnlocked ? <DeveloperPageLock events={events} onUnlock={developerSession.unlock}/> : <>

@@ -4,7 +4,7 @@ import { searchArticles, visibleArticles } from '../guide/articles.js';
 import AboutFounder from './AboutFounder.jsx';
 import { FOUNDER } from '../guide/founder.js';
 
-export default function UserGuide({ role, onClose, initialArticleId = null }) {
+export default function UserGuide({ role, onClose, initialArticleId = null, publicView = false }) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
   const [articleId, setArticleId] = useState(initialArticleId);
@@ -22,7 +22,7 @@ export default function UserGuide({ role, onClose, initialArticleId = null }) {
   return (
     <div className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl p-4 text-slate-900 dark:text-slate-100 leading-relaxed break-words">
       <button type="button" className={`${button} flex items-center gap-2 mb-4`} onClick={article ? () => setArticleId(null) : onClose}>
-        <ChevronLeft size={18} aria-hidden="true" />{article ? 'Back to User Guide' : 'Back to Features & Help'}
+        <ChevronLeft size={18} aria-hidden="true" />{article ? 'Back to User Guide' : publicView ? 'Back to main page' : 'Back to Features & Help'}
       </button>
       <h2 tabIndex={-1} ref={heading} className="text-xl font-bold focus:outline-none flex items-center gap-2"><BookOpen size={22} aria-hidden="true" />{article?.title || 'Ref OS User Guide'}</h2>
       <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Showing guidance for {role}. Bundled with Ref OS for local search and offline reading after the app has been cached.</p>
