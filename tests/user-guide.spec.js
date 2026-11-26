@@ -86,11 +86,12 @@ test('main sidebar opens the public guide and supports role selection without ev
  await page.getByLabel('Search the guide').fill('zip tie');
  await page.getByRole('button',{name:/Robot configuration flags and reminders/}).click();
  await expect(page.getByRole('heading',{name:'Robot configuration flags and reminders',exact:true})).toBeVisible();
- await page.getByLabel('Read guidance for').selectOption('Developer');
- await page.getByLabel('Search the guide').fill('Signature Event');
- await page.getByRole('button',{name:/Mark an event as a Signature Event/}).click();
- await expect(page.getByRole('heading',{name:'Mark an event as a Signature Event',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Back to User Guide',exact:true}).click();
+ await expect(page.getByLabel('Read guidance for').getByRole('option',{name:'Developer',exact:true})).toHaveCount(0);
+ await page.getByLabel('Read guidance for').selectOption('Admin');
+ await page.getByLabel('Search the guide').fill('Signature Event');
+ await expect(page.getByRole('button',{name:/Mark an event as a Signature Event/})).toHaveCount(0);
+ await expect(page.getByRole('heading',{name:'Developer',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Back to main page',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Ref-OS - Referee Operating System',exact:true})).toBeVisible();
  await page.goto('/?page=guide');

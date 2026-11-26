@@ -9,9 +9,10 @@ export default function UserGuide({ role, onClose, initialArticleId = null, publ
   const [category, setCategory] = useState('');
   const [articleId, setArticleId] = useState(initialArticleId);
   const heading = useRef(null);
-  const available = visibleArticles(role);
+  const allowed = article => !publicView || article.category !== 'Developer';
+  const available = visibleArticles(role).filter(allowed);
   const article = available.find((a) => a.id === articleId);
-  const results = searchArticles(role, query, category);
+  const results = searchArticles(role, query, category).filter(allowed);
   const categories = [...new Set(available.map((a) => a.category)), 'About REF-OS'];
   const founderText = [FOUNDER.title, FOUNDER.name, FOUNDER.role, ...FOUNDER.paragraphs].join(' ').toLocaleLowerCase();
   const showFounder = (!category || category === 'About REF-OS') && query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean).every((word) => founderText.includes(word));
