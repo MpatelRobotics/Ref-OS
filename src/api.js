@@ -543,18 +543,21 @@ export async function listSelectableEvents() {
   }
   // Phase 7: archive status and creation date, merged onto every event (active and archived).
   const withLifecycle = async (choices) => {
-    const [lifecycle, formats, locations, programs, links] = await Promise.all([
+    const [lifecycle, formats, locations, programs, links, signatures] = await Promise.all([
       listEventLifecycle(),
       listEventFormats(),
       supabase.rpc("list_refos_event_directory_locations").then(r=>r.error?supabase.rpc("list_refos_event_locations"):r).then(r=>r.error?[]:r.data||[]).catch(()=>[]),
       loadPrograms(choices),
       supabase.rpc("list_refos_event_links").then(r => { if (r.error) throw r.error; return r.data || []; }),
+      supabase.rpc("list_refos_signature_events").then(r => { if (r.error) throw r.error; return r.data || []; }),
     ]);
+    const signatureIds = new Set(signatures.filter(row=>row.enabled).map(row=>row.event_id));
     const locationById = new Map(locations.map(row=>[row.event_id,row]));
     const linkById = new Map(links.map(row => [row.event_id, row.event_code]));
     return choices.map((choice) => ({
       ...choice,
       competitionProgram: programs.get(choice.id),
+      signatureEvent: signatureIds.has(choice.id),
       vexEventCode: linkById.get(choice.id) || "",
       location: locationById.get(choice.id)?.location || "",
       state: locationById.get(choice.id)?.state || "",

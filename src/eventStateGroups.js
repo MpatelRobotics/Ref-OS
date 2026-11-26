@@ -39,5 +39,6 @@ export function groupEventsByState(events){
   if(!groups.has(key))groups.set(key,{name,order:usState?state:location,events:[]});
   groups.get(key).events.push(event);
  }
- return [...groups.values()].sort((a,b)=>a.order.localeCompare(b.order)).map(({name,events})=>({name,events}));
+ const signatureEvents=events.filter(event=>event.signatureEvent===true);
+ return [...(signatureEvents.length?[{name:"Signature Events",events:signatureEvents}]:[]), ...[...groups.values()].sort((a,b)=>a.order.localeCompare(b.order)).map(({name,events})=>({name,events}))];
 }

@@ -2967,10 +2967,16 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   // Only the parts the Admin changed are written. Teams, matches, rankings, violations,
   // alliances, nominations, and access credentials are never touched.
   // Event setup: persist program, location, timezone, branding, and field preferences.
-  const saveEventSettings = async ({ divisions: nextDivisions, setup, timezone, location, name, branding, fieldNames: nextFieldNames, requiredRobotPhotos: nextPhotoRequirements, fieldCount: nextFieldCount }) => {
+  const saveEventSettings = async ({ signatureEvent, divisions: nextDivisions, setup, timezone, location, name, branding, fieldNames: nextFieldNames, requiredRobotPhotos: nextPhotoRequirements, fieldCount: nextFieldCount }) => {
     if (!adminUnlocked) throw new Error("Only this event's Admin can change event settings.");
     if(setup?.competitionProgram&&eventSettings?.vex_event?.value?.code)assertEventCodeProgram(eventSettings.vex_event.value.code,setup.competitionProgram);
+    if (signatureEvent != null && !isDeveloper) throw new Error("Developer access required.");
     try {
+      if (signatureEvent != null) {
+        const saved=await api.upsertEventSetting(eventId,"signature_event",{enabled:signatureEvent},meName);
+        rememberSettingWrite(saved);
+        setEventSettings(current=>({...current,signature_event:saved}));
+      }
       if (location) {
         const saved=await api.upsertEventSetting(eventId,"event_location",location,meName);
         rememberSettingWrite(saved);
@@ -5162,7 +5168,7 @@ const row = await targetApi.upsertEventSetting(eventId, 'tm_field_activity', com
       {showEventManagement && adminUnlocked && <EventManagementModal event={event} eventId={eventId} brand={brand} roleLabel={myRole} isProtected={eventProtected}
         onArchive={archiveCurrentEvent}
         onClose={() => commandCenterChildOpen ? returnToCommandCenter() : setShowEventManagement(false)} />}
-      {showEventSettings && adminUnlocked && <EventSettingsModal divisions={divisionCatalog} divisionId={divisionId} savedLocation={eventSettings?.event_location?.value} importedLocation={eventSettings?.vex_event?.value} competitionProgram={competitionProgram} eventTimezone={eventSettings?.event_timezone?.value?.zone||''} fieldCount={configuredFieldCount} scheduleFields={scheduleFields} event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
+      {showEventSettings && adminUnlocked && <EventSettingsModal isDeveloper={isDeveloper} signatureEvent={eventSettings?.signature_event?.value?.enabled === true} divisions={divisionCatalog} divisionId={divisionId} savedLocation={eventSettings?.event_location?.value} importedLocation={eventSettings?.vex_event?.value} competitionProgram={competitionProgram} eventTimezone={eventSettings?.event_timezone?.value?.zone||''} fieldCount={configuredFieldCount} scheduleFields={scheduleFields} event={event} brand={brand} fieldNames={fieldNames} requiredRobotPhotos={requiredRobotPhotos}
         eventFormat={league || event?.format === "league" ? "league" : "tournament"}
         canConvertToLeague={!league && !isHighlander && event?.format !== "league"}
         onConvertToLeague={() => setShowConvertLeague(true)}

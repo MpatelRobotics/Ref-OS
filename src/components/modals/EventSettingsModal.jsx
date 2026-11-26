@@ -28,7 +28,10 @@ function FieldError({ children }) {
   return <p className="mt-1 text-xs font-semibold text-red-700 dark:text-red-300">{children}</p>;
 }
 
-export default function EventSettingsModal({ divisions = [], divisionId = 0, event, brand, eventTimezone = "", savedLocation, importedLocation, fieldNames = {}, requiredRobotPhotos, onSave, onClose, eventFormat = "tournament", competitionProgram = "v5", fieldCount, scheduleFields = [], canConvertToLeague = false, onConvertToLeague }) {
+export default function EventSettingsModal({ isDeveloper = false, signatureEvent = false, divisions = [], divisionId = 0, event, brand, eventTimezone = "", savedLocation, importedLocation, fieldNames = {}, requiredRobotPhotos, onSave, onClose, eventFormat = "tournament", competitionProgram = "v5", fieldCount, scheduleFields = [], canConvertToLeague = false, onConvertToLeague }) {
+  const [signatureDraft,setSignatureDraft] = useState(signatureEvent);
+  const signatureEdited = useRef(false);
+  useEffect(()=>{if(!signatureEdited.current)setSignatureDraft(signatureEvent);},[signatureEvent]);
   const locationBaseline = savedLocation || eventDirectoryLocation({id:event?.id,...importedLocation});
   const [locationDraft, setLocationDraft] = useState(null);
   const location = locationDraft || locationBaseline;
@@ -163,11 +166,12 @@ export default function EventSettingsModal({ divisions = [], divisionId = 0, eve
     const cleanSetup={...setup,quals:Number(setup.quals)||0,practice:Number(setup.practice)||0,bracket:setup.competitionProgram==='iq'?0:Number(setup.bracket),finalsBestOf:setup.competitionProgram==='iq'?1:Number(setup.finalsBestOf)};
     const setupChanged=Object.keys(initialSetup).some(key=>cleanSetup[key]!==initialSetup[key]);
     const photoRequirementsChanged = JSON.stringify(photoRequirements) !== JSON.stringify(initialPhotoRequirements);
-    if (!divisionsChanged && !locationChanged && !setupChanged && timezone===eventTimezone && count === initialCount && !nameChanged && !fieldsChanged && !photoRequirementsChanged && !Object.values(identityChanged).some(Boolean)) { onClose(); return; }
+    if (!(isDeveloper && signatureDraft!==signatureEvent) && !divisionsChanged && !locationChanged && !setupChanged && timezone===eventTimezone && count === initialCount && !nameChanged && !fieldsChanged && !photoRequirementsChanged && !Object.values(identityChanged).some(Boolean)) { onClose(); return; }
     setSaving(true);
     try {
       await onSave({
         divisions: divisionsChanged ? cleanedDivisions : null,
+        signatureEvent:isDeveloper && signatureDraft!==signatureEvent ? signatureDraft : null,
         setup:setupChanged?cleanSetup:null,
         location:locationChanged?{country:location.country,state:location.state.trim()}:null,
         timezone: timezone!==eventTimezone?timezone:null,
@@ -232,6 +236,10 @@ export default function EventSettingsModal({ divisions = [], divisionId = 0, eve
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Used where the full name is too long, such as the phone header.</p>
               <FieldError>{errors.shortName}</FieldError>
             </label>
+            {isDeveloper && <label className="flex min-h-[44px] items-start gap-3 rounded-xl border border-slate-300 dark:border-slate-600 p-3">
+              <input type="checkbox" className="mt-1 h-5 w-5" checked={signatureDraft} disabled={saving} onChange={e=>{signatureEdited.current=true;setSignatureDraft(e.target.checked);}}/>
+              <span><span className="block font-semibold">Signature Event</span><span className="block text-sm text-slate-600 dark:text-slate-300">Developer only. Show this event in Signature Events as well as its state group.</span></span>
+            </label>}
             <div><EventLocationFields value={location} onChange={setLocationDraft} disabled={saving} /><FieldError>{errors.location}</FieldError></div>
             <div><CountryTimezoneSelect value={timezone} onChange={changeTimezone}/><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Used for event clocks, scheduled match times and judging interviews. Applies across all divisions. Existing saved times keep the same instant.</p><button type="button" className="mt-2 min-h-[44px] rounded-lg border px-3" onClick={()=>changeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone)}>Use this device’s timezone</button><FieldError>{errors.timezone}</FieldError></div>
             <label className="block">
