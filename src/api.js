@@ -1007,7 +1007,7 @@ export async function getRobotPhotoGeneration(eventId, allowCached = false) {
 // Robot photo cloud path: <event-id>/team/<TEAM>/<angle>-<upload-id>.<webp|jpg>
 // Event-prefixed so event isolation and event cleanup can identify every object safely.
 // The extension follows the compressed image type (WebP, or JPEG where WebP encoding is unavailable).
-const ROBOT_PHOTO_ANGLES = ["front", "back", "side", "tag", "lexan"];
+const ROBOT_PHOTO_ANGLES = ["front", "back", "side", "tag", "lexan", "ziptie", "configuration"];
 export const robotPhotoAngleKey = (angle) => (ROBOT_PHOTO_ANGLES.includes(String(angle).toLowerCase()) ? String(angle).toLowerCase() : "other");
 // League sessions add a session folder so each session keeps its own inspection evidence:
 // <event-id>/team/<TEAM>/s-<session-id>/<angle>-<upload-id>.<webp|jpg>
@@ -1018,7 +1018,7 @@ export function robotPhotoPath(eventId, number, angle, id, mime = "image/jpeg", 
   return `${eventId}/team/${num}/${sessionFolder}${robotPhotoAngleKey(angle)}-${id}.${ext}`;
 }
 const dataUrlMimeType = (dataUrl) => (String(dataUrl).match(/^data:([^;,]+)/) || [])[1] || "image/jpeg";
-const pathAngle = (path) => (String(path || "").match(/\/(front|back|side|tag|lexan|other)-[^/]+\.(?:jpe?g|webp)$/i) || [])[1]?.toLowerCase() || "";
+const pathAngle = (path) => (String(path || "").match(/\/(front|back|side|tag|lexan|ziptie|configuration|other)-[^/]+\.(?:jpe?g|webp)$/i) || [])[1]?.toLowerCase() || "";
 
 export async function addTeamPhoto(eventId, number, dataUrl, angle = "other", uploadId = "", generation = "0", photoSessionIdArg) {
   // A queued photo keeps the session it was taken in (photoSessionIdArg), even if this device has
@@ -1045,7 +1045,7 @@ export async function addTeamPhoto(eventId, number, dataUrl, angle = "other", up
   // Replacement: once the new photo is committed, remove older photos for the same angle
   // (cloud object, shared reference, and local cache). "Other" pictures are never replaced.
   let current = paths || [];
-  if (safeAngle !== "other") {
+  if (safeAngle !== "other" && safeAngle !== "configuration") {
     // Only photos of the same session are replaced; earlier sessions' evidence is never overwritten.
     const older = current.filter((existing) => existing !== path && pathAngle(existing) === safeAngle && photoSessionFor(eventId, existing) === (sessionId || null));
     for (const oldPath of older) {

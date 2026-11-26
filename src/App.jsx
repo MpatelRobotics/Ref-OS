@@ -1,3 +1,4 @@
+import RobotReferenceOptions from "./components/RobotReferenceOptions.jsx";
 import {mergeDivisions, divisionFieldNames, validateDivisions} from "./divisionConfiguration.js";
 import { vexEventLink } from "./vexEventLink.js";
 import {eventCodeProgram,assertEventCodeProgram} from '../supabase/functions/_shared/competitionProgram.js';
@@ -4815,7 +4816,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={highlanderDemoLocked ? undefined : (n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} emcee={isEmcee} />
         ) : openRobot ? (
-          <RobotDetail meName={meName} canEditAttendance={!isJudge&&!isEmcee&&!highlanderDemoLocked} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} canTakePhotos={!isEmcee} canDeletePhotos={!isInspection && !isEmcee} />
+          <RobotDetail key={`${eventId}:${leagueSessionId || ""}:${openRobot}`} eventId={eventId} sessionId={leagueSessionId} meName={meName} canEditAttendance={!isJudge&&!isEmcee&&!highlanderDemoLocked} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} canTakePhotos={!isEmcee} canDeletePhotos={!isInspection && !isEmcee} />
         ) : view === "lost-found" ? (
           <LostFoundBoard embedded key={eventId} eventId={eventId} eventName={event?.name || "Current event"} meName={meName} canManage={adminUnlocked}/>
         ) : view === "matches" ? (
@@ -6976,7 +6977,7 @@ function OnlineList({ isDeveloper=false, fieldLocations=Object.keys(DEFAULT_FIEL
 
 
 function robotPhotoAngle(path) {
-  const match = String(path || "").match(/\/(front|back|side|tag|lexan)-[^/]+\.(?:jpe?g|webp)$/i);
+  const match = String(path || "").match(/\/(front|back|side|tag|lexan|ziptie|configuration)-[^/]+\.(?:jpe?g|webp)$/i);
   return match ? match[1].toLowerCase() : "";
 }
 
@@ -7056,7 +7057,7 @@ function LeagueEarlierRobotPhotos({ team, league, onOpenPhoto }) {
 }
 
 // Robot reference: manage required angles, extra photos, and inspection follow-ups.
-function RobotDetail({ meName, canEditAttendance = false, requiredRobotPhotos, isIQ = false, team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, canTakePhotos = true, canDeletePhotos = true }) {
+function RobotDetail({ eventId, sessionId, meName, canEditAttendance = false, requiredRobotPhotos, isIQ = false, team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, canTakePhotos = true, canDeletePhotos = true }) {
   const league = useContext(LeagueUiContext);
   const [busy, setBusy] = useState(false);
   const [captureAngle, setCaptureAngle] = useState("");
@@ -7130,13 +7131,14 @@ function RobotDetail({ meName, canEditAttendance = false, requiredRobotPhotos, i
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{requiredCount ? "Required views are configured by the event Admin. Photo completion does not certify inspection." : "All views are optional for this event."}</p>
         {canTakePhotos && <button type="button" onClick={beginSequence} disabled={busy} className="mt-3 w-full rounded-lg bg-[#D7212B] px-3 py-3 text-base font-bold text-white disabled:bg-slate-400"><Camera size={18} className="inline mr-1.5"/>Take pictures in order</button>}
       </div>
+      <RobotReferenceOptions eventId={eventId} sessionId={sessionId} team={team.number} meName={meName} canEdit={canEditAttendance}/>
       {league&&<LeagueRobotAttendance key={`${league.session.id}:${team.number}`} eventId={league.eventId} sessionId={league.session.id} sessionName={league.session.name} team={team.number} meName={meName} canEdit={canEditAttendance}/>}
       {canTakePhotos && <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; add(file); }} />}
       {canTakePhotos && sequenceIndex >= 0 && createPortal(
         <div className="fixed inset-0 z-[160] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4" onClick={() => { if (!busy) { setSequenceIndex(-1); setCaptureAngle(""); } }}>
           <div role="dialog" aria-modal="true" aria-labelledby="robot-photo-sequence-title" onClick={(event) => event.stopPropagation()} className="w-full max-w-lg rounded-t-2xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl dark:bg-slate-800 sm:rounded-2xl sm:p-6">
             <h2 id="robot-photo-sequence-title" className="text-xl font-bold text-slate-900 dark:text-white">Take all robot pictures</h2>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Take Front, Side, Back, and the Inspection Tag in order.{!isIQ && " The Lexan Diagram is optional."}</p>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Take the required views first, then add any optional reference pictures.</p>
             <div role="status" className="mt-5 rounded-lg border border-sky-200 bg-sky-50 p-4 dark:border-sky-800 dark:bg-sky-950/30">
               <p className="mb-3 text-base font-semibold text-sky-900 dark:text-sky-100">Picture {sequenceIndex + 1} of {photoSlots.length}: {photoSlots[sequenceIndex].label}{photoSlots[sequenceIndex].required ? "" : " (optional)"}</p>
               <button type="button" onClick={() => fileRef.current?.click()} disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#D7212B] px-4 py-4 text-base font-bold text-white shadow-sm disabled:bg-slate-400"><Camera size={22}/>{busy ? "Saving picture…" : `Open camera: Take ${photoSlots[sequenceIndex].label} picture`}</button>
@@ -7159,6 +7161,7 @@ function RobotDetail({ meName, canEditAttendance = false, requiredRobotPhotos, i
               {canDeletePhotos && !slot.pending && slot.remote && <button onClick={() => { if (confirm(`Delete the ${slot.label.toLowerCase()} robot picture?`)) onRemovePhoto(team.number, slot.remote); }} className="absolute top-1 right-1 refos-destructive-photo rounded-full p-1"><Trash2 size={13}/></button>}
             </div>
             {canTakePhotos && <button onClick={() => chooseAngle(slot.key)} disabled={busy} className="w-full px-3 py-2.5 bg-[#D7212B] text-white text-sm font-bold disabled:bg-slate-400"><Camera size={15} className="inline mr-1.5"/>{busy && captureAngle === slot.key ? "Saving…" : slot.remote || slot.pending ? `Retake ${slot.label}` : `Take ${slot.label}`}</button>}
+            {canTakePhotos && slot.key==='configuration' && (slot.remote || slot.pending) && <button type="button" onClick={()=>chooseAngle('configuration')} disabled={busy} className="w-full min-h-[44px] border-t px-3 py-2 text-sm font-semibold">Add another configuration picture</button>}
           </section>
         ))}
       </div>

@@ -11,7 +11,7 @@ export default function EventOperations({eventId,sessionId=null,division=0,divis
  useEffect(()=>{reload();},[eventId,sessionId,division]);
  const kinds=area==='robots'?['robot-change','inspection-followup']:area==='judging'?['judge-group']:['announcement','assignment'];
  const labels={'robot-change':'Robot modification note','inspection-followup':'Inspection follow-up','judge-group':'Judge-group assignment',announcement:'Division announcement',assignment:'Volunteer assignment'};
- const visible=scopedOperations(rows,sessionId,division).filter(r=>kinds.includes(r.kind));
+ const visible=scopedOperations(rows,sessionId,division).filter(r=>kinds.includes(r.kind)&&r.payload?.recordType!=='robot-reference');
  const assignments=new Map();for(const g of scheduleGroups)for(const team of g.teams||[])assignments.set(team,g.name);for(const entry of scheduleEntries)if(entry.group?.trim())assignments.set(entry.team,entry.group.trim());
  const optimizedGroups=[...new Set(assignments.values())].sort().map(name=>({name,teams:[...assignments].filter(([,group])=>group===name).map(([team])=>team).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}))}));
  const canWrite=canManage||(area==='robots'&&canInspect)||(area==='judging'&&canJudge);
