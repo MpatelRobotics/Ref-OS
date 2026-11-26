@@ -1,3 +1,4 @@
+import {zipTiePhotoTeams} from "./robotStartWarnings.js";
 import RobotReferenceOptions from "./components/RobotReferenceOptions.jsx";
 import {mergeDivisions, divisionFieldNames, validateDivisions} from "./divisionConfiguration.js";
 import { vexEventLink } from "./vexEventLink.js";
@@ -4100,6 +4101,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     }
     return m;
   }, [viols]);
+  const zipTiePhotos = useMemo(()=>zipTiePhotoTeams(teams),[teams]);
   const teamNameMap = useMemo(() => Object.fromEntries(teams.map((t) => [t.number, t.name])), [teams]);
   const teamRankMap = useMemo(() => Object.fromEntries(teams.filter((t) => t.rank != null).map((t) => [t.number, t.rank])), [teams]);
   const rankedTeamsForAlliance = useMemo(() =>
@@ -4811,7 +4813,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={isIQ ? undefined : teamRecords[openTeam]}
             onLog={highlanderDemoLocked ? undefined : () => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked && !highlanderDemoLocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : openMatch ? (
-          <MatchDetail isIQ={isIQ} tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
+          <MatchDetail zipTiePhotos={zipTiePhotos} isIQ={isIQ} tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
             fieldLog={fieldLog} fieldResetChecks={fieldResetChecks} onVerifyFieldReset={verifyFieldResetQuadrant} onResetFieldReset={resetFieldResetMatch}
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={highlanderDemoLocked ? undefined : (n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} emcee={isEmcee} />
@@ -4824,8 +4826,8 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             <div className="flex flex-wrap gap-2 mb-4" aria-label="IQ match categories">
               {[["qual", "Qualifications"], ["practice", "Practice"], ["final", "Finals"]].map(([phase, label]) => <button key={phase} type="button" aria-pressed={iqPhase === phase} onClick={() => setIqPhase(phase)} className={`min-h-11 flex-1 rounded-lg border px-2 text-sm font-semibold ${iqPhase === phase ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900" : "bg-white dark:bg-slate-800"}`}>{label}</button>)}
             </div>
-            <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals={iqPhase === "final"} tiebreaks={iqTiebreaks} onSaveTiebreak={saveIqTiebreak} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={openMatchFromList} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} renderMatches={rows=><MatchList isIQ fixedTab={iqPhase} remembered={matchListState} matches={Object.fromEntries(rows.map(row=>[row.id,row]))} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={openMatchFromList} canAdd={false} emcee={isEmcee} fieldNames={fieldNames} />} parseCSV={parseCSV} />
-          </> : <MatchList remembered={matchListState} tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={openMatchFromList} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
+            <IQMatches key={`iq-matches-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals={iqPhase === "final"} tiebreaks={iqTiebreaks} onSaveTiebreak={saveIqTiebreak} matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={openMatchFromList} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} renderMatches={rows=><MatchList zipTiePhotos={zipTiePhotos} isIQ fixedTab={iqPhase} remembered={matchListState} matches={Object.fromEntries(rows.map(row=>[row.id,row]))} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={openMatchFromList} canAdd={false} emcee={isEmcee} fieldNames={fieldNames} />} parseCSV={parseCSV} />
+          </> : <MatchList zipTiePhotos={zipTiePhotos} remembered={matchListState} tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={openMatchFromList} canAdd={adminUnlocked && !highlanderDemoLocked} onAddMatch={() => requireAdmin(() => setAddMatchOpen(true))} emcee={isEmcee} fieldNames={fieldNames} />
         ) : view === "robots" ? (
           <><RobotCheckIn teams={scheduleTeams.scheduled} checkIn={eventSettings?.tm_check_in?.value} onOpen={openRobotFromList} /><RobotList followups={operationRows.filter(r=>r.kind==='inspection-followup'&&r.payload.status==='open'&&(r.session_id||null)===(leagueSessionId||null)&&(r.division_id===0||r.division_id===divisionId))} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} teams={scheduleTeams.scheduled} query={query} setQuery={setQuery} onOpen={openRobotFromList} /><UnscheduledTeams teams={scheduleTeams.unscheduled} query={query} onOpen={openRobotFromList} robots /></>
         ) : view === "judging" ? (
@@ -4868,7 +4870,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
         ) : view === "awp" ? (
           isIQ ? <p>AWP is a V5 tool. IQ teamwork has no autonomous win point.</p> : <AWPHistory fieldLog={fieldLog} matches={matches} viols={viols} canSeeFieldComparison={adminUnlocked} fieldNames={fieldNames} />
         ) : view === "alliances" ? (
-          isIQ ? <IQMatches key={`iq-finals-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={openMatchFromList} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} renderMatches={rows=><MatchList isIQ matches={Object.fromEntries(rows.map(row=>[row.id,row]))} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={openMatchFromList} canAdd={false} emcee={isEmcee} fieldNames={fieldNames} />} parseCSV={parseCSV} /> : <AllianceSelection tmActivity={eventSettings?.tm_field_activity?.value} onOpenMatch={id => { setOpenMatch(id); setView("matches"); }} matches={matches} finalsBestOf={event?.finalsBestOf} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!bracketSaving && !isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
+          isIQ ? <IQMatches key={`iq-finals-${eventId}-${leagueSessionId || ""}`} target={`${event?.name || "Event"}${league ? " · " + league.sessionName(leagueSessionId) : ""}`} finals matches={matches} teams={teams} query={query} setQuery={setQuery} onOpen={openMatchFromList} canEdit={adminUnlocked} onImport={importIQRows} onCreateFinals={importIQRows} renderMatches={rows=><MatchList zipTiePhotos={zipTiePhotos} isIQ matches={Object.fromEntries(rows.map(row=>[row.id,row]))} teamName={teamNameMap} teamRank={teamRankMap} viols={viols.filter(v => !league || (v.sessionId || league.legacySessionId) === leagueSessionId)} fieldLog={fieldLog} query={query} setQuery={setQuery} onOpen={openMatchFromList} canAdd={false} emcee={isEmcee} fieldNames={fieldNames} />} parseCSV={parseCSV} /> : <AllianceSelection tmActivity={eventSettings?.tm_field_activity?.value} onOpenMatch={id => { setOpenMatch(id); setView("matches"); }} matches={matches} finalsBestOf={event?.finalsBestOf} onImport={() => allianceFileRef.current?.click()} canImport={adminUnlocked && !isJudge && !highlanderDemoLocked} canEditBracket={!bracketSaving && !isJudge && !isEmcee && !highlanderDemoLocked} onSetWinner={setMatchWinner} />
         ) : (
           <>
             {!!event?.quals && (
@@ -5956,7 +5958,7 @@ function RulePicker({ ruleDetails, onSetRuleDetails, rules, knownRules, eventId,
 /* ============================ MATCH LIST ============================ */
 
 // Match browsing: preserve selected phase and field filters when returning from match details.
-function MatchList({ fixedTab, remembered, isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
+function MatchList({ zipTiePhotos = {}, fixedTab, remembered, isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, matches, teamName, teamRank = {}, viols, fieldLog = [], query, setQuery, onOpen, canAdd, onAddMatch, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
   const [field, updateField] = useState(() => remembered?.current.field ?? "all");
   const setField = value => {
     if (remembered) remembered.current.field = value;
@@ -6082,6 +6084,7 @@ function MatchList({ fixedTab, remembered, isIQ=false, tmTimes=[], eventTimezone
                 {!emcee && vcount[m.id] ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold border bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 shrink-0">{vcount[m.id]}</span> : null}
                 <ChevronRight size={16} className="text-slate-300 shrink-0" />
               </button>
+                {!emcee && [...new Set([...(m.red || []),...(m.blue || [])])].filter(number=>zipTiePhotos[number]).map(number=><span key={`ziptie-${number}`} className="block mt-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">{number}: starts with zip tie out / touching wall. Check starting configuration.</span>)}
             </li>
           ))}
         </ul>
@@ -6188,7 +6191,7 @@ function AwpChecker({ onSave }) {
 const REPLAY_REASONS = ["Field fault", "Scoring or timer issue", "Match started incorrectly", "Safety interruption", "External interference", "Other"];
 
 // Match workspace: teams, scores, violations, and permitted field operations.
-function MatchDetail({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, canManageViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
+function MatchDetail({ zipTiePhotos = {}, isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, canManageViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
   const league = useContext(LeagueUiContext);
   const [toOpen, setToOpen] = useState(false);
   const [toAlliance, setToAlliance] = useState("red");
@@ -6356,6 +6359,7 @@ function MatchDetail({ isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, 
       </div>
 
       <div className="mb-3"><ScheduledMatchTime match={m} times={tmTimes} zone={eventTimezone}/></div>
+      {!emcee && [...new Set([...(m.red || []),...(m.blue || [])])].filter(number=>zipTiePhotos[number]).map(number=><aside key={`ziptie-${number}`} aria-label={`Starting configuration reminder for ${number}`} className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"><strong>{number}: starts with zip tie out / touching wall.</strong> Check the starting configuration and reference picture in Robots before the match.</aside>)}
       {/* Match readiness: one-glance operational status for the Head Ref. */}
       <div className="mb-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
         <div className="flex items-center justify-between gap-2 mb-2.5">
