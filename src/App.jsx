@@ -6363,8 +6363,13 @@ function MatchDetail({ configurationWarnings = {}, zipTiePhotos = {}, isIQ=false
       </div>
 
       <div className="mb-3"><ScheduledMatchTime match={m} times={tmTimes} zone={eventTimezone}/></div>
-      {!emcee && [...new Set([...(m.red || []),...(m.blue || [])])].filter(number=>zipTiePhotos[number]).map(number=><aside key={`ziptie-${number}`} aria-label={`Starting configuration reminder for ${number}`} className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"><strong>{number}: starts with zip tie out / touching wall.</strong> Check the starting configuration in Robots before the match; a reference picture may also be available.</aside>)}
-      {!emcee && [...new Set([...(m.red || []),...(m.blue || [])])].filter(number=>configurationWarnings[number]).map(number=><aside key={`configuration-${number}`} aria-label={`Configuration reminder for ${number}`} className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"><strong>{number}: multiple configurations or add-ons.</strong> Check the robot configuration in Robots before the match; reference pictures may also be available.</aside>)}
+      {!emcee && [...new Set([...(m.red || []),...(m.blue || [])])].some(number=>zipTiePhotos[number] || configurationWarnings[number]) && <aside aria-label="Robot configuration reminders" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+        <h3 className="mb-2 font-bold">Robot configuration reminders</h3>
+        <ul className="space-y-1.5">
+          {[...new Set([...(m.red || []),...(m.blue || [])])].filter(number=>zipTiePhotos[number] || configurationWarnings[number]).map(number=><li key={number} aria-label={`Robot configuration reminders for ${number}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-1"><strong className="font-mono">{number}</strong><span>{[zipTiePhotos[number] && 'Starts with zip tie out / touching wall',configurationWarnings[number] && 'Multiple configurations or add-ons'].filter(Boolean).join(' • ')}</span></li>)}
+        </ul>
+        <p className="mt-2 text-xs">Check configurations and any reference pictures in Robots before the match.</p>
+      </aside>}
       {/* Match readiness: one-glance operational status for the Head Ref. */}
       <div className="mb-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
         <div className="flex items-center justify-between gap-2 mb-2.5">
