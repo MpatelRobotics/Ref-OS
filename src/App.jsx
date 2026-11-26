@@ -1,4 +1,4 @@
-import {zipTiePhotoTeams} from "./robotStartWarnings.js";
+import {zipTiePhotoTeams,multiConfigurationTeams} from "./robotStartWarnings.js";
 import RobotReferenceOptions from "./components/RobotReferenceOptions.jsx";
 import {mergeDivisions, divisionFieldNames, validateDivisions} from "./divisionConfiguration.js";
 import { vexEventLink } from "./vexEventLink.js";
@@ -4104,6 +4104,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     }
     return m;
   }, [viols]);
+  const configurationWarnings = useMemo(()=>multiConfigurationTeams(teams,robotStartRows,leagueSessionId),[teams,robotStartRows,leagueSessionId]);
   const zipTiePhotos = useMemo(()=>zipTiePhotoTeams(teams,robotStartRows,leagueSessionId),[teams,robotStartRows,leagueSessionId]);
   const teamNameMap = useMemo(() => Object.fromEntries(teams.map((t) => [t.number, t.name])), [teams]);
   const teamRankMap = useMemo(() => Object.fromEntries(teams.filter((t) => t.rank != null).map((t) => [t.number, t.rank])), [teams]);
@@ -4817,7 +4818,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           <TeamDetail team={teams.find((t) => t.number === openTeam)} viols={viols.filter((v) => v.team === openTeam)} record={isIQ ? undefined : teamRecords[openTeam]}
             onLog={highlanderDemoLocked ? undefined : () => setLogFor(openTeam)} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} onDeleteTeam={deleteTeam} canDeleteTeam={adminUnlocked && !highlanderDemoLocked} watch={teamWatch[openTeam] || []} meName={meName} onAddWatch={addWatchNote} onRemoveWatch={removeWatchNote} onOpenPhoto={setLightbox} emcee={isEmcee} />
         ) : openMatch ? (
-          <MatchDetail zipTiePhotos={zipTiePhotos} isIQ={isIQ} tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
+          <MatchDetail configurationWarnings={configurationWarnings} zipTiePhotos={zipTiePhotos} isIQ={isIQ} tmTimes={eventSettings?.tm_match_times?.value?.rows||[]} eventTimezone={eventSettings?.event_timezone?.value?.zone||'UTC'} tmActivity={eventSettings?.tm_field_activity?.value} match={matches[openMatch]} matches={matches} teamName={teamNameMap} teamRank={teamRankMap} teamWatch={teamWatch} viols={viols} onNav={setOpenMatch} fieldNames={fieldNames}
             fieldLog={fieldLog} fieldResetChecks={fieldResetChecks} onVerifyFieldReset={verifyFieldResetQuadrant} onResetFieldReset={resetFieldResetMatch}
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={highlanderDemoLocked ? undefined : (n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} emcee={isEmcee} />
@@ -6194,7 +6195,7 @@ function AwpChecker({ onSave }) {
 const REPLAY_REASONS = ["Field fault", "Scoring or timer issue", "Match started incorrectly", "Safety interruption", "External interference", "Other"];
 
 // Match workspace: teams, scores, violations, and permitted field operations.
-function MatchDetail({ zipTiePhotos = {}, isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, canManageViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
+function MatchDetail({ configurationWarnings = {}, zipTiePhotos = {}, isIQ=false, tmTimes=[], eventTimezone='UTC', tmActivity, match, matches, teamName, teamRank = {}, teamWatch = {}, viols, onNav, onLogTeam, onOpenPhoto, onDeleteViolation, onEditViolation, canManageViolation, fieldLog = [], fieldResetChecks = [], onVerifyFieldReset, onResetFieldReset, onAddField, onRemoveField, meName, canDelete, emcee, fieldNames = DEFAULT_FIELD_NAMES }) {
   const league = useContext(LeagueUiContext);
   const [toOpen, setToOpen] = useState(false);
   const [toAlliance, setToAlliance] = useState("red");
@@ -6363,6 +6364,7 @@ function MatchDetail({ zipTiePhotos = {}, isIQ=false, tmTimes=[], eventTimezone=
 
       <div className="mb-3"><ScheduledMatchTime match={m} times={tmTimes} zone={eventTimezone}/></div>
       {!emcee && [...new Set([...(m.red || []),...(m.blue || [])])].filter(number=>zipTiePhotos[number]).map(number=><aside key={`ziptie-${number}`} aria-label={`Starting configuration reminder for ${number}`} className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"><strong>{number}: starts with zip tie out / touching wall.</strong> Check the starting configuration in Robots before the match; a reference picture may also be available.</aside>)}
+      {!emcee && [...new Set([...(m.red || []),...(m.blue || [])])].filter(number=>configurationWarnings[number]).map(number=><aside key={`configuration-${number}`} aria-label={`Configuration reminder for ${number}`} className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"><strong>{number}: multiple configurations or add-ons.</strong> Check the robot configuration in Robots before the match; reference pictures may also be available.</aside>)}
       {/* Match readiness: one-glance operational status for the Head Ref. */}
       <div className="mb-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
         <div className="flex items-center justify-between gap-2 mb-2.5">

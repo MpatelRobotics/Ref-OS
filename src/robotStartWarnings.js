@@ -9,3 +9,14 @@ export function zipTiePhotoTeams(teams = [], references = [], sessionId = null) 
  }
  return warnings;
 }
+
+export function multiConfigurationTeams(teams = [], references = [], sessionId = null) {
+ const warnings = Object.fromEntries(teams.filter(team =>
+  (team.photoKeys || []).some(path => /\/configuration-[^/]+\.(?:jpe?g|webp)$/i.test(String(path))) ||
+  (team._pendingRobotPhotos || []).some(photo => photo.angle === 'configuration')
+ ).map(team => [team.number,true]));
+ for (const row of references) {
+  if ((row.session_id || null)===(sessionId || null) && row.payload?.recordType==='robot-reference' && row.payload.multiConfiguration===true && row.payload.team) warnings[row.payload.team]=true;
+ }
+ return warnings;
+}

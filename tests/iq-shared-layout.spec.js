@@ -12,7 +12,7 @@ ${detail}
 export {MatchList,MatchDetail};`,{loader:'jsx',format:'esm'}).code;
 async function mount(page,mode='detail',iq=true){
  await page.route('**/shared-layout.js',r=>r.fulfill({contentType:'text/javascript',body:compiled}));
- await page.route('**/iq-shared-test',r=>r.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module">import '/src/index.css';import '/@vite/client';import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(t)=>t;window.__vite_plugin_react_preamble_installed__=true;const React=(await import('/node_modules/.vite/deps/react.js')).default,DOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default,Views=await import('/shared-layout.js');window.logs=[];window.nav=[];const match={id:'1',phase:'qual',num:1,red:['7','9'],blue:${iq?'[]':"['18','24']"},redScore:42,blueScore:${iq?'null':'35'},field:'Main Field'},matches={'1':match,'2':{...match,id:'2',num:2}},props={zipTiePhotos:{'7':true,'999X':true},isIQ:${iq},match,matches,teamName:{'7':'Seven','9':'Nine'},teamRank:{'7':1},viols:[],fieldLog:[],query:'',setQuery:()=>{},onOpen:id=>window.nav.push(id),onNav:id=>window.nav.push(id),onLogTeam:n=>window.logs.push(n),onAddField:async e=>window.logs.push(e),onRemoveField:async()=>{}};DOM.createRoot(document.getElementById('root')).render(React.createElement(Views.${mode==='list'?'MatchList':'MatchDetail'},props));</script>`}));
+ await page.route('**/iq-shared-test',r=>r.fulfill({contentType:'text/html',body:`<meta name="viewport" content="width=device-width,initial-scale=1"><div id="root"></div><script type="module">import '/src/index.css';import '/@vite/client';import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(t)=>t;window.__vite_plugin_react_preamble_installed__=true;const React=(await import('/node_modules/.vite/deps/react.js')).default,DOM=(await import('/node_modules/.vite/deps/react-dom_client.js')).default,Views=await import('/shared-layout.js');window.logs=[];window.nav=[];const match={id:'1',phase:'qual',num:1,red:['7','9'],blue:${iq?'[]':"['18','24']"},redScore:42,blueScore:${iq?'null':'35'},field:'Main Field'},matches={'1':match,'2':{...match,id:'2',num:2}},props={configurationWarnings:{'9':true,'999X':true},zipTiePhotos:{'7':true,'999X':true},isIQ:${iq},match,matches,teamName:{'7':'Seven','9':'Nine'},teamRank:{'7':1},viols:[],fieldLog:[],query:'',setQuery:()=>{},onOpen:id=>window.nav.push(id),onNav:id=>window.nav.push(id),onLogTeam:n=>window.logs.push(n),onAddField:async e=>window.logs.push(e),onRemoveField:async()=>{}};DOM.createRoot(document.getElementById('root')).render(React.createElement(Views.${mode==='list'?'MatchList':'MatchDetail'},props));</script>`}));
  await page.goto('/iq-shared-test');
 }
 test('shared detail adapts IQ partners and score while removing scoring aid and V5 operations',async({page})=>{
@@ -43,4 +43,9 @@ test('zip-tie warning stays in opened match details and off the match list',asyn
  await mount(page,'detail',false);
  await expect(page.getByLabel('Starting configuration reminder for 7')).toBeVisible();
  await expect(page.getByLabel('Starting configuration reminder for 999X')).toHaveCount(0);
+});
+
+test('multiple-configuration reminder appears only inside the opened match for participating teams',async({page})=>{
+ await mount(page,'list',false);await expect(page.getByText(/multiple configurations or add-ons/)).toHaveCount(0);
+ await mount(page,'detail',false);await expect(page.getByLabel('Configuration reminder for 9')).toBeVisible();await expect(page.getByLabel('Configuration reminder for 999X')).toHaveCount(0);
 });
