@@ -36,9 +36,9 @@ test('V5 detail retains alliances and AWP controls',async({page})=>{
  await mount(page,'detail',false);await expect(page.getByText('Red alliance',{exact:true})).toBeVisible();await expect(page.getByText('Blue alliance',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'AWP check',exact:true})).toBeVisible();await expect(page.getByText('Teamwork partners',{exact:true})).toHaveCount(0);
 });
 
-test('zip-tie picture warning appears on match cards and detail for participating teams only',async({page})=>{
+test('zip-tie warning stays in opened match details and off the match list',async({page})=>{
  await mount(page,'list',false);
- await expect(page.getByText('7: starts with zip tie out / touching wall. Check starting configuration.').first()).toBeVisible();
+ await expect(page.getByText(/starts with zip tie/)).toHaveCount(0);
  await expect(page.getByText(/999X: starts with zip tie/)).toHaveCount(0);
  await mount(page,'detail',false);
  await expect(page.getByLabel('Starting configuration reminder for 7')).toBeVisible();

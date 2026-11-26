@@ -6088,7 +6088,6 @@ function MatchList({ zipTiePhotos = {}, fixedTab, remembered, isIQ=false, tmTime
                 {!emcee && vcount[m.id] ? <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-semibold border bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-600 shrink-0">{vcount[m.id]}</span> : null}
                 <ChevronRight size={16} className="text-slate-300 shrink-0" />
               </button>
-                {!emcee && [...new Set([...(m.red || []),...(m.blue || [])])].filter(number=>zipTiePhotos[number]).map(number=><span key={`ziptie-${number}`} className="block mt-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">{number}: starts with zip tie out / touching wall. Check starting configuration.</span>)}
             </li>
           ))}
         </ul>
