@@ -1876,6 +1876,8 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   // Shared event records: load schedules, teams, violations, and supporting data.
   const [matches, setMatches] = useState({}); // { [num]: {red:[], blue:[]} }
   const [operationRows,setOperationRows]=useState([]);
+  const [robotStartRows,setRobotStartRows]=useState([]);
+  const [robotStartError,setRobotStartError]=useState("");
   const [rules, setRules] = useState([]);      // [{ code, desc, category }]
   const [presence, setPresence] = useState([]); // [{ name, ... }] currently online
   const [refRoster, setRefRoster] = useState([]); // refs seen at this event, including offline
@@ -2576,6 +2578,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
   const refresh = useCallback(async () => {
     setSyncing(true);
     setAlliancesLoaded(false);
+      api.listRobotStartReferences(eventId,leagueSessionId).then(rows=>{setRobotStartRows(rows);setRobotStartError("");}).catch(()=>setRobotStartError('Robot starting-position notes could not be refreshed. Check Robots or reconnect.'));
     if (isVenueMode() && !isInspection) {
       api.listViolations(eventId).then(applyViolationList).catch(() => {});
       api.listFieldLog(eventId).then(setFieldLog).catch(() => {});
@@ -4101,7 +4104,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
     }
     return m;
   }, [viols]);
-  const zipTiePhotos = useMemo(()=>zipTiePhotoTeams(teams),[teams]);
+  const zipTiePhotos = useMemo(()=>zipTiePhotoTeams(teams,robotStartRows,leagueSessionId),[teams,robotStartRows,leagueSessionId]);
   const teamNameMap = useMemo(() => Object.fromEntries(teams.map((t) => [t.number, t.name])), [teams]);
   const teamRankMap = useMemo(() => Object.fromEntries(teams.filter((t) => t.rank != null).map((t) => [t.number, t.rank])), [teams]);
   const rankedTeamsForAlliance = useMemo(() =>
@@ -4792,6 +4795,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
           renderEntry={(entry,remove) => <ViolationCard key={entry.id} v={entry} showTeam canManage onDelete={remove} onOpenPhoto={setLightbox} />} />}
         {isInspection && photoRequirementsError && <p role="alert" className="mb-3 rounded-lg border border-amber-300 p-3 text-sm">{photoRequirementsError}</p>}
         {isInspection && programLookupError && <p role="alert" className="mb-3 rounded-lg border border-amber-300 p-3 text-sm">{programLookupError}</p>}
+        {view==='matches' && robotStartError && <p role="status" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100">{robotStartError}</p>}
         {!openTeam && !openMatch && !openRobot && <section className="refos-page-heading" aria-label="Workspace overview">
           <div>
           {view === "awp" && <button onClick={() => { if (commandCenterChildOpen) return returnToCommandCenter(); setView("matches"); setQuery(""); }} className="refos-back-button mb-3" aria-label={commandCenterChildOpen ? "Back to Command Center" : "Back to Matches"}>
@@ -4818,7 +4822,7 @@ function DivisionTracker({ view, setView, divisionId=0, divisionCatalog=[], divi
             onAddField={addFieldLog} onRemoveField={removeFieldLog} meName={meName} canDelete={adminUnlocked}
             onLogTeam={highlanderDemoLocked ? undefined : (n) => { const m = matches[openMatch]; setLogFor(n); setLogMatch(m ? { phase: m.phase, num: m.num } : null); }} onOpenPhoto={setLightbox} onDeleteViolation={deleteViolation} onEditViolation={setEditing} canManageViolation={(v) => !highlanderDemoLocked && (adminUnlocked || !!currentUserId && v.byUserId === currentUserId)} emcee={isEmcee} />
         ) : openRobot ? (
-          <RobotDetail key={`${eventId}:${leagueSessionId || ""}:${openRobot}`} eventId={eventId} sessionId={leagueSessionId} meName={meName} canEditAttendance={!isJudge&&!isEmcee&&!highlanderDemoLocked} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} canTakePhotos={!isEmcee} canDeletePhotos={!isInspection && !isEmcee} />
+          <RobotDetail key={`${eventId}:${leagueSessionId || ""}:${openRobot}`} eventId={eventId} sessionId={leagueSessionId} onReferenceSaved={row=>setRobotStartRows(current=>[...current.filter(item=>item.id!==row.id),row])} meName={meName} canEditAttendance={!isJudge&&!isEmcee&&!highlanderDemoLocked} requiredRobotPhotos={requiredRobotPhotos} isIQ={isIQ} team={teams.find((t) => t.number === openRobot)} onAddPhoto={addRobotPhoto} onRemovePhoto={removeRobotPhoto} onRemovePendingPhoto={removePendingRobotPhoto} onOpenPhoto={setLightbox} canTakePhotos={!isEmcee} canDeletePhotos={!isInspection && !isEmcee} />
         ) : view === "lost-found" ? (
           <LostFoundBoard embedded key={eventId} eventId={eventId} eventName={event?.name || "Current event"} meName={meName} canManage={adminUnlocked}/>
         ) : view === "matches" ? (
@@ -6359,7 +6363,7 @@ function MatchDetail({ zipTiePhotos = {}, isIQ=false, tmTimes=[], eventTimezone=
       </div>
 
       <div className="mb-3"><ScheduledMatchTime match={m} times={tmTimes} zone={eventTimezone}/></div>
-      {!emcee && [...new Set([...(m.red || []),...(m.blue || [])])].filter(number=>zipTiePhotos[number]).map(number=><aside key={`ziptie-${number}`} aria-label={`Starting configuration reminder for ${number}`} className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"><strong>{number}: starts with zip tie out / touching wall.</strong> Check the starting configuration and reference picture in Robots before the match.</aside>)}
+      {!emcee && [...new Set([...(m.red || []),...(m.blue || [])])].filter(number=>zipTiePhotos[number]).map(number=><aside key={`ziptie-${number}`} aria-label={`Starting configuration reminder for ${number}`} className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100"><strong>{number}: starts with zip tie out / touching wall.</strong> Check the starting configuration in Robots before the match; a reference picture may also be available.</aside>)}
       {/* Match readiness: one-glance operational status for the Head Ref. */}
       <div className="mb-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3">
         <div className="flex items-center justify-between gap-2 mb-2.5">
@@ -7061,7 +7065,7 @@ function LeagueEarlierRobotPhotos({ team, league, onOpenPhoto }) {
 }
 
 // Robot reference: manage required angles, extra photos, and inspection follow-ups.
-function RobotDetail({ eventId, sessionId, meName, canEditAttendance = false, requiredRobotPhotos, isIQ = false, team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, canTakePhotos = true, canDeletePhotos = true }) {
+function RobotDetail({ eventId, sessionId, onReferenceSaved, meName, canEditAttendance = false, requiredRobotPhotos, isIQ = false, team, onAddPhoto, onRemovePhoto, onRemovePendingPhoto, onOpenPhoto, canTakePhotos = true, canDeletePhotos = true }) {
   const league = useContext(LeagueUiContext);
   const [busy, setBusy] = useState(false);
   const [captureAngle, setCaptureAngle] = useState("");
@@ -7135,7 +7139,7 @@ function RobotDetail({ eventId, sessionId, meName, canEditAttendance = false, re
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{requiredCount ? "Required views are configured by the event Admin. Photo completion does not certify inspection." : "All views are optional for this event."}</p>
         {canTakePhotos && <button type="button" onClick={beginSequence} disabled={busy} className="mt-3 w-full rounded-lg bg-[#D7212B] px-3 py-3 text-base font-bold text-white disabled:bg-slate-400"><Camera size={18} className="inline mr-1.5"/>Take pictures in order</button>}
       </div>
-      <RobotReferenceOptions eventId={eventId} sessionId={sessionId} team={team.number} meName={meName} canEdit={canEditAttendance}/>
+      <RobotReferenceOptions onSaved={onReferenceSaved} eventId={eventId} sessionId={sessionId} team={team.number} meName={meName} canEdit={canEditAttendance}/>
       {league&&<LeagueRobotAttendance key={`${league.session.id}:${team.number}`} eventId={league.eventId} sessionId={league.session.id} sessionName={league.session.name} team={team.number} meName={meName} canEdit={canEditAttendance}/>}
       {canTakePhotos && <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; add(file); }} />}
       {canTakePhotos && sequenceIndex >= 0 && createPortal(

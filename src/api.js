@@ -2057,3 +2057,16 @@ export async function completeInitialAdminSetup(eventId,code) {
     throw new Error(message || "Could not save the admin code. Try again.");
   }
 }
+
+// Shared robot starting-position flags, filtered to the current event and league session.
+export async function listRobotStartReferences(eventId, sessionId = null) {
+ if (E2E_MOCK) return [];
+ const rows=[];
+ for(let offset=0;offset<20000;offset+=1000){
+  let query=supabase.from('event_operations').select('id,session_id,payload').eq('event_id',eventId).eq('kind','robot-change').eq('division_id',0).contains('payload',{recordType:'robot-reference'}).order('id').range(offset,offset+999);
+  query=sessionId?query.eq('session_id',sessionId):query.is('session_id',null);
+  const {data,error}=await query;if(error)throw error;
+  rows.push(...(data || []));if((data || []).length<1000)return rows;
+ }
+ throw new Error('Too many robot reference records.');
+}

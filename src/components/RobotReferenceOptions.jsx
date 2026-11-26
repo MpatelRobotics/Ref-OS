@@ -3,7 +3,7 @@ import {supabase} from '../supabaseClient';
 import {saveOperation} from '../eventOperations';
 
 // Team reference notes are shared across divisions, with separate records for league sessions.
-export default function RobotReferenceOptions({eventId,sessionId=null,team,canEdit=false,meName=''}) {
+export default function RobotReferenceOptions({eventId,sessionId=null,team,canEdit=false,meName='',onSaved}) {
  const [row,setRow]=useState(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const [pending,setPending]=useState(null);
  const saving=useRef(false),epoch=useRef(0);
@@ -26,7 +26,7 @@ export default function RobotReferenceOptions({eventId,sessionId=null,team,canEd
    const payload={...row?.payload,recordType:'robot-reference',team,status:'open',note:'Robot starting position and configuration reference',owner:meName,zipTieWall:Boolean(row?.payload?.zipTieWall),multiConfiguration:Boolean(row?.payload?.multiConfiguration),[key]:value};
    setPending(payload);
    const saved=await saveOperation(eventId,sessionId,0,'robot-change',payload,row);
-   setRow(saved);setNotice('Saved.');
+   setRow(saved);onSaved?.(saved);setNotice('Saved.');
   }catch(e){setError(e.message || 'Could not save. Reconnect and refresh before trying again.');}
   finally{saving.current=false;setBusy(false);setPending(null);}
  };
